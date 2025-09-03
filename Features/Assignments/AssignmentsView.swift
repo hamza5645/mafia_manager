@@ -4,27 +4,36 @@ struct AssignmentsView: View {
     @EnvironmentObject private var store: GameStore
     @State private var goToNight = false
 
+    // Column widths for tidy alignment
+    private let numberColWidth: CGFloat = 56
+    private let roleColWidth: CGFloat = 96
+
     var body: some View {
         List {
-            Section("Cheat Sheet") {
-                cheatSheet
-            }
-
-            Section("Public List (numbers only)") {
-                ForEach(store.state.players.sorted(by: { $0.number < $1.number })) { p in
-                    HStack {
+            Section {
+                ForEach(sortedPlayers) { p in
+                    HStack(spacing: 12) {
                         Text("#\(p.number)")
                             .monospacedDigit()
-                            .lineLimit(1)
-                            .frame(width: 44, alignment: .trailing)
+                            .frame(width: numberColWidth, alignment: .trailing)
+                            .accessibilityLabel("Number \(p.number)")
+
                         Text(p.name)
                             .lineLimit(1)
-                        Spacer()
-                        if !p.alive { Text("removed").foregroundStyle(.secondary) }
+                            .truncationMode(.tail)
+
+                        Spacer(minLength: 12)
+
+                        Text(p.role.displayName)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(roleColor(p.role))
+                            .frame(width: roleColWidth, alignment: .trailing)
                     }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
             }
         }
+        .listStyle(.plain) // Full-width table look
         .navigationTitle("Assignments")
         .background(
             NavigationLink(destination: NightPhaseView(), isActive: $goToNight) { EmptyView() }
@@ -45,34 +54,8 @@ struct AssignmentsView: View {
         }
     }
 
-    private var cheatSheet: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text("#").font(.subheadline).frame(width: 44, alignment: .trailing)
-                Text("Name").font(.subheadline)
-                Spacer()
-                Text("Role").font(.subheadline)
-            }
-            .foregroundStyle(.secondary)
-
-            ForEach(store.state.players.sorted(by: { $0.number < $1.number })) { p in
-                HStack {
-                    Text("#\(p.number)")
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .frame(width: 44, alignment: .trailing)
-                    Text(p.name)
-                        .lineLimit(1)
-                    Spacer()
-                    Text(p.role.displayName)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(roleColor(p.role))
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        .font(.body)
-        .padding(.vertical, 4)
+    private var sortedPlayers: [Player] {
+        store.state.players.sorted { $0.number < $1.number }
     }
 
     private func roleColor(_ role: Role) -> Color {
