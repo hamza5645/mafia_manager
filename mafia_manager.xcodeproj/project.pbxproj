@@ -6,17 +6,46 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB552E68EF3A002C5B31 /* buildServer.json */; };
+		2F3DBB752E68EF3A002C5B31 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB712E68EF3A002C5B31 /* README.md */; };
+		2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB592E68EF3A002C5B31 /* Player.swift */; };
+		2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */; };
+		2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */; };
+/* removed SeededRandom.swift in Sources */
+		2F3DBB7A2E68EF3A002C5B31 /* GameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */; };
+		2F3DBB7B2E68EF3A002C5B31 /* NightPhaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */; };
+		2F3DBB7C2E68EF3A002C5B31 /* DayAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB562E68EF3A002C5B31 /* DayAction.swift */; };
+		2F3DBB7D2E68EF3A002C5B31 /* AssignmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */; };
+		2F3DBB7E2E68EF3A002C5B31 /* GameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */; };
+		2F3DBB7F2E68EF3A002C5B31 /* MorningSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */; };
+		2F3DBB802E68EF3A002C5B31 /* NightAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB582E68EF3A002C5B31 /* NightAction.swift */; };
+		2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5A2E68EF3A002C5B31 /* Role.swift */; };
+		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
+		2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */; };
+		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		2F3DBB552E68EF3A002C5B31 /* buildServer.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = buildServer.json; sourceTree = "<group>"; };
+		2F3DBB562E68EF3A002C5B31 /* DayAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAction.swift; sourceTree = "<group>"; };
+		2F3DBB572E68EF3A002C5B31 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
+		2F3DBB582E68EF3A002C5B31 /* NightAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightAction.swift; sourceTree = "<group>"; };
+		2F3DBB592E68EF3A002C5B31 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		2F3DBB5A2E68EF3A002C5B31 /* Role.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Role.swift; sourceTree = "<group>"; };
+		2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+/* removed file reference SeededRandom.swift */
+		2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStore.swift; sourceTree = "<group>"; };
+		2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentsView.swift; sourceTree = "<group>"; };
+		2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayManagementView.swift; sourceTree = "<group>"; };
+		2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverView.swift; sourceTree = "<group>"; };
+		2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorningSummaryView.swift; sourceTree = "<group>"; };
+		2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightPhaseView.swift; sourceTree = "<group>"; };
+		2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
+		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		2FF7CF212E68E6E70023D42B /* mafia_manager */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = mafia_manager;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		2FF7CF1C2E68E6E70023D42B /* Frameworks */ = {
@@ -29,10 +58,114 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2F3DBB5B2E68EF3A002C5B31 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB562E68EF3A002C5B31 /* DayAction.swift */,
+				2F3DBB572E68EF3A002C5B31 /* GameState.swift */,
+				2F3DBB582E68EF3A002C5B31 /* NightAction.swift */,
+				2F3DBB592E68EF3A002C5B31 /* Player.swift */,
+				2F3DBB5A2E68EF3A002C5B31 /* Role.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		2F3DBB5E2E68EF3A002C5B31 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */,
+                /* SeededRandom.swift removed */
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		2F3DBB602E68EF3A002C5B31 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		2F3DBB612E68EF3A002C5B31 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB5B2E68EF3A002C5B31 /* Models */,
+				2F3DBB5E2E68EF3A002C5B31 /* Services */,
+				2F3DBB602E68EF3A002C5B31 /* Store */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		2F3DBB632E68EF3A002C5B31 /* Assignments */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */,
+			);
+			path = Assignments;
+			sourceTree = "<group>";
+		};
+		2F3DBB652E68EF3A002C5B31 /* Day */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */,
+			);
+			path = Day;
+			sourceTree = "<group>";
+		};
+		2F3DBB672E68EF3A002C5B31 /* GameOver */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */,
+			);
+			path = GameOver;
+			sourceTree = "<group>";
+		};
+		2F3DBB692E68EF3A002C5B31 /* Morning */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */,
+			);
+			path = Morning;
+			sourceTree = "<group>";
+		};
+		2F3DBB6B2E68EF3A002C5B31 /* Night */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */,
+			);
+			path = Night;
+			sourceTree = "<group>";
+		};
+		2F3DBB6D2E68EF3A002C5B31 /* Setup */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */,
+			);
+			path = Setup;
+			sourceTree = "<group>";
+		};
+		2F3DBB6E2E68EF3A002C5B31 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB632E68EF3A002C5B31 /* Assignments */,
+				2F3DBB652E68EF3A002C5B31 /* Day */,
+				2F3DBB672E68EF3A002C5B31 /* GameOver */,
+				2F3DBB692E68EF3A002C5B31 /* Morning */,
+				2F3DBB6B2E68EF3A002C5B31 /* Night */,
+				2F3DBB6D2E68EF3A002C5B31 /* Setup */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
 		2FF7CF162E68E6E70023D42B = {
 			isa = PBXGroup;
 			children = (
-				2FF7CF212E68E6E70023D42B /* mafia_manager */,
+				2F3DBB552E68EF3A002C5B31 /* buildServer.json */,
+				2F3DBB612E68EF3A002C5B31 /* Core */,
+				2F3DBB6E2E68EF3A002C5B31 /* Features */,
+				2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */,
+				2F3DBB712E68EF3A002C5B31 /* README.md */,
 				2FF7CF202E68E6E70023D42B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,9 +192,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				2FF7CF212E68E6E70023D42B /* mafia_manager */,
 			);
 			name = mafia_manager;
 			packageProductDependencies = (
@@ -109,6 +239,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */,
+				2F3DBB752E68EF3A002C5B31 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +251,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */,
+				2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */,
+				2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */,
+                /* SeededRandom.swift in Sources removed */
+				2F3DBB7A2E68EF3A002C5B31 /* GameOverView.swift in Sources */,
+				2F3DBB7B2E68EF3A002C5B31 /* NightPhaseView.swift in Sources */,
+				2F3DBB7C2E68EF3A002C5B31 /* DayAction.swift in Sources */,
+				2F3DBB7D2E68EF3A002C5B31 /* AssignmentsView.swift in Sources */,
+				2F3DBB7E2E68EF3A002C5B31 /* GameStore.swift in Sources */,
+				2F3DBB7F2E68EF3A002C5B31 /* MorningSummaryView.swift in Sources */,
+				2F3DBB802E68EF3A002C5B31 /* NightAction.swift in Sources */,
+				2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */,
+				2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */,
+				2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */,
+				2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,7 +413,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Hamza.mafia-manager";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.hamza.mafia-manager";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -297,7 +444,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Hamza.mafia-manager";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.hamza.mafia-manager";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
