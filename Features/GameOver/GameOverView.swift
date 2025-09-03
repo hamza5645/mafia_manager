@@ -20,11 +20,12 @@ struct GameOverView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                HStack {
+                HStack(spacing: 12) {
                     Button("New Game") { store.resetAll() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(GlassButtonStyle())
                     Spacer()
                     ShareButton(text: store.exportLogText(includeNames: includeNames))
+                        .buttonStyle(GlassButtonStyle())
                 }
             }
             .padding()
@@ -70,4 +71,29 @@ private struct ActivityView: UIViewControllerRepresentable {
         UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Local glass style
+private struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
+                    .blendMode(.plusLighter)
+                    .opacity(configuration.isPressed ? 0.35 : 1)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
+    }
 }

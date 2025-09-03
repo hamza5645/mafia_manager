@@ -3,9 +3,9 @@ mafia_manager (SwiftUI, iOS 16+)
 
 An offline assistant for the referee/manager of the party game Mafia. Built with Swift 5.10+, SwiftUI, MVVM, and no third‑party dependencies. State persists to a single JSON file in Application Support.
 
-Targets and identifiers
-- Bundle Identifier: `com.example.mafia_manager` (placeholder — change in Xcode if desired).
-- Minimum iOS: 16.0.
+ Targets and identifiers
+ - Bundle Identifier: `com.example.mafia_manager` (placeholder — change in Xcode if desired).
+ - Minimum iOS: 26.0 (uses iOS 26 liquid glass UI).
 
 Features
 - Setup: enter 5–19 unique player names; numbers are unique random values from 1–99.

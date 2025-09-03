@@ -63,7 +63,7 @@ struct SetupView: View {
                 Button("Assign Numbers & Roles") {
                     store.assignNumbersAndRoles(names: validInput)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(GlassButtonStyle())
                 .disabled(!isValid)
 
                 if store.hasSavedGame {
@@ -107,5 +107,30 @@ struct SetupView: View {
         guard trimmed.count >= minPlayers && trimmed.count <= maxPlayers else { return false }
         let set = Set(trimmed.map { $0.lowercased() })
         return set.count == trimmed.count
+    }
+}
+
+// MARK: - Local glass style
+private struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
+                    .blendMode(.plusLighter)
+                    .opacity(configuration.isPressed ? 0.35 : 1)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
     }
 }

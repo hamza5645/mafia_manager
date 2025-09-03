@@ -47,8 +47,9 @@ struct DayManagementView: View {
                 NavigationLink(destination: GameOverView(), isActive: $goToGameOver) { EmptyView() }.hidden()
             }
         )
-        .toolbar {
-            ToolbarItem(placement: .bottomBar) {
+        .toolbar { }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
                 Button {
                     store.applyDayRemovals(removed: removedToday, notes: notes)
                     if store.state.isGameOver {
@@ -59,9 +60,13 @@ struct DayManagementView: View {
                     }
                 } label: {
                     Text("Lock Day \(store.currentDayIndex + 1) & Start Night \(store.currentNightIndex)")
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(GlassButtonStyle())
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.clear)
         }
     }
 }
@@ -79,5 +84,30 @@ struct PlayerChip: View {
             Text(player.name)
             Spacer()
         }
+    }
+}
+
+// MARK: - Local glass style
+private struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
+                    .blendMode(.plusLighter)
+                    .opacity(configuration.isPressed ? 0.35 : 1)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
     }
 }

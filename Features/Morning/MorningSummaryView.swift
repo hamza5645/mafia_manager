@@ -35,21 +35,6 @@ struct MorningSummaryView: View {
             }
 
             Spacer()
-
-            HStack {
-                if store.state.isGameOver {
-                    NavigationLink(destination: GameOverView()) {
-                        Text("View Result")
-                    }
-                    .buttonStyle(.borderedProminent)
-                } else {
-                    NavigationLink(isActive: $goToDay) { DayManagementView() } label: { EmptyView() }
-                    Button { goToDay = true } label: {
-                        Text("Continue to Day \(store.currentDayIndex + 1) (Mark Removals)")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
         }
         .padding()
         .navigationTitle("Morning Summary")
@@ -60,9 +45,31 @@ struct MorningSummaryView: View {
             }
         }
         .background(
-            NavigationLink(destination: GameOverView(), isActive: $goToGameOver) { EmptyView() }
-                .hidden()
+            Group {
+                NavigationLink(destination: DayManagementView(), isActive: $goToDay) { EmptyView() }.hidden()
+                NavigationLink(destination: GameOverView(), isActive: $goToGameOver) { EmptyView() }.hidden()
+            }
         )
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
+                if store.state.isGameOver {
+                    Button { goToGameOver = true } label: {
+                        Text("View Result")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(GlassButtonStyle())
+                } else {
+                    Button { goToDay = true } label: {
+                        Text("Continue to Day \(store.currentDayIndex + 1) (Mark Removals)")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(GlassButtonStyle())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.clear)
+        }
     }
 
     private func summaryRow(title: String, value: String) -> some View {
@@ -71,5 +78,30 @@ struct MorningSummaryView: View {
             Spacer()
             Text(value)
         }
+    }
+}
+
+// MARK: - Local glass style
+private struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
+                    .blendMode(.plusLighter)
+                    .opacity(configuration.isPressed ? 0.35 : 1)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
     }
 }

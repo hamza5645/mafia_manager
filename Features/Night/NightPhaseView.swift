@@ -42,15 +42,22 @@ struct NightPhaseView: View {
             NavigationLink(destination: MorningSummaryView(), isActive: $goToMorning) { EmptyView() }
                 .hidden()
         )
-        .toolbar {
-            ToolbarItem(placement: .bottomBar) {
+        .toolbar { }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
                 Button {
                     store.endNight(mafiaTargetID: mafiaTargetID, inspectorCheckedID: inspectorID, doctorProtectedID: doctorID)
                     goToMorning = true
-                } label: { Text("End Night") }
-                .buttonStyle(.borderedProminent)
+                } label: {
+                    Text("End Night")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(GlassButtonStyle())
                 .disabled(mafiaTargetID == nil)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.clear)
         }
     }
 }
@@ -128,5 +135,30 @@ private struct SelectionCard: View {
         case .inspector: return .blue
         case .citizen: return .gray
         }
+    }
+}
+
+// MARK: - Local glass style
+private struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(Capsule().fill(.ultraThinMaterial))
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
+                    .blendMode(.plusLighter)
+                    .opacity(configuration.isPressed ? 0.35 : 1)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
     }
 }
