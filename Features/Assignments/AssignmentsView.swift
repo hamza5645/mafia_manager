@@ -40,17 +40,25 @@ struct AssignmentsView: View {
                 .hidden()
         )
         .toolbar {
-            ToolbarItem(placement: .bottomBar) {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(role: .destructive) { store.resetAll() } label: { Text("Reset") }
+            }
+        }
+        // Use a safe-area inset CTA with a custom glass style to avoid
+        // toolbar rendering artifacts on newer iOS "liquid" design.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
                 Button {
                     goToNight = true
                 } label: {
                     Text(store.currentNightIndex == 1 ? "Start Night 1" : "Continue Night \(store.currentNightIndex)")
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(GlassButtonStyle())
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(role: .destructive) { store.resetAll() } label: { Text("Reset") }
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.clear)
         }
     }
 
@@ -65,5 +73,35 @@ struct AssignmentsView: View {
         case .inspector: return .blue
         case .citizen: return .gray
         }
+    }
+}
+
+// MARK: - Glass Button Style (Liquid-like)
+private struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(Color.accentColor)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .background(
+                // Translucent, blurred material encapsulated in a capsule
+                Capsule().fill(.ultraThinMaterial)
+            )
+            .overlay(
+                // Subtle inner highlight
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
+                    .blendMode(.plusLighter)
+                    .opacity(configuration.isPressed ? 0.35 : 1)
+            )
+            .overlay(
+                // Accent-tinted rim for the "liquid" sheen
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
     }
 }
