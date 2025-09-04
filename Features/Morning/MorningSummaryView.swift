@@ -16,17 +16,23 @@ struct MorningSummaryView: View {
                         if let t = store.number(for: night.mafiaTargetPlayerID) {
                             summaryRow(title: "Targeted", value: "#\(t)")
                         }
-                        let killed = night.resultingDeaths.compactMap { store.number(for: $0) }.sorted()
-                        summaryRow(title: "Killed tonight", value: killed.isEmpty ? "—" : killed.map { "#\($0)" }.joined(separator: ", "))
-                        if let n = store.number(for: night.inspectorCheckedPlayerID) {
-                            let ident = night.inspectorResultRole?.displayName ?? (night.inspectorResultIsMafia == true ? "Mafia" : (night.inspectorResultIsMafia == false ? "Not Mafia" : "—"))
-                            summaryRow(title: "Inspector checked", value: "#\(n) → \(ident)")
+                        // Removed "Killed tonight" row; deaths are resolved during Day
+                        // Inspector: show inspector number(s) and the number inspected
+                        let inspectorNumbers = store.state.players.filter { $0.role == .inspector }.map { $0.number }.sorted()
+                        let inspectorLabel = inspectorNumbers.isEmpty ? "—" : inspectorNumbers.map { "#\($0)" }.joined(separator: ", ")
+                        if let inspectedNum = store.number(for: night.inspectorCheckedPlayerID) {
+                            summaryRow(title: "Inspector", value: "\(inspectorLabel) → #\(inspectedNum)")
+                        } else {
+                            summaryRow(title: "Inspector", value: inspectorLabel)
                         }
 
-                        if store.state.players.contains(where: { $0.role == .doctor && $0.alive }) {
-                            if let n = store.number(for: night.doctorProtectedPlayerID) {
-                                summaryRow(title: "Doctor protected", value: "#\(n)")
-                            }
+                        // Doctor: show doctor number(s) and the number protected
+                        let doctorNumbers = store.state.players.filter { $0.role == .doctor }.map { $0.number }.sorted()
+                        let doctorLabel = doctorNumbers.isEmpty ? "—" : doctorNumbers.map { "#\($0)" }.joined(separator: ", ")
+                        if let protectedNum = store.number(for: night.doctorProtectedPlayerID) {
+                            summaryRow(title: "Doctor", value: "\(doctorLabel) → #\(protectedNum)")
+                        } else {
+                            summaryRow(title: "Doctor", value: doctorLabel)
                         }
                     }
                 } label: {

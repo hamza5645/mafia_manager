@@ -129,16 +129,14 @@ final class GameStore: ObservableObject {
             }
         }
 
+        // Do not auto-remove the mafia target at night.
+        // We only log the target; actual removals are handled manually during the Day phase.
+        // Still enforce that mafia cannot target mafia; doctor protection is logged but has no removal effect here.
         if let targetID = mafiaTargetID,
            let target = player(by: targetID),
-           target.role != .mafia, // mafia cannot kill mafia
+           target.role != .mafia,
            target.alive {
-            if doctorProtectedID == targetID {
-                // no death
-            } else if let targetIndex = state.players.firstIndex(where: { $0.id == targetID }) {
-                state.players[targetIndex].alive = false
-                resulting.append(targetID)
-            }
+            // Intentionally no state.players[..].alive = false and no resulting death.
         }
 
         let mafiaNumbers = state.players.filter { $0.role == .mafia }.map { $0.number }.sorted()
