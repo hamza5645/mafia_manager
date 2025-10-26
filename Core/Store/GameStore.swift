@@ -260,7 +260,7 @@ final class GameStore: ObservableObject {
             if state.winner == .mafia {
                 winnerText = "Mafia"
             } else {
-                winnerText = "Villagers"
+                winnerText = "Citizens"
             }
             lines.append("Winner: \(winnerText)")
         }

@@ -24,6 +24,8 @@
 		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
 		2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */; };
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
+        AA0000032E69000000000003 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000012E69000000000001 /* DesignSystem.swift */; };
+        AA0000062E69010000000006 /* RoleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000052E69010000000005 /* RoleStyle.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 		2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
 		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        AA0000012E69000000000001 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+        AA0000052E69010000000005 /* RoleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleStyle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,10 +97,20 @@
 				2F3DBB5B2E68EF3A002C5B31 /* Models */,
 				2F3DBB5E2E68EF3A002C5B31 /* Services */,
 				2F3DBB602E68EF3A002C5B31 /* Store */,
+                AA0000022E69000000000002 /* UI */,
 			);
 			path = Core;
 			sourceTree = "<group>";
 		};
+        AA0000022E69000000000002 /* UI */ = {
+            isa = PBXGroup;
+            children = (
+                AA0000012E69000000000001 /* DesignSystem.swift */,
+                AA0000052E69010000000005 /* RoleStyle.swift */,
+            );
+            path = UI;
+            sourceTree = "<group>";
+        };
 		2F3DBB632E68EF3A002C5B31 /* Assignments */ = {
 			isa = PBXGroup;
 			children = (
@@ -265,8 +279,10 @@
 				2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */,
 				2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */,
 				2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */,
-				2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
-			);
+                2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
+                AA0000032E69000000000003 /* DesignSystem.swift in Sources */,
+                AA0000062E69010000000006 /* RoleStyle.swift in Sources */,
+            );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

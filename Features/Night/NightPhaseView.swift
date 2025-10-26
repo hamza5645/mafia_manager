@@ -8,34 +8,60 @@ struct NightPhaseView: View {
     @State private var goToMorning = false
 
     var body: some View {
-        List {
-            SelectionCard(
-                title: "1) Mafia killed",
-                selectionID: $mafiaTargetID,
-                players: store.state.players,
-                help: "Required.",
-                filter: { p in p.role != .mafia && p.alive }
-            )
-
-            SelectionCard(
-                title: "2) Inspector checked",
-                selectionID: $inspectorID,
-                players: store.state.players,
-                help: "Shows full identity (role).",
-                filter: { p in p.role != .inspector },
-                resultKind: .inspector
-            )
-
-            if store.state.players.contains(where: { $0.role == .doctor && $0.alive }) {
+        ScrollView {
+            VStack(spacing: 12) {
                 SelectionCard(
-                    title: "3) Doctor protected",
-                    selectionID: $doctorID,
+                    title: "Mafia Action: Choose a Target",
+                    selectionID: $mafiaTargetID,
                     players: store.state.players,
-                    help: "Can protect self.",
-                    filter: { p in p.alive },
-                    resultKind: .none
+                    help: "Required",
+                    filter: { p in p.role != .mafia && p.alive },
+                    accent: Design.Colors.dangerRed,
+                    icon: "flame.fill"
                 )
+                .cardStyle()
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.Radii.card).stroke(Design.Colors.dangerRed, lineWidth: 1.4)
+                        .shadow(color: Design.Colors.dangerRed.opacity(0.45), radius: 8)
+                )
+
+                SelectionCard(
+                    title: "Inspector Action: Check Identity",
+                    selectionID: $inspectorID,
+                    players: store.state.players,
+                    help: "Shows full role",
+                    filter: { p in p.role != .inspector },
+                    resultKind: .inspector,
+                    accent: Design.Colors.actionBlue,
+                    icon: "eye.fill"
+                )
+                .cardStyle()
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.Radii.card).stroke(Design.Colors.actionBlue, lineWidth: 1.4)
+                        .shadow(color: Design.Colors.actionBlue.opacity(0.45), radius: 8)
+                )
+
+                if store.state.players.contains(where: { $0.role == .doctor && $0.alive }) {
+                    SelectionCard(
+                        title: "Doctor Action: Protect Player",
+                        selectionID: $doctorID,
+                        players: store.state.players,
+                        help: "Can protect self",
+                        filter: { p in p.alive },
+                        resultKind: .none,
+                        accent: Design.Colors.successGreen,
+                        icon: "cross.case.fill"
+                    )
+                    .cardStyle()
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Design.Radii.card).stroke(Design.Colors.successGreen, lineWidth: 1.4)
+                            .shadow(color: Design.Colors.successGreen.opacity(0.45), radius: 8)
+                    )
+                }
+                Spacer(minLength: 8)
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
         .navigationTitle("Night \(store.currentNightIndex)")
         .background(
@@ -49,10 +75,10 @@ struct NightPhaseView: View {
                     store.endNight(mafiaTargetID: mafiaTargetID, inspectorCheckedID: inspectorID, doctorProtectedID: doctorID)
                     goToMorning = true
                 } label: {
-                    Text("End Night")
+                    Text("End Night & Reveal")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(GlassButtonStyle())
+                .buttonStyle(CTAButtonStyle(kind: .primary))
                 .disabled(mafiaTargetID == nil)
             }
             .padding(.horizontal, 16)
@@ -70,6 +96,8 @@ private struct SelectionCard: View {
     var filter: (Player) -> Bool = { _ in true }
     enum ResultKind { case none, inspector }
     var resultKind: ResultKind = .none
+    var accent: Color = Design.Colors.surface2
+    var icon: String? = nil
     @State private var query: String = ""
 
     var filtered: [Player] {
@@ -80,13 +108,32 @@ private struct SelectionCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
-            Text(help).font(.footnote).foregroundStyle(.secondary)
-            TextField("Search by name or #", text: $query)
-                .textInputAutocapitalization(.none)
-                .disableAutocorrection(true)
-                .textFieldStyle(.roundedBorder)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                if let icon {
+                    ZStack {
+                        Circle().fill(accent.opacity(0.22))
+                        Image(systemName: icon).foregroundStyle(accent)
+                    }
+                    .frame(width: 28, height: 28)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    Text(help)
+                        .font(.footnote)
+                        .foregroundStyle(Design.Colors.textSecondary)
+                }
+            }
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(Design.Colors.textSecondary)
+                TextField("Search by name or #", text: $query)
+                    .textInputAutocapitalization(.none)
+                    .disableAutocorrection(true)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(Design.Colors.surface2)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
                     ForEach(filtered) { p in
@@ -96,11 +143,14 @@ private struct SelectionCard: View {
                             HStack(spacing: 6) {
                                 Text("#\(p.number)").bold()
                                 Text(p.name)
-                                if !p.alive { Text("✖").foregroundStyle(.secondary) }
+                                if !p.alive { Text("✖").foregroundStyle(Design.Colors.textSecondary) }
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(selectionID == p.id ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.15))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(selectionID == p.id ? Design.Colors.actionBlue.opacity(0.18) : Design.Colors.surface2)
+                            .overlay(
+                                Capsule().strokeBorder(selectionID == p.id ? Design.Colors.actionBlue : Design.Colors.stroke, lineWidth: 1)
+                            )
                             .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -116,49 +166,19 @@ private struct SelectionCard: View {
                     case .none:
                         EmptyView()
                     case .inspector:
-                        Text("Identity: \(p.role.displayName)")
-                            .font(.subheadline.bold())
-                            .foregroundStyle(roleColor(p.role))
+                        HStack(spacing: 8) {
+                            Text("Result:")
+                            Chip(text: p.role.displayName.uppercased(), style: .outline(p.role.accentColor))
+                        }
+                        .font(.subheadline.bold())
                     }
                 }
             } else {
-                Text("No selection yet").font(.subheadline).foregroundStyle(.secondary)
+                Text("No selection yet").font(.subheadline).foregroundStyle(Design.Colors.textSecondary)
             }
         }
         .padding(.vertical, 6)
     }
-
-    private func roleColor(_ role: Role) -> Color {
-        switch role {
-        case .mafia: return .red
-        case .doctor: return .green
-        case .inspector: return .blue
-        case .citizen: return .gray
-        }
-    }
 }
 
-// MARK: - Local glass style
-private struct GlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(Color.accentColor)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 20)
-            .background(Capsule().fill(.ultraThinMaterial))
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
-                    .blendMode(.plusLighter)
-                    .opacity(configuration.isPressed ? 0.35 : 1)
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
-    }
-}
+// Removed local GlassButtonStyle; using global CTAButtonStyle instead.

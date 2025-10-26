@@ -8,41 +8,43 @@ struct MorningSummaryView: View {
     private var lastNight: NightAction? { store.state.nightHistory.last }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             if let night = lastNight {
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        summaryRow(title: "Mafia", value: night.mafiaNumbers.map { "#\($0)" }.joined(separator: ", "))
-                        if let t = store.number(for: night.mafiaTargetPlayerID) {
-                            summaryRow(title: "Targeted", value: "#\(t)")
-                        }
-                        // Removed "Killed tonight" row; deaths are resolved during Day
-                        // Inspector: show inspector number(s) and the number inspected
-                        let inspectorNumbers = store.state.players.filter { $0.role == .inspector }.map { $0.number }.sorted()
-                        let inspectorLabel = inspectorNumbers.isEmpty ? "—" : inspectorNumbers.map { "#\($0)" }.joined(separator: ", ")
-                        if let inspectedNum = store.number(for: night.inspectorCheckedPlayerID) {
-                            summaryRow(title: "Inspector", value: "\(inspectorLabel) → #\(inspectedNum)")
-                        } else {
-                            summaryRow(title: "Inspector", value: inspectorLabel)
-                        }
-
-                        // Doctor: show doctor number(s) and the number protected
-                        let doctorNumbers = store.state.players.filter { $0.role == .doctor }.map { $0.number }.sorted()
-                        let doctorLabel = doctorNumbers.isEmpty ? "—" : doctorNumbers.map { "#\($0)" }.joined(separator: ", ")
-                        if let protectedNum = store.number(for: night.doctorProtectedPlayerID) {
-                            summaryRow(title: "Doctor", value: "\(doctorLabel) → #\(protectedNum)")
-                        } else {
-                            summaryRow(title: "Doctor", value: doctorLabel)
-                        }
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "moon.stars.fill").foregroundStyle(Design.Colors.brandGold)
+                        Text("Night \(night.nightIndex) Summary").font(.headline)
                     }
-                } label: {
-                    Text("Night \(night.nightIndex) Summary")
+                    summaryRow(title: "Mafia", value: night.mafiaNumbers.map { "#\($0)" }.joined(separator: ", "))
+                    if let t = store.number(for: night.mafiaTargetPlayerID) {
+                        summaryRow(title: "Targeted", value: "#\(t)")
+                    }
+                    // Removed "Killed tonight" row; deaths are resolved during Day
+                    // Inspector: show inspector number(s) and the number inspected
+                    let inspectorNumbers = store.state.players.filter { $0.role == .inspector }.map { $0.number }.sorted()
+                    let inspectorLabel = inspectorNumbers.isEmpty ? "—" : inspectorNumbers.map { "#\($0)" }.joined(separator: ", ")
+                    if let inspectedNum = store.number(for: night.inspectorCheckedPlayerID) {
+                        summaryRow(title: "Inspector", value: "\(inspectorLabel) → #\(inspectedNum)")
+                    } else {
+                        summaryRow(title: "Inspector", value: inspectorLabel)
+                    }
+
+                    // Doctor: show doctor number(s) and the number protected
+                    let doctorNumbers = store.state.players.filter { $0.role == .doctor }.map { $0.number }.sorted()
+                    let doctorLabel = doctorNumbers.isEmpty ? "—" : doctorNumbers.map { "#\($0)" }.joined(separator: ", ")
+                    if let protectedNum = store.number(for: night.doctorProtectedPlayerID) {
+                        summaryRow(title: "Doctor", value: "\(doctorLabel) → #\(protectedNum)")
+                    } else {
+                        summaryRow(title: "Doctor", value: doctorLabel)
+                    }
                 }
+                .cardStyle()
             }
 
             Spacer()
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
         .navigationTitle("Morning Summary")
         .onAppear {
             if store.state.isGameOver {
@@ -63,13 +65,13 @@ struct MorningSummaryView: View {
                         Text("View Result")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(GlassButtonStyle())
+                    .buttonStyle(CTAButtonStyle(kind: .primary))
                 } else {
                     Button { goToDay = true } label: {
                         Text("Continue to Day \(store.currentDayIndex + 1) (Mark Removals)")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(GlassButtonStyle())
+                    .buttonStyle(CTAButtonStyle(kind: .primary))
                 }
             }
             .padding(.horizontal, 16)
@@ -87,27 +89,4 @@ struct MorningSummaryView: View {
     }
 }
 
-// MARK: - Local glass style
-private struct GlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(Color.accentColor)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 20)
-            .background(Capsule().fill(.ultraThinMaterial))
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
-                    .blendMode(.plusLighter)
-                    .opacity(configuration.isPressed ? 0.35 : 1)
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
-    }
-}
+// Removed local GlassButtonStyle; using global CTAButtonStyle instead.

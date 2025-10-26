@@ -8,36 +8,64 @@ struct DayManagementView: View {
     @State private var goToGameOver = false
 
     var body: some View {
-        List {
-            Section("Alive Players") {
-                ForEach(store.alivePlayers.sorted(by: { $0.number < $1.number })) { p in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            PlayerChip(player: p)
-                            Spacer()
-                            Toggle("Removed today", isOn: Binding(
-                                get: { removedToday[p.id] == true },
-                                set: { removedToday[p.id] = $0 }
-                            ))
-                            .labelsHidden()
-                        }
-                        if removedToday[p.id] == true {
-                            TextField("Optional removal note", text: Binding(
-                                get: { notes[p.id, default: ""] },
-                                set: { notes[p.id] = $0 }
-                            ))
-                            .textInputAutocapitalization(.sentences)
-                        }
-                    }
-                    .padding(.vertical, 4)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("DAY \(store.currentDayIndex + 1)")
+                        .font(.system(size: 26, weight: .heavy))
+                        .kerning(1)
+                    Text("Discuss and vote on who to eliminate.")
+                        .foregroundStyle(Design.Colors.textSecondary)
                 }
-            }
+                .padding(.horizontal)
 
-            Section("Counts") {
-                let mafia = store.aliveMafia.count
-                let nonMafia = store.aliveNonMafia.count
-                HStack { Text("Mafia:"); Spacer(); Text("\(mafia)") }
-                HStack { Text("Non-Mafia:"); Spacer(); Text("\(nonMafia)") }
+                // Counts chips
+                HStack(spacing: 8) {
+                    Chip(text: "Mafia: \(store.aliveMafia.count)", style: .filled(Design.Colors.dangerRed))
+                    Chip(text: "Others: \(store.aliveNonMafia.count)", style: .filled(Design.Colors.textSecondary))
+                    Spacer()
+                }
+                .padding(.horizontal)
+
+                VStack(spacing: 10) {
+                    ForEach(store.alivePlayers.sorted(by: { $0.number < $1.number })) { p in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) {
+                                Chip(text: "#\(p.number)", style: .outline(Design.Colors.textSecondary))
+                                Text(p.name).font(.headline)
+                                Spacer()
+                                if removedToday[p.id] == true {
+                                    Button("Undo") { removedToday[p.id] = false }
+                                        .buttonStyle(CTAButtonStyle(kind: .secondary))
+                                        .frame(width: 110)
+                                } else {
+                                    Button("Vote Out") { removedToday[p.id] = true }
+                                        .buttonStyle(CTAButtonStyle(kind: .danger))
+                                        .frame(width: 110)
+                                }
+                            }
+                            if removedToday[p.id] == true {
+                                HStack {
+                                    Image(systemName: "text.quote")
+                                        .foregroundStyle(Design.Colors.textSecondary)
+                                    TextField("Optional removal note", text: Binding(
+                                        get: { notes[p.id, default: ""] },
+                                        set: { notes[p.id] = $0 }
+                                    ))
+                                    .textInputAutocapitalization(.sentences)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(Design.Colors.surface2)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                        }
+                        .cardStyle()
+                    }
+                }
+                .padding(.horizontal)
+
+                Spacer(minLength: 8)
             }
         }
         .navigationTitle("Day \(store.currentDayIndex + 1)")
@@ -59,10 +87,10 @@ struct DayManagementView: View {
                         goToNextNight = true
                     }
                 } label: {
-                    Text("Lock Day \(store.currentDayIndex + 1) & Start Night \(store.currentNightIndex)")
+                    Text("Lock Votes")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(GlassButtonStyle())
+                .buttonStyle(CTAButtonStyle(kind: .primary))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -87,27 +115,4 @@ struct PlayerChip: View {
     }
 }
 
-// MARK: - Local glass style
-private struct GlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(Color.accentColor)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 20)
-            .background(Capsule().fill(.ultraThinMaterial))
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
-                    .blendMode(.plusLighter)
-                    .opacity(configuration.isPressed ? 0.35 : 1)
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
-    }
-}
+// Removed local GlassButtonStyle; using global CTAButtonStyle instead.

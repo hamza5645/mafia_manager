@@ -8,6 +8,8 @@ struct mafia_managerApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .tint(Design.Colors.actionBlue)
+                .preferredColorScheme(.dark)
         }
     }
 }
@@ -25,6 +27,6 @@ struct RootView: View {
                 AssignmentsView()
             }
         }
+        .background(Design.Colors.surface0.ignoresSafeArea())
     }
 }
-

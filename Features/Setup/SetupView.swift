@@ -8,33 +8,52 @@ struct SetupView: View {
     private let maxPlayers = 19
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Title
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("MAFIA MANAGER")
+                        .font(.system(size: 28, weight: .heavy))
+                        .kerning(1.2)
+                        .foregroundStyle(Design.Colors.textPrimary)
+                    Text("Enter player names")
+                        .foregroundStyle(Design.Colors.textSecondary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
 
-            Form {
-                Section("Players") {
-                    Text("Enter between \(minPlayers) and \(maxPlayers) names. Names must be unique.")
-                }.textCase(nil)
-                
-                Section("Player Names") {
+                // Names card
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Between \(minPlayers) and \(maxPlayers) players. Names must be unique.")
+                        .font(.footnote)
+                        .foregroundStyle(Design.Colors.textSecondary)
+
                     ForEach(names.indices, id: \.self) { idx in
-                        HStack {
-                            Text("\(idx + 1).")
-                                .frame(width: 28, alignment: .trailing)
-                                .foregroundStyle(.secondary)
-                            TextField("Name", text: Binding(
+                        HStack(spacing: 12) {
+                            Text("\(idx + 1)")
+                                .font(.subheadline.bold())
+                                .frame(width: 28)
+                                .padding(.vertical, 10)
+                                .background(Design.Colors.surface2)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            TextField("Player Name", text: Binding(
                                 get: { names[idx] },
                                 set: { names[idx] = $0 }
                             ))
                             .textInputAutocapitalization(.words)
                             .disableAutocorrection(true)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                            .background(Design.Colors.surface2)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                             if names.count > minPlayers {
                                 Button {
                                     names.remove(at: idx)
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
-                                        .foregroundStyle(Color.red)
+                                        .foregroundStyle(Design.Colors.dangerRed)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Remove row")
@@ -46,54 +65,54 @@ struct SetupView: View {
                         Button {
                             if names.count < maxPlayers { names.append("") }
                         } label: {
-                            Label("Add Player", systemImage: "plus.circle.fill")
+                            Label("Add Another Player", systemImage: "plus")
+                                .lineLimit(1)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Design.Colors.actionBlue)
+                        .clipShape(Capsule())
                         .disabled(names.count >= maxPlayers)
 
                         Spacer()
-                        Text("Count: \(validInput.count)/\(maxPlayers)")
-                            .foregroundStyle(validInput.count >= minPlayers ? Color.secondary : Color.red)
+                        let filled = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.count
+                        Text("Players: \(names.count)/\(maxPlayers)")
+                            .foregroundStyle(filled < minPlayers ? Design.Colors.dangerRed : Design.Colors.textSecondary)
                     }
                 }
+                .cardStyle()
+                .padding(.horizontal, 20)
 
-                // Randomness is always non-deterministic; no extra controls
+                Spacer(minLength: 14)
             }
-
-            HStack {
-                Button("Assign Numbers & Roles") {
-                    store.assignNumbersAndRoles(names: validInput)
-                }
-                .buttonStyle(GlassButtonStyle())
-                .disabled(!isValid)
-
+        }
+        .background(Design.Colors.surface0)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Reset", role: .destructive) { store.resetAll() }
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: 12) {
                 if store.hasSavedGame {
-                    Button("Load Last Game") {
-                        store.loadLastGame()
-                    }
+                    Button("Load Last Game") { store.loadLastGame() }
+                        .buttonStyle(CTAButtonStyle(kind: .secondary))
+                } else {
+                    Button("Reset All", role: .destructive) { store.resetAll() }
+                        .buttonStyle(CTAButtonStyle(kind: .danger))
                 }
-
-                Spacer()
-
-                Button(role: .destructive) {
-                    store.resetAll()
-                } label: { Text("Reset All") }
+                Button {
+                    store.assignNumbersAndRoles(names: validInput)
+                } label: {
+                    Text("Assign Roles").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(CTAButtonStyle(kind: .primary))
+                .disabled(!isValid)
             }
-            .padding(.horizontal)
-
-            Spacer(minLength: 0)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.clear)
         }
-        .navigationTitle("Mafia Manager Setup")
-    }
-
-    private var header: some View {
-        HStack {
-            Image(systemName: "person.3.fill")
-                .font(.largeTitle)
-            Text("Mafia Manager")
-                .font(.largeTitle).bold()
-            Spacer()
-        }
-        .padding(.horizontal)
     }
 
     private var validInput: [String] {
@@ -108,29 +127,15 @@ struct SetupView: View {
         let set = Set(trimmed.map { $0.lowercased() })
         return set.count == trimmed.count
     }
-}
 
-// MARK: - Local glass style
-private struct GlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(Color.accentColor)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 20)
-            .background(Capsule().fill(.ultraThinMaterial))
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
-                    .blendMode(.plusLighter)
-                    .opacity(configuration.isPressed ? 0.35 : 1)
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
+    private var validationHint: String {
+        let trimmed = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        if trimmed.count < minPlayers { return "Need at least \(minPlayers) names" }
+        if trimmed.count > maxPlayers { return "Max \(maxPlayers) players" }
+        let set = Set(trimmed.map { $0.lowercased() })
+        if set.count != trimmed.count { return "Names must be unique" }
+        return ""
     }
 }
+
+// Removed local GlassButtonStyle; using global CTAButtonStyle instead.

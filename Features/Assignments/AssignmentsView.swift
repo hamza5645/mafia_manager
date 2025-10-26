@@ -9,31 +9,18 @@ struct AssignmentsView: View {
     private let roleColWidth: CGFloat = 96
 
     var body: some View {
-        List {
-            Section {
-                ForEach(sortedPlayers) { p in
-                    HStack(spacing: 12) {
-                        Text("#\(p.number)")
-                            .monospacedDigit()
-                            .frame(width: numberColWidth, alignment: .trailing)
-                            .accessibilityLabel("Number \(p.number)")
-
-                        Text(p.name)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-
-                        Spacer(minLength: 12)
-
-                        Text(p.role.displayName)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(roleColor(p.role))
-                            .frame(width: roleColWidth, alignment: .trailing)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                LazyVGrid(columns: [GridItem(.flexible(minimum: 150, maximum: .infinity)), GridItem(.flexible(minimum: 150, maximum: .infinity))], spacing: 12) {
+                    ForEach(sortedPlayers) { p in
+                        PlayerRoleCard(player: p)
                     }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
+                .padding(.horizontal)
+
+                Spacer(minLength: 8)
             }
         }
-        .listStyle(.plain) // Full-width table look
         .navigationTitle("Assignments")
         .background(
             NavigationLink(destination: NightPhaseView(), isActive: $goToNight) { EmptyView() }
@@ -44,8 +31,6 @@ struct AssignmentsView: View {
                 Button(role: .destructive) { store.resetAll() } label: { Text("Reset") }
             }
         }
-        // Use a safe-area inset CTA with a custom glass style to avoid
-        // toolbar rendering artifacts on newer iOS "liquid" design.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
@@ -54,7 +39,7 @@ struct AssignmentsView: View {
                     Text(store.currentNightIndex == 1 ? "Start Night 1" : "Continue Night \(store.currentNightIndex)")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(GlassButtonStyle())
+                .buttonStyle(CTAButtonStyle(kind: .primary))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -76,32 +61,35 @@ struct AssignmentsView: View {
     }
 }
 
-// MARK: - Glass Button Style (Liquid-like)
-private struct GlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(Color.accentColor)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 20)
-            .background(
-                // Translucent, blurred material encapsulated in a capsule
-                Capsule().fill(.ultraThinMaterial)
-            )
-            .overlay(
-                // Subtle inner highlight
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.45), lineWidth: 0.6)
-                    .blendMode(.plusLighter)
-                    .opacity(configuration.isPressed ? 0.35 : 1)
-            )
-            .overlay(
-                // Accent-tinted rim for the "liquid" sheen
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(configuration.isPressed ? 0.12 : 0.2), radius: 10, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
+// Card for each player's number, name and role
+private struct PlayerRoleCard: View {
+    let player: Player
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Chip(text: "#\(player.number)", style: .outline(Design.Colors.textSecondary), icon: nil)
+                Spacer(minLength: 8)
+                Chip(text: player.role.displayName.uppercased(), style: .outline(player.role.accentColor), icon: player.role.symbolName)
+            }
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: player.role.symbolName)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(player.role.accentColor)
+                Text(player.name)
+                    .font(.subheadline)
+                    .foregroundStyle(Design.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer()
+            }
+        }
+        .cardStyle(padding: 12)
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.Radii.card)
+                .stroke(player.role.accentColor.opacity(0.8), lineWidth: 1.2)
+        )
+        .frame(minHeight: 110)
     }
+
+    // roleColor and icon centralized in RoleStyle extension
 }
