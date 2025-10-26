@@ -2,10 +2,13 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject private var store: GameStore
-    @State private var names: [String] = Array(repeating: "", count: 5)
-
-    private let minPlayers = 5
+    private let minPlayers = 4
     private let maxPlayers = 19
+    @State private var names: [String]
+
+    init() {
+        _names = State(initialValue: Array(repeating: "", count: minPlayers))
+    }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {

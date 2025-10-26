@@ -36,7 +36,7 @@ final class GameStore: ObservableObject {
     func assignNumbersAndRoles(names: [String]) {
         let clean = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        guard clean.count >= 5 && clean.count <= 19 else { return }
+        guard clean.count >= 4 && clean.count <= 19 else { return }
         let unique = Array(NSOrderedSet(array: clean)) as! [String]
         guard unique.count == clean.count else { return }
 
@@ -79,8 +79,11 @@ final class GameStore: ObservableObject {
     // MARK: - Role distribution
 
     private static func roleDistribution(for playerCount: Int) -> (mafia: Int, doctors: Int, inspectors: Int) {
-        let p = min(max(playerCount, 5), 19)
+        let p = min(max(playerCount, 4), 19)
         switch p {
+        case 4:
+            // 1 Mafia, 1 Police, 2 Citizens; no Doctor
+            return (mafia: 1, doctors: 0, inspectors: 1)
         case 5:
             // 1 Mafia, 1 Police, 3 Citizens; no Doctor
             return (mafia: 1, doctors: 0, inspectors: 1)
