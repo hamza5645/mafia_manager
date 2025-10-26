@@ -3,7 +3,7 @@ import SwiftUI
 struct NightPhaseView: View {
     @EnvironmentObject private var store: GameStore
     @State private var mafiaTargetID: UUID?
-    @State private var inspectorID: UUID?
+    @State private var policeCheckID: UUID?
     @State private var doctorID: UUID?
     @State private var goToOutcome = false
 
@@ -26,12 +26,12 @@ struct NightPhaseView: View {
                 )
 
                 SelectionCard(
-                    title: "Inspector Action: Check Identity",
-                    selectionID: $inspectorID,
+                    title: "Police Action: Check Identity",
+                    selectionID: $policeCheckID,
                     players: store.state.players,
                     help: "Shows full role",
                     filter: { p in p.role != .inspector && p.alive },
-                    resultKind: .inspector,
+                    resultKind: .police,
                     accent: Design.Colors.actionBlue,
                     icon: "eye.fill"
                 )
@@ -72,7 +72,7 @@ struct NightPhaseView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
-                    store.endNight(mafiaTargetID: mafiaTargetID, inspectorCheckedID: inspectorID, doctorProtectedID: doctorID)
+                    store.endNight(mafiaTargetID: mafiaTargetID, inspectorCheckedID: policeCheckID, doctorProtectedID: doctorID)
                     goToOutcome = true
                 } label: {
                     Text("End Night & Reveal")
@@ -94,7 +94,7 @@ private struct SelectionCard: View {
     let players: [Player]
     var help: String
     var filter: (Player) -> Bool = { _ in true }
-    enum ResultKind { case none, inspector }
+    enum ResultKind { case none, police }
     var resultKind: ResultKind = .none
     var accent: Color = Design.Colors.surface2
     var icon: String? = nil
@@ -165,7 +165,7 @@ private struct SelectionCard: View {
                     switch resultKind {
                     case .none:
                         EmptyView()
-                    case .inspector:
+                    case .police:
                         HStack(spacing: 8) {
                             Text("Result:")
                             Chip(text: p.role.displayName.uppercased(), style: .outline(p.role.accentColor))

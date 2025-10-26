@@ -9,8 +9,8 @@ An offline assistant for the referee/manager of the party game Mafia. Built with
 
 Features
 - Setup: enter 5–19 unique player names; numbers are unique random values from 1–99.
-- Assignments: each player gets a unique random number (1–99) and roles per booklet rules (with 5 players: 1 Mafia, 1 Inspector, 3 Citizens), capped at 5 Mafia, 2 Doctors, 2 Inspectors.
-- Night: record Mafia kill (cannot target Mafia), Inspector check (shows full identity; cannot check Inspectors), Doctor protect (self allowed; hidden if no Doctor alive).
+- Assignments: each player gets a unique random number (1–99) and roles per booklet rules (with 5 players: 1 Mafia, 1 Police, 3 Citizens), capped at 5 Mafia, 2 Doctors, 2 Police.
+- Night: record Mafia kill (cannot target Mafia), Police check (shows full identity; cannot check other Police), Doctor protect (self allowed; hidden if no Doctor alive).
 - Morning: summary with numbers only (Mafia numbers, killed, inspector’s identity result, doctor protected if present).
 - Day: mark removals (lynch/other), live counts, then continue to next night.
 - Game over: detects Villagers win (no Mafia) or Mafia win (Mafia >= Non‑Mafia at day start); export full log as text.

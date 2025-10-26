@@ -80,7 +80,7 @@ final class GameStore: ObservableObject {
         let p = min(max(playerCount, 5), 19)
         switch p {
         case 5:
-            // 1 Mafia, 1 Inspector (police), 3 Citizens; no Doctor
+            // 1 Mafia, 1 Police, 3 Citizens; no Doctor
             return (mafia: 1, doctors: 0, inspectors: 1)
         case 6...8:
             return (mafia: 2, doctors: 1, inspectors: 1)
@@ -118,7 +118,7 @@ final class GameStore: ObservableObject {
         var inspectorRole: Role?
 
         if let inspectID = inspectorCheckedID, let inspected = player(by: inspectID) {
-            // Prevent identifying inspectors (police cannot identify police)
+            // Prevent police from identifying other police members
             if inspected.role != .inspector {
                 inspectorRole = inspected.role
                 inspectorResult = (inspected.role == .mafia)
@@ -243,9 +243,9 @@ final class GameStore: ObservableObject {
             }
             if let n = number(for: night.inspectorCheckedPlayerID) {
                 let res = night.inspectorResultRole?.displayName ?? (night.inspectorResultIsMafia == true ? "Mafia" : (night.inspectorResultIsMafia == false ? "Not Mafia" : "—"))
-                lines.append("  Inspector checked: #\(n) → \(res)")
+                lines.append("  Police checked: #\(n) → \(res)")
             } else {
-                lines.append("  Inspector checked: —")
+                lines.append("  Police checked: —")
             }
             if let n = number(for: night.doctorProtectedPlayerID) {
                 lines.append("  Doctor protected: #\(n)")

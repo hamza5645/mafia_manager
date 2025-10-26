@@ -66,6 +66,7 @@ struct SetupView: View {
 
                     HStack {
                         let filled = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.count
+                        let allFilled = filled == names.count && filled >= minPlayers
                         Button {
                             if names.count < maxPlayers {
                                 withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
@@ -82,7 +83,7 @@ struct SetupView: View {
 
                         Spacer()
                         Text("Players: \(names.count)/\(maxPlayers)")
-                            .foregroundStyle(filled >= minPlayers ? Design.Colors.successGreen : Design.Colors.dangerRed)
+                            .foregroundStyle(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed)
                     }
                 }
                 .cardStyle()

@@ -3,6 +3,7 @@ import UIKit
 
 struct GameOverView: View {
     @EnvironmentObject private var store: GameStore
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let logText = store.exportLogText(includeNames: true)
@@ -18,14 +19,7 @@ struct GameOverView: View {
                 }
                 .cardStyle()
 
-                HStack(spacing: 12) {
-                    ShareButton(text: logText)
-                        .buttonStyle(CTAButtonStyle(kind: .primary))
-                    Button("Play Again") {
-                        store.resetAll()
-                    }
-                    .buttonStyle(CTAButtonStyle(kind: .secondary))
-                }
+                buttonRow(logText: logText)
             }
             .padding()
         }
@@ -57,11 +51,9 @@ struct GameOverView: View {
 
                 HStack(spacing: 10) {
                     if store.state.winner == .mafia {
-                        Chip(text: "MAFIA", style: .filled(Design.Colors.dangerRed))
-                        Image(systemName: "flame.fill").foregroundStyle(Design.Colors.dangerRed)
+                        Chip(text: "MAFIA", style: .filled(Design.Colors.dangerRed), icon: "skull.fill")
                     } else {
-                        Chip(text: "CITIZENS", style: .filled(Design.Colors.brandGold))
-                        Image(systemName: "person.3.fill").foregroundStyle(Design.Colors.brandGold)
+                        Chip(text: "CITIZENS", style: .filled(Design.Colors.brandGold), icon: "person.3.fill")
                     }
                 }
             }
@@ -75,6 +67,23 @@ struct GameOverView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Design.Colors.stroke, lineWidth: 1)
         )
+    }
+
+    private func buttonRow(logText: String) -> some View {
+        let mafiaWon = store.state.winner == .mafia
+        return HStack(spacing: 12) {
+            ShareButton(text: logText)
+                .buttonStyle(CTAButtonStyle(kind: .primary))
+            Button {
+                store.resetAll()
+                DispatchQueue.main.async {
+                    dismiss()
+                }
+            } label: {
+                Label("Play Again", systemImage: mafiaWon ? "skull.fill" : "arrow.clockwise")
+            }
+            .buttonStyle(CTAButtonStyle(kind: mafiaWon ? .danger : .secondary))
+        }
     }
 }
 

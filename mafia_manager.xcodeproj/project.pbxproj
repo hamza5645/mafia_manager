@@ -12,7 +12,6 @@
 		2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB592E68EF3A002C5B31 /* Player.swift */; };
 		2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */; };
 		2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */; };
-/* removed SeededRandom.swift in Sources */
 		2F3DBB7A2E68EF3A002C5B31 /* GameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */; };
 		2F3DBB7B2E68EF3A002C5B31 /* NightPhaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */; };
 		2F3DBB7C2E68EF3A002C5B31 /* DayAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB562E68EF3A002C5B31 /* DayAction.swift */; };
@@ -24,9 +23,10 @@
 		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
 		2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */; };
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
+		2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* Vision.md */; };
 		A1E0F8FE2F4A4D0E00A5E3F1 /* NightOutcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */; };
 		AA0000032E69000000000003 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000012E69000000000001 /* DesignSystem.swift */; };
-        AA0000062E69010000000006 /* RoleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000052E69010000000005 /* RoleStyle.swift */; };
+		AA0000062E69010000000006 /* RoleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000052E69010000000005 /* RoleStyle.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,7 +37,6 @@
 		2F3DBB592E68EF3A002C5B31 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2F3DBB5A2E68EF3A002C5B31 /* Role.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Role.swift; sourceTree = "<group>"; };
 		2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
-/* removed file reference SeededRandom.swift */
 		2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStore.swift; sourceTree = "<group>"; };
 		2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentsView.swift; sourceTree = "<group>"; };
 		2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayManagementView.swift; sourceTree = "<group>"; };
@@ -47,10 +46,11 @@
 		2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
 		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		2F78C7742EAEC2B1004BC2A7 /* Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Vision.md; sourceTree = "<group>"; };
 		2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightOutcomeView.swift; sourceTree = "<group>"; };
 		AA0000012E69000000000001 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
-        AA0000052E69010000000005 /* RoleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleStyle.swift; sourceTree = "<group>"; };
+		AA0000052E69010000000005 /* RoleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleStyle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,7 +80,6 @@
 			isa = PBXGroup;
 			children = (
 				2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */,
-                /* SeededRandom.swift removed */
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -99,20 +98,11 @@
 				2F3DBB5B2E68EF3A002C5B31 /* Models */,
 				2F3DBB5E2E68EF3A002C5B31 /* Services */,
 				2F3DBB602E68EF3A002C5B31 /* Store */,
-                AA0000022E69000000000002 /* UI */,
+				AA0000022E69000000000002 /* UI */,
 			);
 			path = Core;
 			sourceTree = "<group>";
 		};
-        AA0000022E69000000000002 /* UI */ = {
-            isa = PBXGroup;
-            children = (
-                AA0000012E69000000000001 /* DesignSystem.swift */,
-                AA0000052E69010000000005 /* RoleStyle.swift */,
-            );
-            path = UI;
-            sourceTree = "<group>";
-        };
 		2F3DBB632E68EF3A002C5B31 /* Assignments */ = {
 			isa = PBXGroup;
 			children = (
@@ -183,6 +173,7 @@
 				2F3DBB6E2E68EF3A002C5B31 /* Features */,
 				2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */,
 				2F3DBB712E68EF3A002C5B31 /* README.md */,
+				2F78C7742EAEC2B1004BC2A7 /* Vision.md */,
 				2FF7CF202E68E6E70023D42B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -193,6 +184,15 @@
 				2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA0000022E69000000000002 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000012E69000000000001 /* DesignSystem.swift */,
+				AA0000052E69010000000005 /* RoleStyle.swift */,
+			);
+			path = UI;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -256,6 +256,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */,
 				2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */,
 				2F3DBB752E68EF3A002C5B31 /* README.md in Resources */,
 			);
@@ -271,7 +272,6 @@
 				2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */,
 				2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */,
 				2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */,
-                /* SeededRandom.swift in Sources removed */
 				2F3DBB7A2E68EF3A002C5B31 /* GameOverView.swift in Sources */,
 				2F3DBB7B2E68EF3A002C5B31 /* NightPhaseView.swift in Sources */,
 				2F3DBB7C2E68EF3A002C5B31 /* DayAction.swift in Sources */,
@@ -282,11 +282,11 @@
 				2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */,
 				2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */,
 				2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */,
-                2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
+				2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
 				A1E0F8FE2F4A4D0E00A5E3F1 /* NightOutcomeView.swift in Sources */,
-                AA0000032E69000000000003 /* DesignSystem.swift in Sources */,
-                AA0000062E69010000000006 /* RoleStyle.swift in Sources */,
-            );
+				AA0000032E69000000000003 /* DesignSystem.swift in Sources */,
+				AA0000062E69010000000006 /* RoleStyle.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
@@ -428,11 +428,11 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.hamza.mafia-manager";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -460,11 +460,11 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.hamza.mafia-manager";
 				PRODUCT_NAME = "$(TARGET_NAME)";

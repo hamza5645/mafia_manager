@@ -19,7 +19,7 @@ struct MorningSummaryView: View {
                         summaryRow(title: "Mafia", value: mafiaSummary(for: night))
                         summaryRow(title: "Targeted", value: targetedSummary(for: night))
                         summaryRow(title: "Killed", value: killedSummary(for: night))
-                        summaryRow(title: "Inspector", value: inspectorSummary(for: night))
+                        summaryRow(title: "Police", value: policeSummary(for: night))
                         summaryRow(title: "Doctor", value: doctorSummary(for: night))
                     }
                     .cardStyle()
@@ -103,13 +103,13 @@ private extension MorningSummaryView {
         return deathNumbers.map { "#\($0)" }.joined(separator: ", ")
     }
 
-    func inspectorSummary(for night: NightAction) -> String {
-        let inspectorNumbers = store.state.players.filter { $0.role == .inspector }.map { $0.number }.sorted()
-        let inspectorLabel = inspectorNumbers.isEmpty ? "—" : inspectorNumbers.map { "#\($0)" }.joined(separator: ", ")
+    func policeSummary(for night: NightAction) -> String {
+        let policeNumbers = store.state.players.filter { $0.role == .inspector }.map { $0.number }.sorted()
+        let policeLabel = policeNumbers.isEmpty ? "—" : policeNumbers.map { "#\($0)" }.joined(separator: ", ")
         if let inspectedNum = store.number(for: night.inspectorCheckedPlayerID) {
-            return "\(inspectorLabel) → #\(inspectedNum)"
+            return "\(policeLabel) → #\(inspectedNum)"
         }
-        return inspectorLabel
+        return policeLabel
     }
 
     func doctorSummary(for night: NightAction) -> String {

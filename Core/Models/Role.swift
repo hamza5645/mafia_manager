@@ -10,9 +10,8 @@ enum Role: String, Codable, CaseIterable, Sendable {
         switch self {
         case .mafia: return "Mafia"
         case .doctor: return "Doctor"
-        case .inspector: return "Inspector"
+        case .inspector: return "Police"
         case .citizen: return "Citizen"
         }
     }
 }
-
