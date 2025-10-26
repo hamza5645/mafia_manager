@@ -5,7 +5,7 @@ struct NightPhaseView: View {
     @State private var mafiaTargetID: UUID?
     @State private var inspectorID: UUID?
     @State private var doctorID: UUID?
-    @State private var goToMorning = false
+    @State private var goToOutcome = false
 
     var body: some View {
         ScrollView {
@@ -30,7 +30,7 @@ struct NightPhaseView: View {
                     selectionID: $inspectorID,
                     players: store.state.players,
                     help: "Shows full role",
-                    filter: { p in p.role != .inspector },
+                    filter: { p in p.role != .inspector && p.alive },
                     resultKind: .inspector,
                     accent: Design.Colors.actionBlue,
                     icon: "eye.fill"
@@ -65,7 +65,7 @@ struct NightPhaseView: View {
         }
         .navigationTitle("Night \(store.currentNightIndex)")
         .background(
-            NavigationLink(destination: MorningSummaryView(), isActive: $goToMorning) { EmptyView() }
+            NavigationLink(destination: NightOutcomeView(), isActive: $goToOutcome) { EmptyView() }
                 .hidden()
         )
         .toolbar { }
@@ -73,7 +73,7 @@ struct NightPhaseView: View {
             HStack {
                 Button {
                     store.endNight(mafiaTargetID: mafiaTargetID, inspectorCheckedID: inspectorID, doctorProtectedID: doctorID)
-                    goToMorning = true
+                    goToOutcome = true
                 } label: {
                     Text("End Night & Reveal")
                         .frame(maxWidth: .infinity)
@@ -83,7 +83,7 @@ struct NightPhaseView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.clear)
+            .background(Design.Colors.surface0.opacity(0.95))
         }
     }
 }

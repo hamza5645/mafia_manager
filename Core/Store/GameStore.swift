@@ -38,14 +38,10 @@ final class GameStore: ObservableObject {
         let unique = Array(NSOrderedSet(array: clean)) as! [String]
         guard unique.count == clean.count else { return }
 
-        // Random unique numbers 1..99
+        // Random unique numbers from 1..(2 * playerCount)
         let count = unique.count
-        var numbers = Set<Int>()
-        while numbers.count < count {
-            numbers.insert(Int.random(in: 1...99))
-        }
-        var assignedNumbers = Array(numbers)
-        assignedNumbers.shuffle()
+        let numberPool = Array(1...(count * 2)).shuffled()
+        let assignedNumbers = Array(numberPool.prefix(count))
 
         // Shuffle names independently for random pairing with roles
         var shuffledNames = unique
@@ -152,7 +148,26 @@ final class GameStore: ObservableObject {
         )
         state.nightHistory.append(action)
 
-        // After night ends, check win condition at start of day
+        save()
+    }
+
+    func resolveNightOutcome(targetWasSaved: Bool) {
+        guard let lastIndex = state.nightHistory.indices.last else { return }
+        var action = state.nightHistory[lastIndex]
+        action.resultingDeaths.removeAll()
+
+        if !targetWasSaved,
+           let targetID = action.mafiaTargetPlayerID,
+           let playerIndex = state.players.firstIndex(where: { $0.id == targetID }) {
+            if state.players[playerIndex].alive {
+                state.players[playerIndex].alive = false
+            }
+            action.resultingDeaths = [targetID]
+        }
+
+        state.nightHistory[lastIndex] = action
+
+        // After resolving the night outcome we check if a team has already won.
         evaluateWinners(startOfDay: true)
 
         save()
@@ -246,7 +261,7 @@ final class GameStore: ObservableObject {
             lines.append("")
         }
         for day in state.dayHistory.sorted(by: { $0.dayIndex < $1.dayIndex }) {
-            lines.append("Day \(day.dayIndex)")
+            lines.append("Day \(day.dayIndex + 1)")
             if day.removedPlayerIDs.isEmpty {
                 lines.append("  Removals: none")
             } else {

@@ -8,7 +8,7 @@ struct SetupView: View {
     private let maxPlayers = 19
 
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 // Title
                 VStack(alignment: .leading, spacing: 4) {
@@ -50,7 +50,10 @@ struct SetupView: View {
 
                             if names.count > minPlayers {
                                 Button {
-                                    names.remove(at: idx)
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85, blendDuration: 0.25)) {
+                                        let removalIndex = names.index(names.startIndex, offsetBy: idx)
+                                        names.remove(at: removalIndex)
+                                    }
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
                                         .foregroundStyle(Design.Colors.dangerRed)
@@ -62,21 +65,24 @@ struct SetupView: View {
                     }
 
                     HStack {
+                        let filled = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.count
                         Button {
-                            if names.count < maxPlayers { names.append("") }
+                            if names.count < maxPlayers {
+                                withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
+                                    names.append("")
+                                }
+                            }
                         } label: {
                             Label("Add Another Player", systemImage: "plus")
                                 .lineLimit(1)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Design.Colors.actionBlue)
-                        .clipShape(Capsule())
+                        .buttonStyle(PillButtonStyle(background: Design.Colors.actionBlue))
+                        .opacity(names.count >= maxPlayers ? 0.5 : 1)
                         .disabled(names.count >= maxPlayers)
 
                         Spacer()
-                        let filled = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.count
                         Text("Players: \(names.count)/\(maxPlayers)")
-                            .foregroundStyle(filled < minPlayers ? Design.Colors.dangerRed : Design.Colors.textSecondary)
+                            .foregroundStyle(filled >= minPlayers ? Design.Colors.successGreen : Design.Colors.dangerRed)
                     }
                 }
                 .cardStyle()
@@ -87,31 +93,40 @@ struct SetupView: View {
         }
         .background(Design.Colors.surface0)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Reset", role: .destructive) { store.resetAll() }
+        .onAppear {
+            if store.isFreshSetup {
+                resetNameFields(animated: false)
+            }
+        }
+        .onChange(of: store.isFreshSetup) { fresh in
+            if fresh {
+                resetNameFields()
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            HStack(spacing: 12) {
+            VStack(spacing: 12) {
                 if store.hasSavedGame {
                     Button("Load Last Game") { store.loadLastGame() }
                         .buttonStyle(CTAButtonStyle(kind: .secondary))
-                } else {
-                    Button("Reset All", role: .destructive) { store.resetAll() }
-                        .buttonStyle(CTAButtonStyle(kind: .danger))
                 }
-                Button {
-                    store.assignNumbersAndRoles(names: validInput)
-                } label: {
-                    Text("Assign Roles").frame(maxWidth: .infinity)
+                HStack(spacing: 12) {
+                    Button("Reset All", role: .destructive) {
+                        store.resetAll()
+                        resetNameFields()
+                    }
+                    .buttonStyle(CTAButtonStyle(kind: .danger))
+                    Button {
+                        store.assignNumbersAndRoles(names: validInput)
+                    } label: {
+                        Text("Assign Roles").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(CTAButtonStyle(kind: .primary))
+                    .disabled(!isValid)
                 }
-                .buttonStyle(CTAButtonStyle(kind: .primary))
-                .disabled(!isValid)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.clear)
+            .padding(.vertical, 12)
+            .background(Design.Colors.surface0.opacity(0.95))
         }
     }
 
@@ -128,13 +143,15 @@ struct SetupView: View {
         return set.count == trimmed.count
     }
 
-    private var validationHint: String {
-        let trimmed = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        if trimmed.count < minPlayers { return "Need at least \(minPlayers) names" }
-        if trimmed.count > maxPlayers { return "Max \(maxPlayers) players" }
-        let set = Set(trimmed.map { $0.lowercased() })
-        if set.count != trimmed.count { return "Names must be unique" }
-        return ""
+    private func resetNameFields(animated: Bool = true) {
+        let base = Array(repeating: "", count: minPlayers)
+        if animated {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
+                names = base
+            }
+        } else {
+            names = base
+        }
     }
 }
 

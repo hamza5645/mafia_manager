@@ -61,34 +61,96 @@ enum CTAKind { case primary, secondary, danger }
 struct CTAButtonStyle: ButtonStyle {
     var kind: CTAKind = .primary
     func makeBody(configuration: Configuration) -> some View {
-        let bg: Color
-        let fg: Color
-        switch kind {
-        case .primary:
-            bg = Design.Colors.brandGold
-            fg = .black
-        case .secondary:
-            bg = Design.Colors.surface2
-            fg = Design.Colors.textPrimary
-        case .danger:
-            bg = Design.Colors.dangerRed
-            fg = .white
+        CTAButton(configuration: configuration, kind: kind)
+    }
+
+    private struct CTAButton: View {
+        let configuration: Configuration
+        let kind: CTAKind
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let colors = palette(for: kind)
+            return configuration.label
+                .font(.headline)
+                .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.6))
+                .frame(height: 52)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                        .fill(colors.background.opacity(isEnabled ? 1 : 0.4))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                        .stroke(.white.opacity(0.08))
+                )
+                .shadow(color: .black.opacity(shadowOpacity(isPressed: configuration.isPressed, enabled: isEnabled)), radius: 10, y: 6)
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.98 : 1)
+                .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
         }
-        return configuration.label
-            .font(.headline)
-            .foregroundStyle(fg)
-            .frame(height: 52)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 2)
-            .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
-                    .stroke(.white.opacity(0.08))
-            )
-            .shadow(color: .black.opacity(configuration.isPressed ? 0.1 : 0.25), radius: 10, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
+
+        private func palette(for kind: CTAKind) -> (background: Color, foreground: Color) {
+            switch kind {
+            case .primary:
+                return (Design.Colors.brandGold, .black)
+            case .secondary:
+                return (Design.Colors.surface2, Design.Colors.textPrimary)
+            case .danger:
+                return (Design.Colors.dangerRed, .white)
+            }
+        }
+
+        private func shadowOpacity(isPressed: Bool, enabled: Bool) -> Double {
+            guard enabled else { return 0.08 }
+            return isPressed ? 0.1 : 0.25
+        }
+    }
+}
+
+// Compact pill control for inline actions (e.g., add player)
+struct PillButtonStyle: ButtonStyle {
+    var background: Color = Design.Colors.actionBlue
+    var foreground: Color = .white
+
+    func makeBody(configuration: Configuration) -> some View {
+        Pill(configuration: configuration, background: background, foreground: foreground)
+    }
+
+    private struct Pill: View {
+        let configuration: Configuration
+        let background: Color
+        let foreground: Color
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(foreground.opacity(isEnabled ? 1 : 0.45))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(
+                    Capsule()
+                        .fill(background.opacity(fillOpacity))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(isEnabled ? 0.12 : 0.04), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(shadowOpacity), radius: 8, y: 4)
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1)
+                .animation(.spring(response: 0.28, dampingFraction: 0.85), value: configuration.isPressed)
+        }
+
+        private var fillOpacity: Double {
+            guard isEnabled else { return 0.35 }
+            return configuration.isPressed ? 0.85 : 1
+        }
+
+        private var shadowOpacity: Double {
+            guard isEnabled else { return 0 }
+            return configuration.isPressed ? 0.08 : 0.18
+        }
     }
 }
 
@@ -141,4 +203,3 @@ extension Color {
         self = Color(red: r, green: g, blue: b, opacity: alpha)
     }
 }
-

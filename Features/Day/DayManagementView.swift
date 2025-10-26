@@ -94,7 +94,7 @@ struct DayManagementView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.clear)
+            .background(Design.Colors.surface0.opacity(0.95))
         }
     }
 }

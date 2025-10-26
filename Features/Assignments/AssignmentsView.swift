@@ -5,21 +5,27 @@ struct AssignmentsView: View {
     @State private var goToNight = false
 
     // Column widths for tidy alignment
-    private let numberColWidth: CGFloat = 56
-    private let roleColWidth: CGFloat = 96
+    private let columns = [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 16, alignment: .top)]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                LazyVGrid(columns: [GridItem(.flexible(minimum: 150, maximum: .infinity)), GridItem(.flexible(minimum: 150, maximum: .infinity))], spacing: 12) {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Reveal numbers and roles privately to each player. All assignments are randomised.")
+                    .font(.footnote)
+                    .foregroundStyle(Design.Colors.textSecondary)
+                    .padding(.horizontal, 4)
+
+                LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(sortedPlayers) { p in
                         PlayerRoleCard(player: p)
                     }
                 }
-                .padding(.horizontal)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer(minLength: 8)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
         }
         .navigationTitle("Assignments")
         .background(
@@ -27,8 +33,13 @@ struct AssignmentsView: View {
                 .hidden()
         )
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(role: .destructive) { store.resetAll() } label: { Text("Reset") }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    store.resetAll()
+                } label: {
+                    Label("Back", systemImage: "chevron.backward")
+                        .labelStyle(.titleAndIcon)
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -43,21 +54,12 @@ struct AssignmentsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.clear)
+            .background(Design.Colors.surface0.opacity(0.95))
         }
     }
 
     private var sortedPlayers: [Player] {
         store.state.players.sorted { $0.number < $1.number }
-    }
-
-    private func roleColor(_ role: Role) -> Color {
-        switch role {
-        case .mafia: return .red
-        case .doctor: return .green
-        case .inspector: return .blue
-        case .citizen: return .gray
-        }
     }
 }
 
@@ -65,31 +67,100 @@ struct AssignmentsView: View {
 private struct PlayerRoleCard: View {
     let player: Player
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Chip(text: "#\(player.number)", style: .outline(Design.Colors.textSecondary), icon: nil)
+        let palette = RoleCardPalette(role: player.role)
+        return VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                Text("#\(player.number)")
+                    .font(.system(size: 24, weight: .heavy))
+                    .foregroundStyle(palette.numberColor)
+                    .shadow(color: .black.opacity(0.35), radius: 2, y: 2)
                 Spacer(minLength: 8)
-                Chip(text: player.role.displayName.uppercased(), style: .outline(player.role.accentColor), icon: player.role.symbolName)
+                RoleBadge(role: player.role)
             }
-            HStack(alignment: .center, spacing: 10) {
+
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: player.role.symbolName)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(player.role.accentColor)
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(palette.iconColor)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(palette.iconBackground)
+                    )
                 Text(player.name)
-                    .font(.subheadline)
+                    .font(.headline)
                     .foregroundStyle(Design.Colors.textPrimary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.75)
                 Spacer()
             }
         }
-        .cardStyle(padding: 12)
-        .overlay(
-            RoundedRectangle(cornerRadius: Design.Radii.card)
-                .stroke(player.role.accentColor.opacity(0.8), lineWidth: 1.2)
+        .padding(.vertical, 20)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: Design.Radii.card + 4, style: .continuous)
+                .fill(palette.backgroundGradient)
         )
-        .frame(minHeight: 110)
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.Radii.card + 4, style: .continuous)
+                .stroke(palette.borderColor, lineWidth: 1.4)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 10, y: 6)
     }
 
     // roleColor and icon centralized in RoleStyle extension
+}
+
+private struct RoleBadge: View {
+    let role: Role
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: role.symbolName)
+                .font(.caption.weight(.bold))
+            Text(role.displayName.uppercased())
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .foregroundStyle(role.accentColor)
+        .background(
+            Capsule()
+                .fill(role.accentColor.opacity(0.18))
+        )
+        .overlay(
+            Capsule()
+                .stroke(role.accentColor.opacity(0.55), lineWidth: 1)
+        )
+        .frame(minWidth: 92, alignment: .center)
+        .accessibilityLabel(role.displayName)
+    }
+}
+
+private struct RoleCardPalette {
+    let numberColor: Color
+    let iconColor: Color
+    let iconBackground: Color
+    let borderColor: Color
+    let backgroundGradient: LinearGradient
+
+    init(role: Role) {
+        let accent = role.accentColor
+        self.iconColor = accent
+        self.iconBackground = accent.opacity(0.18)
+        self.borderColor = accent.opacity(0.6)
+        self.numberColor = Color.white.opacity(0.95)
+
+        let top = accent.opacity(role == .citizen ? 0.16 : 0.26)
+        let bottom = Design.Colors.surface1.opacity(0.9)
+        self.backgroundGradient = LinearGradient(
+            colors: [top, bottom],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 }

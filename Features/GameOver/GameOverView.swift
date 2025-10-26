@@ -3,30 +3,28 @@ import UIKit
 
 struct GameOverView: View {
     @EnvironmentObject private var store: GameStore
-    @State private var includeNames = false
-    @State private var showingShare = false
 
     var body: some View {
+        let logText = store.exportLogText(includeNames: true)
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 winnerBanner
 
-                Toggle("Include names in log", isOn: $includeNames)
-                    .toggleStyle(.switch)
-
                 VStack(alignment: .leading) {
                     Text("Event Log").font(.headline)
-                    Text(store.exportLogText(includeNames: includeNames))
+                    Text(logText)
                         .font(.system(.body, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .cardStyle()
 
                 HStack(spacing: 12) {
-                    ShareButton(text: store.exportLogText(includeNames: includeNames))
+                    ShareButton(text: logText)
                         .buttonStyle(CTAButtonStyle(kind: .primary))
-                    Button("Play Again") { store.resetAll() }
-                        .buttonStyle(CTAButtonStyle(kind: .secondary))
+                    Button("Play Again") {
+                        store.resetAll()
+                    }
+                    .buttonStyle(CTAButtonStyle(kind: .secondary))
                 }
             }
             .padding()
@@ -35,7 +33,6 @@ struct GameOverView: View {
     }
 
     private var winnerBanner: some View {
-        let winnerText: String = store.state.winner == .mafia ? "Mafia" : "Citizens"
         return ZStack {
             // Celebratory gradient background
             LinearGradient(
@@ -111,11 +108,11 @@ private struct ConfettiOverlay: View {
         Canvas { ctx, size in
             let count = 22
             for i in 0..<count {
-                var g = GraphicsContext.Shading.color(i % 2 == 0 ? Design.Colors.brandGold : .white)
+                let shading = GraphicsContext.Shading.color(i % 2 == 0 ? Design.Colors.brandGold : .white)
                 let x = CGFloat(i) / CGFloat(count) * size.width
                 let y = (sin(t + CGFloat(i)) * 0.3 + 0.5) * size.height
                 let rect = CGRect(x: x, y: y, width: 4, height: 10)
-                ctx.fill(Path(roundedRect: rect, cornerRadius: 2), with: g)
+                ctx.fill(Path(roundedRect: rect, cornerRadius: 2), with: shading)
             }
         }
         .opacity(0.6)
