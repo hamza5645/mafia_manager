@@ -6,6 +6,7 @@ import Combine
 final class GameStore: ObservableObject {
     @Published private(set) var state: GameState = .empty
     @Published var isFreshSetup: Bool = true
+    @Published var flowID: UUID = UUID()
 
     init() {
         if let saved = Persistence.shared.load() {
@@ -22,6 +23,7 @@ final class GameStore: ObservableObject {
         state = .empty
         isFreshSetup = true
         Persistence.shared.reset()
+        flowID = UUID()
     }
 
     func loadLastGame() {

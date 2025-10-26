@@ -27,6 +27,7 @@ struct RootView: View {
                 AssignmentsView()
             }
         }
+        .id(store.flowID)
         .background(Design.Colors.surface0.ignoresSafeArea())
     }
 }
