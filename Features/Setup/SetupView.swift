@@ -5,6 +5,7 @@ struct SetupView: View {
     private let minPlayers = 4
     private let maxPlayers = 19
     @State private var names: [String]
+    @State private var isAddingPlayer = false
 
     init() {
         _names = State(initialValue: Array(repeating: "", count: minPlayers))
@@ -31,6 +32,12 @@ struct SetupView: View {
                         .font(.footnote)
                         .foregroundStyle(Design.Colors.textSecondary)
 
+                    if names.count == minPlayers {
+                        Text("Minimum \(minPlayers) players required for gameplay.")
+                            .font(.caption2)
+                            .foregroundStyle(Design.Colors.textSecondary.opacity(0.7))
+                    }
+
                     ForEach(names.indices, id: \.self) { idx in
                         HStack(spacing: 12) {
                             Text("\(idx + 1)")
@@ -53,9 +60,16 @@ struct SetupView: View {
 
                             if names.count > minPlayers {
                                 Button {
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85, blendDuration: 0.25)) {
-                                        let removalIndex = names.index(names.startIndex, offsetBy: idx)
-                                        names.remove(at: removalIndex)
+                                    // Extra safety check to ensure we don't go below minimum
+                                    if names.count > minPlayers {
+                                        withAnimation(.spring(response: 0.28, dampingFraction: 0.85, blendDuration: 0.25)) {
+                                            let removalIndex = names.index(names.startIndex, offsetBy: idx)
+                                            names.remove(at: removalIndex)
+                                            // Final safety check - if somehow we went below minimum, reset to minimum
+                                            if names.count < minPlayers {
+                                                resetNameFields(animated: true)
+                                            }
+                                        }
                                     }
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
@@ -63,6 +77,8 @@ struct SetupView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Remove row")
+                                .disabled(isAddingPlayer)
+                                .opacity(isAddingPlayer ? 0.3 : 1.0)
                             }
                         }
                     }
@@ -72,8 +88,13 @@ struct SetupView: View {
                         let allFilled = filled == names.count && filled >= minPlayers
                         Button {
                             if names.count < maxPlayers {
+                                isAddingPlayer = true
                                 withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
                                     names.append("")
+                                }
+                                // Add a small delay before allowing removals again
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    isAddingPlayer = false
                                 }
                             }
                         } label: {
@@ -148,6 +169,7 @@ struct SetupView: View {
     }
 
     private func resetNameFields(animated: Bool = true) {
+        isAddingPlayer = false
         let base = Array(repeating: "", count: minPlayers)
         if animated {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
