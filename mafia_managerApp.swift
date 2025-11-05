@@ -30,20 +30,6 @@ struct RootView: View {
     @EnvironmentObject private var authStore: AuthStore
 
     var body: some View {
-        Group {
-            if authStore.isAuthenticated {
-                AuthenticatedRootView()
-            } else {
-                LoginView()
-            }
-        }
-    }
-}
-
-struct AuthenticatedRootView: View {
-    @EnvironmentObject private var gameStore: GameStore
-
-    var body: some View {
         NavigationStack {
             if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
                 SetupView()

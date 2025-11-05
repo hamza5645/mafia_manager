@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var authStore: AuthStore
+    @State private var showingLogin = false
 
     var body: some View {
         NavigationStack {
@@ -10,62 +11,100 @@ struct SettingsView: View {
                     .ignoresSafeArea()
 
                 List {
-                    // Profile Section
+                    // Profile/Account Section
                     Section {
-                        NavigationLink {
-                            ProfileView()
-                                .environmentObject(authStore)
-                        } label: {
-                            HStack(spacing: 16) {
-                                Circle()
-                                    .fill(Design.Colors.brandGold.opacity(0.2))
-                                    .frame(width: 50, height: 50)
-                                    .overlay(
-                                        Text(authStore.userProfile?.displayName.prefix(1).uppercased() ?? "U")
-                                            .font(.title3.bold())
-                                            .foregroundColor(Design.Colors.brandGold)
-                                    )
+                        if authStore.isAuthenticated {
+                            // Show profile when authenticated
+                            NavigationLink {
+                                ProfileView()
+                                    .environmentObject(authStore)
+                            } label: {
+                                HStack(spacing: 16) {
+                                    Circle()
+                                        .fill(Design.Colors.brandGold.opacity(0.2))
+                                        .frame(width: 50, height: 50)
+                                        .overlay(
+                                            Text(authStore.userProfile?.displayName.prefix(1).uppercased() ?? "U")
+                                                .font(.title3.bold())
+                                                .foregroundColor(Design.Colors.brandGold)
+                                        )
 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(authStore.userProfile?.displayName ?? "User")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(authStore.userProfile?.displayName ?? "User")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
 
-                                    Text("View Profile")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.7))
+                                        Text("View Profile")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
                                 }
+                                .padding(.vertical, 8)
                             }
-                            .padding(.vertical, 8)
+                        } else {
+                            // Show login button when not authenticated
+                            Button {
+                                showingLogin = true
+                            } label: {
+                                HStack(spacing: 16) {
+                                    Circle()
+                                        .fill(Design.Colors.actionBlue.opacity(0.2))
+                                        .frame(width: 50, height: 50)
+                                        .overlay(
+                                            Image(systemName: "person.circle.fill")
+                                                .font(.title2)
+                                                .foregroundColor(Design.Colors.actionBlue)
+                                        )
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Login / Sign Up")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+
+                                        Text("Save your stats and custom roles")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.3))
+                                }
+                                .padding(.vertical, 8)
+                            }
                         }
                     }
                     .listRowBackground(Design.Colors.surface1)
 
-                    // Stats Section
-                    Section("Statistics") {
-                        NavigationLink {
-                            PlayerStatsView()
-                                .environmentObject(authStore)
-                        } label: {
-                            SettingsRow(
-                                icon: "chart.bar.fill",
-                                title: "Player Stats",
-                                color: Design.Colors.successGreen
-                            )
-                        }
+                    // Stats Section (only show when authenticated)
+                    if authStore.isAuthenticated {
+                        Section("Statistics") {
+                            NavigationLink {
+                                PlayerStatsView()
+                                    .environmentObject(authStore)
+                            } label: {
+                                SettingsRow(
+                                    icon: "chart.bar.fill",
+                                    title: "Player Stats",
+                                    color: Design.Colors.successGreen
+                                )
+                            }
 
-                        NavigationLink {
-                            CustomRolesView()
-                                .environmentObject(authStore)
-                        } label: {
-                            SettingsRow(
-                                icon: "person.3.fill",
-                                title: "Custom Roles",
-                                color: Design.Colors.actionBlue
-                            )
+                            NavigationLink {
+                                CustomRolesView()
+                                    .environmentObject(authStore)
+                            } label: {
+                                SettingsRow(
+                                    icon: "person.3.fill",
+                                    title: "Custom Roles",
+                                    color: Design.Colors.actionBlue
+                                )
+                            }
                         }
+                        .listRowBackground(Design.Colors.surface1)
                     }
-                    .listRowBackground(Design.Colors.surface1)
 
                     // About Section
                     Section("About") {
@@ -82,6 +121,10 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $showingLogin) {
+                LoginView()
+                    .environmentObject(authStore)
+            }
         }
     }
 }
