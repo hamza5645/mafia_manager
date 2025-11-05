@@ -4,6 +4,7 @@ import UIKit
 struct GameOverView: View {
     @EnvironmentObject private var store: GameStore
     @Environment(\.dismiss) private var dismiss
+    @State private var hasSynced = false
 
     var body: some View {
         let logText = store.exportLogText(includeNames: true)
@@ -24,6 +25,13 @@ struct GameOverView: View {
             .padding()
         }
         .navigationTitle("Game Over")
+        .task {
+            // Sync stats to cloud when game is over (only once)
+            if !hasSynced {
+                await store.syncPlayerStatsToCloud()
+                hasSynced = true
+            }
+        }
     }
 
     private var winnerBanner: some View {

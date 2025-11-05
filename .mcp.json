@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp"
+    },
+    "xcode": {
+      "command": "npx",
+      "args": ["-y", "xcode-mcp-server"],
+      "env": {
+        "PROJECTS_BASE_DIR": "/Users/hamzaosama/Documents/Developer/SwiftUI"
+      }
+    }
+  }
+}

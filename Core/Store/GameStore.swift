@@ -8,11 +8,18 @@ final class GameStore: ObservableObject {
     @Published var isFreshSetup: Bool = true
     @Published var flowID: UUID = UUID()
 
+    private let databaseService = DatabaseService()
+    private var authStore: AuthStore?
+
     init() {
         if let saved = Persistence.shared.load() {
             self.state = saved
             self.isFreshSetup = saved.players.isEmpty
         }
+    }
+
+    func setAuthStore(_ authStore: AuthStore) {
+        self.authStore = authStore
     }
 
     // MARK: - Setup & Persistence
@@ -199,6 +206,51 @@ final class GameStore: ObservableObject {
         evaluateWinners(startOfDay: false)
 
         save()
+    }
+
+    // MARK: - Cloud Sync
+
+    func syncPlayerStatsToCloud() async {
+        guard let userId = authStore?.currentUserId,
+              authStore?.isAuthenticated == true,
+              state.isGameOver,
+              let winner = state.winner else { return }
+
+        // Calculate kills per player (only mafia can get kills)
+        var killsPerPlayer: [UUID: Int] = [:]
+        for night in state.nightHistory {
+            if let killedID = night.resultingDeaths.first {
+                // Find which mafia players were alive during this night
+                let aliveMafiaInNight = state.players.filter { player in
+                    player.role == .mafia &&
+                    night.mafiaNumbers.contains(player.number)
+                }
+                // Distribute the kill equally among all mafia (or assign to one)
+                for mafiaPlayer in aliveMafiaInNight {
+                    killsPerPlayer[mafiaPlayer.id, default: 0] += 1
+                }
+            }
+        }
+
+        // Sync stats for each player
+        for player in state.players {
+            let playerWon = (winner == .mafia && player.role == .mafia) ||
+                           (winner != .mafia && player.role != .mafia)
+            let kills = killsPerPlayer[player.id] ?? 0
+
+            do {
+                try await databaseService.upsertPlayerStat(
+                    userId: userId,
+                    playerName: player.name,
+                    role: player.role,
+                    won: playerWon,
+                    kills: kills
+                )
+            } catch {
+                print("Error syncing stats for \(player.name): \(error)")
+                // Continue with other players even if one fails
+            }
+        }
     }
 
     // MARK: - Victory

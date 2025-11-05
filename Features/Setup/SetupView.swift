@@ -118,6 +118,16 @@ struct SetupView: View {
         }
         .background(Design.Colors.surface0)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundColor(Design.Colors.brandGold)
+                }
+            }
+        }
         .onAppear {
             if store.isFreshSetup {
                 resetNameFields(animated: false)
