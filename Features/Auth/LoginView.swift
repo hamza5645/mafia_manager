@@ -194,8 +194,10 @@ struct PasswordResetView: View {
                         let success = await authStore.resetPassword(email: sanitizedResetEmail)
                         if success {
                             showSuccess = true
-                            try? await Task.sleep(nanoseconds: 2_000_000_000)
-                            dismiss()
+                            // Auto-dismiss after showing success message
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                dismiss()
+                            }
                         }
                     }
                 } label: {

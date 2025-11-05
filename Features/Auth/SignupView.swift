@@ -31,7 +31,10 @@ struct SignupView: View {
 
                     // Input Fields
                     VStack(spacing: 16) {
-                        TextField("Display Name", text: $displayName)
+                        TextField("Display Name", text: Binding(
+                            get: { displayName },
+                            set: { displayName = String($0.prefix(50)) }
+                        ))
                             .textContentType(.name)
                             .textInputAutocapitalization(.words)
                             .padding()
@@ -43,7 +46,10 @@ struct SignupView: View {
                                     .stroke(Design.Colors.stroke, lineWidth: 1)
                             )
 
-                        TextField("Email", text: $email)
+                        TextField("Email", text: Binding(
+                            get: { email },
+                            set: { email = String($0.prefix(255)) }
+                        ))
                             .textContentType(.emailAddress)
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
@@ -57,7 +63,10 @@ struct SignupView: View {
                                     .stroke(Design.Colors.stroke, lineWidth: 1)
                             )
 
-                        SecureField("Password", text: $password)
+                        SecureField("Password", text: Binding(
+                            get: { password },
+                            set: { password = String($0.prefix(72)) }
+                        ))
                             .textContentType(.newPassword)
                             .disableAutocorrection(true)
                             .padding()
@@ -69,7 +78,10 @@ struct SignupView: View {
                                     .stroke(Design.Colors.stroke, lineWidth: 1)
                             )
 
-                        SecureField("Confirm Password", text: $confirmPassword)
+                        SecureField("Confirm Password", text: Binding(
+                            get: { confirmPassword },
+                            set: { confirmPassword = String($0.prefix(72)) }
+                        ))
                             .textContentType(.newPassword)
                             .disableAutocorrection(true)
                             .padding()
@@ -197,13 +209,28 @@ struct SignupView: View {
             return false
         }
 
+        guard sanitizedDisplayName.count <= 50 else {
+            validationError = "Display name must be 50 characters or less"
+            return false
+        }
+
         guard isValidEmail(sanitizedEmail) else {
             validationError = "Please enter a valid email address"
             return false
         }
 
+        guard sanitizedEmail.count <= 255 else {
+            validationError = "Email must be 255 characters or less"
+            return false
+        }
+
         guard sanitizedPassword.count >= 6 else {
             validationError = "Password must be at least 6 characters"
+            return false
+        }
+
+        guard sanitizedPassword.count <= 72 else {
+            validationError = "Password must be 72 characters or less"
             return false
         }
 

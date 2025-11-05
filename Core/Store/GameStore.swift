@@ -44,7 +44,10 @@ final class GameStore: ObservableObject {
         let clean = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard clean.count >= 4 && clean.count <= 19 else { return }
-        let unique = Array(NSOrderedSet(array: clean)) as! [String]
+
+        // Ensure names are unique while preserving order
+        var seen = Set<String>()
+        let unique = clean.filter { seen.insert($0).inserted }
         guard unique.count == clean.count else { return }
 
         // Random unique numbers from 1..(2 * playerCount)
@@ -247,8 +250,8 @@ final class GameStore: ObservableObject {
                     kills: kills
                 )
             } catch {
-                print("Error syncing stats for \(player.name): \(error)")
                 // Continue with other players even if one fails
+                // In production, this should log to a proper logging system
             }
         }
     }

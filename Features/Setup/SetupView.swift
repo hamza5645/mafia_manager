@@ -49,7 +49,10 @@ struct SetupView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             TextField("Player Name", text: Binding(
                                 get: { names[idx] },
-                                set: { names[idx] = $0 }
+                                set: { newValue in
+                                    // Limit player names to 30 characters
+                                    names[idx] = String(newValue.prefix(30))
+                                }
                             ))
                             .textInputAutocapitalization(.words)
                             .disableAutocorrection(true)
@@ -167,8 +170,9 @@ struct SetupView: View {
 
     private var validInput: [String] {
         let trimmed = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        let unique = Array(NSOrderedSet(array: trimmed)) as! [String]
-        return unique
+        // Remove duplicates while preserving order
+        var seen = Set<String>()
+        return trimmed.filter { seen.insert($0).inserted }
     }
 
     private var isValid: Bool {

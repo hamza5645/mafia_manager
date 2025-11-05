@@ -23,67 +23,26 @@ final class AuthService {
     // MARK: - Sign Up
 
     func signUp(email: String, password: String, displayName: String) async throws -> User {
-        print("🔵 AuthService.signUp called with email: \(email)")
-
         // Pass display_name in user metadata
-        // The database trigger will automatically create the profile
-        do {
-            let response = try await supabase.auth.signUp(
-                email: email,
-                password: password,
-                data: ["display_name": .string(displayName)]
-            )
+        // The database trigger will automatically create the profile and confirm email
+        let response = try await supabase.auth.signUp(
+            email: email,
+            password: password,
+            data: ["display_name": .string(displayName)]
+        )
 
-            let user = response.user
-            print("✅ Signup successful for user: \(user.id)")
-
-            try await autoConfirmUser(userId: user.id)
-            print("✅ Auto-confirmed email for user: \(user.id)")
-
-            // Wait a brief moment for the trigger to complete
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-
-            return user
-        } catch {
-            print("❌ Signup error: \(error)")
-            print("❌ Error description: \(error.localizedDescription)")
-            if let nsError = error as NSError? {
-                print("❌ Error domain: \(nsError.domain)")
-                print("❌ Error code: \(nsError.code)")
-                print("❌ Error userInfo: \(nsError.userInfo)")
-            }
-            throw error
-        }
-    }
-
-    private func autoConfirmUser(userId: UUID) async throws {
-        let params = ["p_user_id": userId.uuidString]
-        try await supabase.rpc("auto_confirm_user", params: params).execute()
+        return response.user
     }
 
     // MARK: - Sign In
 
     func signIn(email: String, password: String) async throws -> Session {
-        print("🔵 AuthService.signIn called with email: \(email)")
+        let session = try await supabase.auth.signIn(
+            email: email,
+            password: password
+        )
 
-        do {
-            let session = try await supabase.auth.signIn(
-                email: email,
-                password: password
-            )
-
-            print("✅ Sign in successful for user: \(session.user.id)")
-            return session
-        } catch {
-            print("❌ Sign in error: \(error)")
-            print("❌ Error description: \(error.localizedDescription)")
-            if let nsError = error as NSError? {
-                print("❌ Error domain: \(nsError.domain)")
-                print("❌ Error code: \(nsError.code)")
-                print("❌ Error userInfo: \(nsError.userInfo)")
-            }
-            throw error
-        }
+        return session
     }
 
     // MARK: - Sign Out
