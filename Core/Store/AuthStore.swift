@@ -81,18 +81,35 @@ final class AuthStore: ObservableObject {
 
     // MARK: - Sign Up
 
-    func signUp(email: String, password: String, displayName: String) async {
+    func signUp(email: String, password: String, displayName: String) async -> Bool {
         isLoading = true
         errorMessage = nil
 
         do {
             _ = try await authService.signUp(email: email, password: password, displayName: displayName)
-            // Auth state listener will handle updating isAuthenticated
+            // Signup successful - auth state listener will handle updating isAuthenticated if auto-confirmed
+            isLoading = false
+            return true
+        } catch let error as NSError {
+            // Parse Supabase error messages
+            if let errorDict = error.userInfo["com.supabase.auth"] as? [String: Any],
+               let message = errorDict["msg"] as? String {
+                errorMessage = message
+            } else if error.localizedDescription.contains("already registered") ||
+                      error.localizedDescription.contains("already been registered") {
+                errorMessage = "This email is already registered. Try signing in instead."
+            } else if error.localizedDescription.contains("invalid") && error.localizedDescription.contains("email") {
+                errorMessage = "This email address is invalid or not allowed."
+            } else {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+            return false
         } catch {
             errorMessage = error.localizedDescription
+            isLoading = false
+            return false
         }
-
-        isLoading = false
     }
 
     // MARK: - Sign In

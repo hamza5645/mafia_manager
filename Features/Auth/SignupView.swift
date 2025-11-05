@@ -8,6 +8,7 @@ struct SignupView: View {
     @State private var confirmPassword = ""
     @State private var displayName = ""
     @State private var validationError: String?
+    @State private var showSuccessAlert = false
 
     var body: some View {
         ZStack {
@@ -99,10 +100,18 @@ struct SignupView: View {
                     Button {
                         if validateForm() {
                             Task {
-                                await authStore.signUp(email: email, password: password, displayName: displayName)
-                                if authStore.isAuthenticated {
-                                    dismiss()
+                                let success = await authStore.signUp(email: email, password: password, displayName: displayName)
+                                if success {
+                                    // Signup successful
+                                    if authStore.isAuthenticated {
+                                        // Auto-confirmed, logged in immediately
+                                        dismiss()
+                                    } else {
+                                        // Email confirmation required
+                                        showSuccessAlert = true
+                                    }
                                 }
+                                // If not success, error will be shown in errorMessage
                             }
                         }
                     } label: {
@@ -171,6 +180,13 @@ struct SignupView: View {
         }
         .onAppear {
             authStore.clearError()
+        }
+        .alert("Account Created!", isPresented: $showSuccessAlert) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            Text("Please check your email to verify your account before signing in.")
         }
     }
 

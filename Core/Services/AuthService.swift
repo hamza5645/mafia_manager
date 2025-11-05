@@ -23,20 +23,34 @@ final class AuthService {
     // MARK: - Sign Up
 
     func signUp(email: String, password: String, displayName: String) async throws -> User {
+        print("🔵 AuthService.signUp called with email: \(email)")
+
         // Pass display_name in user metadata
         // The database trigger will automatically create the profile
-        let response = try await supabase.auth.signUp(
-            email: email,
-            password: password,
-            data: ["display_name": .string(displayName)]
-        )
+        do {
+            let response = try await supabase.auth.signUp(
+                email: email,
+                password: password,
+                data: ["display_name": .string(displayName)]
+            )
 
-        let user = response.user
+            let user = response.user
+            print("✅ Signup successful for user: \(user.id)")
 
-        // Wait a brief moment for the trigger to complete
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Wait a brief moment for the trigger to complete
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
-        return user
+            return user
+        } catch {
+            print("❌ Signup error: \(error)")
+            print("❌ Error description: \(error.localizedDescription)")
+            if let nsError = error as NSError? {
+                print("❌ Error domain: \(nsError.domain)")
+                print("❌ Error code: \(nsError.code)")
+                print("❌ Error userInfo: \(nsError.userInfo)")
+            }
+            throw error
+        }
     }
 
     // MARK: - Sign In
