@@ -59,12 +59,18 @@ struct CustomRolesView: View {
     }
 
     private func loadConfigs() async {
-        guard let userId = authStore.currentUserId else { return }
+        guard let userId = authStore.currentUserId,
+              authStore.isAuthenticated else {
+            errorMessage = "You must be logged in to view custom roles"
+            return
+        }
 
         isLoading = true
         errorMessage = nil
 
         do {
+            // WORKAROUND: Pass access token to database service
+            databaseService.accessToken = authStore.accessToken
             customConfigs = try await databaseService.getCustomRoleConfigs(userId: userId)
         } catch {
             errorMessage = error.localizedDescription
@@ -74,7 +80,14 @@ struct CustomRolesView: View {
     }
 
     private func deleteConfig(_ config: CustomRoleConfig) async {
+        guard authStore.isAuthenticated else {
+            errorMessage = "You must be logged in to delete custom roles"
+            return
+        }
+
         do {
+            // WORKAROUND: Pass access token to database service
+            databaseService.accessToken = authStore.accessToken
             try await databaseService.deleteCustomRoleConfig(id: config.id)
             await loadConfigs()
         } catch {
@@ -285,7 +298,11 @@ struct AddCustomRoleConfigView: View {
     }
 
     private func saveConfig() async {
-        guard let userId = authStore.currentUserId else { return }
+        guard let userId = authStore.currentUserId,
+              authStore.isAuthenticated else {
+            errorMessage = "You must be logged in to save custom roles"
+            return
+        }
 
         isLoading = true
         errorMessage = nil
@@ -308,6 +325,8 @@ struct AddCustomRoleConfigView: View {
         )
 
         do {
+            // WORKAROUND: Pass access token to database service
+            databaseService.accessToken = authStore.accessToken
             try await databaseService.createCustomRoleConfig(newConfig)
             await onSave()
             dismiss()

@@ -144,11 +144,18 @@ final class DatabaseService {
     // MARK: - Custom Role Configs
 
     func getCustomRoleConfigs(userId: UUID) async throws -> [CustomRoleConfig] {
-        let response: [CustomRoleConfig] = try await supabase
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
             .from("custom_roles_configs")
             .select()
             .eq("user_id", value: userId.uuidString)
             .order("config_name")
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        let response: [CustomRoleConfig] = try await request
             .execute()
             .value
 
@@ -156,10 +163,17 @@ final class DatabaseService {
     }
 
     func getCustomRoleConfig(id: UUID) async throws -> CustomRoleConfig? {
-        let response: [CustomRoleConfig] = try await supabase
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
             .from("custom_roles_configs")
             .select()
             .eq("id", value: id.uuidString)
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        let response: [CustomRoleConfig] = try await request
             .execute()
             .value
 
@@ -167,10 +181,16 @@ final class DatabaseService {
     }
 
     func createCustomRoleConfig(_ config: CustomRoleConfig) async throws {
-        try await supabase
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
             .from("custom_roles_configs")
             .insert(config)
-            .execute()
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        try await request.execute()
     }
 
     func updateCustomRoleConfig(_ config: CustomRoleConfig) async throws {
@@ -192,19 +212,31 @@ final class DatabaseService {
             updatedAt: Date()
         )
 
-        try await supabase
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
             .from("custom_roles_configs")
             .update(updateData)
             .eq("id", value: config.id.uuidString)
-            .execute()
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        try await request.execute()
     }
 
     func deleteCustomRoleConfig(id: UUID) async throws {
-        try await supabase
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
             .from("custom_roles_configs")
             .delete()
             .eq("id", value: id.uuidString)
-            .execute()
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        try await request.execute()
     }
 
     // MARK: - Player Groups

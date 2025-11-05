@@ -61,24 +61,11 @@ struct ProfileView: View {
                                 }
                             }
                         }
-
-                        // User ID (truncated)
-                        if let userId = authStore.currentUserId {
-                            Text("ID: \(userId.uuidString.prefix(8))...")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.5))
-                        }
                     }
                     .padding(.top, 40)
 
                     // Account Info
                     VStack(spacing: 16) {
-                        ProfileCard(
-                            icon: "envelope.fill",
-                            title: "Email",
-                            value: "Connected"
-                        )
-
                         ProfileCard(
                             icon: "calendar",
                             title: "Member Since",

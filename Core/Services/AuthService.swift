@@ -67,6 +67,10 @@ final class AuthService {
         try await supabase.auth.session
     }
 
+    func restoreSession(accessToken: String, refreshToken: String) async throws {
+        try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+    }
+
     // Listen to auth state changes
     func onAuthStateChange(_ handler: @escaping (AuthChangeEvent, Session?) -> Void) -> Task<Void, Never> {
         Task {

@@ -12,8 +12,24 @@ final class AuthStore: ObservableObject {
     @Published var errorMessage: String?
 
     // WORKAROUND: Store tokens manually since SDK doesn't persist session
-    @Published var accessToken: String?
-    @Published var refreshToken: String?
+    @Published var accessToken: String? {
+        didSet {
+            if let token = accessToken {
+                UserDefaults.standard.set(token, forKey: "auth_access_token")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "auth_access_token")
+            }
+        }
+    }
+    @Published var refreshToken: String? {
+        didSet {
+            if let token = refreshToken {
+                UserDefaults.standard.set(token, forKey: "auth_refresh_token")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "auth_refresh_token")
+            }
+        }
+    }
 
     private let authService = AuthService()
     private let databaseService = DatabaseService()
@@ -26,7 +42,23 @@ final class AuthStore: ObservableObject {
     }
 
     init() {
+        // Restore tokens from UserDefaults
+        self.accessToken = UserDefaults.standard.string(forKey: "auth_access_token")
+        self.refreshToken = UserDefaults.standard.string(forKey: "auth_refresh_token")
+
         Task {
+            // Try to restore session if we have tokens
+            if let accessToken = self.accessToken,
+               let refreshToken = self.refreshToken {
+                do {
+                    try await authService.restoreSession(accessToken: accessToken, refreshToken: refreshToken)
+                } catch {
+                    // If session restoration fails, clear tokens
+                    self.accessToken = nil
+                    self.refreshToken = nil
+                }
+            }
+
             await checkAuthState()
             setupAuthStateListener()
         }
