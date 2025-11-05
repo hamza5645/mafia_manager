@@ -4,6 +4,12 @@
 
 To fix the "new row violates row-level security policy" error, you need to set up a database trigger that automatically creates user profiles.
 
+### Step 0: (Optional) Auto-confirm emails
+
+If you want new accounts to skip the email verification step, run `auto_confirm_users.sql` in the SQL editor.  
+The script drops/recreates the helper function and marks users as verified by setting `email_confirmed_at`.
+If you previously ran an older version of this script, run it again so the function is replaced.
+
 ### Step 1: Set Up the Database Trigger (REQUIRED)
 
 1. Go to your Supabase project dashboard: https://ptspsxqmbfvcwczjpztd.supabase.co

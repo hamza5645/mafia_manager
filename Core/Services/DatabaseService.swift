@@ -9,7 +9,7 @@ final class DatabaseService {
     // MARK: - Player Stats
 
     func getPlayerStats(userId: UUID) async throws -> [PlayerStats] {
-        let response: [PlayerStats] = try await supabase.database
+        let response: [PlayerStats] = try await supabase
             .from("player_stats")
             .select()
             .eq("user_id", value: userId.uuidString)
@@ -21,7 +21,7 @@ final class DatabaseService {
     }
 
     func getPlayerStat(userId: UUID, playerName: String) async throws -> PlayerStats? {
-        let response: [PlayerStats] = try await supabase.database
+        let response: [PlayerStats] = try await supabase
             .from("player_stats")
             .select()
             .eq("user_id", value: userId.uuidString)
@@ -33,7 +33,7 @@ final class DatabaseService {
     }
 
     func createPlayerStat(_ stat: PlayerStats) async throws {
-        try await supabase.database
+        try await supabase
             .from("player_stats")
             .insert(stat)
             .execute()
@@ -76,7 +76,7 @@ final class DatabaseService {
             updatedAt: Date()
         )
 
-        try await supabase.database
+        try await supabase
             .from("player_stats")
             .update(updateData)
             .eq("id", value: stat.id.uuidString)
@@ -84,7 +84,7 @@ final class DatabaseService {
     }
 
     func deletePlayerStat(id: UUID) async throws {
-        try await supabase.database
+        try await supabase
             .from("player_stats")
             .delete()
             .eq("id", value: id.uuidString)
@@ -141,7 +141,7 @@ final class DatabaseService {
     // MARK: - Custom Role Configs
 
     func getCustomRoleConfigs(userId: UUID) async throws -> [CustomRoleConfig] {
-        let response: [CustomRoleConfig] = try await supabase.database
+        let response: [CustomRoleConfig] = try await supabase
             .from("custom_roles_configs")
             .select()
             .eq("user_id", value: userId.uuidString)
@@ -153,7 +153,7 @@ final class DatabaseService {
     }
 
     func getCustomRoleConfig(id: UUID) async throws -> CustomRoleConfig? {
-        let response: [CustomRoleConfig] = try await supabase.database
+        let response: [CustomRoleConfig] = try await supabase
             .from("custom_roles_configs")
             .select()
             .eq("id", value: id.uuidString)
@@ -164,7 +164,7 @@ final class DatabaseService {
     }
 
     func createCustomRoleConfig(_ config: CustomRoleConfig) async throws {
-        try await supabase.database
+        try await supabase
             .from("custom_roles_configs")
             .insert(config)
             .execute()
@@ -189,7 +189,7 @@ final class DatabaseService {
             updatedAt: Date()
         )
 
-        try await supabase.database
+        try await supabase
             .from("custom_roles_configs")
             .update(updateData)
             .eq("id", value: config.id.uuidString)
@@ -197,7 +197,7 @@ final class DatabaseService {
     }
 
     func deleteCustomRoleConfig(id: UUID) async throws {
-        try await supabase.database
+        try await supabase
             .from("custom_roles_configs")
             .delete()
             .eq("id", value: id.uuidString)

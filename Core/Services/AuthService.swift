@@ -37,8 +37,11 @@ final class AuthService {
             let user = response.user
             print("✅ Signup successful for user: \(user.id)")
 
+            try await autoConfirmUser(userId: user.id)
+            print("✅ Auto-confirmed email for user: \(user.id)")
+
             // Wait a brief moment for the trigger to complete
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
 
             return user
         } catch {
@@ -51,6 +54,11 @@ final class AuthService {
             }
             throw error
         }
+    }
+
+    private func autoConfirmUser(userId: UUID) async throws {
+        let params = ["p_user_id": userId.uuidString]
+        try await supabase.rpc("auto_confirm_user", params: params).execute()
     }
 
     // MARK: - Sign In
@@ -111,7 +119,7 @@ final class AuthService {
     // when a new user signs up. See supabase/alternative_trigger_approach.sql
 
     func getUserProfile(userId: UUID) async throws -> UserProfile {
-        let response: UserProfile = try await supabase.database
+        let response: UserProfile = try await supabase
             .from("profiles")
             .select()
             .eq("id", value: userId.uuidString)
@@ -135,7 +143,7 @@ final class AuthService {
 
         let updateData = UpdateData(displayName: displayName, updatedAt: Date())
 
-        try await supabase.database
+        try await supabase
             .from("profiles")
             .update(updateData)
             .eq("id", value: userId.uuidString)

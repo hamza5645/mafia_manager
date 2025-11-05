@@ -125,7 +125,7 @@ final class GameStore: ObservableObject {
     // MARK: - Night phase
 
     func endNight(mafiaTargetID: UUID?, inspectorCheckedID: UUID?, doctorProtectedID: UUID?) {
-        var resulting: [UUID] = []
+        let resulting: [UUID] = []
         var inspectorResult: Bool?
         var inspectorRole: Role?
 
@@ -219,7 +219,7 @@ final class GameStore: ObservableObject {
         // Calculate kills per player (only mafia can get kills)
         var killsPerPlayer: [UUID: Int] = [:]
         for night in state.nightHistory {
-            if let killedID = night.resultingDeaths.first {
+            if night.resultingDeaths.first != nil {
                 // Find which mafia players were alive during this night
                 let aliveMafiaInNight = state.players.filter { player in
                     player.role == .mafia &&
