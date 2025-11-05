@@ -28,7 +28,8 @@ final class Persistence: @unchecked Sendable {
             let data = try encoder.encode(state)
             try data.write(to: stateURL, options: .atomic)
         } catch {
-            print("[Persistence] Save error: \(error)")
+            // Silently fail - persistence is not critical for app functionality
+            // In production, this should log to a proper logging system
         }
     }
 

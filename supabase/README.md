@@ -1,64 +1,64 @@
-# Supabase Database Setup
+# Supabase Setup Guide
 
-## IMPORTANT: Required Setup for Authentication
+Complete setup guide for the Mafia Manager Supabase backend.
 
-To fix the "new row violates row-level security policy" error, you need to set up a database trigger that automatically creates user profiles.
+## Quick Setup (2 Steps)
 
-### Step 0: (Optional) Auto-confirm emails
+### Step 1: Disable Email Confirmation
 
-If you want new accounts to skip the email verification step, run `auto_confirm_users.sql` in the SQL editor.  
-The script drops/recreates the helper function and marks users as verified by setting `email_confirmed_at`.
-If you previously ran an older version of this script, run it again so the function is replaced.
+1. Go to your Supabase Dashboard
+2. Navigate to **Authentication** → **Providers** → **Email**
+3. Scroll down and **DISABLE** the "Confirm email" toggle
+4. Click **Save**
 
-### Step 1: Set Up the Database Trigger (REQUIRED)
+### Step 2: Run Database Setup
 
-1. Go to your Supabase project dashboard: https://ptspsxqmbfvcwczjpztd.supabase.co
-2. Navigate to the SQL Editor (left sidebar)
-3. Click "New Query"
-4. Copy and paste the contents of `alternative_trigger_approach.sql`
-5. Click "Run" to execute
+1. In your Supabase Dashboard, go to the **SQL Editor**
+2. Click **"New Query"**
+3. Copy and paste the entire contents of `setup.sql`
+4. Click **"Run"**
 
-**What this does:**
-- Creates a database trigger that automatically creates a profile when a new user signs up
-- The trigger runs with elevated privileges, bypassing RLS
-- The display_name is pulled from the user metadata passed during signup
-- This is the recommended approach by Supabase for handling profile creation
+That's it! The single SQL file creates everything:
+- All database tables (profiles, player_stats, custom_roles_configs)
+- Row-Level Security policies
+- Auto-profile creation trigger
 
-### Step 2: Verify RLS Policies (Optional)
+### Step 3: Update API Credentials
 
-If you want to check what RLS policies currently exist:
+1. In Supabase, go to **Settings** → **API**
+2. Copy your Project URL and `anon` public key
+3. Update `Core/Services/SupabaseConfig.swift`:
 
-1. In SQL Editor, run the contents of `diagnose_rls.sql`
-2. This will show you all existing policies on the profiles table
+```swift
+enum SupabaseConfig {
+    static let supabaseURL = "YOUR_PROJECT_URL"
+    static let supabaseAnonKey = "YOUR_ANON_KEY"
+}
+```
 
-### Step 3: Fix INSERT Policy (Only if needed)
+## Testing
 
-If you're still having issues after Step 1, try running `fix_insert_policy.sql` to recreate the INSERT policy.
+1. Build and run the app
+2. Sign up with a test account
+3. You should be immediately signed in (no email confirmation)
+4. Check Supabase dashboard to verify user and profile were created
 
-## How It Works Now
+## What the Setup Creates
 
-**Before (Old Approach - Had Issues):**
-1. User signs up
-2. Swift code tries to manually insert profile
-3. RLS policy blocks it because session might not be fully established ❌
+**Tables:**
+- `profiles` - User display names
+- `player_stats` - Game statistics per player
+- `custom_roles_configs` - Saved role distributions
 
-**After (New Approach - Works Reliably):**
-1. User signs up with display_name in metadata
-2. Database trigger automatically creates profile with elevated privileges
-3. No RLS issues because trigger runs as SECURITY DEFINER ✅
+**Security:**
+- Row-Level Security (RLS) ensures users only access their own data
+- Automatic profile creation via database trigger
 
-## Database Tables
+## Troubleshooting
 
-This setup manages three tables:
+**"Email not confirmed" error:**
+- Disable "Confirm email" in Authentication settings (Step 1)
 
-1. **profiles** table:
-   - Auto-created by trigger on signup
-   - Users can view and update only their own profile
-
-2. **player_stats** table:
-   - Users can view, insert, update, and delete only their own stats
-
-3. **custom_roles_configs** table:
-   - Users can view, insert, update, and delete only their own role configurations
-
-All tables have RLS enabled to ensure users can only access their own data.
+**Profile not created:**
+- Make sure you ran the entire `setup.sql` file
+- Check Supabase logs for errors

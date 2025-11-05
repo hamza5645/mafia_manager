@@ -81,7 +81,8 @@ final class AuthStore: ObservableObject {
         do {
             userProfile = try await authService.getUserProfile(userId: userId)
         } catch {
-            print("Error loading user profile: \(error)")
+            // Silently fail - profile will be loaded on next auth state change
+            errorMessage = "Could not load user profile"
         }
     }
 
@@ -97,8 +98,18 @@ final class AuthStore: ObservableObject {
 
         do {
             _ = try await authService.signUp(email: sanitizedEmail, password: sanitizedPassword, displayName: trimmedDisplayName)
-        } catch let signUpError as NSError {
-            errorMessage = mapAuthError(signUpError, operation: .signUp)
+
+            // With the auto-confirm trigger, the user should be immediately signed in
+            // If not, attempt sign-in
+            if await authService.currentSession == nil {
+                _ = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
+            }
+
+            // Signup + auto sign-in successful - auth state listener updates isAuthenticated
+            isLoading = false
+            return true
+        } catch let error as NSError {
+            errorMessage = mapAuthError(error, operation: .signUp)
             isLoading = false
             return false
         } catch {
@@ -106,37 +117,6 @@ final class AuthStore: ObservableObject {
             isLoading = false
             return false
         }
-
-        if await authService.currentSession == nil {
-            let maxAttempts = 3
-            for attempt in 1...maxAttempts {
-                do {
-                    _ = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
-                    break
-                } catch let signInError as NSError {
-                    let message = mapAuthError(signInError, operation: .signIn)
-
-                    if message.lowercased().contains("verify your email") || message.lowercased().contains("email not confirmed") {
-                        if attempt < maxAttempts {
-                            try? await Task.sleep(nanoseconds: 1_000_000_000)
-                            continue
-                        }
-                    }
-
-                    errorMessage = message
-                    isLoading = false
-                    return false
-                } catch {
-                    errorMessage = error.localizedDescription
-                    isLoading = false
-                    return false
-                }
-            }
-        }
-
-        // Signup + auto sign-in successful - auth state listener updates isAuthenticated
-        isLoading = false
-        return true
     }
 
     // MARK: - Sign In
@@ -237,8 +217,8 @@ final class AuthStore: ObservableObject {
                 return AuthError.emailAlreadyInUse.errorDescription ?? message
             }
 
-            if normalized.contains("auto_confirm_user") || normalized.contains("permission denied for relation users") {
-                return "Auto-confirmation is not configured. Run supabase/auto_confirm_users.sql in your Supabase project."
+            if normalized.contains("email not confirmed") || normalized.contains("verify your email") {
+                return "Email confirmation is enabled in Supabase. Disable it in Authentication → Providers → Email settings."
             }
 
             if normalized.contains("invalid login credentials") {
