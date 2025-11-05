@@ -56,12 +56,26 @@ final class AuthService {
     // MARK: - Sign In
 
     func signIn(email: String, password: String) async throws -> Session {
-        let session = try await supabase.auth.signIn(
-            email: email,
-            password: password
-        )
+        print("🔵 AuthService.signIn called with email: \(email)")
 
-        return session
+        do {
+            let session = try await supabase.auth.signIn(
+                email: email,
+                password: password
+            )
+
+            print("✅ Sign in successful for user: \(session.user.id)")
+            return session
+        } catch {
+            print("❌ Sign in error: \(error)")
+            print("❌ Error description: \(error.localizedDescription)")
+            if let nsError = error as NSError? {
+                print("❌ Error domain: \(nsError.domain)")
+                print("❌ Error code: \(nsError.code)")
+                print("❌ Error userInfo: \(nsError.userInfo)")
+            }
+            throw error
+        }
     }
 
     // MARK: - Sign Out

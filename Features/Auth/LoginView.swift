@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authStore: AuthStore
+    @Environment(\.dismiss) var dismiss
     @State private var email = ""
     @State private var password = ""
     @State private var showSignup = false
@@ -126,6 +127,11 @@ struct LoginView: View {
         }
         .onAppear {
             authStore.clearError()
+        }
+        .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                dismiss()
+            }
         }
     }
 }

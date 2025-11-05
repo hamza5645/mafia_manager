@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authStore: AuthStore
+    @Environment(\.dismiss) var dismiss
     @State private var isEditingName = false
     @State private var editedDisplayName = ""
     @State private var showLogoutConfirmation = false
@@ -117,6 +118,11 @@ struct ProfileView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
+            if !isAuthenticated {
+                dismiss()
+            }
         }
     }
 
