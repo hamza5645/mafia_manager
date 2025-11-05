@@ -32,7 +32,8 @@ struct LoginView: View {
                     VStack(spacing: 16) {
                         TextField("Email", text: $email)
                             .textContentType(.emailAddress)
-                            .autocapitalization(.none)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
                             .keyboardType(.emailAddress)
                             .padding()
                             .background(Design.Colors.surface1)
@@ -45,6 +46,7 @@ struct LoginView: View {
 
                         SecureField("Password", text: $password)
                             .textContentType(.password)
+                            .disableAutocorrection(true)
                             .padding()
                             .background(Design.Colors.surface1)
                             .foregroundColor(.white)
@@ -67,7 +69,7 @@ struct LoginView: View {
                     // Sign In Button
                     Button {
                         Task {
-                            await authStore.signIn(email: email, password: password)
+                            await authStore.signIn(email: sanitizedEmail, password: sanitizedPassword)
                         }
                     } label: {
                         HStack {
@@ -86,7 +88,7 @@ struct LoginView: View {
                         .cornerRadius(Design.Radii.card)
                         .shadow(color: Design.Colors.actionBlue.opacity(0.3), radius: 16, y: 8)
                     }
-                    .disabled(authStore.isLoading || email.isEmpty || password.isEmpty)
+                    .disabled(authStore.isLoading || sanitizedEmail.isEmpty || sanitizedPassword.isEmpty)
                     .padding(.horizontal, 32)
 
                     // Forgot Password
@@ -161,7 +163,8 @@ struct PasswordResetView: View {
 
                 TextField("Email", text: $email)
                     .textContentType(.emailAddress)
-                    .autocapitalization(.none)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
                     .keyboardType(.emailAddress)
                     .padding()
                     .background(Design.Colors.surface1)
@@ -178,14 +181,22 @@ struct PasswordResetView: View {
                         .font(.caption)
                         .foregroundColor(Design.Colors.successGreen)
                         .padding(.horizontal, 32)
+                } else if let errorMessage = authStore.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(Design.Colors.dangerRed)
+                        .padding(.horizontal, 32)
                 }
 
                 Button {
                     Task {
-                        await authStore.resetPassword(email: email)
-                        showSuccess = true
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-                        dismiss()
+                        showSuccess = false
+                        let success = await authStore.resetPassword(email: sanitizedResetEmail)
+                        if success {
+                            showSuccess = true
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            dismiss()
+                        }
                     }
                 } label: {
                     HStack {
@@ -203,11 +214,25 @@ struct PasswordResetView: View {
                     .foregroundColor(.white)
                     .cornerRadius(Design.Radii.card)
                 }
-                .disabled(authStore.isLoading || email.isEmpty)
+                .disabled(authStore.isLoading || sanitizedResetEmail.isEmpty)
                 .padding(.horizontal, 32)
 
                 Spacer()
             }
         }
+    }
+
+    private var sanitizedResetEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
+extension LoginView {
+    private var sanitizedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private var sanitizedPassword: String {
+        password.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

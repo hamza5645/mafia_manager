@@ -15,6 +15,12 @@ final class AuthStore: ObservableObject {
     private let databaseService = DatabaseService()
     private var authStateTask: Task<Void, Never>?
 
+    private enum AuthOperation {
+        case signIn
+        case signUp
+        case resetPassword
+    }
+
     init() {
         Task {
             await checkAuthState()
@@ -86,23 +92,16 @@ final class AuthStore: ObservableObject {
         errorMessage = nil
 
         do {
-            _ = try await authService.signUp(email: email, password: password, displayName: displayName)
+            let sanitizedEmail = sanitizeEmail(email)
+            let sanitizedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            _ = try await authService.signUp(email: sanitizedEmail, password: sanitizedPassword, displayName: trimmedDisplayName)
             // Signup successful - auth state listener will handle updating isAuthenticated if auto-confirmed
             isLoading = false
             return true
         } catch let error as NSError {
-            // Parse Supabase error messages
-            if let errorDict = error.userInfo["com.supabase.auth"] as? [String: Any],
-               let message = errorDict["msg"] as? String {
-                errorMessage = message
-            } else if error.localizedDescription.contains("already registered") ||
-                      error.localizedDescription.contains("already been registered") {
-                errorMessage = "This email is already registered. Try signing in instead."
-            } else if error.localizedDescription.contains("invalid") && error.localizedDescription.contains("email") {
-                errorMessage = "This email address is invalid or not allowed."
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = mapAuthError(error, operation: .signUp)
             isLoading = false
             return false
         } catch {
@@ -119,10 +118,15 @@ final class AuthStore: ObservableObject {
         errorMessage = nil
 
         do {
-            _ = try await authService.signIn(email: email, password: password)
+            let sanitizedEmail = sanitizeEmail(email)
+            let sanitizedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            _ = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
             // Auth state listener will handle updating isAuthenticated
+        } catch let error as NSError {
+            errorMessage = mapAuthError(error, operation: .signIn)
         } catch {
-            errorMessage = "Invalid email or password"
+            errorMessage = error.localizedDescription
         }
 
         isLoading = false
@@ -146,17 +150,23 @@ final class AuthStore: ObservableObject {
 
     // MARK: - Password Reset
 
-    func resetPassword(email: String) async {
+    func resetPassword(email: String) async -> Bool {
         isLoading = true
         errorMessage = nil
 
         do {
-            try await authService.resetPassword(email: email)
+            let sanitizedEmail = sanitizeEmail(email)
+            try await authService.resetPassword(email: sanitizedEmail)
+            isLoading = false
+            return true
+        } catch let error as NSError {
+            errorMessage = mapAuthError(error, operation: .resetPassword)
         } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
+        return false
     }
 
     // MARK: - Profile Management
@@ -181,5 +191,76 @@ final class AuthStore: ObservableObject {
 
     func clearError() {
         errorMessage = nil
+    }
+
+    private func sanitizeEmail(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func mapAuthError(_ error: NSError, operation: AuthOperation) -> String {
+        if error.domain == NSURLErrorDomain {
+            return AuthError.networkError.errorDescription ?? "Network error. Please try again."
+        }
+
+        if let message = extractSupabaseMessage(from: error) {
+            let normalized = message.lowercased()
+
+            if normalized.contains("already registered") || normalized.contains("already been registered") {
+                return AuthError.emailAlreadyInUse.errorDescription ?? message
+            }
+
+            if normalized.contains("invalid login credentials") {
+                return AuthError.invalidCredentials.errorDescription ?? message
+            }
+
+            if normalized.contains("email not confirmed") || normalized.contains("email not verified") {
+                return "Please verify your email address before signing in. Check your inbox for the confirmation link."
+            }
+
+            if normalized.contains("password should be at least") || normalized.contains("weak password") {
+                return AuthError.weakPassword.errorDescription ?? message
+            }
+
+            if normalized.contains("user not found") {
+                return AuthError.userNotFound.errorDescription ?? message
+            }
+
+            return message
+        }
+
+        if error.domain == "GoTrueClientError" && error.code == 400 {
+            switch operation {
+            case .signIn:
+                return AuthError.invalidCredentials.errorDescription ?? error.localizedDescription
+            case .signUp:
+                return AuthError.unknown.errorDescription ?? error.localizedDescription
+            case .resetPassword:
+                return "We couldn't find an account with that email address."
+            }
+        }
+
+        if operation == .signIn {
+            return AuthError.invalidCredentials.errorDescription ?? error.localizedDescription
+        }
+
+        return error.localizedDescription
+    }
+
+    private func extractSupabaseMessage(from error: NSError) -> String? {
+        if let message = error.userInfo["error_description"] as? String, !message.isEmpty {
+            return message
+        }
+
+        if let dict = error.userInfo["com.supabase.auth"] as? [String: Any],
+           let message = dict["msg"] as? String,
+           !message.isEmpty {
+            return message
+        }
+
+        if let message = error.userInfo[NSLocalizedDescriptionKey] as? String, !message.isEmpty {
+            return message
+        }
+
+        return nil
     }
 }

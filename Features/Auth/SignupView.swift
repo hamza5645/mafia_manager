@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct SignupView: View {
@@ -33,7 +34,7 @@ struct SignupView: View {
                     VStack(spacing: 16) {
                         TextField("Display Name", text: $displayName)
                             .textContentType(.name)
-                            .autocapitalization(.words)
+                            .textInputAutocapitalization(.words)
                             .padding()
                             .background(Design.Colors.surface1)
                             .foregroundColor(.white)
@@ -45,7 +46,8 @@ struct SignupView: View {
 
                         TextField("Email", text: $email)
                             .textContentType(.emailAddress)
-                            .autocapitalization(.none)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
                             .keyboardType(.emailAddress)
                             .padding()
                             .background(Design.Colors.surface1)
@@ -58,6 +60,7 @@ struct SignupView: View {
 
                         SecureField("Password", text: $password)
                             .textContentType(.newPassword)
+                            .disableAutocorrection(true)
                             .padding()
                             .background(Design.Colors.surface1)
                             .foregroundColor(.white)
@@ -69,6 +72,7 @@ struct SignupView: View {
 
                         SecureField("Confirm Password", text: $confirmPassword)
                             .textContentType(.newPassword)
+                            .disableAutocorrection(true)
                             .padding()
                             .background(Design.Colors.surface1)
                             .foregroundColor(.white)
@@ -100,7 +104,7 @@ struct SignupView: View {
                     Button {
                         if validateForm() {
                             Task {
-                                let success = await authStore.signUp(email: email, password: password, displayName: displayName)
+                                let success = await authStore.signUp(email: sanitizedEmail, password: sanitizedPassword, displayName: sanitizedDisplayName)
                                 if success {
                                     // Signup successful
                                     if authStore.isAuthenticated {
@@ -141,16 +145,16 @@ struct SignupView: View {
                             .foregroundColor(.white.opacity(0.7))
 
                         HStack(spacing: 8) {
-                            Image(systemName: password.count >= 6 ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(password.count >= 6 ? Design.Colors.successGreen : .white.opacity(0.3))
+                            Image(systemName: sanitizedPassword.count >= 6 ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(sanitizedPassword.count >= 6 ? Design.Colors.successGreen : .white.opacity(0.3))
                             Text("Be at least 6 characters")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
                         }
 
                         HStack(spacing: 8) {
-                            Image(systemName: password == confirmPassword && !password.isEmpty ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(password == confirmPassword && !password.isEmpty ? Design.Colors.successGreen : .white.opacity(0.3))
+                            Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(passwordsMatch ? Design.Colors.successGreen : .white.opacity(0.3))
                             Text("Match confirmation")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
@@ -191,32 +195,57 @@ struct SignupView: View {
     }
 
     private var isFormFilled: Bool {
-        !email.isEmpty && !password.isEmpty && !confirmPassword.isEmpty && !displayName.isEmpty
+        !sanitizedEmail.isEmpty && !sanitizedPassword.isEmpty && !sanitizedConfirmPassword.isEmpty && !sanitizedDisplayName.isEmpty
     }
 
     private func validateForm() -> Bool {
         validationError = nil
 
-        guard displayName.count >= 2 else {
+        guard sanitizedDisplayName.count >= 2 else {
             validationError = "Display name must be at least 2 characters"
             return false
         }
 
-        guard email.contains("@") && email.contains(".") else {
+        guard isValidEmail(sanitizedEmail) else {
             validationError = "Please enter a valid email address"
             return false
         }
 
-        guard password.count >= 6 else {
+        guard sanitizedPassword.count >= 6 else {
             validationError = "Password must be at least 6 characters"
             return false
         }
 
-        guard password == confirmPassword else {
+        guard sanitizedPassword == sanitizedConfirmPassword else {
             validationError = "Passwords do not match"
             return false
         }
 
         return true
+    }
+
+    private var sanitizedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private var sanitizedPassword: String {
+        password.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var sanitizedConfirmPassword: String {
+        confirmPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var sanitizedDisplayName: String {
+        displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var passwordsMatch: Bool {
+        !sanitizedPassword.isEmpty && sanitizedPassword == sanitizedConfirmPassword
+    }
+
+    private func isValidEmail(_ email: String) -> Bool {
+        let pattern = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+        return NSPredicate(format: "SELF MATCHES %@", pattern).evaluate(with: email)
     }
 }
