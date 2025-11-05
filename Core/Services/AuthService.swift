@@ -23,15 +23,18 @@ final class AuthService {
     // MARK: - Sign Up
 
     func signUp(email: String, password: String, displayName: String) async throws -> User {
+        // Pass display_name in user metadata
+        // The database trigger will automatically create the profile
         let response = try await supabase.auth.signUp(
             email: email,
-            password: password
+            password: password,
+            data: ["display_name": .string(displayName)]
         )
 
         let user = response.user
 
-        // Create user profile
-        try await createUserProfile(userId: user.id, displayName: displayName)
+        // Wait a brief moment for the trigger to complete
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
         return user
     }
@@ -76,19 +79,8 @@ final class AuthService {
 
     // MARK: - Profile Management
 
-    private func createUserProfile(userId: UUID, displayName: String) async throws {
-        let profile = UserProfile(
-            id: userId,
-            displayName: displayName,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-
-        try await supabase.database
-            .from("profiles")
-            .insert(profile)
-            .execute()
-    }
+    // Note: Profile creation is now handled by a database trigger
+    // when a new user signs up. See supabase/alternative_trigger_approach.sql
 
     func getUserProfile(userId: UUID) async throws -> UserProfile {
         let response: UserProfile = try await supabase.database

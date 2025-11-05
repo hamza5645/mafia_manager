@@ -1,38 +1,58 @@
 # Supabase Database Setup
 
-## Applying the RLS Policies
+## IMPORTANT: Required Setup for Authentication
 
-To fix the "new row violates row-level security policy" error, you need to apply the RLS policies to your Supabase database.
+To fix the "new row violates row-level security policy" error, you need to set up a database trigger that automatically creates user profiles.
 
-### Option 1: Using Supabase Dashboard (Recommended)
+### Step 1: Set Up the Database Trigger (REQUIRED)
 
 1. Go to your Supabase project dashboard: https://ptspsxqmbfvcwczjpztd.supabase.co
 2. Navigate to the SQL Editor (left sidebar)
 3. Click "New Query"
-4. Copy and paste the contents of `migrations/20250111_enable_rls_policies.sql`
-5. Click "Run" to execute the migration
+4. Copy and paste the contents of `alternative_trigger_approach.sql`
+5. Click "Run" to execute
 
-### Option 2: Using Supabase CLI
+**What this does:**
+- Creates a database trigger that automatically creates a profile when a new user signs up
+- The trigger runs with elevated privileges, bypassing RLS
+- The display_name is pulled from the user metadata passed during signup
+- This is the recommended approach by Supabase for handling profile creation
 
-If you have the Supabase CLI installed:
+### Step 2: Verify RLS Policies (Optional)
 
-```bash
-cd supabase
-supabase db push
-```
+If you want to check what RLS policies currently exist:
 
-## What This Migration Does
+1. In SQL Editor, run the contents of `diagnose_rls.sql`
+2. This will show you all existing policies on the profiles table
 
-This migration enables Row Level Security (RLS) on three tables and creates policies that:
+### Step 3: Fix INSERT Policy (Only if needed)
+
+If you're still having issues after Step 1, try running `fix_insert_policy.sql` to recreate the INSERT policy.
+
+## How It Works Now
+
+**Before (Old Approach - Had Issues):**
+1. User signs up
+2. Swift code tries to manually insert profile
+3. RLS policy blocks it because session might not be fully established ❌
+
+**After (New Approach - Works Reliably):**
+1. User signs up with display_name in metadata
+2. Database trigger automatically creates profile with elevated privileges
+3. No RLS issues because trigger runs as SECURITY DEFINER ✅
+
+## Database Tables
+
+This setup manages three tables:
 
 1. **profiles** table:
-   - Allow users to create their own profile during signup
-   - Allow users to view and update only their own profile
+   - Auto-created by trigger on signup
+   - Users can view and update only their own profile
 
 2. **player_stats** table:
-   - Allow users to view, insert, update, and delete only their own stats
+   - Users can view, insert, update, and delete only their own stats
 
 3. **custom_roles_configs** table:
-   - Allow users to view, insert, update, and delete only their own role configurations
+   - Users can view, insert, update, and delete only their own role configurations
 
-These policies ensure that users can only access their own data while maintaining security.
+All tables have RLS enabled to ensure users can only access their own data.
