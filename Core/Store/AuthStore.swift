@@ -217,8 +217,8 @@ final class AuthStore: ObservableObject {
                 return AuthError.emailAlreadyInUse.errorDescription ?? message
             }
 
-            if normalized.contains("auto_confirm_user") || normalized.contains("permission denied for relation users") {
-                return "Email confirmation is not configured. Check your Supabase configuration."
+            if normalized.contains("email not confirmed") || normalized.contains("verify your email") {
+                return "Email confirmation is enabled in Supabase. Disable it in Authentication → Providers → Email settings."
             }
 
             if normalized.contains("invalid login credentials") {
