@@ -6,6 +6,9 @@ import PostgREST
 final class DatabaseService {
     private let supabase = SupabaseService.shared.client
 
+    // WORKAROUND: Access token to manually attach to requests
+    var accessToken: String?
+
     // MARK: - Player Stats
 
     func getPlayerStats(userId: UUID) async throws -> [PlayerStats] {
@@ -202,5 +205,103 @@ final class DatabaseService {
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    // MARK: - Player Groups
+
+    func getPlayerGroups(userId: UUID) async throws -> [PlayerGroup] {
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
+            .from("player_groups")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .order("group_name")
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        let response: [PlayerGroup] = try await request
+            .execute()
+            .value
+
+        return response
+    }
+
+    func getPlayerGroup(id: UUID) async throws -> PlayerGroup? {
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
+            .from("player_groups")
+            .select()
+            .eq("id", value: id.uuidString)
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        let response: [PlayerGroup] = try await request
+            .execute()
+            .value
+
+        return response.first
+    }
+
+    func createPlayerGroup(_ group: PlayerGroup) async throws {
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
+            .from("player_groups")
+            .insert(group)
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        try await request.execute()
+    }
+
+    func updatePlayerGroup(_ group: PlayerGroup) async throws {
+        struct UpdateData: Encodable {
+            let groupName: String
+            let playerNames: [String]
+            let updatedAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case groupName = "group_name"
+                case playerNames = "player_names"
+                case updatedAt = "updated_at"
+            }
+        }
+
+        let updateData = UpdateData(
+            groupName: group.groupName,
+            playerNames: group.playerNames,
+            updatedAt: Date()
+        )
+
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
+            .from("player_groups")
+            .update(updateData)
+            .eq("id", value: group.id.uuidString)
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        try await request.execute()
+    }
+
+    func deletePlayerGroup(id: UUID) async throws {
+        // WORKAROUND: Manually attach auth token to request
+        var request = try supabase
+            .from("player_groups")
+            .delete()
+            .eq("id", value: id.uuidString)
+
+        if let token = accessToken {
+            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
+        }
+
+        try await request.execute()
     }
 }

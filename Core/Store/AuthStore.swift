@@ -11,6 +11,10 @@ final class AuthStore: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    // WORKAROUND: Store tokens manually since SDK doesn't persist session
+    @Published var accessToken: String?
+    @Published var refreshToken: String?
+
     private let authService = AuthService()
     private let databaseService = DatabaseService()
     private var authStateTask: Task<Void, Never>?
@@ -64,10 +68,14 @@ final class AuthStore: ObservableObject {
                     self.isAuthenticated = false
                     self.currentUserId = nil
                     self.userProfile = nil
+                    self.accessToken = nil
+                    self.refreshToken = nil
                 case .userDeleted:
                     self.isAuthenticated = false
                     self.currentUserId = nil
                     self.userProfile = nil
+                    self.accessToken = nil
+                    self.refreshToken = nil
                 default:
                     break
                 }
@@ -129,7 +137,12 @@ final class AuthStore: ObservableObject {
             let sanitizedEmail = sanitizeEmail(email)
             let sanitizedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            _ = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
+            let session = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
+
+            // WORKAROUND: Manually store tokens since SDK doesn't persist properly
+            self.accessToken = session.accessToken
+            self.refreshToken = session.refreshToken
+
             // Auth state listener will handle updating isAuthenticated
         } catch let error as NSError {
             errorMessage = mapAuthError(error, operation: .signIn)

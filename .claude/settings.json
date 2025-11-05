@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./DerivedData/**)",
+      "Read(./build/**)",
+      "Read(./.build/**)",
+      "Read(./Pods/**)",
+      "Read(./node_modules/**)",
+      "Read(./.git/**)",
+      "Read(./**/*.log)",
+      "Read(./**/*.xcarchive/**)",
+      "Read(./**/*.xcresult/**)",
+      "Read(./**/*.car)",
+      "Read(./**/*.png)",
+      "Read(./**/*.jpg)",
+      "Read(./**/*.pdf)"
+    ]
+  }
+}

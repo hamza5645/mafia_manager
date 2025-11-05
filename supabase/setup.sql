@@ -3,6 +3,9 @@
 -- =====================================================
 -- Run this entire file in your Supabase SQL Editor
 -- This creates all tables, policies, and triggers needed for the app
+--
+-- IMPORTANT: This file is idempotent and can be run multiple times safely.
+-- It will drop and recreate all policies to ensure they are up to date.
 
 -- =====================================================
 -- 1. CREATE TABLES
@@ -45,6 +48,17 @@ CREATE TABLE IF NOT EXISTS public.custom_roles_configs (
     UNIQUE(user_id, config_name)
 );
 
+-- Player Groups table: Saved groups of player names
+CREATE TABLE IF NOT EXISTS public.player_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    group_name TEXT NOT NULL,
+    player_names JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    UNIQUE(user_id, group_name)
+);
+
 -- =====================================================
 -- 2. ENABLE ROW LEVEL SECURITY
 -- =====================================================
@@ -52,10 +66,16 @@ CREATE TABLE IF NOT EXISTS public.custom_roles_configs (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.custom_roles_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.player_groups ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
 -- 3. PROFILES TABLE POLICIES
 -- =====================================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can create their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 
 -- Allow users to insert their own profile during signup
 CREATE POLICY "Users can create their own profile"
@@ -79,60 +99,106 @@ USING (auth.uid() = id);
 -- 4. PLAYER_STATS TABLE POLICIES
 -- =====================================================
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view their own stats" ON public.player_stats;
+DROP POLICY IF EXISTS "Users can insert their own stats" ON public.player_stats;
+DROP POLICY IF EXISTS "Users can update their own stats" ON public.player_stats;
+DROP POLICY IF EXISTS "Users can delete their own stats" ON public.player_stats;
+
 -- Allow users to view their own stats
 CREATE POLICY "Users can view their own stats"
 ON public.player_stats
 FOR SELECT
-USING (user_id = auth.uid());
+USING (auth.uid() = user_id);
 
 -- Allow users to insert their own stats
 CREATE POLICY "Users can insert their own stats"
 ON public.player_stats
 FOR INSERT
-WITH CHECK (user_id = auth.uid());
+WITH CHECK (auth.uid() = user_id);
 
 -- Allow users to update their own stats
 CREATE POLICY "Users can update their own stats"
 ON public.player_stats
 FOR UPDATE
-USING (user_id = auth.uid());
+USING (auth.uid() = user_id);
 
 -- Allow users to delete their own stats
 CREATE POLICY "Users can delete their own stats"
 ON public.player_stats
 FOR DELETE
-USING (user_id = auth.uid());
+USING (auth.uid() = user_id);
 
 -- =====================================================
 -- 5. CUSTOM_ROLES_CONFIGS TABLE POLICIES
 -- =====================================================
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view their own role configs" ON public.custom_roles_configs;
+DROP POLICY IF EXISTS "Users can insert their own role configs" ON public.custom_roles_configs;
+DROP POLICY IF EXISTS "Users can update their own role configs" ON public.custom_roles_configs;
+DROP POLICY IF EXISTS "Users can delete their own role configs" ON public.custom_roles_configs;
+
 -- Allow users to view their own role configs
 CREATE POLICY "Users can view their own role configs"
 ON public.custom_roles_configs
 FOR SELECT
-USING (user_id = auth.uid());
+USING (auth.uid() = user_id);
 
 -- Allow users to insert their own role configs
 CREATE POLICY "Users can insert their own role configs"
 ON public.custom_roles_configs
 FOR INSERT
-WITH CHECK (user_id = auth.uid());
+WITH CHECK (auth.uid() = user_id);
 
 -- Allow users to update their own role configs
 CREATE POLICY "Users can update their own role configs"
 ON public.custom_roles_configs
 FOR UPDATE
-USING (user_id = auth.uid());
+USING (auth.uid() = user_id);
 
 -- Allow users to delete their own role configs
 CREATE POLICY "Users can delete their own role configs"
 ON public.custom_roles_configs
 FOR DELETE
+USING (auth.uid() = user_id);
+
+-- =====================================================
+-- 6. PLAYER_GROUPS TABLE POLICIES
+-- =====================================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view their own player groups" ON public.player_groups;
+DROP POLICY IF EXISTS "Users can insert their own player groups" ON public.player_groups;
+DROP POLICY IF EXISTS "Users can update their own player groups" ON public.player_groups;
+DROP POLICY IF EXISTS "Users can delete their own player groups" ON public.player_groups;
+
+-- Allow users to view their own player groups
+CREATE POLICY "Users can view their own player groups"
+ON public.player_groups
+FOR SELECT
+USING (user_id = auth.uid());
+
+-- Allow users to insert their own player groups
+CREATE POLICY "Users can insert their own player groups"
+ON public.player_groups
+FOR INSERT
+WITH CHECK (user_id = auth.uid());
+
+-- Allow users to update their own player groups
+CREATE POLICY "Users can update their own player groups"
+ON public.player_groups
+FOR UPDATE
+USING (user_id = auth.uid());
+
+-- Allow users to delete their own player groups
+CREATE POLICY "Users can delete their own player groups"
+ON public.player_groups
+FOR DELETE
 USING (user_id = auth.uid());
 
 -- =====================================================
--- 6. AUTO-CREATE PROFILE TRIGGER
+-- 7. AUTO-CREATE PROFILE TRIGGER
 -- =====================================================
 
 -- Function that automatically creates a profile when a user signs up

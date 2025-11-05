@@ -42,6 +42,10 @@ final class AuthService {
             password: password
         )
 
+        // WORKAROUND: Manually set the session to ensure persistence
+        // The Supabase Swift SDK has a known issue where sessions aren't persisted automatically
+        try await supabase.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+
         return session
     }
 

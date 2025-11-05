@@ -91,14 +91,28 @@ struct SettingsView: View {
                                     color: Design.Colors.successGreen
                                 )
                             }
+                        }
+                        .listRowBackground(Design.Colors.surface1)
 
+                        Section("Customization") {
                             NavigationLink {
                                 CustomRolesView()
                                     .environmentObject(authStore)
                             } label: {
                                 SettingsRow(
-                                    icon: "person.3.fill",
+                                    icon: "flame.fill",
                                     title: "Custom Roles",
+                                    color: Design.Colors.dangerRed
+                                )
+                            }
+
+                            NavigationLink {
+                                PlayerGroupsView()
+                                    .environmentObject(authStore)
+                            } label: {
+                                SettingsRow(
+                                    icon: "person.3.fill",
+                                    title: "Player Groups",
                                     color: Design.Colors.actionBlue
                                 )
                             }

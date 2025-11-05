@@ -2,10 +2,15 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject private var store: GameStore
+    @EnvironmentObject private var authStore: AuthStore
     private let minPlayers = 4
     private let maxPlayers = 19
     @State private var names: [String]
     @State private var isAddingPlayer = false
+    @State private var showLoadGroupSheet = false
+    @State private var playerGroups: [PlayerGroup] = []
+    @State private var isLoadingGroups = false
+    private let databaseService = DatabaseService()
 
     init() {
         _names = State(initialValue: Array(repeating: "", count: minPlayers))
@@ -147,6 +152,20 @@ struct SetupView: View {
                     Button("Load Last Game") { store.loadLastGame() }
                         .buttonStyle(CTAButtonStyle(kind: .secondary))
                 }
+                if authStore.isAuthenticated {
+                    Button {
+                        Task {
+                            await loadPlayerGroups()
+                            showLoadGroupSheet = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.3.fill")
+                            Text("Load Player Group")
+                        }
+                    }
+                    .buttonStyle(CTAButtonStyle(kind: .secondary))
+                }
                 HStack(spacing: 12) {
                     Button("Reset All", role: .destructive) {
                         store.resetAll()
@@ -165,6 +184,16 @@ struct SetupView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Design.Colors.surface0.opacity(0.95))
+        }
+        .sheet(isPresented: $showLoadGroupSheet) {
+            LoadPlayerGroupSheet(
+                playerGroups: playerGroups,
+                isLoading: isLoadingGroups,
+                onSelect: { group in
+                    loadGroup(group)
+                    showLoadGroupSheet = false
+                }
+            )
         }
     }
 
@@ -191,6 +220,117 @@ struct SetupView: View {
             }
         } else {
             names = base
+        }
+    }
+
+    private func loadPlayerGroups() async {
+        guard let userId = authStore.currentUserId else { return }
+
+        isLoadingGroups = true
+
+        do {
+            // WORKAROUND: Pass access token to database service
+            databaseService.accessToken = authStore.accessToken
+            playerGroups = try await databaseService.getPlayerGroups(userId: userId)
+        } catch {
+            // Silent fail - user can try again
+            playerGroups = []
+        }
+
+        isLoadingGroups = false
+    }
+
+    private func loadGroup(_ group: PlayerGroup) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
+            names = group.playerNames
+        }
+    }
+}
+
+// MARK: - Load Player Group Sheet
+
+struct LoadPlayerGroupSheet: View {
+    let playerGroups: [PlayerGroup]
+    let isLoading: Bool
+    let onSelect: (PlayerGroup) -> Void
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Design.Colors.surface0
+                    .ignoresSafeArea()
+
+                if isLoading {
+                    ProgressView()
+                        .tint(.white)
+                } else if playerGroups.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        Text("No Saved Groups")
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+
+                        Text("Create player groups in Settings")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            ForEach(playerGroups) { group in
+                                Button {
+                                    onSelect(group)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text(group.groupName)
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+
+                                            Spacer()
+
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "person.3.fill")
+                                                Text("\(group.playerNames.count)")
+                                            }
+                                            .foregroundColor(Design.Colors.brandGold)
+                                            .font(.subheadline)
+                                        }
+
+                                        Text(group.playerNames.prefix(5).joined(separator: ", "))
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                            .lineLimit(1)
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Design.Colors.surface1)
+                                    .cornerRadius(Design.Radii.card)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Design.Radii.card)
+                                            .stroke(Design.Colors.stroke, lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle("Load Player Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }

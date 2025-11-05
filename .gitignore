@@ -1,3 +1,13 @@
 .vscode/settings.json
 DerivedData/
 .idea
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcresult/
+*.xcarchive/
+.DS_Store
+build/
+.build/
+node_modules/
+Pods/
+*.log
