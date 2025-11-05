@@ -1,39 +1,34 @@
 # Supabase Setup Guide
 
-Quick setup guide for the Mafia Manager Supabase backend.
+Complete setup guide for the Mafia Manager Supabase backend.
 
-## Setup Steps
+## Quick Setup (2 Steps)
 
-### Step 1: Disable Email Confirmation (IMPORTANT)
-
-This app does not require email confirmation. To disable it:
+### Step 1: Disable Email Confirmation
 
 1. Go to your Supabase Dashboard
 2. Navigate to **Authentication** → **Providers** → **Email**
 3. Scroll down and **DISABLE** the "Confirm email" toggle
 4. Click **Save**
 
-Users can now sign up and immediately sign in without confirming their email.
+### Step 2: Run Database Setup
 
-### Step 2: Run Database Migrations
+1. In your Supabase Dashboard, go to the **SQL Editor**
+2. Click **"New Query"**
+3. Copy and paste the entire contents of `setup.sql`
+4. Click **"Run"**
 
-In the Supabase SQL Editor, run these files in order:
-
-1. **`migrations/20250111_enable_rls_policies.sql`**
-   - Creates database tables (profiles, player_stats, custom_roles_configs)
-   - Sets up Row-Level Security policies
-
-2. **`alternative_trigger_approach.sql`**
-   - Creates a trigger that automatically creates user profiles on signup
-   - Uses the display_name from signup metadata
+That's it! The single SQL file creates everything:
+- All database tables (profiles, player_stats, custom_roles_configs)
+- Row-Level Security policies
+- Auto-profile creation trigger
 
 ### Step 3: Update API Credentials
 
-1. Get your credentials from **Settings** → **API**:
-   - Project URL
-   - `anon` public key
+1. In Supabase, go to **Settings** → **API**
+2. Copy your Project URL and `anon` public key
+3. Update `Core/Services/SupabaseConfig.swift`:
 
-2. Update `Core/Services/SupabaseConfig.swift`:
 ```swift
 enum SupabaseConfig {
     static let supabaseURL = "YOUR_PROJECT_URL"
@@ -45,23 +40,25 @@ enum SupabaseConfig {
 
 1. Build and run the app
 2. Sign up with a test account
-3. You should be immediately signed in (no email confirmation needed)
+3. You should be immediately signed in (no email confirmation)
 4. Check Supabase dashboard to verify user and profile were created
+
+## What the Setup Creates
+
+**Tables:**
+- `profiles` - User display names
+- `player_stats` - Game statistics per player
+- `custom_roles_configs` - Saved role distributions
+
+**Security:**
+- Row-Level Security (RLS) ensures users only access their own data
+- Automatic profile creation via database trigger
 
 ## Troubleshooting
 
 **"Email not confirmed" error:**
-- Make sure you disabled "Confirm email" in Step 1
-- Wait a few minutes for settings to propagate
+- Disable "Confirm email" in Authentication settings (Step 1)
 
 **Profile not created:**
-- Verify the trigger was created (Step 2)
+- Make sure you ran the entire `setup.sql` file
 - Check Supabase logs for errors
-
-## Database Schema
-
-- **profiles**: User display names and metadata
-- **player_stats**: Game statistics per player
-- **custom_roles_configs**: Saved role configurations
-
-All tables use Row-Level Security (RLS) to ensure users can only access their own data.
