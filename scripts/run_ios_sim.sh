@@ -34,7 +34,10 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 echo "→ Ad-hoc signing app bundle..."
-/usr/bin/codesign --force --sign - --timestamp=none --deep "$APP_PATH" >/tmp/run_ios_sim_codesign.log 2>&1 || {
+BUILD_VERSION="$(sw_vers -buildVersion)"
+/usr/libexec/PlistBuddy -c "Set :BuildMachineOSBuild ${BUILD_VERSION}" "$APP_PATH/Info.plist" >/tmp/run_ios_sim_codesign.log 2>&1 || true
+/usr/bin/xattr -rc "$APP_PATH" >>/tmp/run_ios_sim_codesign.log 2>&1 || true
+/usr/bin/codesign --force --sign - --timestamp=none --deep "$APP_PATH" >>/tmp/run_ios_sim_codesign.log 2>&1 || {
   echo "✖︎ codesign failed. See /tmp/run_ios_sim_codesign.log"
   exit 1
 }
