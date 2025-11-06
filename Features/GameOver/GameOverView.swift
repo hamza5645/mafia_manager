@@ -191,41 +191,32 @@ private struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-// Enhanced celebratory confetti using Canvas
+// Simplified celebratory confetti using Canvas
 private struct ConfettiOverlay: View {
     let winColor: Color
     @State private var t: CGFloat = 0
 
     var body: some View {
         Canvas { ctx, size in
-            let count = 40
+            let count = 25
             let colors: [Color] = [
                 winColor,
                 Design.Colors.brandGold,
-                Design.Colors.brandGoldBright,
-                .white,
-                Design.Colors.actionBlue
+                .white
             ]
 
             for i in 0..<count {
                 let colorIndex = i % colors.count
                 let shading = GraphicsContext.Shading.color(colors[colorIndex])
 
-                // Create varied horizontal positions
-                let xBase = (CGFloat(i) / CGFloat(count)) * size.width
-                let xOffset = sin(t * 1.5 + CGFloat(i) * 0.5) * 30
+                // Simple wave motion
+                let x = (CGFloat(i) / CGFloat(count)) * size.width
+                let yOffset = sin(t + CGFloat(i) * 0.5) * 0.3
+                let y = (yOffset + 0.5) * size.height
 
-                // Create wave motion with varied amplitudes
-                let amplitude = (CGFloat(i % 3) + 1) * 0.15
-                let yBase = (sin(t + CGFloat(i) * 0.4) * amplitude + 0.5) * size.height
-                let yOffset = cos(t * 0.8 + CGFloat(i) * 0.3) * 20
-
-                let x = xBase + xOffset
-                let y = yBase + yOffset
-
-                // Varied sizes
-                let width = CGFloat([3, 4, 5, 6][i % 4])
-                let height = CGFloat([8, 10, 12, 14][i % 4])
+                // Simple rectangles without rotation
+                let width: CGFloat = CGFloat([3, 4, 5][i % 3])
+                let height: CGFloat = CGFloat([8, 10, 12][i % 3])
 
                 let rect = CGRect(
                     x: x - width / 2,
@@ -234,23 +225,17 @@ private struct ConfettiOverlay: View {
                     height: height
                 )
 
-                // Draw rotated confetti pieces
-                var rotatedCtx = ctx
-                rotatedCtx.translateBy(x: x, y: y)
-                rotatedCtx.rotate(by: Angle(degrees: Double(t * 50 + CGFloat(i) * 20)))
-                rotatedCtx.translateBy(x: -x, y: -y)
-
-                rotatedCtx.fill(
+                ctx.fill(
                     Path(roundedRect: rect, cornerRadius: 2),
                     with: shading
                 )
             }
         }
-        .opacity(0.7)
+        .opacity(0.6)
         .onAppear {
             withAnimation(
-                .linear(duration: 3.5)
-                    .repeatForever(autoreverses: false)
+                .linear(duration: 2.5)
+                    .repeatForever(autoreverses: true)
             ) {
                 t = .pi * 2
             }
