@@ -108,6 +108,59 @@ struct CTAButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Compact Grid Button Style
+enum GridButtonKind { case primary, secondary, accent, danger }
+
+struct CompactGridButtonStyle: ButtonStyle {
+    var kind: GridButtonKind = .primary
+
+    func makeBody(configuration: Configuration) -> some View {
+        GridButton(configuration: configuration, kind: kind)
+    }
+
+    private struct GridButton: View {
+        let configuration: Configuration
+        let kind: GridButtonKind
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let colors = palette(for: kind)
+            return configuration.label
+                .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.5))
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                        .fill(colors.background.opacity(isEnabled ? 1 : 0.4))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                        .stroke(colors.border.opacity(isEnabled ? 0.3 : 0.1), lineWidth: 1.5)
+                )
+                .shadow(color: .black.opacity(shadowOpacity(isPressed: configuration.isPressed, enabled: isEnabled)), radius: 8, y: 4)
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.96 : 1)
+                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: configuration.isPressed)
+        }
+
+        private func palette(for kind: GridButtonKind) -> (background: Color, foreground: Color, border: Color) {
+            switch kind {
+            case .primary:
+                return (Design.Colors.brandGold, .black, Design.Colors.brandGold)
+            case .secondary:
+                return (Design.Colors.surface2, Design.Colors.textPrimary, Design.Colors.stroke)
+            case .accent:
+                return (Design.Colors.surface2, Design.Colors.brandGold, Design.Colors.brandGold)
+            case .danger:
+                return (Design.Colors.surface2, Design.Colors.dangerRed, Design.Colors.dangerRed)
+            }
+        }
+
+        private func shadowOpacity(isPressed: Bool, enabled: Bool) -> Double {
+            guard enabled else { return 0.05 }
+            return isPressed ? 0.1 : 0.2
+        }
+    }
+}
+
 // Compact pill control for inline actions (e.g., add player)
 struct PillButtonStyle: ButtonStyle {
     var background: Color = Design.Colors.actionBlue

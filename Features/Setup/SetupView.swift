@@ -152,55 +152,114 @@ struct SetupView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 12) {
+                // Load Last Game (if available)
                 if store.hasSavedGame {
-                    Button("Load Last Game") { store.loadLastGame() }
-                        .buttonStyle(CTAButtonStyle(kind: .secondary))
-                }
-                if authStore.isAuthenticated {
-                    HStack(spacing: 12) {
-                        Button {
-                            Task {
-                                await loadPlayerGroups()
-                                showLoadGroupSheet = true
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "person.3.fill")
-                                Text("Load Group")
-                            }
-                            .frame(maxWidth: .infinity)
+                    Button {
+                        store.loadLastGame()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("Load Last Game")
                         }
-                        .buttonStyle(CTAButtonStyle(kind: .secondary))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(CTAButtonStyle(kind: .secondary))
+                }
+
+                // Grid layout for authenticated users
+                if authStore.isAuthenticated {
+                    VStack(spacing: 10) {
+                        // Top row: Load Group & Load Roles
+                        HStack(spacing: 10) {
+                            Button {
+                                Task {
+                                    await loadPlayerGroups()
+                                    showLoadGroupSheet = true
+                                }
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "person.3.fill")
+                                        .font(.system(size: 20))
+                                    Text("Load Group")
+                                        .font(.caption.weight(.medium))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                            }
+                            .buttonStyle(CompactGridButtonStyle(kind: .secondary))
+
+                            Button {
+                                Task {
+                                    await loadCustomRoleConfigs()
+                                    showLoadRoleConfigSheet = true
+                                }
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "person.2.badge.gearshape.fill")
+                                        .font(.system(size: 20))
+                                    Text(selectedRoleConfig == nil ? "Load Roles" : selectedRoleConfig!.configName)
+                                        .font(.caption.weight(.medium))
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                            }
+                            .buttonStyle(CompactGridButtonStyle(kind: selectedRoleConfig == nil ? .secondary : .accent))
+                        }
+
+                        // Bottom row: Reset All & Assign Roles
+                        HStack(spacing: 10) {
+                            Button(role: .destructive) {
+                                store.resetAll()
+                                resetNameFields()
+                                selectedRoleConfig = nil
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "trash.fill")
+                                        .font(.system(size: 20))
+                                    Text("Reset All")
+                                        .font(.caption.weight(.medium))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                            }
+                            .buttonStyle(CompactGridButtonStyle(kind: .danger))
+
+                            Button {
+                                store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 20))
+                                    Text(selectedRoleConfig == nil ? "Default Roles" : "Custom Roles")
+                                        .font(.caption.weight(.medium))
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                            }
+                            .buttonStyle(CompactGridButtonStyle(kind: .primary))
+                            .disabled(!isValid)
+                        }
+                    }
+                } else {
+                    // Non-authenticated users: Simple row layout
+                    HStack(spacing: 12) {
+                        Button("Reset All", role: .destructive) {
+                            store.resetAll()
+                            resetNameFields()
+                            selectedRoleConfig = nil
+                        }
+                        .buttonStyle(CTAButtonStyle(kind: .danger))
 
                         Button {
-                            Task {
-                                await loadCustomRoleConfigs()
-                                showLoadRoleConfigSheet = true
-                            }
+                            store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
                         } label: {
-                            HStack {
-                                Image(systemName: "person.2.badge.gearshape.fill")
-                                Text(selectedRoleConfig == nil ? "Load Roles" : "Roles: \(selectedRoleConfig!.configName)")
-                            }
-                            .frame(maxWidth: .infinity)
+                            Text("Assign Roles").frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(CTAButtonStyle(kind: selectedRoleConfig == nil ? .secondary : .primary))
+                        .buttonStyle(CTAButtonStyle(kind: .primary))
+                        .disabled(!isValid)
                     }
-                }
-                HStack(spacing: 12) {
-                    Button("Reset All", role: .destructive) {
-                        store.resetAll()
-                        resetNameFields()
-                        selectedRoleConfig = nil
-                    }
-                    .buttonStyle(CTAButtonStyle(kind: .danger))
-                    Button {
-                        store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
-                    } label: {
-                        Text(selectedRoleConfig == nil ? "Assign Roles (Default)" : "Assign Roles (Custom)").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(CTAButtonStyle(kind: .primary))
-                    .disabled(!isValid)
                 }
             }
             .padding(.horizontal, 16)
