@@ -105,29 +105,22 @@ private struct PlayerRoleCard: View {
     var body: some View {
         let palette = RoleCardPalette(role: player.role)
 
-        return VStack(alignment: .leading, spacing: 20) {
-            // Top section: Player number and role badge
-            HStack(alignment: .top, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                // Simple, visible player number
                 Text("#\(player.number)")
-                    .font(Design.Typography.title1)
-                    .fontWeight(.heavy)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [palette.numberColor, palette.numberColor.opacity(0.85)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .shadow(color: palette.glowColor, radius: 8, y: 2)
-                    .shadow(color: .black.opacity(0.4), radius: 2, y: 2)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(Design.Colors.brandGold)
+                    .shadow(color: Design.Colors.glowGold, radius: 4, y: 0)
+                    .shadow(color: .black.opacity(0.3), radius: 2, y: 2)
+                    .frame(minWidth: 32, alignment: .leading)
 
                 Spacer(minLength: 8)
 
                 RoleBadge(role: player.role)
             }
 
-            // Bottom section: Role icon and player name
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
                 ZStack {
                     // Glow background
                     Circle()
@@ -136,28 +129,23 @@ private struct PlayerRoleCard: View {
 
                     // Icon
                     Image(systemName: player.role.symbolName)
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(palette.iconColor)
                 }
-                .frame(width: 44, height: 44)
+                .frame(width: 36, height: 36)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(player.name)
-                        .font(Design.Typography.headline)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                Text(player.name)
+                    .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
 
-                    Text(player.role.displayName)
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(palette.iconColor)
-                }
-
-                Spacer(minLength: 0)
+                Spacer()
             }
         }
-        .padding(22)
-        .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
+        .padding(.vertical, 20)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
         .background(
             ZStack {
                 // Base gradient background
