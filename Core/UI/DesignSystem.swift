@@ -1,61 +1,158 @@
 import SwiftUI
 
-// Centralized design tokens to match the provided reference style
-// without changing app features or flows.
+// Modern, enhanced design system with gradients, glassmorphism, and refined tokens
 enum Design {
     enum Colors {
-        // Dark surfaces
-        static let surface0 = Color(hex: 0x0E1014)
-        static let surface1 = Color(hex: 0x171A21)
-        static let surface2 = Color(hex: 0x1F2430)
-        static let stroke    = Color(hex: 0x2B3240)
+        // Dark surfaces with richer tones
+        static let surface0 = Color(hex: 0x0A0C10)
+        static let surface1 = Color(hex: 0x141822)
+        static let surface2 = Color(hex: 0x1E2432)
+        static let surface3 = Color(hex: 0x252D3F)
+        static let stroke    = Color(hex: 0x2D3648)
+        static let strokeLight = Color(hex: 0x3A4458)
 
-        // Text
-        static let textPrimary   = Color(hex: 0xF4F6FA)
-        static let textSecondary = Color(hex: 0xB5BDCB)
+        // Text with better contrast
+        static let textPrimary   = Color(hex: 0xF8FAFC)
+        static let textSecondary = Color(hex: 0xC1C9D6)
+        static let textTertiary  = Color(hex: 0x8B95A8)
 
-        // Accents
-        static let brandGold   = Color(hex: 0xFFC83D)
+        // Enhanced accent colors
+        static let brandGold   = Color(hex: 0xFFD060)
+        static let brandGoldBright = Color(hex: 0xFFE594)
         static let actionBlue  = Color(hex: 0x0A84FF)
-        static let dangerRed   = Color(hex: 0xFF453A)
-        static let successGreen = Color(hex: 0x30D158)
+        static let actionBlueBright = Color(hex: 0x4DA5FF)
+        static let dangerRed   = Color(hex: 0xFF4757)
+        static let dangerRedBright = Color(hex: 0xFF6B79)
+        static let successGreen = Color(hex: 0x32D74B)
+        static let successGreenBright = Color(hex: 0x66E678)
+
+        // Role-specific gradients
+        static let mafiaGradient = [Color(hex: 0xFF4757), Color(hex: 0xD43545)]
+        static let doctorGradient = [Color(hex: 0x32D74B), Color(hex: 0x28B03D)]
+        static let policeGradient = [Color(hex: 0x0A84FF), Color(hex: 0x086BCF)]
+        static let citizenGradient = [Color(hex: 0x8B95A8), Color(hex: 0x6B7587)]
+
+        // UI effect colors
+        static let glowGold = Color(hex: 0xFFD060).opacity(0.3)
+        static let glowBlue = Color(hex: 0x0A84FF).opacity(0.3)
+        static let glowRed = Color(hex: 0xFF4757).opacity(0.3)
+        static let glowGreen = Color(hex: 0x32D74B).opacity(0.3)
     }
 
     enum Radii {
-        static let card: CGFloat = 16
+        static let small: CGFloat = 12
+        static let medium: CGFloat = 16
+        static let large: CGFloat = 20
+        static let extraLarge: CGFloat = 24
+        static let card: CGFloat = 20
         static let button: CGFloat = 16
-        static let pill: CGFloat = 22
+        static let pill: CGFloat = 24
     }
 
     enum Spacing {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
         static let grid: CGFloat = 8
+    }
+
+    enum Typography {
+        static let largeTitle = Font.system(size: 34, weight: .heavy, design: .rounded)
+        static let title1 = Font.system(size: 28, weight: .bold, design: .rounded)
+        static let title2 = Font.system(size: 22, weight: .bold, design: .rounded)
+        static let title3 = Font.system(size: 20, weight: .semibold, design: .rounded)
+        static let headline = Font.system(size: 17, weight: .semibold, design: .rounded)
+        static let body = Font.system(size: 17, weight: .regular, design: .rounded)
+        static let callout = Font.system(size: 16, weight: .regular, design: .rounded)
+        static let subheadline = Font.system(size: 15, weight: .medium, design: .rounded)
+        static let footnote = Font.system(size: 13, weight: .regular, design: .rounded)
+        static let caption = Font.system(size: 12, weight: .medium, design: .rounded)
+    }
+
+    enum Shadows {
+        static let small = (color: Color.black.opacity(0.15), radius: CGFloat(8), x: CGFloat(0), y: CGFloat(2))
+        static let medium = (color: Color.black.opacity(0.25), radius: CGFloat(12), x: CGFloat(0), y: CGFloat(4))
+        static let large = (color: Color.black.opacity(0.35), radius: CGFloat(20), x: CGFloat(0), y: CGFloat(8))
+        static let glow = (radius: CGFloat(20), opacity: Double(0.6))
+    }
+
+    enum Animations {
+        static let quick = Animation.spring(response: 0.25, dampingFraction: 0.9)
+        static let smooth = Animation.spring(response: 0.35, dampingFraction: 0.85)
+        static let bouncy = Animation.spring(response: 0.4, dampingFraction: 0.75)
     }
 }
 
-// MARK: - Card container style
+// MARK: - Card container style with glassmorphism
 struct Card: ViewModifier {
-    var padding: CGFloat = 12
+    var padding: CGFloat = 16
+    var withGlow: Bool = false
+
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Design.Colors.surface1)
-            .overlay(
-                RoundedRectangle(cornerRadius: Design.Radii.card)
-                    .stroke(Design.Colors.stroke, lineWidth: 1)
+            .background(
+                ZStack {
+                    // Base surface
+                    RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
+                        .fill(Design.Colors.surface1)
+
+                    // Subtle gradient overlay for depth
+                    RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Design.Colors.surface2.opacity(0.3),
+                                    Design.Colors.surface1.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
             )
-            .cornerRadius(Design.Radii.card)
-            .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+            .overlay(
+                RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Design.Colors.strokeLight.opacity(0.6),
+                                Design.Colors.stroke.opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: Design.Shadows.medium.color, radius: Design.Shadows.medium.radius, x: Design.Shadows.medium.x, y: Design.Shadows.medium.y)
+            .if(withGlow) { view in
+                view.shadow(color: Design.Colors.glowGold, radius: Design.Shadows.glow.radius)
+            }
     }
 }
 
 extension View {
-    func cardStyle(padding: CGFloat = 12) -> some View {
-        modifier(Card(padding: padding))
+    func cardStyle(padding: CGFloat = 16, withGlow: Bool = false) -> some View {
+        modifier(Card(padding: padding, withGlow: withGlow))
+    }
+
+    // Conditional modifier helper
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
     }
 }
 
-// MARK: - Button style
+// MARK: - Enhanced Button Styles with Gradients
 enum CTAKind { case primary, secondary, danger }
 
 struct CTAButtonStyle: ButtonStyle {
@@ -72,43 +169,74 @@ struct CTAButtonStyle: ButtonStyle {
         var body: some View {
             let colors = palette(for: kind)
             return configuration.label
-                .font(.headline)
-                .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.6))
-                .frame(height: 52)
+                .font(Design.Typography.headline)
+                .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.5))
+                .frame(height: 56)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 2)
                 .background(
-                    RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
-                        .fill(colors.background.opacity(isEnabled ? 1 : 0.4))
+                    ZStack {
+                        // Gradient background
+                        RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: colors.gradient,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.4)
+
+                        // Subtle shimmer overlay
+                        RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.15), .clear],
+                                    startPoint: .topLeading,
+                                    endPoint: .center
+                                )
+                            )
+                            .opacity(isEnabled ? 1 : 0)
+                    }
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
-                        .stroke(.white.opacity(0.08))
+                        .stroke(colors.border.opacity(isEnabled ? 0.3 : 0.1), lineWidth: 1.5)
                 )
-                .shadow(color: .black.opacity(shadowOpacity(isPressed: configuration.isPressed, enabled: isEnabled)), radius: 10, y: 6)
-                .scaleEffect(configuration.isPressed && isEnabled ? 0.98 : 1)
-                .animation(.spring(response: 0.25, dampingFraction: 0.9), value: configuration.isPressed)
+                .shadow(color: colors.glow, radius: configuration.isPressed ? 8 : 16, y: configuration.isPressed ? 2 : 4)
+                .shadow(color: Design.Shadows.large.color, radius: Design.Shadows.large.radius, x: Design.Shadows.large.x, y: Design.Shadows.large.y)
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.97 : 1)
+                .animation(Design.Animations.quick, value: configuration.isPressed)
         }
 
-        private func palette(for kind: CTAKind) -> (background: Color, foreground: Color) {
+        private func palette(for kind: CTAKind) -> (gradient: [Color], foreground: Color, border: Color, glow: Color) {
             switch kind {
             case .primary:
-                return (Design.Colors.brandGold, .black)
+                return (
+                    [Design.Colors.brandGold, Design.Colors.brandGoldBright],
+                    .black,
+                    Design.Colors.brandGoldBright,
+                    Design.Colors.glowGold
+                )
             case .secondary:
-                return (Design.Colors.surface2, Design.Colors.textPrimary)
+                return (
+                    [Design.Colors.surface2, Design.Colors.surface3],
+                    Design.Colors.textPrimary,
+                    Design.Colors.strokeLight,
+                    Color.clear
+                )
             case .danger:
-                return (Design.Colors.dangerRed, .white)
+                return (
+                    [Design.Colors.dangerRed, Design.Colors.dangerRedBright],
+                    .white,
+                    Design.Colors.dangerRedBright,
+                    Design.Colors.glowRed
+                )
             }
-        }
-
-        private func shadowOpacity(isPressed: Bool, enabled: Bool) -> Double {
-            guard enabled else { return 0.08 }
-            return isPressed ? 0.1 : 0.25
         }
     }
 }
 
-// MARK: - Compact Grid Button Style
+// MARK: - Enhanced Grid Button Style
 enum GridButtonKind { case primary, secondary, accent, danger }
 
 struct CompactGridButtonStyle: ButtonStyle {
@@ -126,42 +254,81 @@ struct CompactGridButtonStyle: ButtonStyle {
         var body: some View {
             let colors = palette(for: kind)
             return configuration.label
-                .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.5))
+                .font(Design.Typography.subheadline)
+                .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.45))
                 .frame(maxWidth: .infinity)
                 .background(
-                    RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
-                        .fill(colors.background.opacity(isEnabled ? 1 : 0.4))
+                    ZStack {
+                        RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: colors.gradient,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.35)
+
+                        // Shimmer effect for primary buttons
+                        if kind == .primary {
+                            RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.2), .clear],
+                                        startPoint: .topLeading,
+                                        endPoint: .center
+                                    )
+                                )
+                                .opacity(isEnabled ? 1 : 0)
+                        }
+                    }
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
-                        .stroke(colors.border.opacity(isEnabled ? 0.3 : 0.1), lineWidth: 1.5)
+                        .stroke(colors.border.opacity(isEnabled ? 0.4 : 0.15), lineWidth: 1.5)
                 )
-                .shadow(color: .black.opacity(shadowOpacity(isPressed: configuration.isPressed, enabled: isEnabled)), radius: 8, y: 4)
-                .scaleEffect(configuration.isPressed && isEnabled ? 0.96 : 1)
-                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: configuration.isPressed)
+                .shadow(color: colors.glow, radius: configuration.isPressed ? 6 : 12)
+                .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1)
+                .animation(Design.Animations.quick, value: configuration.isPressed)
         }
 
-        private func palette(for kind: GridButtonKind) -> (background: Color, foreground: Color, border: Color) {
+        private func palette(for kind: GridButtonKind) -> (gradient: [Color], foreground: Color, border: Color, glow: Color) {
             switch kind {
             case .primary:
-                return (Design.Colors.brandGold, .black, Design.Colors.brandGold)
+                return (
+                    [Design.Colors.brandGold, Design.Colors.brandGoldBright],
+                    .black,
+                    Design.Colors.brandGoldBright,
+                    Design.Colors.glowGold.opacity(0.5)
+                )
             case .secondary:
-                return (Design.Colors.surface2, Design.Colors.textPrimary, Design.Colors.stroke)
+                return (
+                    [Design.Colors.surface2, Design.Colors.surface3],
+                    Design.Colors.textPrimary,
+                    Design.Colors.stroke,
+                    Color.clear
+                )
             case .accent:
-                return (Design.Colors.surface2, Design.Colors.brandGold, Design.Colors.brandGold)
+                return (
+                    [Design.Colors.surface2, Design.Colors.surface3],
+                    Design.Colors.brandGold,
+                    Design.Colors.brandGold,
+                    Design.Colors.glowGold.opacity(0.3)
+                )
             case .danger:
-                return (Design.Colors.surface2, Design.Colors.dangerRed, Design.Colors.dangerRed)
+                return (
+                    [Design.Colors.surface2, Design.Colors.surface3],
+                    Design.Colors.dangerRed,
+                    Design.Colors.dangerRed,
+                    Design.Colors.glowRed.opacity(0.3)
+                )
             }
-        }
-
-        private func shadowOpacity(isPressed: Bool, enabled: Bool) -> Double {
-            guard enabled else { return 0.05 }
-            return isPressed ? 0.1 : 0.2
         }
     }
 }
 
-// Compact pill control for inline actions (e.g., add player)
+// MARK: - Enhanced Pill Button Style
 struct PillButtonStyle: ButtonStyle {
     var background: Color = Design.Colors.actionBlue
     var foreground: Color = .white
@@ -178,71 +345,121 @@ struct PillButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(foreground.opacity(isEnabled ? 1 : 0.45))
-                .padding(.horizontal, 18)
+                .font(Design.Typography.subheadline)
+                .foregroundStyle(foreground.opacity(isEnabled ? 1 : 0.4))
+                .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .background(
-                    Capsule()
-                        .fill(background.opacity(fillOpacity))
+                    ZStack {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [background, background.opacity(0.85)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(fillOpacity)
+
+                        // Shimmer overlay
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.2), .clear],
+                                    startPoint: .topLeading,
+                                    endPoint: .center
+                                )
+                            )
+                            .opacity(isEnabled ? 1 : 0)
+                    }
                 )
                 .overlay(
                     Capsule()
-                        .stroke(Color.white.opacity(isEnabled ? 0.12 : 0.04), lineWidth: 1)
+                        .stroke(foreground.opacity(isEnabled ? 0.15 : 0.05), lineWidth: 1.5)
                 )
-                .shadow(color: .black.opacity(shadowOpacity), radius: 8, y: 4)
-                .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1)
-                .animation(.spring(response: 0.28, dampingFraction: 0.85), value: configuration.isPressed)
+                .shadow(color: background.opacity(0.4), radius: configuration.isPressed ? 6 : 12)
+                .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
+                .scaleEffect(configuration.isPressed && isEnabled ? 0.94 : 1)
+                .animation(Design.Animations.quick, value: configuration.isPressed)
         }
 
         private var fillOpacity: Double {
-            guard isEnabled else { return 0.35 }
-            return configuration.isPressed ? 0.85 : 1
-        }
-
-        private var shadowOpacity: Double {
-            guard isEnabled else { return 0 }
-            return configuration.isPressed ? 0.08 : 0.18
+            guard isEnabled else { return 0.3 }
+            return configuration.isPressed ? 0.8 : 1
         }
     }
 }
 
-// MARK: - Chips
+// MARK: - Enhanced Chips
 struct Chip: View {
     enum Style { case filled(Color), outline(Color) }
     let text: String
     var style: Style
     var icon: String?
+
     var body: some View {
         HStack(spacing: 6) {
-            if let icon { Image(systemName: icon) }
-            Text(text).font(.subheadline).bold()
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            Text(text)
+                .font(Design.Typography.caption)
+                .fontWeight(.semibold)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(background)
-        .overlay(
-            Capsule().strokeBorder(borderColor, lineWidth: 1)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            ZStack {
+                Capsule()
+                    .fill(background)
+
+                // Subtle gradient overlay for filled chips
+                if case .filled = style {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.1), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            }
         )
-        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(borderColor, lineWidth: 1.5)
+        )
         .foregroundStyle(foreground)
+        .shadow(color: shadowColor, radius: 6, y: 2)
     }
+
     private var background: Color {
         switch style {
-        case .filled(let c): return c.opacity(0.18)
+        case .filled(let c): return c.opacity(0.2)
         case .outline: return Design.Colors.surface2
         }
     }
+
     private var borderColor: Color {
         switch style {
-        case .filled(let c): return c.opacity(0.65)
-        case .outline(let c): return c
+        case .filled(let c): return c.opacity(0.7)
+        case .outline(let c): return c.opacity(0.6)
         }
     }
+
     private var foreground: Color {
         switch style {
         case .filled(let c): return c
         case .outline(let c): return c
+        }
+    }
+
+    private var shadowColor: Color {
+        switch style {
+        case .filled(let c): return c.opacity(0.2)
+        case .outline: return Color.clear
         }
     }
 }

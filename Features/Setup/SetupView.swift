@@ -22,40 +22,65 @@ struct SetupView: View {
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 16) {
-                // Title
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 20) {
+                // Enhanced Title Section with Gradient
+                VStack(alignment: .leading, spacing: 8) {
                     Text("MAFIA MANAGER")
-                        .font(.system(size: 28, weight: .heavy))
-                        .kerning(1.2)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                    Text("Enter player names")
+                        .font(Design.Typography.largeTitle)
+                        .kerning(1.5)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .shadow(color: Design.Colors.glowGold, radius: 10, y: 2)
+
+                    Text("Enter player names to begin")
+                        .font(Design.Typography.callout)
                         .foregroundStyle(Design.Colors.textSecondary)
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.top, 12)
 
-                // Names card
-                VStack(alignment: .leading, spacing: 10) {
+                // Enhanced Names Card
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Between \(minPlayers) and \(maxPlayers) players. Names must be unique.")
-                        .font(.footnote)
+                        .font(Design.Typography.footnote)
                         .foregroundStyle(Design.Colors.textSecondary)
 
                     if names.count == minPlayers {
                         Text("Minimum \(minPlayers) players required for gameplay.")
-                            .font(.caption2)
-                            .foregroundStyle(Design.Colors.textSecondary.opacity(0.7))
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.textTertiary)
                     }
 
                     ForEach(names.indices, id: \.self) { idx in
-                        HStack(spacing: 12) {
+                        HStack(spacing: 10) {
+                            // Enhanced player number badge
                             Text("\(idx + 1)")
-                                .font(.subheadline.bold())
-                                .frame(width: 28)
-                                .padding(.vertical, 10)
-                                .background(Design.Colors.surface2)
-                                .foregroundStyle(Design.Colors.textSecondary)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .font(Design.Typography.subheadline)
+                                .fontWeight(.bold)
+                                .frame(width: 36)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Design.Colors.surface2, Design.Colors.surface3],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                        .stroke(Design.Colors.stroke.opacity(0.5), lineWidth: 1)
+                                )
+                                .foregroundStyle(Design.Colors.brandGold)
+
+                            // Enhanced text field
                             TextField("Player Name", text: Binding(
                                 get: { names[idx] },
                                 set: { newValue in
@@ -63,18 +88,25 @@ struct SetupView: View {
                                     names[idx] = String(newValue.prefix(30))
                                 }
                             ))
+                            .font(Design.Typography.body)
                             .textInputAutocapitalization(.words)
                             .disableAutocorrection(true)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 12)
-                            .background(Design.Colors.surface2)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                    .fill(Design.Colors.surface2)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                    .stroke(Design.Colors.stroke.opacity(0.4), lineWidth: 1)
+                            )
 
                             if names.count > minPlayers {
                                 Button {
                                     // Extra safety check to ensure we don't go below minimum
                                     if names.count > minPlayers {
-                                        withAnimation(.spring(response: 0.28, dampingFraction: 0.85, blendDuration: 0.25)) {
+                                        withAnimation(Design.Animations.smooth) {
                                             let removalIndex = names.index(names.startIndex, offsetBy: idx)
                                             names.remove(at: removalIndex)
                                             // Final safety check - if somehow we went below minimum, reset to minimum
@@ -85,7 +117,9 @@ struct SetupView: View {
                                     }
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
+                                        .font(.system(size: 22))
                                         .foregroundStyle(Design.Colors.dangerRed)
+                                        .shadow(color: Design.Colors.glowRed.opacity(0.5), radius: 6)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Remove row")
@@ -93,15 +127,21 @@ struct SetupView: View {
                                 .opacity(isAddingPlayer ? 0.3 : 1.0)
                             }
                         }
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .scale.combined(with: .opacity)
+                        ))
                     }
 
-                    HStack {
+                    // Enhanced bottom control section
+                    HStack(spacing: 12) {
                         let filled = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.count
                         let allFilled = filled == names.count && filled >= minPlayers
+
                         Button {
                             if names.count < maxPlayers {
                                 isAddingPlayer = true
-                                withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
+                                withAnimation(Design.Animations.smooth) {
                                     names.append("")
                                 }
                                 // Add a small delay before allowing removals again
@@ -110,19 +150,37 @@ struct SetupView: View {
                                 }
                             }
                         } label: {
-                            Label("Add Another Player", systemImage: "plus")
-                                .lineLimit(1)
+                            Label("Add Player", systemImage: "plus.circle.fill")
+                                .font(Design.Typography.subheadline)
                         }
                         .buttonStyle(PillButtonStyle(background: Design.Colors.actionBlue))
                         .opacity(names.count >= maxPlayers ? 0.5 : 1)
                         .disabled(names.count >= maxPlayers)
 
                         Spacer()
-                        Text("Players: \(names.count)/\(maxPlayers)")
-                            .foregroundStyle(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed)
+
+                        // Enhanced player count indicator
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.3.fill")
+                                .font(.system(size: 14))
+                            Text("\(names.count)/\(maxPlayers)")
+                                .font(Design.Typography.subheadline)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundStyle(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill((allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed).opacity(0.15))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed, lineWidth: 1.5)
+                        )
                     }
                 }
-                .cardStyle()
+                .cardStyle(padding: 18)
                 .padding(.horizontal, 20)
 
                 Spacer(minLength: 14)
@@ -151,114 +209,149 @@ struct SetupView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 12) {
-                // Load Last Game (if available)
+            VStack(spacing: Design.Spacing.md) {
+                // Load Last Game (if available) with enhanced styling
                 if store.hasSavedGame {
                     Button {
                         store.loadLastGame()
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 18, weight: .semibold))
                             Text("Load Last Game")
+                                .font(Design.Typography.headline)
                         }
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(CTAButtonStyle(kind: .secondary))
                 }
 
-                // Grid layout for authenticated users
+                // Enhanced grid layout for authenticated users
                 if authStore.isAuthenticated {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Design.Spacing.sm) {
                         // Top row: Load Group & Load Roles
-                        HStack(spacing: 10) {
+                        HStack(spacing: Design.Spacing.sm) {
                             Button {
                                 showLoadGroupSheet = true
                             } label: {
-                                VStack(spacing: 6) {
+                                VStack(spacing: 8) {
                                     Image(systemName: "person.3.fill")
-                                        .font(.system(size: 20))
+                                        .font(.system(size: 22, weight: .semibold))
                                     Text("Load Group")
-                                        .font(.caption.weight(.medium))
+                                        .font(Design.Typography.caption)
+                                        .fontWeight(.semibold)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 14)
                             }
                             .buttonStyle(CompactGridButtonStyle(kind: .secondary))
 
                             Button {
                                 showLoadRoleConfigSheet = true
                             } label: {
-                                VStack(spacing: 6) {
+                                VStack(spacing: 8) {
                                     Image(systemName: "person.2.badge.gearshape.fill")
-                                        .font(.system(size: 20))
+                                        .font(.system(size: 22, weight: .semibold))
                                     Text(selectedRoleConfig == nil ? "Load Roles" : selectedRoleConfig!.configName)
-                                        .font(.caption.weight(.medium))
+                                        .font(Design.Typography.caption)
+                                        .fontWeight(.semibold)
                                         .lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 14)
                             }
                             .buttonStyle(CompactGridButtonStyle(kind: selectedRoleConfig == nil ? .secondary : .accent))
                         }
 
                         // Bottom row: Reset All & Assign Roles
-                        HStack(spacing: 10) {
+                        HStack(spacing: Design.Spacing.sm) {
                             Button(role: .destructive) {
                                 store.resetAll()
                                 resetNameFields()
                                 selectedRoleConfig = nil
                             } label: {
-                                VStack(spacing: 6) {
+                                VStack(spacing: 8) {
                                     Image(systemName: "trash.fill")
-                                        .font(.system(size: 20))
+                                        .font(.system(size: 22, weight: .semibold))
                                     Text("Reset All")
-                                        .font(.caption.weight(.medium))
+                                        .font(Design.Typography.caption)
+                                        .fontWeight(.semibold)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 14)
                             }
                             .buttonStyle(CompactGridButtonStyle(kind: .danger))
 
                             Button {
                                 store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
                             } label: {
-                                VStack(spacing: 6) {
+                                VStack(spacing: 8) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 20))
+                                        .font(.system(size: 22, weight: .semibold))
                                     Text(selectedRoleConfig == nil ? "Default Roles" : "Custom Roles")
-                                        .font(.caption.weight(.medium))
+                                        .font(Design.Typography.caption)
+                                        .fontWeight(.semibold)
                                         .lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 14)
                             }
                             .buttonStyle(CompactGridButtonStyle(kind: .primary))
                             .disabled(!isValid)
                         }
                     }
                 } else {
-                    // Non-authenticated users: Simple row layout
-                    HStack(spacing: 12) {
-                        Button("Reset All", role: .destructive) {
+                    // Enhanced non-authenticated users layout
+                    HStack(spacing: Design.Spacing.md) {
+                        Button {
                             store.resetAll()
                             resetNameFields()
                             selectedRoleConfig = nil
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "trash.fill")
+                                Text("Reset All")
+                            }
+                            .font(Design.Typography.headline)
                         }
                         .buttonStyle(CTAButtonStyle(kind: .danger))
 
                         Button {
                             store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
                         } label: {
-                            Text("Assign Roles").frame(maxWidth: .infinity)
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Assign Roles")
+                            }
+                            .font(Design.Typography.headline)
+                            .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(CTAButtonStyle(kind: .primary))
                         .disabled(!isValid)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Design.Colors.surface0.opacity(0.95))
+            .padding(.horizontal, Design.Spacing.lg)
+            .padding(.vertical, Design.Spacing.md)
+            .background(
+                ZStack {
+                    // Glassmorphic background
+                    Design.Colors.surface0.opacity(0.98)
+
+                    // Top border gradient
+                    LinearGradient(
+                        colors: [
+                            Design.Colors.strokeLight.opacity(0.3),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 1)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                }
+            )
+            .shadow(color: .black.opacity(0.2), radius: 20, y: -5)
         }
         .sheet(isPresented: $showLoadGroupSheet) {
             LoadPlayerGroupSheet(
