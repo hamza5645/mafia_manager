@@ -5,6 +5,7 @@ struct CustomRolesView: View {
     @State private var customConfigs: [CustomRoleConfig] = []
     @State private var isLoading = false
     @State private var showAddConfig = false
+    @State private var editingConfig: CustomRoleConfig?
     @State private var errorMessage: String?
     private let databaseService = DatabaseService()
 
@@ -24,6 +25,9 @@ struct CustomRolesView: View {
                         ForEach(customConfigs) { config in
                             CustomRoleConfigCard(
                                 config: config,
+                                onEdit: {
+                                    editingConfig = config
+                                },
                                 onDelete: {
                                     await deleteConfig(config)
                                 }
@@ -54,6 +58,10 @@ struct CustomRolesView: View {
         }
         .sheet(isPresented: $showAddConfig) {
             AddCustomRoleConfigView(onSave: { await loadConfigs() })
+                .environmentObject(authStore)
+        }
+        .sheet(item: $editingConfig) { config in
+            EditCustomRoleConfigView(config: config, onSave: { await loadConfigs() })
                 .environmentObject(authStore)
         }
     }
@@ -118,6 +126,7 @@ struct EmptyCustomRolesView: View {
 
 struct CustomRoleConfigCard: View {
     let config: CustomRoleConfig
+    let onEdit: () -> Void
     let onDelete: () async -> Void
     @State private var showDeleteConfirmation = false
 
@@ -130,6 +139,13 @@ struct CustomRoleConfigCard: View {
                     .foregroundColor(.white)
 
                 Spacer()
+
+                Button {
+                    onEdit()
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundColor(Design.Colors.brandGold)
+                }
 
                 Button {
                     showDeleteConfirmation = true
@@ -328,6 +344,143 @@ struct AddCustomRoleConfigView: View {
             // WORKAROUND: Pass access token to database service
             databaseService.accessToken = authStore.accessToken
             try await databaseService.createCustomRoleConfig(newConfig)
+            await onSave()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+}
+
+struct EditCustomRoleConfigView: View {
+    @EnvironmentObject var authStore: AuthStore
+    @Environment(\.dismiss) var dismiss
+    let config: CustomRoleConfig
+    @State private var configName = ""
+    @State private var mafiaCount = 1
+    @State private var doctorCount = 1
+    @State private var inspectorCount = 1
+    @State private var citizenCount = 4
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    let onSave: () async -> Void
+    private let databaseService = DatabaseService()
+
+    private var totalPlayers: Int {
+        mafiaCount + doctorCount + inspectorCount + citizenCount
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Design.Colors.surface0
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Config Name
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Configuration Name")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            TextField("e.g., Small Game", text: $configName)
+                                .padding()
+                                .background(Design.Colors.surface1)
+                                .foregroundColor(.white)
+                                .cornerRadius(Design.Radii.card)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Design.Radii.card)
+                                        .stroke(Design.Colors.stroke, lineWidth: 1)
+                                )
+                        }
+
+                        // Total Players Display
+                        HStack {
+                            Text("Total Players:")
+                                .foregroundColor(.white.opacity(0.7))
+
+                            Text("\(totalPlayers)")
+                                .fontWeight(.bold)
+                                .foregroundColor(Design.Colors.brandGold)
+                                .font(.title3)
+                        }
+
+                        // Role Counts
+                        VStack(spacing: 16) {
+                            RoleCountPicker(role: .mafia, count: $mafiaCount, range: 1...5)
+                            RoleCountPicker(role: .doctor, count: $doctorCount, range: 0...2)
+                            RoleCountPicker(role: .inspector, count: $inspectorCount, range: 0...2)
+                            RoleCountPicker(role: .citizen, count: $citizenCount, range: 1...15)
+                        }
+
+                        if let errorMessage = errorMessage {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundColor(Design.Colors.dangerRed)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Edit Configuration")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task {
+                            await saveConfig()
+                        }
+                    }
+                    .disabled(configName.isEmpty || isLoading)
+                }
+            }
+            .onAppear {
+                // Initialize with existing config data
+                configName = config.configName
+                mafiaCount = config.roleDistribution.mafiaCount
+                doctorCount = config.roleDistribution.doctorCount
+                inspectorCount = config.roleDistribution.inspectorCount
+                citizenCount = config.roleDistribution.citizenCount
+            }
+        }
+    }
+
+    private func saveConfig() async {
+        guard let userId = authStore.currentUserId,
+              authStore.isAuthenticated else {
+            errorMessage = "You must be logged in to save custom roles"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        let roleDistribution = CustomRoleConfig.RoleDistribution(
+            mafiaCount: mafiaCount,
+            doctorCount: doctorCount,
+            inspectorCount: inspectorCount,
+            citizenCount: citizenCount,
+            totalPlayers: totalPlayers
+        )
+
+        var updatedConfig = config
+        updatedConfig.configName = configName
+        updatedConfig.roleDistribution = roleDistribution
+        updatedConfig.updatedAt = Date()
+
+        do {
+            // WORKAROUND: Pass access token to database service
+            databaseService.accessToken = authStore.accessToken
+            try await databaseService.updateCustomRoleConfig(updatedConfig)
             await onSave()
             dismiss()
         } catch {

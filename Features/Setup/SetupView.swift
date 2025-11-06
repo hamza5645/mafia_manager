@@ -8,8 +8,12 @@ struct SetupView: View {
     @State private var names: [String]
     @State private var isAddingPlayer = false
     @State private var showLoadGroupSheet = false
+    @State private var showLoadRoleConfigSheet = false
     @State private var playerGroups: [PlayerGroup] = []
+    @State private var customRoleConfigs: [CustomRoleConfig] = []
+    @State private var selectedRoleConfig: CustomRoleConfig?
     @State private var isLoadingGroups = false
+    @State private var isLoadingConfigs = false
     private let databaseService = DatabaseService()
 
     init() {
@@ -153,29 +157,47 @@ struct SetupView: View {
                         .buttonStyle(CTAButtonStyle(kind: .secondary))
                 }
                 if authStore.isAuthenticated {
-                    Button {
-                        Task {
-                            await loadPlayerGroups()
-                            showLoadGroupSheet = true
+                    HStack(spacing: 12) {
+                        Button {
+                            Task {
+                                await loadPlayerGroups()
+                                showLoadGroupSheet = true
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "person.3.fill")
+                                Text("Load Group")
+                            }
+                            .frame(maxWidth: .infinity)
                         }
-                    } label: {
-                        HStack {
-                            Image(systemName: "person.3.fill")
-                            Text("Load Player Group")
+                        .buttonStyle(CTAButtonStyle(kind: .secondary))
+
+                        Button {
+                            Task {
+                                await loadCustomRoleConfigs()
+                                showLoadRoleConfigSheet = true
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "person.2.badge.gearshape.fill")
+                                Text(selectedRoleConfig == nil ? "Load Roles" : "Roles: \(selectedRoleConfig!.configName)")
+                            }
+                            .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(CTAButtonStyle(kind: selectedRoleConfig == nil ? .secondary : .primary))
                     }
-                    .buttonStyle(CTAButtonStyle(kind: .secondary))
                 }
                 HStack(spacing: 12) {
                     Button("Reset All", role: .destructive) {
                         store.resetAll()
                         resetNameFields()
+                        selectedRoleConfig = nil
                     }
                     .buttonStyle(CTAButtonStyle(kind: .danger))
                     Button {
-                        store.assignNumbersAndRoles(names: validInput)
+                        store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
                     } label: {
-                        Text("Assign Roles").frame(maxWidth: .infinity)
+                        Text(selectedRoleConfig == nil ? "Assign Roles (Default)" : "Assign Roles (Custom)").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(CTAButtonStyle(kind: .primary))
                     .disabled(!isValid)
@@ -192,6 +214,22 @@ struct SetupView: View {
                 onSelect: { group in
                     loadGroup(group)
                     showLoadGroupSheet = false
+                }
+            )
+        }
+        .sheet(isPresented: $showLoadRoleConfigSheet) {
+            LoadCustomRoleConfigSheet(
+                customRoleConfigs: customRoleConfigs,
+                isLoading: isLoadingConfigs,
+                selectedConfig: selectedRoleConfig,
+                playerCount: validInput.count,
+                onSelect: { config in
+                    selectedRoleConfig = config
+                    showLoadRoleConfigSheet = false
+                },
+                onClearSelection: {
+                    selectedRoleConfig = nil
+                    showLoadRoleConfigSheet = false
                 }
             )
         }
@@ -244,6 +282,23 @@ struct SetupView: View {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
             names = group.playerNames
         }
+    }
+
+    private func loadCustomRoleConfigs() async {
+        guard let userId = authStore.currentUserId else { return }
+
+        isLoadingConfigs = true
+
+        do {
+            // WORKAROUND: Pass access token to database service
+            databaseService.accessToken = authStore.accessToken
+            customRoleConfigs = try await databaseService.getCustomRoleConfigs(userId: userId)
+        } catch {
+            // Silent fail - user can try again
+            customRoleConfigs = []
+        }
+
+        isLoadingConfigs = false
     }
 }
 
@@ -332,6 +387,170 @@ struct LoadPlayerGroupSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Load Custom Role Config Sheet
+
+struct LoadCustomRoleConfigSheet: View {
+    let customRoleConfigs: [CustomRoleConfig]
+    let isLoading: Bool
+    let selectedConfig: CustomRoleConfig?
+    let playerCount: Int
+    let onSelect: (CustomRoleConfig) -> Void
+    let onClearSelection: () -> Void
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Design.Colors.surface0
+                    .ignoresSafeArea()
+
+                if isLoading {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            // Default option - always shown first
+                            Button {
+                                onClearSelection()
+                            } label: {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Default Role Distribution")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+
+                                        Spacer()
+
+                                        if selectedConfig == nil {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(Design.Colors.successGreen)
+                                        }
+                                    }
+
+                                    Text("Balanced roles based on player count")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(selectedConfig == nil ? Design.Colors.surface2 : Design.Colors.surface1)
+                                .cornerRadius(Design.Radii.card)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Design.Radii.card)
+                                        .stroke(selectedConfig == nil ? Design.Colors.brandGold : Design.Colors.stroke, lineWidth: selectedConfig == nil ? 2 : 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            if customRoleConfigs.isEmpty {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "person.2.badge.gearshape.fill")
+                                        .font(.system(size: 60))
+                                        .foregroundColor(.white.opacity(0.3))
+                                        .padding(.top, 40)
+
+                                    Text("No Custom Role Configs")
+                                        .font(.title2.bold())
+                                        .foregroundColor(.white)
+
+                                    Text("Create custom role configurations in Settings")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .multilineTextAlignment(.center)
+                                }
+                            } else {
+                                // Custom configs
+                                ForEach(customRoleConfigs) { config in
+                                    let isMatchingPlayerCount = config.roleDistribution.totalPlayers == playerCount
+                                    let isSelected = selectedConfig?.id == config.id
+
+                                    Button {
+                                        if isMatchingPlayerCount {
+                                            onSelect(config)
+                                        }
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            HStack {
+                                                Text(config.configName)
+                                                    .font(.headline)
+                                                    .foregroundColor(isMatchingPlayerCount ? .white : .white.opacity(0.5))
+
+                                                Spacer()
+
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "person.3.fill")
+                                                    Text("\(config.roleDistribution.totalPlayers)")
+                                                }
+                                                .foregroundColor(isMatchingPlayerCount ? Design.Colors.brandGold : .white.opacity(0.5))
+                                                .font(.subheadline)
+
+                                                if isSelected {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .foregroundColor(Design.Colors.successGreen)
+                                                }
+                                            }
+
+                                            HStack(spacing: 16) {
+                                                RoleCountBadge(role: .mafia, count: config.roleDistribution.mafiaCount, dimmed: !isMatchingPlayerCount)
+                                                RoleCountBadge(role: .doctor, count: config.roleDistribution.doctorCount, dimmed: !isMatchingPlayerCount)
+                                                RoleCountBadge(role: .inspector, count: config.roleDistribution.inspectorCount, dimmed: !isMatchingPlayerCount)
+                                                RoleCountBadge(role: .citizen, count: config.roleDistribution.citizenCount, dimmed: !isMatchingPlayerCount)
+                                            }
+                                            .font(.caption)
+
+                                            if !isMatchingPlayerCount {
+                                                Text("⚠️ Requires exactly \(config.roleDistribution.totalPlayers) players (currently \(playerCount))")
+                                                    .font(.caption2)
+                                                    .foregroundColor(Design.Colors.dangerRed.opacity(0.8))
+                                            }
+                                        }
+                                        .padding()
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(isSelected ? Design.Colors.surface2 : Design.Colors.surface1)
+                                        .cornerRadius(Design.Radii.card)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: Design.Radii.card)
+                                                .stroke(isSelected ? Design.Colors.brandGold : Design.Colors.stroke, lineWidth: isSelected ? 2 : 1)
+                                        )
+                                        .opacity(isMatchingPlayerCount ? 1.0 : 0.6)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(!isMatchingPlayerCount)
+                                }
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle("Role Configuration")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct RoleCountBadge: View {
+    let role: Role
+    let count: Int
+    let dimmed: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: role.symbolName)
+            Text("\(count)")
+        }
+        .foregroundColor(dimmed ? role.accentColor.opacity(0.5) : role.accentColor)
     }
 }
 

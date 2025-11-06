@@ -40,7 +40,7 @@ final class GameStore: ObservableObject {
         }
     }
 
-    func assignNumbersAndRoles(names: [String]) {
+    func assignNumbersAndRoles(names: [String], customRoleConfig: CustomRoleConfig? = nil) {
         let clean = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard clean.count >= 4 && clean.count <= 19 else { return }
@@ -59,8 +59,21 @@ final class GameStore: ObservableObject {
         var shuffledNames = unique
         shuffledNames.shuffle()
 
-        // Roles
-        let roleCounts = Self.roleDistribution(for: count)
+        // Roles - use custom config if provided, otherwise use default distribution
+        let roleCounts: (mafia: Int, doctors: Int, inspectors: Int)
+        if let customConfig = customRoleConfig,
+           customConfig.roleDistribution.totalPlayers == count {
+            // Use custom role distribution if it matches the player count
+            roleCounts = (
+                mafia: customConfig.roleDistribution.mafiaCount,
+                doctors: customConfig.roleDistribution.doctorCount,
+                inspectors: customConfig.roleDistribution.inspectorCount
+            )
+        } else {
+            // Fall back to default distribution
+            roleCounts = Self.roleDistribution(for: count)
+        }
+
         var roles: [Role] = []
         roles += Array(repeating: .mafia, count: roleCounts.mafia)
         roles += Array(repeating: .doctor, count: roleCounts.doctors)
