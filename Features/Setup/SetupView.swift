@@ -172,10 +172,7 @@ struct SetupView: View {
                         // Top row: Load Group & Load Roles
                         HStack(spacing: 10) {
                             Button {
-                                Task {
-                                    await loadPlayerGroups()
-                                    showLoadGroupSheet = true
-                                }
+                                showLoadGroupSheet = true
                             } label: {
                                 VStack(spacing: 6) {
                                     Image(systemName: "person.3.fill")
@@ -189,10 +186,7 @@ struct SetupView: View {
                             .buttonStyle(CompactGridButtonStyle(kind: .secondary))
 
                             Button {
-                                Task {
-                                    await loadCustomRoleConfigs()
-                                    showLoadRoleConfigSheet = true
-                                }
+                                showLoadRoleConfigSheet = true
                             } label: {
                                 VStack(spacing: 6) {
                                     Image(systemName: "person.2.badge.gearshape.fill")
@@ -275,6 +269,9 @@ struct SetupView: View {
                     showLoadGroupSheet = false
                 }
             )
+            .task {
+                await loadPlayerGroups()
+            }
         }
         .sheet(isPresented: $showLoadRoleConfigSheet) {
             LoadCustomRoleConfigSheet(
@@ -291,6 +288,9 @@ struct SetupView: View {
                     showLoadRoleConfigSheet = false
                 }
             )
+            .task {
+                await loadCustomRoleConfigs()
+            }
         }
     }
 
