@@ -263,72 +263,36 @@ struct SetupView: View {
                             .buttonStyle(CompactGridButtonStyle(kind: selectedRoleConfig == nil ? .secondary : .accent))
                         }
 
-                        // Bottom row: Reset All & Assign Roles
-                        HStack(spacing: Design.Spacing.sm) {
-                            Button(role: .destructive) {
-                                store.resetAll()
-                                resetNameFields()
-                                selectedRoleConfig = nil
-                            } label: {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "trash.fill")
-                                        .font(.system(size: 22, weight: .semibold))
-                                    Text("Reset All")
-                                        .font(Design.Typography.caption)
-                                        .fontWeight(.semibold)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                            }
-                            .buttonStyle(CompactGridButtonStyle(kind: .danger))
-
-                            Button {
-                                store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
-                            } label: {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 22, weight: .semibold))
-                                    Text(selectedRoleConfig == nil ? "Default Roles" : "Custom Roles")
-                                        .font(Design.Typography.caption)
-                                        .fontWeight(.semibold)
-                                        .lineLimit(1)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                            }
-                            .buttonStyle(CompactGridButtonStyle(kind: .primary))
-                            .disabled(!isValid)
-                        }
-                    }
-                } else {
-                    // Enhanced non-authenticated users layout
-                    HStack(spacing: Design.Spacing.md) {
-                        Button {
-                            store.resetAll()
-                            resetNameFields()
-                            selectedRoleConfig = nil
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "trash.fill")
-                                Text("Reset All")
-                            }
-                            .font(Design.Typography.headline)
-                        }
-                        .buttonStyle(CTAButtonStyle(kind: .danger))
-
+                        // Bottom row: Continue button (full width)
                         Button {
                             store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
                         } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Assign Roles")
+                            HStack(spacing: 10) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                Text("Continue")
+                                    .font(Design.Typography.headline)
                             }
-                            .font(Design.Typography.headline)
                             .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(CTAButtonStyle(kind: .primary))
                         .disabled(!isValid)
                     }
+                } else {
+                    // Enhanced non-authenticated users layout
+                    Button {
+                        store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Continue")
+                                .font(Design.Typography.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(CTAButtonStyle(kind: .primary))
+                    .disabled(!isValid)
                 }
             }
             .padding(.horizontal, Design.Spacing.lg)
