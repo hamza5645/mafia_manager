@@ -11,4 +11,6 @@ struct NightAction: Codable, Sendable, Identifiable {
     var resultingDeaths: [UUID]
     // Snapshot of mafia numbers for this night (numbers only)
     var mafiaNumbers: [Int]
+    // BUG FIX: Track alive mafia IDs for accurate kill attribution
+    var aliveMafiaIDs: [UUID]?
 }
