@@ -282,8 +282,19 @@ final class GameStore: ObservableObject {
         }
 
         let mafiaNumbers = state.players.filter { $0.role == .mafia }.map { $0.number }.sorted()
+
+        // Determine the night index: use existing unresolved night or create new one
+        let nightIndex: Int
+        if let lastNight = state.nightHistory.last, !lastNight.isResolved {
+            // There's an unresolved night in progress - update it
+            nightIndex = lastNight.nightIndex
+        } else {
+            // Start a new night
+            nightIndex = state.nightHistory.count + 1
+        }
+
         let action = NightAction(
-            nightIndex: currentNightIndex,
+            nightIndex: nightIndex,
             mafiaTargetPlayerID: mafiaTargetID,
             inspectorCheckedPlayerID: inspectorCheckedID,
             inspectorResultIsMafia: inspectorResult,
@@ -294,7 +305,7 @@ final class GameStore: ObservableObject {
         )
 
         // Update existing night action if it exists, or append new one
-        if let existingIndex = state.nightHistory.lastIndex(where: { $0.nightIndex == currentNightIndex }) {
+        if let existingIndex = state.nightHistory.lastIndex(where: { $0.nightIndex == nightIndex }) {
             state.nightHistory[existingIndex] = action
         } else {
             state.nightHistory.append(action)
@@ -317,6 +328,8 @@ final class GameStore: ObservableObject {
             action.resultingDeaths = [targetID]
         }
 
+        // Mark night as resolved
+        action.isResolved = true
         state.nightHistory[lastIndex] = action
 
         // After resolving the night outcome we check if a team has already won.

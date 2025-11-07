@@ -494,11 +494,14 @@ struct NightWakeUpView: View {
         switch role {
         case .mafia:
             // Record mafia target
+            // Only use data from unresolved night (current night), not from previous resolved nights
             let currentNight = store.state.nightHistory.last
+            let isCurrentNight = currentNight?.isResolved == false
+
             store.endNight(
                 mafiaTargetID: selectedTargetID,
-                inspectorCheckedID: currentNight?.inspectorCheckedPlayerID,
-                doctorProtectedID: currentNight?.doctorProtectedPlayerID
+                inspectorCheckedID: isCurrentNight ? currentNight?.inspectorCheckedPlayerID : nil,
+                doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
             )
 
             // Show transition and move to next role
@@ -526,11 +529,14 @@ struct NightWakeUpView: View {
                     investigationResult = (isMafia: target.role == .mafia, role: target.role)
 
                     // Record investigation
+                    // Only use data from unresolved night (current night)
                     let currentNight = store.state.nightHistory.last
+                    let isCurrentNight = currentNight?.isResolved == false
+
                     store.endNight(
-                        mafiaTargetID: currentNight?.mafiaTargetPlayerID,
+                        mafiaTargetID: isCurrentNight ? currentNight?.mafiaTargetPlayerID : nil,
                         inspectorCheckedID: selectedTargetID,
-                        doctorProtectedID: currentNight?.doctorProtectedPlayerID
+                        doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
                     )
 
                     withAnimation {
@@ -559,10 +565,13 @@ struct NightWakeUpView: View {
 
         case .doctor:
             // Record doctor protection
+            // Only use data from unresolved night (current night)
             let currentNight = store.state.nightHistory.last
+            let isCurrentNight = currentNight?.isResolved == false
+
             store.endNight(
-                mafiaTargetID: currentNight?.mafiaTargetPlayerID,
-                inspectorCheckedID: currentNight?.inspectorCheckedPlayerID,
+                mafiaTargetID: isCurrentNight ? currentNight?.mafiaTargetPlayerID : nil,
+                inspectorCheckedID: isCurrentNight ? currentNight?.inspectorCheckedPlayerID : nil,
                 doctorProtectedID: selectedTargetID
             )
 
@@ -575,7 +584,9 @@ struct NightWakeUpView: View {
                 store.completeRoleAction()
 
                 // Resolve night outcome and go to morning
-                let wasSaved = currentNight?.mafiaTargetPlayerID == selectedTargetID
+                // Get the updated night record after endNight
+                let updatedNight = store.state.nightHistory.last
+                let wasSaved = updatedNight?.mafiaTargetPlayerID == selectedTargetID
                 store.resolveNightOutcome(targetWasSaved: wasSaved)
                 store.transitionToMorning()
 
