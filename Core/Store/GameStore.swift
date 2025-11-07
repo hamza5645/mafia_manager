@@ -90,13 +90,131 @@ final class GameStore: ObservableObject {
             players.append(Player(id: UUID(), number: number, name: name, role: role, alive: true, removalNote: nil))
         }
 
-        state = GameState(players: players, nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil)
+        state = GameState(players: players, nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil, currentPhase: .roleReveal(currentPlayerIndex: 0))
         isFreshSetup = false
         save()
     }
 
     private func save() {
         Persistence.shared.save(state)
+    }
+
+    // MARK: - Phase Management
+
+    func startRoleReveal() {
+        state.currentPhase = .roleReveal(currentPlayerIndex: 0)
+        save()
+    }
+
+    func revealRoleToPlayer(at index: Int) {
+        guard index >= 0 && index < state.players.count else { return }
+        state.currentPhase = .roleReveal(currentPlayerIndex: index)
+        save()
+    }
+
+    func advanceToNextPlayer() {
+        guard case .roleReveal(let currentIndex) = state.currentPhase else { return }
+        let nextIndex = currentIndex + 1
+
+        if nextIndex >= state.players.count {
+            // All players have seen their roles - start night phase
+            completeRoleReveal()
+        } else {
+            state.currentPhase = .roleReveal(currentPlayerIndex: nextIndex)
+            save()
+        }
+    }
+
+    func completeRoleReveal() {
+        // After all players see their roles, transition to first night
+        state.currentPhase = .nightWakeUp(activeRole: .mafia)
+        save()
+    }
+
+    func wakeUpRole(_ role: Role) {
+        state.currentPhase = .nightWakeUp(activeRole: role)
+        save()
+    }
+
+    func beginRoleAction(_ role: Role) {
+        state.currentPhase = .nightAction(activeRole: role)
+        save()
+    }
+
+    func completeRoleAction() {
+        // Determine next role to wake
+        guard case .nightAction(let currentRole) = state.currentPhase else { return }
+
+        switch currentRole {
+        case .mafia:
+            // After mafia, check if police are alive
+            if alivePlayers.contains(where: { $0.role == .inspector }) {
+                state.currentPhase = .nightTransition
+            } else if alivePlayers.contains(where: { $0.role == .doctor }) {
+                state.currentPhase = .nightTransition
+            } else {
+                // No more roles, go to morning
+                transitionToMorning()
+            }
+        case .inspector:
+            // After police, check if doctor is alive
+            if alivePlayers.contains(where: { $0.role == .doctor }) {
+                state.currentPhase = .nightTransition
+            } else {
+                // No doctor, go to morning
+                transitionToMorning()
+            }
+        case .doctor:
+            // After doctor, always go to morning
+            transitionToMorning()
+        case .citizen:
+            // Citizens don't have night actions
+            break
+        }
+        save()
+    }
+
+    func transitionToNextRole() {
+        guard case .nightTransition = state.currentPhase else { return }
+
+        // Determine which role wakes up next based on who acted last
+        // Since we're in transition, we need to figure out what happened before
+
+        // Simple approach: check night history to see what actions were recorded
+        // For now, use a simple order: Mafia → Police → Doctor
+
+        // If we have current night actions, determine next role
+        let currentNight = state.nightHistory.last
+
+        if currentNight == nil {
+            // No actions yet, start with mafia
+            state.currentPhase = .nightWakeUp(activeRole: .mafia)
+        } else if currentNight?.inspectorCheckedPlayerID == nil && alivePlayers.contains(where: { $0.role == .inspector }) {
+            // Mafia done, police not done yet
+            state.currentPhase = .nightWakeUp(activeRole: .inspector)
+        } else if currentNight?.doctorProtectedPlayerID == nil && alivePlayers.contains(where: { $0.role == .doctor }) {
+            // Police done (or skipped), doctor not done yet
+            state.currentPhase = .nightWakeUp(activeRole: .doctor)
+        } else {
+            // All roles done
+            transitionToMorning()
+        }
+        save()
+    }
+
+    func transitionToMorning() {
+        state.currentPhase = .morning
+        save()
+    }
+
+    func transitionToDay() {
+        state.currentPhase = .day
+        save()
+    }
+
+    func transitionToGameOver() {
+        state.currentPhase = .gameOver
+        save()
     }
 
     // MARK: - Role distribution
@@ -174,7 +292,13 @@ final class GameStore: ObservableObject {
             resultingDeaths: resulting,
             mafiaNumbers: mafiaNumbers
         )
-        state.nightHistory.append(action)
+
+        // Update existing night action if it exists, or append new one
+        if let existingIndex = state.nightHistory.lastIndex(where: { $0.nightIndex == currentNightIndex }) {
+            state.nightHistory[existingIndex] = action
+        } else {
+            state.nightHistory.append(action)
+        }
 
         save()
     }
@@ -278,17 +402,20 @@ final class GameStore: ObservableObject {
         if mafiaCount == 0 {
             state.isGameOver = true
             state.winner = .citizen // represent villagers team
+            state.currentPhase = .gameOver
             return
         }
         if startOfDay && mafiaCount >= nonMafiaCount {
             state.isGameOver = true
             state.winner = .mafia
+            state.currentPhase = .gameOver
             return
         }
         // Optional: also end immediately after day if mafia outnumber
         if !startOfDay && mafiaCount >= nonMafiaCount {
             state.isGameOver = true
             state.winner = .mafia
+            state.currentPhase = .gameOver
             return
         }
     }

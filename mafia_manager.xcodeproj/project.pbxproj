@@ -10,6 +10,7 @@
 		0BE60C3DAEC30B54849E843F /* CustomRolesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */; };
 		0ECA67702A1EE2E0FB10D789 /* PlayerGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */; };
 		289CD2C8F599CF39B1185E93 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */; };
+		291403FD0E26754FDC71DF76 /* NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */; };
 		2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB552E68EF3A002C5B31 /* buildServer.json */; };
 		2F3DBB752E68EF3A002C5B31 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB712E68EF3A002C5B31 /* README.md */; };
 		2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB592E68EF3A002C5B31 /* Player.swift */; };
@@ -35,13 +36,17 @@
 		2FD6A3B42EBB311100D43510 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3B32EBB311100D43510 /* Supabase */; };
 		2FD6A3D62EBBA8BD00D43510 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD6A3CF2EBB370B00D43510 /* DatabaseService.swift */; };
 		32A904FAF6CF1B8F4FE63FA0 /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FF17F2386FC18783995D1B /* SupabaseConfig.swift */; };
+		38F7EFD5FE23CF34B97E7CCB /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149D10B5544054F427EDE996 /* RoleRevealView.swift */; };
 		3B165BF15F71109935F50E5C /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B504B861E344F0BBFE2ABE0 /* DatabaseService.swift */; };
+		4BE91939A7F14F651DBA1679 /* PrivacyBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FED3AC93A4A0BFC665928CD /* PrivacyBlurView.swift */; };
 		4E733D4A63D5D7591864D960 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */; };
 		54B8A8966BF3B9D082D0E4DC /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1709435DE4A42E7402F6A60 /* PlayerStats.swift */; };
 		650E154B6CD70025846E975D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3203E55E05959A3B5751E94 /* LoginView.swift */; };
 		6D0DF051E56F80AA419BEAD4 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */; };
 		7B3E887FC46C875E7F3DD91E /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582569330F61BF4D7DC63263 /* AuthStore.swift */; };
+		7BB913D4FEC37717D0A71161 /* PrivacyBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC2640FD6DAAFAC6908E0CE /* PrivacyBlurView.swift */; };
 		7F663480AC89982C964BBEC8 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895520245FFCE2891105A416 /* ProfileView.swift */; };
+		8A1C60CD939ED660A4F8B9C0 /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCA5E35D8E018DD0E5793DD /* RoleRevealView.swift */; };
 		9226823934ABE5B71B14CD7E /* CustomRoleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */; };
 		A1AA07220B426B151121CE31 /* PlayerGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4499CE3EB8728265E3984899 /* PlayerGroup.swift */; };
 		A1E0F8FE2F4A4D0E00A5E3F1 /* NightOutcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */; };
@@ -54,7 +59,9 @@
 
 /* Begin PBXFileReference section */
 		0B504B861E344F0BBFE2ABE0 /* DatabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DatabaseService.swift; path = Core/Services/DatabaseService.swift; sourceTree = SOURCE_ROOT; };
+		0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Features/Night/NightWakeUpView.swift; sourceTree = SOURCE_ROOT; };
 		1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Features/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		149D10B5544054F427EDE996 /* RoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Features/Assignments/RoleRevealView.swift; sourceTree = SOURCE_ROOT; };
 		17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomRolesView.swift; path = Features/Stats/CustomRolesView.swift; sourceTree = SOURCE_ROOT; };
 		1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerGroupsView.swift; path = Features/Stats/PlayerGroupsView.swift; sourceTree = "<group>"; };
 		2625D31F7758B229B06FC51C /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthService.swift; path = Core/Services/AuthService.swift; sourceTree = SOURCE_ROOT; };
@@ -92,6 +99,7 @@
 		7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SupabaseService.swift; path = Core/Services/SupabaseService.swift; sourceTree = SOURCE_ROOT; };
 		889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomRoleConfig.swift; path = Core/Models/CustomRoleConfig.swift; sourceTree = SOURCE_ROOT; };
 		895520245FFCE2891105A416 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfileView.swift; path = Features/Auth/ProfileView.swift; sourceTree = SOURCE_ROOT; };
+		8FED3AC93A4A0BFC665928CD /* PrivacyBlurView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PrivacyBlurView.swift; path = Core/Components/PrivacyBlurView.swift; sourceTree = SOURCE_ROOT; };
 		958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserProfile.swift; path = Core/Models/UserProfile.swift; sourceTree = SOURCE_ROOT; };
 		99FF17F2386FC18783995D1B /* SupabaseConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SupabaseConfig.swift; path = Core/Services/SupabaseConfig.swift; sourceTree = SOURCE_ROOT; };
 		9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerStatsView.swift; path = Features/Stats/PlayerStatsView.swift; sourceTree = SOURCE_ROOT; };
@@ -101,6 +109,8 @@
 		B1709435DE4A42E7402F6A60 /* PlayerStats.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerStats.swift; path = Core/Models/PlayerStats.swift; sourceTree = SOURCE_ROOT; };
 		B3203E55E05959A3B5751E94 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoginView.swift; path = Features/Auth/LoginView.swift; sourceTree = SOURCE_ROOT; };
 		B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SignupView.swift; path = Features/Auth/SignupView.swift; sourceTree = SOURCE_ROOT; };
+		CDCA5E35D8E018DD0E5793DD /* RoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RoleRevealView.swift; path = Features/Assignments/RoleRevealView.swift; sourceTree = SOURCE_ROOT; };
+		FAC2640FD6DAAFAC6908E0CE /* PrivacyBlurView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Core/Components/PrivacyBlurView.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,6 +178,7 @@
 				2F3DBB5E2E68EF3A002C5B31 /* Services */,
 				2F3DBB602E68EF3A002C5B31 /* Store */,
 				AA0000022E69000000000002 /* UI */,
+				69E62B2722384CE701263572 /* Components */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -176,6 +187,8 @@
 			isa = PBXGroup;
 			children = (
 				2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */,
+				CDCA5E35D8E018DD0E5793DD /* RoleRevealView.swift */,
+				149D10B5544054F427EDE996 /* RoleRevealView.swift */,
 			);
 			path = Assignments;
 			sourceTree = "<group>";
@@ -209,6 +222,7 @@
 			children = (
 				2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */,
 				A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */,
+				0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */,
 			);
 			path = Night;
 			sourceTree = "<group>";
@@ -291,6 +305,16 @@
 				2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		69E62B2722384CE701263572 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				8FED3AC93A4A0BFC665928CD /* PrivacyBlurView.swift */,
+				FAC2640FD6DAAFAC6908E0CE /* PrivacyBlurView.swift */,
+			);
+			name = Components;
+			path = Components;
 			sourceTree = "<group>";
 		};
 		AA0000022E69000000000002 /* UI */ = {
@@ -419,6 +443,11 @@
 				B2F8EDAC09AF2903C3554A43 /* SettingsView.swift in Sources */,
 				A1AA07220B426B151121CE31 /* PlayerGroup.swift in Sources */,
 				0ECA67702A1EE2E0FB10D789 /* PlayerGroupsView.swift in Sources */,
+				8A1C60CD939ED660A4F8B9C0 /* RoleRevealView.swift in Sources */,
+				4BE91939A7F14F651DBA1679 /* PrivacyBlurView.swift in Sources */,
+				38F7EFD5FE23CF34B97E7CCB /* RoleRevealView.swift in Sources */,
+				7BB913D4FEC37717D0A71161 /* PrivacyBlurView.swift in Sources */,
+				291403FD0E26754FDC71DF76 /* NightWakeUpView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -566,7 +595,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.hamza.mafia-manager";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -598,7 +627,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.hamza.mafia-manager";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

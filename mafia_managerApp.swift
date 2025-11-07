@@ -33,13 +33,27 @@ struct RootView: View {
         NavigationStack {
             if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
                 SetupView()
-            } else if gameStore.state.isGameOver {
-                GameOverView()
             } else {
-                AssignmentsView()
+                phaseBasedView
             }
         }
         .id(gameStore.flowID)
         .background(Design.Colors.surface0.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private var phaseBasedView: some View {
+        switch gameStore.state.currentPhase {
+        case .roleReveal:
+            RoleRevealView()
+        case .nightWakeUp, .nightAction, .nightTransition:
+            NightWakeUpView()
+        case .morning:
+            MorningSummaryView()
+        case .day:
+            DayManagementView()
+        case .gameOver:
+            GameOverView()
+        }
     }
 }

@@ -4,21 +4,10 @@ struct DayManagementView: View {
     @EnvironmentObject private var store: GameStore
     @State private var removedToday: [UUID: Bool] = [:]
     @State private var notes: [UUID: String] = [:]
-    @State private var goToNextNight = false
-    @State private var goToGameOver = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("DAY \(store.currentDayIndex + 1)")
-                        .font(.system(size: 26, weight: .heavy))
-                        .kerning(1)
-                    Text("Discuss and vote on who to eliminate.")
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
-                .padding(.horizontal)
-
                 // Counts chips
                 HStack(spacing: 8) {
                     Chip(text: "Mafia: \(store.aliveMafia.count)", style: .filled(Design.Colors.dangerRed))
@@ -69,23 +58,19 @@ struct DayManagementView: View {
             }
         }
         .navigationTitle("Day \(store.currentDayIndex + 1)")
-        .background(
-            Group {
-                NavigationLink(destination: NightPhaseView(), isActive: $goToNextNight) { EmptyView() }.hidden()
-                NavigationLink(destination: GameOverView(), isActive: $goToGameOver) { EmptyView() }.hidden()
-            }
-        )
+        .navigationBarBackButtonHidden(true)
         .toolbar { }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
                     store.applyDayRemovals(removed: removedToday, notes: notes)
-                    if store.state.isGameOver {
-                        goToNextNight = false
-                        goToGameOver = true
-                    } else {
-                        goToNextNight = true
+
+                    // Check if game is over, otherwise start next night
+                    if !store.state.isGameOver {
+                        // Start next night by waking up mafia
+                        store.wakeUpRole(.mafia)
                     }
+                    // If game is over, phase is already set to .gameOver in evaluateWinners
                 } label: {
                     Text("Lock Votes")
                         .frame(maxWidth: .infinity)

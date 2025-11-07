@@ -2,8 +2,6 @@ import SwiftUI
 
 struct MorningSummaryView: View {
     @EnvironmentObject private var store: GameStore
-    @State private var goToDay = false
-    @State private var goToGameOver = false
 
     private var lastNight: NightAction? { store.state.nightHistory.last }
 
@@ -17,7 +15,6 @@ struct MorningSummaryView: View {
                             Text("Night \(night.nightIndex) Summary").font(.headline)
                         }
                         summaryRow(title: "Mafia", value: mafiaSummary(for: night))
-                        summaryRow(title: "Targeted", value: targetedSummary(for: night))
                         summaryRow(title: "Killed", value: killedSummary(for: night))
                         summaryRow(title: "Police", value: policeSummary(for: night))
                         summaryRow(title: "Doctor", value: doctorSummary(for: night))
@@ -31,34 +28,21 @@ struct MorningSummaryView: View {
             .padding(.top, 12)
         }
         .navigationTitle("Morning Summary")
+        .navigationBarBackButtonHidden(true)
         .background(Design.Colors.surface0.ignoresSafeArea())
-        .onAppear {
-            if store.state.isGameOver {
-                // If a win was reached at start-of-day, auto-offer Game Over
-                goToGameOver = true
-            }
-        }
-        .background(
-            Group {
-                NavigationLink(destination: DayManagementView(), isActive: $goToDay) { EmptyView() }.hidden()
-                NavigationLink(destination: GameOverView(), isActive: $goToGameOver) { EmptyView() }.hidden()
-            }
-        )
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
-                if store.state.isGameOver {
-                    Button { goToGameOver = true } label: {
-                        Text("View Result")
-                            .frame(maxWidth: .infinity)
+                Button {
+                    if store.state.isGameOver {
+                        store.transitionToGameOver()
+                    } else {
+                        store.transitionToDay()
                     }
-                    .buttonStyle(CTAButtonStyle(kind: .primary))
-                } else {
-                    Button { goToDay = true } label: {
-                        Text("Continue to Day \(store.currentDayIndex + 1) (Mark Removals)")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(CTAButtonStyle(kind: .primary))
+                } label: {
+                    Text(store.state.isGameOver ? "View Result" : "Continue to Day \(store.currentDayIndex + 1)")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(CTAButtonStyle(kind: .primary))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -83,24 +67,28 @@ struct MorningSummaryView: View {
 private extension MorningSummaryView {
     func mafiaSummary(for night: NightAction) -> String {
         let numbers = night.mafiaNumbers.sorted()
-        return numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
-    }
+        let mafiaLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
-    func targetedSummary(for night: NightAction) -> String {
-        guard let targetNumber = store.number(for: night.mafiaTargetPlayerID) else { return "—" }
-        return "#\(targetNumber)"
+        if let targetNumber = store.number(for: night.mafiaTargetPlayerID) {
+            return "\(mafiaLabel) → #\(targetNumber)"
+        }
+        return mafiaLabel
     }
 
     func killedSummary(for night: NightAction) -> String {
         let deathNumbers = night.resultingDeaths.compactMap { store.number(for: $0) }.sorted()
-        guard !deathNumbers.isEmpty else {
-            if let targetNumber = store.number(for: night.mafiaTargetPlayerID),
-               night.doctorProtectedPlayerID == night.mafiaTargetPlayerID {
-                return "None (Doctor saved #\(targetNumber))"
-            }
-            return "None"
+
+        if !deathNumbers.isEmpty {
+            return deathNumbers.map { "#\($0)" }.joined(separator: ", ")
         }
-        return deathNumbers.map { "#\($0)" }.joined(separator: ", ")
+
+        // No deaths - check if doctor saved someone
+        if let targetNumber = store.number(for: night.mafiaTargetPlayerID),
+           night.doctorProtectedPlayerID == night.mafiaTargetPlayerID {
+            return "None (Doctor saved #\(targetNumber))"
+        }
+
+        return "None"
     }
 
     func policeSummary(for night: NightAction) -> String {
