@@ -7,12 +7,21 @@ final class GameStore: ObservableObject {
     @Published private(set) var state: GameState = .empty
     @Published var isFreshSetup: Bool = true
     @Published var flowID: UUID = UUID()
+    // BUG FIX: Track persistence errors to show to user
+    @Published var persistenceError: String?
 
     private let databaseService = DatabaseService()
     // BUG FIX: Use weak reference to prevent potential retain cycle
     private weak var authStore: AuthStore?
 
     init() {
+        // BUG FIX: Set up persistence error callback
+        Persistence.shared.onSaveError = { [weak self] error in
+            Task { @MainActor in
+                self?.persistenceError = "Failed to save game: \(error.localizedDescription)"
+            }
+        }
+
         if let saved = Persistence.shared.load() {
             self.state = saved
             self.isFreshSetup = saved.players.isEmpty
@@ -310,14 +319,16 @@ final class GameStore: ObservableObject {
             }
         }
 
-        // Do not auto-remove the mafia target at night.
-        // We only log the target; actual removals are handled manually during the Day phase.
-        // Still enforce that mafia cannot target mafia; doctor protection is logged but has no removal effect here.
-        if let targetID = mafiaTargetID,
-           let target = player(by: targetID),
-           target.role != .mafia,
-           target.alive {
-            // Intentionally no state.players[..].alive = false and no resulting death.
+        // BUG FIX: Validate mafia targeting rules
+        // Mafia cannot target another mafia member or dead players
+        if let targetID = mafiaTargetID, let target = player(by: targetID) {
+            if target.role == .mafia {
+                print("⚠️ Invalid: Mafia attempted to target another mafia member (#\(target.number))")
+                // Continue anyway - action will be recorded but targeting rules violated
+            } else if !target.alive {
+                print("⚠️ Invalid: Mafia attempted to target dead player (#\(target.number))")
+                // Continue anyway - action will be recorded but targeting rules violated
+            }
         }
 
         let mafiaNumbers = state.players.filter { $0.role == .mafia }.map { $0.number }.sorted()

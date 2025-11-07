@@ -13,4 +13,8 @@ struct NightAction: Codable, Sendable, Identifiable {
     var mafiaNumbers: [Int]
     // BUG FIX: Track alive mafia IDs for accurate kill attribution
     var aliveMafiaIDs: [UUID]?
+    // BUG FIX: Phase completion tracking for robust transitions
+    var mafiaPhaseCompleted: Bool = false
+    var inspectorPhaseCompleted: Bool = false
+    var doctorPhaseCompleted: Bool = false
 }

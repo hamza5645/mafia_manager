@@ -21,6 +21,12 @@ final class AuthStore: ObservableObject {
     private let keychain = KeychainHelper.shared
     private var authStateTask: Task<Void, Never>?
 
+    // SECURITY FIX: Rate limiting for authentication attempts
+    private var failedSignInAttempts = 0
+    private var lastFailedAttemptTime: Date?
+    private let maxAttemptsBeforeCooldown = 5
+    private let cooldownDuration: TimeInterval = 30 // 30 seconds
+
     private enum KeychainKeys {
         static let accessToken = "auth_access_token"
         static let refreshToken = "auth_refresh_token"
@@ -230,6 +236,13 @@ final class AuthStore: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // SECURITY FIX: Check rate limiting before attempting sign in
+        if let cooldownRemaining = getRateLimitCooldown() {
+            errorMessage = "Too many failed attempts. Please wait \(Int(cooldownRemaining)) seconds before trying again."
+            isLoading = false
+            return
+        }
+
         // SECURITY FIX: Validate inputs
         let validEmail: String
         switch InputValidator.validateEmail(email) {
@@ -258,10 +271,17 @@ final class AuthStore: ObservableObject {
             saveAccessToken(session.accessToken)
             saveRefreshToken(session.refreshToken)
 
+            // SECURITY FIX: Reset failed attempts on successful sign in
+            resetRateLimit()
+
             // Auth state listener will handle updating isAuthenticated
         } catch let error as NSError {
+            // SECURITY FIX: Track failed sign in attempt
+            recordFailedSignInAttempt()
             errorMessage = mapAuthError(error, operation: .signIn)
         } catch {
+            // SECURITY FIX: Track failed sign in attempt
+            recordFailedSignInAttempt()
             errorMessage = error.localizedDescription
         }
 
@@ -331,6 +351,37 @@ final class AuthStore: ObservableObject {
 
     private func sanitizeEmail(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    // MARK: - Rate Limiting
+
+    /// Returns remaining cooldown time in seconds if rate limited, nil otherwise
+    private func getRateLimitCooldown() -> TimeInterval? {
+        guard failedSignInAttempts >= maxAttemptsBeforeCooldown,
+              let lastAttempt = lastFailedAttemptTime else {
+            return nil
+        }
+
+        let timeSinceLastAttempt = Date().timeIntervalSince(lastAttempt)
+        let remainingCooldown = cooldownDuration - timeSinceLastAttempt
+
+        if remainingCooldown > 0 {
+            return remainingCooldown
+        } else {
+            // Cooldown expired, reset
+            resetRateLimit()
+            return nil
+        }
+    }
+
+    private func recordFailedSignInAttempt() {
+        failedSignInAttempts += 1
+        lastFailedAttemptTime = Date()
+    }
+
+    private func resetRateLimit() {
+        failedSignInAttempts = 0
+        lastFailedAttemptTime = nil
     }
 
     private func mapAuthError(_ error: NSError, operation: AuthOperation) -> String {
