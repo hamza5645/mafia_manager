@@ -11,3 +11,6 @@ build/
 node_modules/
 Pods/
 *.log
+
+# Sensitive configuration files - DO NOT COMMIT
+Core/Services/SupabaseConfig.swift

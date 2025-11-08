@@ -1,0 +1,16 @@
+import Foundation
+
+/// Supabase Configuration
+/// IMPORTANT: This file contains sensitive credentials and should NOT be committed to version control.
+/// Copy SupabaseConfig.swift.template to SupabaseConfig.swift and fill in your credentials.
+
+enum SupabaseConfig {
+    static let supabaseURL = "YOUR_SUPABASE_URL_HERE"
+    static let supabaseAnonKey = "YOUR_SUPABASE_ANON_KEY_HERE"
+}
+
+// SETUP INSTRUCTIONS:
+// 1. Copy this file to SupabaseConfig.swift (without .template)
+// 2. Replace YOUR_SUPABASE_URL_HERE with your Supabase project URL
+// 3. Replace YOUR_SUPABASE_ANON_KEY_HERE with your anon key
+// 4. SupabaseConfig.swift is gitignored and will not be committed

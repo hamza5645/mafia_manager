@@ -10,30 +10,30 @@ final class AuthStore: ObservableObject {
     @Published var userProfile: UserProfile?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var isRestoringSession = true
 
-    // WORKAROUND: Store tokens manually since SDK doesn't persist session
-    @Published var accessToken: String? {
-        didSet {
-            if let token = accessToken {
-                UserDefaults.standard.set(token, forKey: "auth_access_token")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "auth_access_token")
-            }
-        }
-    }
-    @Published var refreshToken: String? {
-        didSet {
-            if let token = refreshToken {
-                UserDefaults.standard.set(token, forKey: "auth_refresh_token")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "auth_refresh_token")
-            }
-        }
-    }
+    // SECURITY FIX: Tokens now stored securely in Keychain instead of UserDefaults
+    @Published var accessToken: String?
+    @Published var refreshToken: String?
 
     private let authService = AuthService()
     private let databaseService = DatabaseService()
+    private let keychain = KeychainHelper.shared
     private var authStateTask: Task<Void, Never>?
+
+    // SECURITY FIX: Rate limiting to prevent brute force attacks
+    private struct RateLimitEntry {
+        var attempts: Int
+        var lastAttempt: Date
+    }
+    private var rateLimits: [String: RateLimitEntry] = [:]
+    private let maxAttempts = 5
+    private let cooldownSeconds: TimeInterval = 30
+
+    private enum KeychainKeys {
+        static let accessToken = "auth_access_token"
+        static let refreshToken = "auth_refresh_token"
+    }
 
     private enum AuthOperation {
         case signIn
@@ -42,11 +42,16 @@ final class AuthStore: ObservableObject {
     }
 
     init() {
-        // Restore tokens from UserDefaults
-        self.accessToken = UserDefaults.standard.string(forKey: "auth_access_token")
-        self.refreshToken = UserDefaults.standard.string(forKey: "auth_refresh_token")
+        // SECURITY FIX: Migrate from UserDefaults to Keychain if needed
+        migrateTokensFromUserDefaultsIfNeeded()
+
+        // Restore tokens from Keychain
+        self.accessToken = loadAccessToken()
+        self.refreshToken = loadRefreshToken()
 
         Task {
+            defer { isRestoringSession = false }
+
             // Try to restore session if we have tokens
             if let accessToken = self.accessToken,
                let refreshToken = self.refreshToken {
@@ -54,8 +59,7 @@ final class AuthStore: ObservableObject {
                     try await authService.restoreSession(accessToken: accessToken, refreshToken: refreshToken)
                 } catch {
                     // If session restoration fails, clear tokens
-                    self.accessToken = nil
-                    self.refreshToken = nil
+                    clearTokens()
                 }
             }
 
@@ -100,14 +104,12 @@ final class AuthStore: ObservableObject {
                     self.isAuthenticated = false
                     self.currentUserId = nil
                     self.userProfile = nil
-                    self.accessToken = nil
-                    self.refreshToken = nil
+                    self.clearTokens()
                 case .userDeleted:
                     self.isAuthenticated = false
                     self.currentUserId = nil
                     self.userProfile = nil
-                    self.accessToken = nil
-                    self.refreshToken = nil
+                    self.clearTokens()
                 default:
                     break
                 }
@@ -126,33 +128,152 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    // MARK: - Secure Token Management
+
+    private func saveAccessToken(_ token: String) {
+        try? keychain.save(token, forKey: KeychainKeys.accessToken)
+        self.accessToken = token
+    }
+
+    private func saveRefreshToken(_ token: String) {
+        try? keychain.save(token, forKey: KeychainKeys.refreshToken)
+        self.refreshToken = token
+    }
+
+    private func loadAccessToken() -> String? {
+        try? keychain.load(forKey: KeychainKeys.accessToken)
+    }
+
+    private func loadRefreshToken() -> String? {
+        try? keychain.load(forKey: KeychainKeys.refreshToken)
+    }
+
+    private func clearTokens() {
+        try? keychain.delete(forKey: KeychainKeys.accessToken)
+        try? keychain.delete(forKey: KeychainKeys.refreshToken)
+        self.accessToken = nil
+        self.refreshToken = nil
+    }
+
+    /// Migrate tokens from UserDefaults to Keychain for existing users
+    private func migrateTokensFromUserDefaultsIfNeeded() {
+        let defaults = UserDefaults.standard
+
+        // Check if tokens exist in UserDefaults
+        if let accessToken = defaults.string(forKey: KeychainKeys.accessToken),
+           !keychain.exists(forKey: KeychainKeys.accessToken) {
+            try? keychain.save(accessToken, forKey: KeychainKeys.accessToken)
+            defaults.removeObject(forKey: KeychainKeys.accessToken)
+        }
+
+        if let refreshToken = defaults.string(forKey: KeychainKeys.refreshToken),
+           !keychain.exists(forKey: KeychainKeys.refreshToken) {
+            try? keychain.save(refreshToken, forKey: KeychainKeys.refreshToken)
+            defaults.removeObject(forKey: KeychainKeys.refreshToken)
+        }
+    }
+
+    // MARK: - Rate Limiting
+
+    /// Check if email is rate limited
+    private func isRateLimited(email: String) -> Bool {
+        guard let entry = rateLimits[email.lowercased()] else {
+            return false
+        }
+
+        let timeSinceLastAttempt = Date().timeIntervalSince(entry.lastAttempt)
+
+        // If cooldown has passed, reset the entry
+        if timeSinceLastAttempt >= cooldownSeconds {
+            rateLimits.removeValue(forKey: email.lowercased())
+            return false
+        }
+
+        // Check if max attempts reached
+        return entry.attempts >= maxAttempts
+    }
+
+    /// Record a failed authentication attempt
+    private func recordFailedAttempt(email: String) {
+        let key = email.lowercased()
+        if var entry = rateLimits[key] {
+            entry.attempts += 1
+            entry.lastAttempt = Date()
+            rateLimits[key] = entry
+        } else {
+            rateLimits[key] = RateLimitEntry(attempts: 1, lastAttempt: Date())
+        }
+    }
+
+    /// Reset rate limit for successful authentication
+    private func resetRateLimit(email: String) {
+        rateLimits.removeValue(forKey: email.lowercased())
+    }
+
     // MARK: - Sign Up
 
     func signUp(email: String, password: String, displayName: String) async -> Bool {
         isLoading = true
         errorMessage = nil
 
-        let sanitizedEmail = sanitizeEmail(email)
-        let sanitizedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        // SECURITY FIX: Check rate limiting
+        if isRateLimited(email: email) {
+            errorMessage = "Too many attempts. Please wait 30 seconds before trying again."
+            isLoading = false
+            return false
+        }
+
+        // SECURITY FIX: Validate inputs
+        let validEmail: String
+        switch InputValidator.validateEmail(email) {
+        case .success(let email):
+            validEmail = email
+        case .failure(let error):
+            errorMessage = "Invalid email: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+
+        let validPassword: String
+        switch InputValidator.validatePassword(password) {
+        case .success(let pwd):
+            validPassword = pwd
+        case .failure(let error):
+            errorMessage = "Invalid password: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+
+        let validDisplayName: String
+        switch InputValidator.validateDisplayName(displayName) {
+        case .success(let name):
+            validDisplayName = name
+        case .failure(let error):
+            errorMessage = "Invalid display name: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
 
         do {
-            _ = try await authService.signUp(email: sanitizedEmail, password: sanitizedPassword, displayName: trimmedDisplayName)
+            _ = try await authService.signUp(email: validEmail, password: validPassword, displayName: validDisplayName)
 
             // With the auto-confirm trigger, the user should be immediately signed in
             // If not, attempt sign-in
             if await authService.currentSession == nil {
-                _ = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
+                _ = try await authService.signIn(email: validEmail, password: validPassword)
             }
 
             // Signup + auto sign-in successful - auth state listener updates isAuthenticated
+            resetRateLimit(email: validEmail)
             isLoading = false
             return true
         } catch let error as NSError {
+            recordFailedAttempt(email: email)
             errorMessage = mapAuthError(error, operation: .signUp)
             isLoading = false
             return false
         } catch {
+            recordFailedAttempt(email: email)
             errorMessage = error.localizedDescription
             isLoading = false
             return false
@@ -165,20 +286,50 @@ final class AuthStore: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // SECURITY FIX: Check rate limiting
+        if isRateLimited(email: email) {
+            errorMessage = "Too many attempts. Please wait 30 seconds before trying again."
+            isLoading = false
+            return
+        }
+
+        // SECURITY FIX: Validate inputs
+        let validEmail: String
+        switch InputValidator.validateEmail(email) {
+        case .success(let email):
+            validEmail = email
+        case .failure(let error):
+            errorMessage = "Invalid email: \(error.localizedDescription)"
+            isLoading = false
+            return
+        }
+
+        let validPassword: String
+        switch InputValidator.validatePassword(password) {
+        case .success(let pwd):
+            validPassword = pwd
+        case .failure(let error):
+            errorMessage = "Invalid password: \(error.localizedDescription)"
+            isLoading = false
+            return
+        }
+
         do {
-            let sanitizedEmail = sanitizeEmail(email)
-            let sanitizedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+            let session = try await authService.signIn(email: validEmail, password: validPassword)
 
-            let session = try await authService.signIn(email: sanitizedEmail, password: sanitizedPassword)
+            // SECURITY FIX: Store tokens securely in Keychain
+            saveAccessToken(session.accessToken)
+            saveRefreshToken(session.refreshToken)
 
-            // WORKAROUND: Manually store tokens since SDK doesn't persist properly
-            self.accessToken = session.accessToken
-            self.refreshToken = session.refreshToken
+            // Auth successful - reset rate limit
+            resetRateLimit(email: validEmail)
 
             // Auth state listener will handle updating isAuthenticated
         } catch let error as NSError {
+            recordFailedAttempt(email: email)
             errorMessage = mapAuthError(error, operation: .signIn)
         } catch {
+            recordFailedAttempt(email: email)
             errorMessage = error.localizedDescription
         }
 

@@ -7,11 +7,21 @@ final class GameStore: ObservableObject {
     @Published private(set) var state: GameState = .empty
     @Published var isFreshSetup: Bool = true
     @Published var flowID: UUID = UUID()
+    // BUG FIX: Track persistence errors to show to user
+    @Published var persistenceError: String?
 
     private let databaseService = DatabaseService()
-    private var authStore: AuthStore?
+    // BUG FIX: Use weak reference to prevent potential retain cycle
+    private weak var authStore: AuthStore?
 
     init() {
+        // BUG FIX: Set up persistence error callback
+        Persistence.shared.onSaveError = { [weak self] error in
+            Task { @MainActor in
+                self?.persistenceError = "Failed to save game: \(error.localizedDescription)"
+            }
+        }
+
         if let saved = Persistence.shared.load() {
             self.state = saved
             self.isFreshSetup = saved.players.isEmpty
@@ -41,14 +51,24 @@ final class GameStore: ObservableObject {
     }
 
     func assignNumbersAndRoles(names: [String], customRoleConfig: CustomRoleConfig? = nil) {
-        let clean = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        guard clean.count >= 4 && clean.count <= 19 else { return }
+        // SECURITY FIX: Validate all player names
+        var validatedNames: [String] = []
+        for name in names {
+            switch InputValidator.validatePlayerName(name) {
+            case .success(let validName):
+                validatedNames.append(validName)
+            case .failure:
+                // Skip invalid names
+                continue
+            }
+        }
+
+        guard validatedNames.count >= 4 && validatedNames.count <= 19 else { return }
 
         // Ensure names are unique while preserving order
         var seen = Set<String>()
-        let unique = clean.filter { seen.insert($0).inserted }
-        guard unique.count == clean.count else { return }
+        let unique = validatedNames.filter { seen.insert($0).inserted }
+        guard unique.count == validatedNames.count else { return }
 
         // Random unique numbers from 1..(2 * playerCount)
         let count = unique.count
@@ -61,16 +81,39 @@ final class GameStore: ObservableObject {
 
         // Roles - use custom config if provided, otherwise use default distribution
         let roleCounts: (mafia: Int, doctors: Int, inspectors: Int)
+
+        // BUG FIX: Validate custom role distribution before using
         if let customConfig = customRoleConfig,
            customConfig.roleDistribution.totalPlayers == count {
-            // Use custom role distribution if it matches the player count
-            roleCounts = (
-                mafia: customConfig.roleDistribution.mafiaCount,
-                doctors: customConfig.roleDistribution.doctorCount,
-                inspectors: customConfig.roleDistribution.inspectorCount
-            )
+
+            let totalCustomRoles = customConfig.roleDistribution.mafiaCount +
+                                 customConfig.roleDistribution.doctorCount +
+                                 customConfig.roleDistribution.inspectorCount
+
+            // Validate: total roles shouldn't exceed player count
+            let validTotalCount = totalCustomRoles <= count
+            // Validate: must have at least one mafia
+            let validMafiaCount = customConfig.roleDistribution.mafiaCount >= 1
+
+            if validTotalCount && validMafiaCount {
+                // Use valid custom role distribution
+                roleCounts = (
+                    mafia: customConfig.roleDistribution.mafiaCount,
+                    doctors: customConfig.roleDistribution.doctorCount,
+                    inspectors: customConfig.roleDistribution.inspectorCount
+                )
+            } else {
+                // Invalid config - fall back to default
+                if !validTotalCount {
+                    print("⚠️ Custom config has \(totalCustomRoles) roles for \(count) players - falling back to default")
+                }
+                if !validMafiaCount {
+                    print("⚠️ Custom config must have at least 1 mafia - falling back to default")
+                }
+                roleCounts = Self.roleDistribution(for: count)
+            }
         } else {
-            // Fall back to default distribution
+            // No custom config or player count mismatch - use default distribution
             roleCounts = Self.roleDistribution(for: count)
         }
 
@@ -265,47 +308,47 @@ final class GameStore: ObservableObject {
 
         if let inspectID = inspectorCheckedID, let inspected = player(by: inspectID) {
             // Prevent police from identifying other police members
-            if inspected.role != .inspector {
+            if inspected.role == .inspector {
+                // BUG FIX: Provide feedback that inspector was blocked
+                // Set role to .inspector so UI knows what happened, but keep boolean nil
+                inspectorRole = .inspector
+                inspectorResult = nil
+            } else {
                 inspectorRole = inspected.role
                 inspectorResult = (inspected.role == .mafia)
             }
         }
 
-        // Do not auto-remove the mafia target at night.
-        // We only log the target; actual removals are handled manually during the Day phase.
-        // Still enforce that mafia cannot target mafia; doctor protection is logged but has no removal effect here.
-        if let targetID = mafiaTargetID,
-           let target = player(by: targetID),
-           target.role != .mafia,
-           target.alive {
-            // Intentionally no state.players[..].alive = false and no resulting death.
+        // BUG FIX: Validate mafia targeting rules
+        // Mafia cannot target another mafia member or dead players
+        if let targetID = mafiaTargetID, let target = player(by: targetID) {
+            if target.role == .mafia {
+                print("⚠️ Invalid: Mafia attempted to target another mafia member (#\(target.number))")
+                // Continue anyway - action will be recorded but targeting rules violated
+            } else if !target.alive {
+                print("⚠️ Invalid: Mafia attempted to target dead player (#\(target.number))")
+                // Continue anyway - action will be recorded but targeting rules violated
+            }
         }
 
         let mafiaNumbers = state.players.filter { $0.role == .mafia }.map { $0.number }.sorted()
-
-        // Determine the night index: use existing unresolved night or create new one
-        let nightIndex: Int
-        if let lastNight = state.nightHistory.last, !lastNight.isResolved {
-            // There's an unresolved night in progress - update it
-            nightIndex = lastNight.nightIndex
-        } else {
-            // Start a new night
-            nightIndex = state.nightHistory.count + 1
-        }
+        // BUG FIX: Track alive mafia IDs for accurate kill attribution
+        let aliveMafiaIDs = state.players.filter { $0.role == .mafia && $0.alive }.map { $0.id }
 
         let action = NightAction(
-            nightIndex: nightIndex,
+            nightIndex: currentNightIndex,
             mafiaTargetPlayerID: mafiaTargetID,
             inspectorCheckedPlayerID: inspectorCheckedID,
             inspectorResultIsMafia: inspectorResult,
             inspectorResultRole: inspectorRole,
             doctorProtectedPlayerID: doctorProtectedID,
             resultingDeaths: resulting,
-            mafiaNumbers: mafiaNumbers
+            mafiaNumbers: mafiaNumbers,
+            aliveMafiaIDs: aliveMafiaIDs
         )
 
         // Update existing night action if it exists, or append new one
-        if let existingIndex = state.nightHistory.lastIndex(where: { $0.nightIndex == nightIndex }) {
+        if let existingIndex = state.nightHistory.lastIndex(where: { $0.nightIndex == currentNightIndex }) {
             state.nightHistory[existingIndex] = action
         } else {
             state.nightHistory.append(action)
@@ -317,6 +360,15 @@ final class GameStore: ObservableObject {
     func resolveNightOutcome(targetWasSaved: Bool) {
         guard let lastIndex = state.nightHistory.indices.last else { return }
         var action = state.nightHistory[lastIndex]
+
+        // BUG FIX: Guard against duplicate resolution
+        // If resultingDeaths is not empty, this night was already resolved
+        guard action.resultingDeaths.isEmpty else {
+            print("⚠️ Night \(action.nightIndex) outcome already resolved")
+            return
+        }
+
+        // Note: We clear and rebuild resultingDeaths to ensure clean state
         action.resultingDeaths.removeAll()
 
         if !targetWasSaved,
@@ -328,8 +380,6 @@ final class GameStore: ObservableObject {
             action.resultingDeaths = [targetID]
         }
 
-        // Mark night as resolved
-        action.isResolved = true
         state.nightHistory[lastIndex] = action
 
         // After resolving the night outcome we check if a team has already won.
@@ -369,18 +419,25 @@ final class GameStore: ObservableObject {
               state.isGameOver,
               let winner = state.winner else { return }
 
-        // Calculate kills per player (only mafia can get kills)
+        // BUG FIX: Calculate kills per player using accurate alive mafia tracking
         var killsPerPlayer: [UUID: Int] = [:]
         for night in state.nightHistory {
             if night.resultingDeaths.first != nil {
-                // Find which mafia players were alive during this night
-                let aliveMafiaInNight = state.players.filter { player in
-                    player.role == .mafia &&
-                    night.mafiaNumbers.contains(player.number)
-                }
-                // Distribute the kill equally among all mafia (or assign to one)
-                for mafiaPlayer in aliveMafiaInNight {
-                    killsPerPlayer[mafiaPlayer.id, default: 0] += 1
+                // Use new aliveMafiaIDs field if available (post-fix), fall back to old logic
+                if let aliveMafiaIDs = night.aliveMafiaIDs {
+                    // New accurate method: use tracked alive mafia IDs
+                    for mafiaID in aliveMafiaIDs {
+                        killsPerPlayer[mafiaID, default: 0] += 1
+                    }
+                } else {
+                    // Old fallback method (for backward compatibility with old saves)
+                    let aliveMafiaInNight = state.players.filter { player in
+                        player.role == .mafia &&
+                        night.mafiaNumbers.contains(player.number)
+                    }
+                    for mafiaPlayer in aliveMafiaInNight {
+                        killsPerPlayer[mafiaPlayer.id, default: 0] += 1
+                    }
                 }
             }
         }
@@ -409,6 +466,9 @@ final class GameStore: ObservableObject {
     // MARK: - Victory
 
     private func evaluateWinners(startOfDay: Bool) {
+        // BUG FIX: Prevent re-evaluation if game is already over
+        guard !state.isGameOver else { return }
+
         let mafiaCount = aliveMafia.count
         let nonMafiaCount = aliveNonMafia.count
 
