@@ -21,16 +21,11 @@ final class Persistence: @unchecked Sendable {
 
     private var stateURL: URL { folderURL.appendingPathComponent("GameState.json") }
 
-    func save(_ state: GameState) {
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(state)
-            try data.write(to: stateURL, options: .atomic)
-        } catch {
-            // Silently fail - persistence is not critical for app functionality
-            // In production, this should log to a proper logging system
-        }
+    func save(_ state: GameState) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(state)
+        try data.write(to: stateURL, options: .atomic)
     }
 
     func load() -> GameState? {

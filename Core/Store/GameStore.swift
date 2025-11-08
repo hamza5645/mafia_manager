@@ -7,10 +7,14 @@ final class GameStore: ObservableObject {
     @Published private(set) var state: GameState = .empty
     @Published var isFreshSetup: Bool = true
     @Published var flowID: UUID = UUID()
+    // SECURITY FIX: Surface persistence errors to user
+    @Published var persistenceError: String?
 
     private let databaseService = DatabaseService()
     // BUG FIX: Use weak reference to prevent potential retain cycle
     private weak var authStore: AuthStore?
+    // PERFORMANCE FIX: Debounce saves to prevent file system thrashing
+    private var saveTask: Task<Void, Never>?
 
     init() {
         if let saved = Persistence.shared.load() {
@@ -130,7 +134,27 @@ final class GameStore: ObservableObject {
     }
 
     private func save() {
-        Persistence.shared.save(state)
+        // Cancel any pending save
+        saveTask?.cancel()
+
+        // Schedule new save after 300ms delay to prevent file system thrashing
+        saveTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+
+            guard !Task.isCancelled else { return }
+
+            do {
+                try Persistence.shared.save(state)
+                await MainActor.run {
+                    persistenceError = nil
+                }
+            } catch {
+                await MainActor.run {
+                    persistenceError = "Failed to save game: \(error.localizedDescription)"
+                    print("⚠️ Persistence error: \(error)")
+                }
+            }
+        }
     }
 
     // MARK: - Phase Management

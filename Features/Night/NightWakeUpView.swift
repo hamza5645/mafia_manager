@@ -493,6 +493,19 @@ struct NightWakeUpView: View {
 
         switch role {
         case .mafia:
+            // SECURITY FIX: Validate target is not mafia
+            if let targetID = selectedTargetID,
+               let target = store.player(by: targetID),
+               target.role == .mafia {
+                // Invalid target - show error and clear selection
+                let errorGenerator = UINotificationFeedbackGenerator()
+                errorGenerator.notificationOccurred(.error)
+
+                // Clear selection
+                selectedTargetID = nil
+                return
+            }
+
             // Record mafia target
             let currentNight = store.state.nightHistory.last
             store.endNight(
