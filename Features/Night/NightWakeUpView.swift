@@ -10,6 +10,8 @@ struct NightWakeUpView: View {
     @State private var showInitialSleepScreen = true
     @State private var showStartNightTransition = false
     @State private var showEndGameConfirmation = false
+    @State private var wakeUpSoundPlayer: AVAudioPlayer?
+    @State private var awaitingMafiaWakeCue = true
 
     var body: some View {
         ZStack {
@@ -53,12 +55,21 @@ struct NightWakeUpView: View {
             // Show initial sleep screen when entering night for the first time
             if case .nightWakeUp(.mafia) = store.state.currentPhase {
                 showInitialSleepScreen = true
+                awaitingMafiaWakeCue = true
             }
+            maybePlayCurrentWakeUpSound()
+        }
+        .onChange(of: store.state.currentPhase) { _, newPhase in
+            if case .nightWakeUp(let role) = newPhase, role == .mafia {
+                awaitingMafiaWakeCue = true
+            }
+            maybePlayCurrentWakeUpSound()
         }
         .onChange(of: store.currentNightIndex) { _, _ in
             // Reset sleep screen for each new night
             if case .nightWakeUp(.mafia) = store.state.currentPhase {
                 showInitialSleepScreen = true
+                awaitingMafiaWakeCue = true
             }
         }
     }
@@ -138,8 +149,9 @@ struct NightWakeUpView: View {
 
                 // After 2 seconds, play sound and show mafia wake up
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    // Play system sound
-                    AudioServicesPlaySystemSound(1013) // System sound for notification
+                    // Play mafia wake-up cue
+                    awaitingMafiaWakeCue = false
+                    playWakeUpSound(for: .mafia)
 
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showStartNightTransition = false
@@ -543,7 +555,6 @@ struct NightWakeUpView: View {
 
             // Play sound and transition after delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                playTransitionSound()
                 store.completeRoleAction()
                 store.transitionToNextRole()
 
@@ -582,7 +593,6 @@ struct NightWakeUpView: View {
                 }
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    playTransitionSound()
                     store.completeRoleAction()
                     store.transitionToNextRole()
 
@@ -633,9 +643,47 @@ struct NightWakeUpView: View {
         }
     }
 
-    private func playTransitionSound() {
-        // Play system sound
-        AudioServicesPlaySystemSound(1052) // Simple beep sound
+    private func maybePlayCurrentWakeUpSound() {
+        guard case .nightWakeUp(let role) = store.state.currentPhase else { return }
+
+        if role == .mafia && awaitingMafiaWakeCue {
+            // We're still showing the pre-night instructions, so wait for the host to start the night
+            return
+        }
+
+        playWakeUpSound(for: role)
+    }
+
+    private func playWakeUpSound(for role: Role) {
+        guard let fileName = wakeUpSoundFileName(for: role) else { return }
+        guard let url = Bundle.main.url(forResource: fileName, withExtension: "wav") else {
+            print("Missing wake-up sound file: \\(fileName).wav")
+            return
+        }
+
+        wakeUpSoundPlayer?.stop()
+
+        do {
+            wakeUpSoundPlayer = try AVAudioPlayer(contentsOf: url)
+            wakeUpSoundPlayer?.volume = 1.0
+            wakeUpSoundPlayer?.prepareToPlay()
+            wakeUpSoundPlayer?.play()
+        } catch {
+            print("Failed to play wake-up sound: \\(error.localizedDescription)")
+        }
+    }
+
+    private func wakeUpSoundFileName(for role: Role) -> String? {
+        switch role {
+        case .mafia:
+            return "mafia_gunshot"
+        case .inspector:
+            return "police_siren"
+        case .doctor:
+            return "doctor_ecg"
+        case .citizen:
+            return nil
+        }
     }
 }
 

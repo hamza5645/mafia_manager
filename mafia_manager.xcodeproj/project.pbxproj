@@ -30,6 +30,9 @@
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
 		2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* Vision.md */; };
 		2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */; };
+		A73CA2BD45494EA3A36D7A53 /* mafia_gunshot.wav in Resources */ = {isa = PBXBuildFile; fileRef = 8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */; };
+		9EA73543D2004D3AA739EE52 /* police_siren.wav in Resources */ = {isa = PBXBuildFile; fileRef = D21D488C56C94775B5A786B0 /* police_siren.wav */; };
+		CCA6AB8A5D9C4567B4A97AD0 /* doctor_ecg.wav in Resources */ = {isa = PBXBuildFile; fileRef = 733E894B28BB497697DE0ACD /* doctor_ecg.wav */; };
 		2FD6A3AA2EBB311100D43510 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3A92EBB311100D43510 /* Auth */; };
 		2FD6A3AC2EBB311100D43510 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AB2EBB311100D43510 /* Functions */; };
 		2FD6A3AE2EBB311100D43510 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AD2EBB311100D43510 /* PostgREST */; };
@@ -83,6 +86,9 @@
 		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2F78C7742EAEC2B1004BC2A7 /* Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Vision.md; sourceTree = "<group>"; };
 		2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathRevealView.swift; sourceTree = "<group>"; };
+		8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = mafia_gunshot.wav; sourceTree = "<group>"; };
+		D21D488C56C94775B5A786B0 /* police_siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = police_siren.wav; sourceTree = "<group>"; };
+		733E894B28BB497697DE0ACD /* doctor_ecg.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = doctor_ecg.wav; sourceTree = "<group>"; };
 		2FD6A3BD2EBB354500D43510 /* Core/Store/AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Store/AuthStore.swift; sourceTree = SOURCE_ROOT; };
 		2FD6A3BF2EBB358900D43510 /* Features/Auth/LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Auth/LoginView.swift; sourceTree = SOURCE_ROOT; };
 		2FD6A3C02EBB358900D43510 /* Features/Auth/ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Auth/ProfileView.swift; sourceTree = SOURCE_ROOT; };
@@ -302,6 +308,7 @@
 				2F3DBB552E68EF3A002C5B31 /* buildServer.json */,
 				2F3DBB612E68EF3A002C5B31 /* Core */,
 				2F3DBB6E2E68EF3A002C5B31 /* Features */,
+				532A4160448E4D7897EE80A5 /* Resources */,
 				2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */,
 				2F3DBB712E68EF3A002C5B31 /* README.md */,
 				2F78C7742EAEC2B1004BC2A7 /* Vision.md */,
@@ -317,6 +324,24 @@
 				2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		532A4160448E4D7897EE80A5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C2EB945FA9FE4AFBB354EA2A3B15A56F /* Sounds */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		C2EB945FA9FE4AFBB354EA2A3B15A56F /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */,
+				D21D488C56C94775B5A786B0 /* police_siren.wav */,
+				733E894B28BB497697DE0ACD /* doctor_ecg.wav */,
+			);
+			path = Sounds;
 			sourceTree = "<group>";
 		};
 		69E62B2722384CE701263572 /* Components */ = {
@@ -409,6 +434,9 @@
 				2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */,
 				2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */,
 				2F3DBB752E68EF3A002C5B31 /* README.md in Resources */,
+				A73CA2BD45494EA3A36D7A53 /* mafia_gunshot.wav in Resources */,
+				9EA73543D2004D3AA739EE52 /* police_siren.wav in Resources */,
+				CCA6AB8A5D9C4567B4A97AD0 /* doctor_ecg.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
