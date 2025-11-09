@@ -28,10 +28,20 @@ struct mafia_managerApp: App {
 struct RootView: View {
     @EnvironmentObject private var gameStore: GameStore
     @EnvironmentObject private var authStore: AuthStore
+    @AppStorage("hasSeenIntro") private var hasSeenIntro = false
 
     var body: some View {
         NavigationStack {
-            if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
+            if !hasSeenIntro {
+                IntroView(
+                    onStart: {
+                        hasSeenIntro = true
+                    },
+                    onSkip: {
+                        hasSeenIntro = true
+                    }
+                )
+            } else if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
                 SetupView()
             } else {
                 phaseBasedView
