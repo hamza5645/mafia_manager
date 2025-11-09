@@ -43,8 +43,8 @@ struct IntroView: View {
                     IntroScreen5()
                         .tag(4)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut, value: currentPage)
+                .tabViewStyle(.page)
+                .indexViewStyle(.page(backgroundDisplayMode: .interactive))
 
                 // Page indicator and navigation
                 VStack(spacing: 24) {
