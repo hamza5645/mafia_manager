@@ -55,10 +55,11 @@ struct MorningSummaryView: View {
                     if store.state.isGameOver {
                         store.transitionToGameOver()
                     } else {
-                        store.transitionToDay()
+                        // Transition to death reveal screen to show who died
+                        store.transitionToDeathReveal()
                     }
                 } label: {
-                    Text(store.state.isGameOver ? "View Result" : "Continue to Day \(store.currentDayIndex + 1)")
+                    Text(store.state.isGameOver ? "View Result" : "Continue")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(CTAButtonStyle(kind: .primary))
