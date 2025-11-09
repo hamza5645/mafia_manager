@@ -79,10 +79,6 @@ final class GameStore: ObservableObject {
         let numberPool = Array(1...(count * 2)).shuffled()
         let assignedNumbers = Array(numberPool.prefix(count))
 
-        // Shuffle names independently for random pairing with roles
-        var shuffledNames = unique
-        shuffledNames.shuffle()
-
         // Roles - use custom config if provided, otherwise use default distribution
         let roleCounts: (mafia: Int, doctors: Int, inspectors: Int)
 
@@ -129,9 +125,9 @@ final class GameStore: ObservableObject {
         roles += Array(repeating: .citizen, count: remaining)
         roles.shuffle()
 
-        // Build players
+        // Build players - preserve entry order of names
         var players: [Player] = []
-        for (idx, name) in shuffledNames.enumerated() {
+        for (idx, name) in unique.enumerated() {
             let number = assignedNumbers[idx]
             let role = roles[idx]
             players.append(Player(id: UUID(), number: number, name: name, role: role, alive: true, removalNote: nil))
