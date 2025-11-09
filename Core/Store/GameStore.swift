@@ -509,6 +509,15 @@ final class GameStore: ObservableObject {
         }
     }
 
+    func endGameEarly() {
+        // End game early without determining a winner
+        // Could optionally determine winner based on current state
+        state.isGameOver = true
+        state.winner = nil
+        state.currentPhase = .gameOver
+        save()
+    }
+
     // MARK: - Export
 
     func exportLogText(includeNames: Bool) -> String {

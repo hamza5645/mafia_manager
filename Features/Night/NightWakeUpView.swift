@@ -9,6 +9,7 @@ struct NightWakeUpView: View {
     @State private var showTransition = false
     @State private var showInitialSleepScreen = true
     @State private var showStartNightTransition = false
+    @State private var showEndGameConfirmation = false
 
     var body: some View {
         ZStack {
@@ -30,6 +31,28 @@ struct NightWakeUpView: View {
         }
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .confirmationDialog(
+            "Are you sure you want to end the game?",
+            isPresented: $showEndGameConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
         .onAppear {
             // Show initial sleep screen when entering night for the first time
             if case .nightWakeUp(.mafia) = store.state.currentPhase {

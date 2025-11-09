@@ -41,9 +41,11 @@ struct GameOverView: View {
     }
 
     private var winnerBanner: some View {
-        let isMafiaWin = store.state.winner == .mafia
-        let winColor = isMafiaWin ? Design.Colors.dangerRed : Design.Colors.brandGold
-        let glowColor = isMafiaWin ? Design.Colors.glowRed : Design.Colors.glowGold
+        let winner = store.state.winner
+        let isMafiaWin = winner == .mafia
+        let isNoWinner = winner == nil
+        let winColor = isNoWinner ? Design.Colors.textSecondary : (isMafiaWin ? Design.Colors.dangerRed : Design.Colors.brandGold)
+        let glowColor = isNoWinner ? Design.Colors.surface2 : (isMafiaWin ? Design.Colors.glowRed : Design.Colors.glowGold)
 
         return ZStack {
             // Enhanced gradient background with glassmorphism
@@ -85,30 +87,42 @@ struct GameOverView: View {
                     .tracking(2)
 
                 // Enhanced win title with gradient
-                let title = isMafiaWin ? "MAFIA WIN!" : "CITIZENS WIN!"
+                let title = isNoWinner ? "GAME ENDED" : (isMafiaWin ? "MAFIA WIN!" : "CITIZENS WIN!")
                 Text(title)
                     .font(Design.Typography.largeTitle)
                     .fontWeight(.heavy)
                     .foregroundStyle(
-                        LinearGradient(
-                            colors: isMafiaWin ?
-                                [Design.Colors.dangerRed, Design.Colors.dangerRedBright] :
-                                [Design.Colors.brandGold, Design.Colors.brandGoldBright],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                        isNoWinner ?
+                            LinearGradient(
+                                colors: [Design.Colors.textPrimary, Design.Colors.textSecondary],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ) :
+                            LinearGradient(
+                                colors: isMafiaWin ?
+                                    [Design.Colors.dangerRed, Design.Colors.dangerRedBright] :
+                                    [Design.Colors.brandGold, Design.Colors.brandGoldBright],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                     )
                     .shadow(color: glowColor, radius: 16, y: 0)
                     .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                     .tracking(2)
 
                 // Enhanced winner chip
-                HStack(spacing: 10) {
-                    if isMafiaWin {
-                        Chip(text: "MAFIA", style: .filled(Design.Colors.dangerRed), icon: "flame.fill")
-                    } else {
-                        Chip(text: "CITIZENS", style: .filled(Design.Colors.successGreen), icon: "checkmark.seal.fill")
+                if !isNoWinner {
+                    HStack(spacing: 10) {
+                        if isMafiaWin {
+                            Chip(text: "MAFIA", style: .filled(Design.Colors.dangerRed), icon: "flame.fill")
+                        } else {
+                            Chip(text: "CITIZENS", style: .filled(Design.Colors.successGreen), icon: "checkmark.seal.fill")
+                        }
                     }
+                } else {
+                    Text("No Winner Determined")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.textSecondary)
                 }
             }
             .padding(.vertical, 32)
@@ -137,7 +151,9 @@ struct GameOverView: View {
     }
 
     private func buttonRow(logText: String) -> some View {
-        let mafiaWon = store.state.winner == .mafia
+        let winner = store.state.winner
+        let mafiaWon = winner == .mafia
+        let isNoWinner = winner == nil
         return VStack(spacing: Design.Spacing.md) {
             Button {
                 store.resetAll()
@@ -146,14 +162,14 @@ struct GameOverView: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: mafiaWon ? "flame.fill" : "arrow.clockwise")
+                    Image(systemName: (mafiaWon && !isNoWinner) ? "flame.fill" : "arrow.clockwise")
                         .font(.system(size: 18, weight: .semibold))
                     Text("Play Again")
                         .font(Design.Typography.headline)
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(CTAButtonStyle(kind: mafiaWon ? .danger : .primary))
+            .buttonStyle(CTAButtonStyle(kind: (mafiaWon && !isNoWinner) ? .danger : .primary))
 
             ShareButton(text: logText)
                 .buttonStyle(CTAButtonStyle(kind: .secondary))

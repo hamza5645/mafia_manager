@@ -4,6 +4,7 @@ struct DayManagementView: View {
     @EnvironmentObject private var store: GameStore
     @State private var removedToday: [UUID: Bool] = [:]
     @State private var notes: [UUID: String] = [:]
+    @State private var showEndGameConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -59,7 +60,28 @@ struct DayManagementView: View {
         }
         .navigationTitle("Day \(store.currentDayIndex + 1)")
         .navigationBarBackButtonHidden(true)
-        .toolbar { }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .confirmationDialog(
+            "Are you sure you want to end the game?",
+            isPresented: $showEndGameConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
