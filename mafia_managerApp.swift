@@ -60,6 +60,8 @@ struct RootView: View {
             NightWakeUpView()
         case .morning:
             MorningSummaryView()
+        case .deathReveal:
+            DeathRevealView()
         case .day:
             DayManagementView()
         case .gameOver:

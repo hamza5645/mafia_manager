@@ -260,6 +260,11 @@ final class GameStore: ObservableObject {
         save()
     }
 
+    func transitionToDeathReveal() {
+        state.currentPhase = .deathReveal
+        save()
+    }
+
     func transitionToDay() {
         state.currentPhase = .day
         save()
