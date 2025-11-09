@@ -93,45 +93,25 @@ struct DeathRevealView: View {
     }
 
     private var deathRevealContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Spacer(minLength: 40)
+        VStack(spacing: 32) {
+            Spacer()
 
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "moon.zzz.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(Design.Colors.textSecondary)
-                        .opacity(0.5)
-
-                    Text("Morning Announcement")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Design.Colors.textPrimary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.bottom, 20)
-
-                // Death cards
-                ForEach(deadPlayers, id: \.id) { player in
-                    deathCard(for: player)
-                }
-
-                Spacer(minLength: 100)
+            // Death cards
+            ForEach(deadPlayers, id: \.id) { player in
+                deathCard(for: player)
             }
-            .padding(.horizontal, Design.Spacing.lg)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+
+            Spacer()
+
             continueButton
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Design.Colors.surface0.opacity(0.95))
         }
+        .padding(.horizontal, Design.Spacing.lg)
     }
 
     private func deathCard(for player: Player) -> some View {
         let palette = RoleCardPalette(role: player.role)
 
-        return VStack(alignment: .center, spacing: 24) {
+        return VStack(alignment: .center, spacing: 20) {
             // Skull icon
             ZStack {
                 Circle()
@@ -143,23 +123,27 @@ struct DeathRevealView: View {
                     .font(.system(size: 50, weight: .bold))
                     .foregroundStyle(Design.Colors.dangerRed)
             }
+            .padding(.top, 8)
 
-            // Player name
-            Text(player.name)
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+            // Title: Name has Died
+            Text("\(player.name) has Died")
+                .font(.system(size: 32, weight: .heavy, design: .rounded))
                 .foregroundStyle(Design.Colors.textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
 
             // Number
             Text("#\(player.number)")
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
                 .foregroundStyle(Design.Colors.brandGold)
 
             Divider()
                 .background(Design.Colors.stroke)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 4)
 
             // Role reveal
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 Text("Was a")
                     .font(Design.Typography.callout)
                     .foregroundColor(Design.Colors.textSecondary)
@@ -174,10 +158,10 @@ struct DeathRevealView: View {
                         .foregroundStyle(player.role.accentColor)
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.bottom, 8)
         }
-        .padding(.vertical, 40)
-        .padding(.horizontal, 32)
+        .padding(.vertical, 36)
+        .padding(.horizontal, 28)
         .frame(maxWidth: .infinity)
         .background(
             ZStack {
