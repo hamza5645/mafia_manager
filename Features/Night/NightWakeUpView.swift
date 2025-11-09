@@ -12,6 +12,7 @@ struct NightWakeUpView: View {
     @State private var showEndGameConfirmation = false
     @State private var wakeUpSoundPlayer: AVAudioPlayer?
     @State private var awaitingMafiaWakeCue = true
+    @State private var isAudioSessionConfigured = false
 
     var body: some View {
         ZStack {
@@ -52,6 +53,7 @@ struct NightWakeUpView: View {
             Text("This will end the current game without determining a winner.")
         }
         .onAppear {
+            configureAudioSessionIfNeeded()
             // Show initial sleep screen when entering night for the first time
             if case .nightWakeUp(.mafia) = store.state.currentPhase {
                 showInitialSleepScreen = true
@@ -640,6 +642,18 @@ struct NightWakeUpView: View {
 
         case .citizen:
             break
+        }
+    }
+
+    private func configureAudioSessionIfNeeded() {
+        guard !isAudioSessionConfigured else { return }
+
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+            isAudioSessionConfigured = true
+        } catch {
+            print("Failed to configure audio session: \(error.localizedDescription)")
         }
     }
 
