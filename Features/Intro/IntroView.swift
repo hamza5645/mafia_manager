@@ -8,59 +8,76 @@ struct IntroView: View {
     private let totalPages = 5
 
     var body: some View {
-        ZStack {
-            Design.Colors.surface0.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                Design.Colors.surface0.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Skip button
-                HStack {
-                    Spacer()
-                    Button {
-                        onSkip()
-                    } label: {
-                        Text("Skip")
-                            .font(Design.Typography.subheadline)
-                            .foregroundStyle(Design.Colors.textTertiary)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
+                VStack(spacing: 0) {
+                    // Skip button
+                    HStack {
+                        Spacer()
+                        Button {
+                            onSkip()
+                        } label: {
+                            Text("Skip")
+                                .font(Design.Typography.subheadline)
+                                .foregroundStyle(Design.Colors.textTertiary)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                        }
+                        .accessibilityLabel("Skip introduction")
+                        .accessibilityIdentifier("intro_skip_button")
                     }
-                    .accessibilityLabel("Skip introduction")
-                    .accessibilityIdentifier("intro_skip_button")
-                }
-                .padding(.top, 8)
-                .padding(.trailing, 12)
+                    .padding(.top, 8)
+                    .padding(.trailing, 12)
 
-                // Paged content - TabView gets all remaining space
-                GeometryReader { geometry in
-                    TabView(selection: $currentPage) {
+                    // Custom paging view using offset
+                    HStack(spacing: 0) {
                         IntroScreen1()
-                            .tag(0)
+                            .frame(width: geometry.size.width)
 
                         IntroScreen2()
-                            .tag(1)
+                            .frame(width: geometry.size.width)
 
                         IntroScreen3()
-                            .tag(2)
+                            .frame(width: geometry.size.width)
 
                         IntroScreen4()
-                            .tag(3)
+                            .frame(width: geometry.size.width)
 
                         IntroScreen5()
-                            .tag(4)
+                            .frame(width: geometry.size.width)
                     }
-                    .tabViewStyle(.page)
-                    .indexViewStyle(.page(backgroundDisplayMode: .always))
-                }
+                    .offset(x: -CGFloat(currentPage) * geometry.size.width)
+                    .frame(width: geometry.size.width, height: geometry.size.height - 200, alignment: .leading)
+                    .clipped()
+                    .animation(.easeInOut(duration: 0.3), value: currentPage)
+                    .gesture(
+                        DragGesture()
+                            .onEnded { value in
+                                let threshold: CGFloat = 50
+                                if value.translation.width < -threshold && currentPage < totalPages - 1 {
+                                    withAnimation {
+                                        currentPage += 1
+                                    }
+                                } else if value.translation.width > threshold && currentPage > 0 {
+                                    withAnimation {
+                                        currentPage -= 1
+                                    }
+                                }
+                            }
+                    )
 
-                // Page indicator and navigation
-                VStack(spacing: 20) {
-                    PageIndicator(currentPage: currentPage, totalPages: totalPages)
+                    // Page indicator and navigation
+                    VStack(spacing: 20) {
+                        PageIndicator(currentPage: currentPage, totalPages: totalPages)
 
-                    navigationButtons
+                        navigationButtons
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 32)
+                    .background(Design.Colors.surface0)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
-                .background(Design.Colors.surface0)
             }
         }
         .navigationBarHidden(true)
