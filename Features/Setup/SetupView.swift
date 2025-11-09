@@ -200,12 +200,22 @@ struct SetupView: View {
         }
         .onAppear {
             if store.isFreshSetup {
-                resetNameFields(animated: false)
+                // Check if we have previous player names from "Play Again"
+                if !store.previousPlayerNames.isEmpty {
+                    loadPreviousPlayers(animated: false)
+                } else {
+                    resetNameFields(animated: false)
+                }
             }
         }
         .onChange(of: store.isFreshSetup) { fresh in
             if fresh {
-                resetNameFields()
+                // Check if we have previous player names from "Play Again"
+                if !store.previousPlayerNames.isEmpty {
+                    loadPreviousPlayers()
+                } else {
+                    resetNameFields()
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -398,6 +408,19 @@ struct SetupView: View {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
             names = group.playerNames
         }
+    }
+
+    private func loadPreviousPlayers(animated: Bool = true) {
+        let previousNames = store.previousPlayerNames
+        if animated {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
+                names = previousNames
+            }
+        } else {
+            names = previousNames
+        }
+        // Clear the previous names after loading so they don't persist
+        store.previousPlayerNames = []
     }
 
     private func loadCustomRoleConfigs() async {

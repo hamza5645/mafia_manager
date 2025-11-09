@@ -9,6 +9,8 @@ final class GameStore: ObservableObject {
     @Published var flowID: UUID = UUID()
     // BUG FIX: Track persistence errors to show to user
     @Published var persistenceError: String?
+    // Store previous player names for "Play Again" feature
+    @Published var previousPlayerNames: [String] = []
 
     private let databaseService = DatabaseService()
     // BUG FIX: Use weak reference to prevent potential retain cycle
@@ -37,6 +39,8 @@ final class GameStore: ObservableObject {
     var hasSavedGame: Bool { Persistence.shared.hasSavedState() }
 
     func resetAll() {
+        // Preserve player names for "Play Again" feature
+        previousPlayerNames = state.players.map { $0.name }
         state = .empty
         isFreshSetup = true
         Persistence.shared.reset()
