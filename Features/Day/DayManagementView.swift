@@ -70,11 +70,7 @@ struct DayManagementView: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Are you sure you want to end the game?",
-            isPresented: $showEndGameConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
             Button("End Game", role: .destructive) {
                 store.endGameEarly()
             }

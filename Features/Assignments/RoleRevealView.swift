@@ -4,6 +4,7 @@ struct RoleRevealView: View {
     @EnvironmentObject private var store: GameStore
     @State private var isRoleRevealed = false
     @State private var showBlur = false
+    @State private var showEndGameConfirmation = false
 
     var body: some View {
         ZStack {
@@ -20,6 +21,24 @@ struct RoleRevealView: View {
         }
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
         .onAppear {
             isRoleRevealed = false
             showBlur = false
