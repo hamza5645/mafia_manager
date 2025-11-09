@@ -30,36 +30,37 @@ struct IntroView: View {
                 .padding(.top, 8)
                 .padding(.trailing, 12)
 
-                // Paged content
-                TabView(selection: $currentPage) {
-                    IntroScreen1()
-                        .tag(0)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    IntroScreen2()
-                        .tag(1)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    IntroScreen3()
-                        .tag(2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    IntroScreen4()
-                        .tag(3)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    IntroScreen5()
-                        .tag(4)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Paged content - TabView gets all remaining space
+                GeometryReader { geometry in
+                    TabView(selection: $currentPage) {
+                        IntroScreen1()
+                            .tag(0)
+
+                        IntroScreen2()
+                            .tag(1)
+
+                        IntroScreen3()
+                            .tag(2)
+
+                        IntroScreen4()
+                            .tag(3)
+
+                        IntroScreen5()
+                            .tag(4)
+                    }
+                    .tabViewStyle(.page)
+                    .indexViewStyle(.page(backgroundDisplayMode: .always))
                 }
-                .tabViewStyle(.page)
-                .indexViewStyle(.page(backgroundDisplayMode: .interactive))
-                .background(Design.Colors.surface0)
 
                 // Page indicator and navigation
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     PageIndicator(currentPage: currentPage, totalPages: totalPages)
 
                     navigationButtons
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
+                .background(Design.Colors.surface0)
             }
         }
         .navigationBarHidden(true)
@@ -106,6 +107,7 @@ struct IntroView: View {
             .accessibilityLabel(currentPage < totalPages - 1 ? "Go to next screen" : "Start game setup")
             .accessibilityIdentifier(currentPage < totalPages - 1 ? "intro_next_button" : "intro_start_button")
         }
+        .frame(height: 56)
     }
 }
 
@@ -134,13 +136,13 @@ private struct PageIndicator: View {
 private struct IntroScreen1: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 32) {
-                Spacer(minLength: 20)
+            VStack(spacing: 28) {
+                Spacer().frame(height: 20)
 
-                // Hero icon
-                VStack(spacing: 20) {
+                // Hero
+                VStack(spacing: 18) {
                     Image(systemName: "theatermasks.fill")
-                        .font(.system(size: 72))
+                        .font(.system(size: 60))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
@@ -149,11 +151,10 @@ private struct IntroScreen1: View {
                             )
                         )
                         .shadow(color: Design.Colors.glowGold, radius: 20)
-                        .accessibilityLabel("Mafia game icon")
 
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) {
                         Text("Welcome to")
-                            .font(Design.Typography.title2)
+                            .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textSecondary)
 
                         Text("Mafia Manager")
@@ -166,40 +167,39 @@ private struct IntroScreen1: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .tracking(1)
 
                         Text("Your AI-powered game host")
-                            .font(Design.Typography.body)
+                            .font(Design.Typography.callout)
                             .foregroundStyle(Design.Colors.textTertiary)
                     }
                     .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(spacing: 14) {
                     InfoCard(
                         icon: "person.3.fill",
                         title: "What is Mafia?",
-                        description: "A social deduction game where citizens try to identify hidden Mafia members before it's too late.",
-                        gradientColors: Design.Colors.citizenGradient
+                        description: "A social deduction game where citizens identify hidden Mafia members.",
+                        color: Design.Colors.actionBlue
                     )
 
                     InfoCard(
                         icon: "moon.stars.fill",
                         title: "Two Teams Battle",
-                        description: "Mafia works in darkness to eliminate citizens. Citizens use logic and voting to find the Mafia.",
-                        gradientColors: Design.Colors.policeGradient
+                        description: "Mafia eliminates citizens at night. Citizens vote to find Mafia by day.",
+                        color: Design.Colors.dangerRed
                     )
 
                     InfoCard(
                         icon: "brain.head.profile",
                         title: "Deception & Deduction",
-                        description: "Bluff, investigate, and debate. Every choice matters. Trust no one.",
-                        gradientColors: Design.Colors.mafiaGradient
+                        description: "Bluff, investigate, debate. Every choice matters. Trust no one.",
+                        color: Design.Colors.brandGold
                     )
                 }
 
-                Spacer(minLength: 100)
+                Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
         }
@@ -211,12 +211,12 @@ private struct IntroScreen1: View {
 private struct IntroScreen2: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 32) {
-                Spacer(minLength: 20)
+            VStack(spacing: 28) {
+                Spacer().frame(height: 20)
 
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     Image(systemName: "wand.and.stars")
-                        .font(.system(size: 64))
+                        .font(.system(size: 60))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.actionBlue, Design.Colors.actionBlueBright],
@@ -226,56 +226,32 @@ private struct IntroScreen2: View {
                         )
                         .shadow(color: Design.Colors.glowBlue, radius: 20)
 
-                    Text("Your Personal Game Master")
+                    Text("Your Game Master")
                         .font(Design.Typography.largeTitle)
                         .fontWeight(.heavy)
                         .foregroundStyle(Design.Colors.textPrimary)
                         .multilineTextAlignment(.center)
 
                     Text("Never worry about hosting again")
-                        .font(Design.Typography.body)
+                        .font(Design.Typography.callout)
                         .foregroundStyle(Design.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("What I Do For You")
-                        .font(Design.Typography.title3)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                        .padding(.top, 8)
+                        .font(Design.Typography.headline)
+                        .foregroundStyle(Design.Colors.brandGold)
 
-                    FeatureRow(
-                        icon: "shuffle",
-                        title: "Assign Roles Secretly",
-                        description: "Each player sees only their role on the device"
-                    )
-
-                    FeatureRow(
-                        icon: "speaker.wave.3.fill",
-                        title: "Voice Narration",
-                        description: "I guide players through each phase with audio cues"
-                    )
-
-                    FeatureRow(
-                        icon: "clock.badge.checkmark",
-                        title: "Manage Timing",
-                        description: "Wake up roles in order, track actions automatically"
-                    )
-
-                    FeatureRow(
-                        icon: "doc.text.fill",
-                        title: "Keep Event Logs",
-                        description: "Every action is recorded so you can review after"
-                    )
-
-                    FeatureRow(
-                        icon: "arrow.clockwise",
-                        title: "Quick Replays",
-                        description: "Restart with the same players in one tap"
-                    )
+                    FeatureRow(icon: "shuffle", title: "Assign roles secretly")
+                    FeatureRow(icon: "speaker.wave.3.fill", title: "Voice narration for each phase")
+                    FeatureRow(icon: "clock.badge.checkmark", title: "Manage timing automatically")
+                    FeatureRow(icon: "doc.text.fill", title: "Keep detailed event logs")
+                    FeatureRow(icon: "arrow.clockwise", title: "Quick replay with same players")
                 }
+                .cardStyle(padding: 16)
 
-                Spacer(minLength: 100)
+                Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
         }
@@ -287,12 +263,12 @@ private struct IntroScreen2: View {
 private struct IntroScreen3: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 32) {
-                Spacer(minLength: 20)
+            VStack(spacing: 28) {
+                Spacer().frame(height: 20)
 
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     Image(systemName: "moon.stars.fill")
-                        .font(.system(size: 64))
+                        .font(.system(size: 60))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: Design.Colors.policeGradient,
@@ -308,47 +284,18 @@ private struct IntroScreen3: View {
                         .foregroundStyle(Design.Colors.textPrimary)
 
                     Text("Roles wake up one by one")
-                        .font(Design.Typography.body)
+                        .font(Design.Typography.callout)
                         .foregroundStyle(Design.Colors.textTertiary)
                 }
-                .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Meet the Roles")
-                        .font(Design.Typography.title3)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                        .padding(.top, 8)
-
-                    RoleDetailCard(
-                        role: .mafia,
-                        action: "Choose a citizen to eliminate",
-                        goal: "Eliminate all citizens without being caught",
-                        gradientColors: Design.Colors.mafiaGradient
-                    )
-
-                    RoleDetailCard(
-                        role: .doctor,
-                        action: "Save one player from elimination",
-                        goal: "Protect citizens and survive",
-                        gradientColors: Design.Colors.doctorGradient
-                    )
-
-                    RoleDetailCard(
-                        role: .inspector,
-                        action: "Investigate one player's role",
-                        goal: "Find the Mafia and guide citizens",
-                        gradientColors: Design.Colors.policeGradient
-                    )
-
-                    RoleDetailCard(
-                        role: .citizen,
-                        action: "Sleep (no night action)",
-                        goal: "Use voting and logic to find Mafia",
-                        gradientColors: Design.Colors.citizenGradient
-                    )
+                VStack(spacing: 12) {
+                    RoleRow(role: .mafia, action: "Choose a target to eliminate")
+                    RoleRow(role: .doctor, action: "Save one player from death")
+                    RoleRow(role: .inspector, action: "Investigate one player's role")
+                    RoleRow(role: .citizen, action: "Sleep peacefully (no action)")
                 }
 
-                Spacer(minLength: 100)
+                Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
         }
@@ -360,12 +307,12 @@ private struct IntroScreen3: View {
 private struct IntroScreen4: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 32) {
-                Spacer(minLength: 20)
+            VStack(spacing: 28) {
+                Spacer().frame(height: 20)
 
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     Image(systemName: "sun.max.fill")
-                        .font(.system(size: 64))
+                        .font(.system(size: 60))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
@@ -381,64 +328,41 @@ private struct IntroScreen4: View {
                         .foregroundStyle(Design.Colors.textPrimary)
 
                     Text("Discover, discuss, and decide")
-                        .font(Design.Typography.body)
+                        .font(Design.Typography.callout)
                         .foregroundStyle(Design.Colors.textTertiary)
                 }
-                .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(spacing: 14) {
                     PhaseCard(
                         icon: "sunrise.fill",
                         phase: "Morning",
-                        description: "See if anyone was eliminated overnight. I'll announce the results and show what happened.",
-                        color: Design.Colors.brandGold,
-                        gradientColors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
-                        details: [
-                            "Check who was eliminated (if anyone)",
-                            "Doctor save revealed if successful",
-                            "Review the event log for clues"
-                        ]
+                        description: "See who was eliminated. Doctor saves are revealed.",
+                        color: Design.Colors.brandGold
                     )
 
                     PhaseCard(
                         icon: "sun.max.fill",
-                        phase: "Day (Discussion)",
-                        description: "The town debates and votes. Use your words, your logic, and your suspicions wisely.",
-                        color: Design.Colors.dangerRed,
-                        gradientColors: Design.Colors.mafiaGradient,
-                        details: [
-                            "Discuss suspicions as a group",
-                            "Vote to eliminate one player",
-                            "Majority vote decides who goes"
-                        ]
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "trophy.fill")
-                            .foregroundStyle(Design.Colors.brandGold)
-                        Text("How to Win")
-                            .font(Design.Typography.headline)
-                            .foregroundStyle(Design.Colors.textPrimary)
-                    }
-                    .padding(.top, 8)
-
-                    WinConditionRow(
-                        team: "Citizens Win",
-                        condition: "Eliminate all Mafia members",
-                        color: Design.Colors.successGreen
-                    )
-
-                    WinConditionRow(
-                        team: "Mafia Wins",
-                        condition: "Equal or outnumber the citizens",
+                        phase: "Day Discussion",
+                        description: "Town debates and votes to eliminate one suspect.",
                         color: Design.Colors.dangerRed
                     )
                 }
-                .cardStyle(padding: 16)
 
-                Spacer(minLength: 100)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trophy.fill")
+                            .foregroundStyle(Design.Colors.brandGold)
+                        Text("Win Conditions")
+                            .font(Design.Typography.headline)
+                            .foregroundStyle(Design.Colors.textPrimary)
+                    }
+
+                    WinRow(team: "Citizens Win", condition: "Eliminate all Mafia", color: Design.Colors.successGreen)
+                    WinRow(team: "Mafia Wins", condition: "Equal or outnumber citizens", color: Design.Colors.dangerRed)
+                }
+                .cardStyle(padding: 14)
+
+                Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
         }
@@ -450,12 +374,12 @@ private struct IntroScreen4: View {
 private struct IntroScreen5: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 32) {
-                Spacer(minLength: 20)
+            VStack(spacing: 28) {
+                Spacer().frame(height: 20)
 
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 64))
+                        .font(.system(size: 60))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
@@ -471,60 +395,38 @@ private struct IntroScreen5: View {
                         .foregroundStyle(Design.Colors.textPrimary)
 
                     Text("Here are some pro tips")
-                        .font(Design.Typography.body)
+                        .font(Design.Typography.callout)
                         .foregroundStyle(Design.Colors.textTertiary)
-                }
-                .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Pro Tips")
-                        .font(Design.Typography.title3)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                        .padding(.top, 8)
-
-                    TipCard(
-                        number: 1,
-                        tip: "Pass the device around during role reveal. Keep roles secret!",
-                        icon: "eye.slash.fill"
-                    )
-
-                    TipCard(
-                        number: 2,
-                        tip: "Pay attention to who speaks and how they vote. Patterns reveal truth.",
-                        icon: "chart.line.uptrend.xyaxis"
-                    )
-
-                    TipCard(
-                        number: 3,
-                        tip: "Use the event log after the game to see what really happened.",
-                        icon: "doc.text.magnifyingglass"
-                    )
-
-                    TipCard(
-                        number: 4,
-                        tip: "Don't rush! Good discussion leads to better deduction.",
-                        icon: "bubble.left.and.bubble.right.fill"
-                    )
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
+                    Text("Pro Tips")
+                        .font(Design.Typography.headline)
+                        .foregroundStyle(Design.Colors.brandGold)
+
+                    TipRow(number: 1, tip: "Pass device during role reveal. Keep roles secret!")
+                    TipRow(number: 2, tip: "Pay attention to voting patterns and behavior")
+                    TipRow(number: 3, tip: "Review event log after game to see what happened")
+                    TipRow(number: 4, tip: "Don't rush! Good discussion = better deduction")
+                }
+                .cardStyle(padding: 16)
+
+                VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundStyle(Design.Colors.actionBlue)
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Design.Colors.successGreen)
                         Text("Best Experience")
                             .font(Design.Typography.headline)
                             .foregroundStyle(Design.Colors.textPrimary)
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        BestPracticeRow(text: "Play with 5-12 players for balanced gameplay")
-                        BestPracticeRow(text: "Use headphones for clear voice narration")
-                        BestPracticeRow(text: "Sit in a circle so everyone can see each other")
-                    }
+                    BestPracticeRow(text: "5-12 players for balanced gameplay")
+                    BestPracticeRow(text: "Use headphones for clear narration")
+                    BestPracticeRow(text: "Sit in a circle to see everyone")
                 }
-                .cardStyle(padding: 16)
+                .cardStyle(padding: 14)
 
-                Spacer(minLength: 100)
+                Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
         }
@@ -537,54 +439,14 @@ private struct InfoCard: View {
     let icon: String
     let title: String
     let description: String
-    let gradientColors: [Color]
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: gradientColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 48, height: 48)
-
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .shadow(color: gradientColors.first?.opacity(0.4) ?? .clear, radius: 8)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(Design.Typography.headline)
-                    .foregroundStyle(Design.Colors.textPrimary)
-
-                Text(description)
-                    .font(Design.Typography.callout)
-                    .foregroundStyle(Design.Colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .cardStyle(padding: 16)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct FeatureRow: View {
-    let icon: String
-    let title: String
-    let description: String
+    let color: Color
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Design.Colors.brandGold)
-                .frame(width: 28)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -597,65 +459,67 @@ private struct FeatureRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
+        .padding(14)
+        .background(Design.Colors.surface1)
+        .cornerRadius(Design.Radii.medium)
     }
 }
 
-private struct RoleDetailCard: View {
-    let role: Role
-    let action: String
-    let goal: String
-    let gradientColors: [Color]
+private struct FeatureRow: View {
+    let icon: String
+    let title: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Text(String(role.displayName.prefix(1)))
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: gradientColors,
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .shadow(color: gradientColors.first?.opacity(0.4) ?? .clear, radius: 6)
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Design.Colors.brandGold)
+                .frame(width: 24)
 
+            Text(title)
+                .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.textPrimary)
+        }
+    }
+}
+
+private struct RoleRow: View {
+    let role: Role
+    let action: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(String(role.displayName.prefix(1)))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle()
+                        .fill(roleColor)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
                 Text(role.displayName)
-                    .font(Design.Typography.title3)
+                    .font(Design.Typography.headline)
                     .foregroundStyle(Design.Colors.textPrimary)
-            }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "hand.tap.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Design.Colors.textTertiary)
-                        .frame(width: 20)
-                    Text(action)
-                        .font(Design.Typography.callout)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
-
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "target")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Design.Colors.textTertiary)
-                        .frame(width: 20)
-                    Text(goal)
-                        .font(Design.Typography.callout)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
+                Text(action)
+                    .font(Design.Typography.callout)
+                    .foregroundStyle(Design.Colors.textSecondary)
             }
         }
-        .cardStyle(padding: 14)
-        .accessibilityElement(children: .combine)
+        .padding(12)
+        .background(Design.Colors.surface1)
+        .cornerRadius(Design.Radii.medium)
+    }
+
+    private var roleColor: Color {
+        switch role {
+        case .mafia: return Design.Colors.dangerRed
+        case .doctor: return Design.Colors.successGreen
+        case .inspector: return Design.Colors.actionBlue
+        case .citizen: return Design.Colors.textTertiary
+        }
     }
 }
 
@@ -664,116 +528,79 @@ private struct PhaseCard: View {
     let phase: String
     let description: String
     let color: Color
-    let gradientColors: [Color]
-    let details: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: gradientColors,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 44, height: 44)
-
-                    Image(systemName: icon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .shadow(color: color.opacity(0.4), radius: 8)
-
-                Text(phase)
-                    .font(Design.Typography.title3)
-                    .foregroundStyle(Design.Colors.textPrimary)
-            }
-
-            Text(description)
-                .font(Design.Typography.callout)
-                .foregroundStyle(Design.Colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(details, id: \.self) { detail in
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(color)
-                            .frame(width: 16)
-                        Text(detail)
-                            .font(Design.Typography.footnote)
-                            .foregroundStyle(Design.Colors.textTertiary)
-                    }
-                }
-            }
-        }
-        .cardStyle(padding: 16)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct WinConditionRow: View {
-    let team: String
-    let condition: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(color)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(team)
-                    .font(Design.Typography.headline)
-                    .foregroundStyle(Design.Colors.textPrimary)
-                Text(condition)
-                    .font(Design.Typography.callout)
-                    .foregroundStyle(Design.Colors.textSecondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct TipCard: View {
-    let number: Int
-    let tip: String
-    let icon: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Design.Colors.surface2)
-                    .frame(width: 32, height: 32)
+                    .fill(color.opacity(0.2))
+                    .frame(width: 44, height: 44)
 
-                Text("\(number)")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(Design.Colors.brandGold)
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(color)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Design.Colors.brandGold)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(phase)
+                    .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.textPrimary)
 
-                    Text(tip)
-                        .font(Design.Typography.callout)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(description)
+                    .font(Design.Typography.callout)
+                    .foregroundStyle(Design.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
+        .padding(14)
         .background(Design.Colors.surface1)
         .cornerRadius(Design.Radii.medium)
-        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct WinRow: View {
+    let team: String
+    let condition: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(color)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(team)
+                    .font(Design.Typography.subheadline)
+                    .foregroundStyle(Design.Colors.textPrimary)
+                Text(condition)
+                    .font(Design.Typography.footnote)
+                    .foregroundStyle(Design.Colors.textSecondary)
+            }
+        }
+    }
+}
+
+private struct TipRow: View {
+    let number: Int
+    let tip: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(number)")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Design.Colors.brandGold)
+                .frame(width: 28, height: 28)
+                .background(
+                    Circle()
+                        .fill(Design.Colors.surface2)
+                )
+
+            Text(tip)
+                .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
