@@ -34,17 +34,23 @@ struct IntroView: View {
                 TabView(selection: $currentPage) {
                     IntroScreen1()
                         .tag(0)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     IntroScreen2()
                         .tag(1)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     IntroScreen3()
                         .tag(2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     IntroScreen4()
                         .tag(3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     IntroScreen5()
                         .tag(4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .tabViewStyle(.page)
                 .indexViewStyle(.page(backgroundDisplayMode: .interactive))
+                .background(Design.Colors.surface0)
 
                 // Page indicator and navigation
                 VStack(spacing: 24) {
@@ -127,7 +133,7 @@ private struct PageIndicator: View {
 
 private struct IntroScreen1: View {
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 32) {
                 Spacer(minLength: 20)
 
@@ -204,7 +210,7 @@ private struct IntroScreen1: View {
 
 private struct IntroScreen2: View {
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 32) {
                 Spacer(minLength: 20)
 
@@ -280,7 +286,7 @@ private struct IntroScreen2: View {
 
 private struct IntroScreen3: View {
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 32) {
                 Spacer(minLength: 20)
 
@@ -353,7 +359,7 @@ private struct IntroScreen3: View {
 
 private struct IntroScreen4: View {
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 32) {
                 Spacer(minLength: 20)
 
@@ -443,7 +449,7 @@ private struct IntroScreen4: View {
 
 private struct IntroScreen5: View {
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 32) {
                 Spacer(minLength: 20)
 
