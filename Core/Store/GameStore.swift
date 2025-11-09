@@ -196,7 +196,8 @@ final class GameStore: ObservableObject {
             } else if alivePlayers.contains(where: { $0.role == .doctor }) {
                 state.currentPhase = .nightTransition
             } else {
-                // No more roles, go to morning
+                // No more roles - resolve night outcome (no doctor to save) and go to morning
+                resolveNightOutcome(targetWasSaved: false)
                 transitionToMorning()
             }
         case .inspector:
@@ -204,11 +205,13 @@ final class GameStore: ObservableObject {
             if alivePlayers.contains(where: { $0.role == .doctor }) {
                 state.currentPhase = .nightTransition
             } else {
-                // No doctor, go to morning
+                // No doctor - resolve night outcome (no doctor to save) and go to morning
+                resolveNightOutcome(targetWasSaved: false)
                 transitionToMorning()
             }
         case .doctor:
             // After doctor, always go to morning
+            // Note: NightWakeUpView calls resolveNightOutcome before this
             transitionToMorning()
         case .citizen:
             // Citizens don't have night actions
@@ -239,7 +242,14 @@ final class GameStore: ObservableObject {
             // Police done (or skipped), doctor not done yet
             state.currentPhase = .nightWakeUp(activeRole: .doctor)
         } else {
-            // All roles done
+            // All roles done - resolve if no doctor acted
+            // Check if doctor exists in game (not just alive)
+            let hasDoctor = state.players.contains(where: { $0.role == .doctor })
+            if !hasDoctor || currentNight?.doctorProtectedPlayerID == nil {
+                // No doctor in game or doctor didn't protect - resolve outcome
+                let wasSaved = currentNight?.mafiaTargetPlayerID == currentNight?.doctorProtectedPlayerID
+                resolveNightOutcome(targetWasSaved: wasSaved)
+            }
             transitionToMorning()
         }
         save()
@@ -361,9 +371,8 @@ final class GameStore: ObservableObject {
         guard let lastIndex = state.nightHistory.indices.last else { return }
         var action = state.nightHistory[lastIndex]
 
-        // BUG FIX: Guard against duplicate resolution
-        // If resultingDeaths is not empty, this night was already resolved
-        guard action.resultingDeaths.isEmpty else {
+        // BUG FIX: Guard against duplicate resolution using isResolved flag
+        guard !action.isResolved else {
             print("⚠️ Night \(action.nightIndex) outcome already resolved")
             return
         }
@@ -379,6 +388,9 @@ final class GameStore: ObservableObject {
             }
             action.resultingDeaths = [targetID]
         }
+
+        // Mark this night as resolved
+        action.isResolved = true
 
         state.nightHistory[lastIndex] = action
 

@@ -20,8 +20,8 @@ struct DayManagementView: View {
                     ForEach(store.alivePlayers.sorted(by: { $0.number < $1.number })) { p in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 12) {
-                                Chip(text: "#\(p.number)", style: .outline(Design.Colors.textSecondary))
-                                Text(p.name).font(.headline)
+                                Text(p.name)
+                                    .font(.headline)
                                 Spacer()
                                 if removedToday[p.id] == true {
                                     Button("Undo") { removedToday[p.id] = false }
