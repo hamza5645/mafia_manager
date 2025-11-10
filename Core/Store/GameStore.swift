@@ -301,7 +301,16 @@ final class GameStore: ObservableObject {
     var mafiaPlayers: [Player] { state.players.filter { $0.role == .mafia } }
     var aliveMafia: [Player] { state.players.filter { $0.role == .mafia && $0.alive } }
     var aliveNonMafia: [Player] { state.players.filter { $0.role != .mafia && $0.alive } }
-    var currentNightIndex: Int { state.nightHistory.count + 1 }
+    var currentNightIndex: Int {
+        if let lastNight = state.nightHistory.last {
+            // If last night is resolved, we're on the next night
+            // If last night is not resolved, we're still on that night
+            return lastNight.isResolved ? lastNight.nightIndex + 1 : lastNight.nightIndex
+        } else {
+            // No history yet, we're on night 1
+            return 1
+        }
+    }
     var currentDayIndex: Int { state.dayIndex }
 
     func player(by id: UUID?) -> Player? {
