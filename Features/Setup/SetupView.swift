@@ -18,14 +18,14 @@ struct SetupView: View {
     private let databaseService = DatabaseService()
 
     init() {
-        _names = State(initialValue: Array(repeating: "", count: minPlayers))
+        _names = State(initialValue: Array(repeating: "", count: 1))
     }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 24) {
                 // Enhanced Title Section with Gradient
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("MAFIA MANAGER")
                         .font(Design.Typography.largeTitle)
                         .kerning(1.5)
@@ -39,57 +39,46 @@ struct SetupView: View {
                         .shadow(color: Design.Colors.glowGold, radius: 10, y: 2)
 
                     Text("Enter player names to begin")
-                        .font(Design.Typography.callout)
+                        .font(Design.Typography.body)
                         .foregroundStyle(Design.Colors.textSecondary)
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
+                .padding(.top, 16)
 
-                // Enhanced Names Card
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Between \(minPlayers) and \(maxPlayers) players. Names must be unique.")
+                // Players Card
+                VStack(alignment: .leading, spacing: 16) {
+                    let totalPlayers = validInput.count + numberOfBots
+
+                    Text("Between \(minPlayers) and \(maxPlayers) total players (humans + bots). Names must be unique.")
                         .font(Design.Typography.footnote)
                         .foregroundStyle(Design.Colors.textSecondary)
 
-                    if names.count == minPlayers {
-                        Text("Minimum \(minPlayers) players required for gameplay.")
+                    if totalPlayers < minPlayers {
+                        Text("Add \(minPlayers - totalPlayers) more player(s) to start.")
                             .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Colors.textTertiary)
+                            .foregroundStyle(Design.Colors.dangerRed.opacity(0.8))
                     }
 
-                    // Player list with drag-and-drop support
+                    // Player list with drag-and-drop reordering
                     List {
                         ForEach(names.indices, id: \.self) { idx in
-                            HStack(spacing: 10) {
-                                // Drag handle icon
-                                Image(systemName: "line.3.horizontal")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Design.Colors.textSecondary)
-                                    .opacity(0.6)
+                            HStack(spacing: 12) {
+                                // Simplified player number badge
+                                ZStack {
+                                    Circle()
+                                        .fill(Design.Colors.surface2)
+                                        .frame(width: 40, height: 40)
 
-                                // Enhanced player number badge
-                                Text("\(idx + 1)")
-                                    .font(Design.Typography.subheadline)
-                                    .fontWeight(.bold)
-                                    .frame(width: 36)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [Design.Colors.surface2, Design.Colors.surface3],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                )
-                                            )
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                            .stroke(Design.Colors.stroke.opacity(0.5), lineWidth: 1)
-                                    )
-                                    .foregroundStyle(Design.Colors.brandGold)
+                                    Circle()
+                                        .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 1.5)
+                                        .frame(width: 40, height: 40)
 
-                                // Enhanced text field
+                                    Text("\(idx + 1)")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundStyle(Design.Colors.brandGold)
+                                }
+
+                                // Streamlined text field
                                 TextField("Player Name", text: Binding(
                                     get: { names[idx] },
                                     set: { newValue in
@@ -100,35 +89,25 @@ struct SetupView: View {
                                 .font(Design.Typography.body)
                                 .textInputAutocapitalization(.words)
                                 .disableAutocorrection(true)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                        .fill(Design.Colors.surface2)
-                                )
+                                .padding(.vertical, 14)
+                                .padding(.horizontal, 16)
+                                .background(Design.Colors.surface2)
+                                .cornerRadius(Design.Radii.medium)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                        .stroke(Design.Colors.stroke.opacity(0.4), lineWidth: 1)
+                                        .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
                                 )
 
-                                if names.count > minPlayers {
+                                if names.count > 1 {
                                     Button {
-                                        // Extra safety check to ensure we don't go below minimum
-                                        if names.count > minPlayers {
-                                            withAnimation(Design.Animations.smooth) {
-                                                let removalIndex = names.index(names.startIndex, offsetBy: idx)
-                                                names.remove(at: removalIndex)
-                                                // Final safety check - if somehow we went below minimum, reset to minimum
-                                                if names.count < minPlayers {
-                                                    resetNameFields(animated: true)
-                                                }
-                                            }
+                                        withAnimation(Design.Animations.smooth) {
+                                            let removalIndex = names.index(names.startIndex, offsetBy: idx)
+                                            names.remove(at: removalIndex)
                                         }
                                     } label: {
                                         Image(systemName: "minus.circle.fill")
-                                            .font(.system(size: 22))
-                                            .foregroundStyle(Design.Colors.dangerRed)
-                                            .shadow(color: Design.Colors.glowRed.opacity(0.5), radius: 6)
+                                            .font(.system(size: 24))
+                                            .foregroundStyle(Design.Colors.dangerRed.opacity(0.8))
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("Remove row")
@@ -152,10 +131,10 @@ struct SetupView: View {
                     }
                     .listStyle(.plain)
                     .scrollDisabled(true)
-                    .frame(height: CGFloat(names.count) * 70)
+                    .frame(height: CGFloat(names.count) * 64)
 
-                    // Enhanced bottom control section
-                    HStack(spacing: 12) {
+                    // Improved bottom control section
+                    HStack(spacing: 16) {
                         let filled = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.count
                         let allFilled = filled == names.count && filled >= minPlayers
 
@@ -171,41 +150,51 @@ struct SetupView: View {
                                 }
                             }
                         } label: {
-                            Label("Add Player", systemImage: "plus.circle.fill")
-                                .font(Design.Typography.subheadline)
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 18))
+                                Text("Add Player")
+                                    .font(Design.Typography.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Design.Colors.actionBlue.opacity(names.count >= maxPlayers ? 0.3 : 0.2))
+                            .cornerRadius(Design.Radii.medium)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                    .stroke(Design.Colors.actionBlue.opacity(names.count >= maxPlayers ? 0.3 : 0.6), lineWidth: 1.5)
+                            )
                         }
-                        .buttonStyle(PillButtonStyle(background: Design.Colors.actionBlue))
-                        .opacity(names.count >= maxPlayers ? 0.5 : 1)
+                        .foregroundStyle(Design.Colors.actionBlue.opacity(names.count >= maxPlayers ? 0.5 : 1))
                         .disabled(names.count >= maxPlayers)
 
                         Spacer()
 
-                        // Enhanced player count indicator
-                        HStack(spacing: 6) {
+                        // Cleaner player count indicator
+                        HStack(spacing: 8) {
                             Image(systemName: "person.3.fill")
-                                .font(.system(size: 14))
+                                .font(.system(size: 16))
                             Text("\(names.count)\(numberOfBots > 0 ? "+\(numberOfBots)" : "")/\(maxPlayers)")
-                                .font(Design.Typography.subheadline)
-                                .fontWeight(.bold)
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
                         }
-                        .foregroundStyle(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill((allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed).opacity(0.15))
-                        )
+                        .foregroundStyle(allFilled ? Design.Colors.successGreen : Design.Colors.textTertiary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Design.Colors.surface2)
+                        .cornerRadius(Design.Radii.medium)
                         .overlay(
-                            Capsule()
-                                .stroke(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed, lineWidth: 1.5)
+                            RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                .stroke(allFilled ? Design.Colors.successGreen.opacity(0.5) : Design.Colors.stroke.opacity(0.3), lineWidth: 1.5)
                         )
                     }
+                    .padding(.top, 8)
                 }
-                .cardStyle(padding: 18)
+                .cardStyle(padding: 20)
                 .padding(.horizontal, 20)
 
-                // Bot Players Section
-                VStack(alignment: .leading, spacing: 12) {
+                // Bot Players Section - Centered
+                VStack(alignment: .center, spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: "cpu.fill")
                             .font(.system(size: 18))
@@ -218,8 +207,9 @@ struct SetupView: View {
                     Text("Add computer-controlled players to fill out your game")
                         .font(Design.Typography.footnote)
                         .foregroundStyle(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
 
-                    HStack(spacing: 16) {
+                    HStack(spacing: 24) {
                         Button {
                             if numberOfBots > 0 {
                                 withAnimation(Design.Animations.smooth) {
@@ -228,7 +218,7 @@ struct SetupView: View {
                             }
                         } label: {
                             Image(systemName: "minus.circle.fill")
-                                .font(.system(size: 32))
+                                .font(.system(size: 36))
                                 .foregroundStyle(numberOfBots > 0 ? Design.Colors.brandGold : Design.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
@@ -236,12 +226,12 @@ struct SetupView: View {
 
                         VStack(spacing: 4) {
                             Text("\(numberOfBots)")
-                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .font(.system(size: 42, weight: .bold, design: .rounded))
                                 .foregroundStyle(Design.Colors.brandGold)
-                                .frame(minWidth: 60)
+                                .frame(minWidth: 80)
 
                             Text(numberOfBots == 1 ? "Bot" : "Bots")
-                                .font(Design.Typography.caption)
+                                .font(Design.Typography.subheadline)
                                 .foregroundStyle(Design.Colors.textSecondary)
                         }
 
@@ -254,54 +244,20 @@ struct SetupView: View {
                             }
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 32))
+                                .font(.system(size: 36))
                                 .foregroundStyle((validInput.count + numberOfBots) < maxPlayers ? Design.Colors.brandGold : Design.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
                         .disabled((validInput.count + numberOfBots) >= maxPlayers)
-
-                        Spacer()
                     }
-                    .padding(.vertical, 8)
-
-                    // Show bot names preview if bots are added
-                    if numberOfBots > 0 {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Bot Names:")
-                                .font(Design.Typography.caption)
-                                .foregroundStyle(Design.Colors.textSecondary)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(1...numberOfBots, id: \.self) { index in
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "cpu")
-                                                .font(.system(size: 12))
-                                            Text("Bot \(index)")
-                                                .font(Design.Typography.caption)
-                                        }
-                                        .foregroundStyle(Design.Colors.textSecondary)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            Capsule()
-                                                .fill(Design.Colors.surface2)
-                                        )
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(Design.Colors.stroke.opacity(0.4), lineWidth: 1)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.top, 4)
-                    }
+                    .padding(.vertical, 12)
                 }
-                .cardStyle(padding: 18)
+                .frame(maxWidth: .infinity)
+                .cardStyle(padding: 20)
                 .padding(.horizontal, 20)
 
-                Spacer(minLength: 14)
+                // Add significant bottom padding to prevent overlap with bottom buttons
+                Spacer(minLength: 180)
             }
         }
         .background(Design.Colors.surface0)
@@ -500,13 +456,15 @@ struct SetupView: View {
 
     private func resetNameFields(animated: Bool = true) {
         isAddingPlayer = false
-        let base = Array(repeating: "", count: minPlayers)
+        let base = Array(repeating: "", count: 1)
         if animated {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
                 names = base
+                numberOfBots = 0
             }
         } else {
             names = base
+            numberOfBots = 0
         }
     }
 
