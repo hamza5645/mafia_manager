@@ -56,82 +56,102 @@ struct SetupView: View {
                             .foregroundStyle(Design.Colors.textTertiary)
                     }
 
-                    ForEach(names.indices, id: \.self) { idx in
-                        HStack(spacing: 10) {
-                            // Enhanced player number badge
-                            Text("\(idx + 1)")
-                                .font(Design.Typography.subheadline)
-                                .fontWeight(.bold)
-                                .frame(width: 36)
+                    // Player list with drag-and-drop support
+                    List {
+                        ForEach(names.indices, id: \.self) { idx in
+                            HStack(spacing: 10) {
+                                // Drag handle icon
+                                Image(systemName: "line.3.horizontal")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Design.Colors.textSecondary)
+                                    .opacity(0.6)
+
+                                // Enhanced player number badge
+                                Text("\(idx + 1)")
+                                    .font(Design.Typography.subheadline)
+                                    .fontWeight(.bold)
+                                    .frame(width: 36)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [Design.Colors.surface2, Design.Colors.surface3],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
+                                            .stroke(Design.Colors.stroke.opacity(0.5), lineWidth: 1)
+                                    )
+                                    .foregroundStyle(Design.Colors.brandGold)
+
+                                // Enhanced text field
+                                TextField("Player Name", text: Binding(
+                                    get: { names[idx] },
+                                    set: { newValue in
+                                        // Limit player names to 30 characters
+                                        names[idx] = String(newValue.prefix(30))
+                                    }
+                                ))
+                                .font(Design.Typography.body)
+                                .textInputAutocapitalization(.words)
+                                .disableAutocorrection(true)
                                 .padding(.vertical, 12)
+                                .padding(.horizontal, 14)
                                 .background(
                                     RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Design.Colors.surface2, Design.Colors.surface3],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
+                                        .fill(Design.Colors.surface2)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                        .stroke(Design.Colors.stroke.opacity(0.5), lineWidth: 1)
+                                        .stroke(Design.Colors.stroke.opacity(0.4), lineWidth: 1)
                                 )
-                                .foregroundStyle(Design.Colors.brandGold)
 
-                            // Enhanced text field
-                            TextField("Player Name", text: Binding(
-                                get: { names[idx] },
-                                set: { newValue in
-                                    // Limit player names to 30 characters
-                                    names[idx] = String(newValue.prefix(30))
-                                }
-                            ))
-                            .font(Design.Typography.body)
-                            .textInputAutocapitalization(.words)
-                            .disableAutocorrection(true)
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                    .fill(Design.Colors.surface2)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
-                                    .stroke(Design.Colors.stroke.opacity(0.4), lineWidth: 1)
-                            )
-
-                            if names.count > minPlayers {
-                                Button {
-                                    // Extra safety check to ensure we don't go below minimum
-                                    if names.count > minPlayers {
-                                        withAnimation(Design.Animations.smooth) {
-                                            let removalIndex = names.index(names.startIndex, offsetBy: idx)
-                                            names.remove(at: removalIndex)
-                                            // Final safety check - if somehow we went below minimum, reset to minimum
-                                            if names.count < minPlayers {
-                                                resetNameFields(animated: true)
+                                if names.count > minPlayers {
+                                    Button {
+                                        // Extra safety check to ensure we don't go below minimum
+                                        if names.count > minPlayers {
+                                            withAnimation(Design.Animations.smooth) {
+                                                let removalIndex = names.index(names.startIndex, offsetBy: idx)
+                                                names.remove(at: removalIndex)
+                                                // Final safety check - if somehow we went below minimum, reset to minimum
+                                                if names.count < minPlayers {
+                                                    resetNameFields(animated: true)
+                                                }
                                             }
                                         }
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .font(.system(size: 22))
+                                            .foregroundStyle(Design.Colors.dangerRed)
+                                            .shadow(color: Design.Colors.glowRed.opacity(0.5), radius: 6)
                                     }
-                                } label: {
-                                    Image(systemName: "minus.circle.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundStyle(Design.Colors.dangerRed)
-                                        .shadow(color: Design.Colors.glowRed.opacity(0.5), radius: 6)
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove row")
+                                    .disabled(isAddingPlayer)
+                                    .opacity(isAddingPlayer ? 0.3 : 1.0)
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Remove row")
-                                .disabled(isAddingPlayer)
-                                .opacity(isAddingPlayer ? 0.3 : 1.0)
+                            }
+                            .transition(.asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .scale.combined(with: .opacity)
+                            ))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        }
+                        .onMove { offsets, offset in
+                            withAnimation(Design.Animations.smooth) {
+                                names.move(fromOffsets: offsets, toOffset: offset)
                             }
                         }
-                        .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity),
-                            removal: .scale.combined(with: .opacity)
-                        ))
                     }
+                    .listStyle(.plain)
+                    .scrollDisabled(true)
+                    .frame(height: CGFloat(names.count) * 70)
 
                     // Enhanced bottom control section
                     HStack(spacing: 12) {
