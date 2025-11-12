@@ -4,6 +4,7 @@ struct DayManagementView: View {
     @EnvironmentObject private var store: GameStore
     @State private var removedToday: [UUID: Bool] = [:]
     @State private var notes: [UUID: String] = [:]
+    @State private var showEndGameConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -20,8 +21,8 @@ struct DayManagementView: View {
                     ForEach(store.alivePlayers.sorted(by: { $0.number < $1.number })) { p in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 12) {
-                                Chip(text: "#\(p.number)", style: .outline(Design.Colors.textSecondary))
-                                Text(p.name).font(.headline)
+                                Text(p.name)
+                                    .font(.headline)
                                 Spacer()
                                 if removedToday[p.id] == true {
                                     Button("Undo") { removedToday[p.id] = false }
@@ -59,7 +60,24 @@ struct DayManagementView: View {
         }
         .navigationTitle("Day \(store.currentDayIndex + 1)")
         .navigationBarBackButtonHidden(true)
-        .toolbar { }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {

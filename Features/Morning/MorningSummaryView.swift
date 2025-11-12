@@ -1,7 +1,11 @@
 import SwiftUI
+import AVFoundation
 
 struct MorningSummaryView: View {
     @EnvironmentObject private var store: GameStore
+    @State private var showEndGameConfirmation = false
+    @State private var wakeUpSoundPlayer: AVAudioPlayer?
+    @State private var isAudioSessionConfigured = false
 
     private var lastNight: NightAction? { store.state.nightHistory.last }
 
@@ -30,16 +34,39 @@ struct MorningSummaryView: View {
         .navigationTitle("Morning Summary")
         .navigationBarBackButtonHidden(true)
         .background(Design.Colors.surface0.ignoresSafeArea())
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
+        .onAppear {
+            configureAudioSessionIfNeeded()
+            playMorningWakeUpSound()
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
                     if store.state.isGameOver {
                         store.transitionToGameOver()
                     } else {
-                        store.transitionToDay()
+                        // Transition to death reveal screen to show who died
+                        store.transitionToDeathReveal()
                     }
                 } label: {
-                    Text(store.state.isGameOver ? "View Result" : "Continue to Day \(store.currentDayIndex + 1)")
+                    Text(store.state.isGameOver ? "View Result" : "Continue")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(CTAButtonStyle(kind: .primary))
@@ -107,5 +134,35 @@ private extension MorningSummaryView {
             return "\(doctorLabel) → #\(protectedNum)"
         }
         return doctorLabel
+    }
+
+    func configureAudioSessionIfNeeded() {
+        guard !isAudioSessionConfigured else { return }
+
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+            isAudioSessionConfigured = true
+        } catch {
+            print("Failed to configure audio session: \(error.localizedDescription)")
+        }
+    }
+
+    func playMorningWakeUpSound() {
+        guard let url = Bundle.main.url(forResource: "wakeup_rooster", withExtension: "wav") else {
+            print("Missing morning wake-up sound file: wakeup_rooster.wav")
+            return
+        }
+
+        wakeUpSoundPlayer?.stop()
+
+        do {
+            wakeUpSoundPlayer = try AVAudioPlayer(contentsOf: url)
+            wakeUpSoundPlayer?.volume = 1.0
+            wakeUpSoundPlayer?.prepareToPlay()
+            wakeUpSoundPlayer?.play()
+        } catch {
+            print("Failed to play morning wake-up sound: \(error.localizedDescription)")
+        }
     }
 }

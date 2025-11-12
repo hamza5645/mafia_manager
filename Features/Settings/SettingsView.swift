@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var authStore: AuthStore
     @State private var showingLogin = false
+    @State private var showingIntro = false
 
     var body: some View {
         NavigationStack {
@@ -120,6 +121,21 @@ struct SettingsView: View {
                         .listRowBackground(Design.Colors.surface1)
                     }
 
+                    // Help & Tutorial Section
+                    Section("Help & Tutorial") {
+                        Button {
+                            showingIntro = true
+                        } label: {
+                            SettingsRow(
+                                icon: "graduationcap.fill",
+                                title: "View Tutorial",
+                                subtitle: "Learn how to play Mafia",
+                                color: Design.Colors.brandGold
+                            )
+                        }
+                    }
+                    .listRowBackground(Design.Colors.surface1)
+
                     // About Section
                     Section("About") {
                         SettingsRow(
@@ -138,6 +154,16 @@ struct SettingsView: View {
             .sheet(isPresented: $showingLogin) {
                 LoginView()
                     .environmentObject(authStore)
+            }
+            .fullScreenCover(isPresented: $showingIntro) {
+                IntroView(
+                    onStart: {
+                        showingIntro = false
+                    },
+                    onSkip: {
+                        showingIntro = false
+                    }
+                )
             }
         }
     }

@@ -6,6 +6,7 @@ enum GamePhase: Codable, Sendable, Equatable {
     case nightAction(activeRole: Role)
     case nightTransition
     case morning
+    case deathReveal
     case day
     case gameOver
 }

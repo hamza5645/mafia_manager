@@ -45,11 +45,11 @@ struct NightOutcomeView: View {
     }
 
     private var defaultSelection: OutcomeSelection? {
-        guard let night = lastNight else { return nil }
+        guard let night = lastNight, targetedPlayer != nil else { return nil }
         if night.doctorProtectedPlayerID == night.mafiaTargetPlayerID {
             return .saved
         }
-        return nil
+        return .killed
     }
 
     var body: some View {
