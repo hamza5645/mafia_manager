@@ -6,6 +6,7 @@ struct Player: Identifiable, Codable, Hashable, Sendable {
     var name: String
     var role: Role
     var alive: Bool
+    var isBot: Bool = false
     var removalNote: String?
 }
 

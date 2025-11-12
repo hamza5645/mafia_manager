@@ -14,6 +14,7 @@ struct SetupView: View {
     @State private var selectedRoleConfig: CustomRoleConfig?
     @State private var isLoadingGroups = false
     @State private var isLoadingConfigs = false
+    @State private var numberOfBots: Int = 0
     private let databaseService = DatabaseService()
 
     init() {
@@ -183,7 +184,7 @@ struct SetupView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "person.3.fill")
                                 .font(.system(size: 14))
-                            Text("\(names.count)/\(maxPlayers)")
+                            Text("\(names.count)\(numberOfBots > 0 ? "+\(numberOfBots)" : "")/\(maxPlayers)")
                                 .font(Design.Typography.subheadline)
                                 .fontWeight(.bold)
                         }
@@ -198,6 +199,103 @@ struct SetupView: View {
                             Capsule()
                                 .stroke(allFilled ? Design.Colors.successGreen : Design.Colors.dangerRed, lineWidth: 1.5)
                         )
+                    }
+                }
+                .cardStyle(padding: 18)
+                .padding(.horizontal, 20)
+
+                // Bot Players Section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "cpu.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Design.Colors.brandGold)
+                        Text("Bot Players")
+                            .font(Design.Typography.headline)
+                            .foregroundStyle(Design.Colors.textPrimary)
+                    }
+
+                    Text("Add computer-controlled players to fill out your game")
+                        .font(Design.Typography.footnote)
+                        .foregroundStyle(Design.Colors.textSecondary)
+
+                    HStack(spacing: 16) {
+                        Button {
+                            if numberOfBots > 0 {
+                                withAnimation(Design.Animations.smooth) {
+                                    numberOfBots -= 1
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(numberOfBots > 0 ? Design.Colors.brandGold : Design.Colors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(numberOfBots == 0)
+
+                        VStack(spacing: 4) {
+                            Text("\(numberOfBots)")
+                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .foregroundStyle(Design.Colors.brandGold)
+                                .frame(minWidth: 60)
+
+                            Text(numberOfBots == 1 ? "Bot" : "Bots")
+                                .font(Design.Typography.caption)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                        }
+
+                        Button {
+                            let totalPlayers = validInput.count + numberOfBots
+                            if totalPlayers < maxPlayers {
+                                withAnimation(Design.Animations.smooth) {
+                                    numberOfBots += 1
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle((validInput.count + numberOfBots) < maxPlayers ? Design.Colors.brandGold : Design.Colors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled((validInput.count + numberOfBots) >= maxPlayers)
+
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+
+                    // Show bot names preview if bots are added
+                    if numberOfBots > 0 {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Bot Names:")
+                                .font(Design.Typography.caption)
+                                .foregroundStyle(Design.Colors.textSecondary)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(1...numberOfBots, id: \.self) { index in
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "cpu")
+                                                .font(.system(size: 12))
+                                            Text("Bot \(index)")
+                                                .font(Design.Typography.caption)
+                                        }
+                                        .foregroundStyle(Design.Colors.textSecondary)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            Capsule()
+                                                .fill(Design.Colors.surface2)
+                                        )
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Design.Colors.stroke.opacity(0.4), lineWidth: 1)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 .cardStyle(padding: 18)
@@ -295,7 +393,7 @@ struct SetupView: View {
 
                         // Bottom row: Continue button (full width)
                         Button {
-                            store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
+                            store.assignNumbersAndRoles(names: validInput, numberOfBots: numberOfBots, customRoleConfig: selectedRoleConfig)
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.right.circle.fill")
@@ -311,7 +409,7 @@ struct SetupView: View {
                 } else {
                     // Enhanced non-authenticated users layout
                     Button {
-                        store.assignNumbersAndRoles(names: validInput, customRoleConfig: selectedRoleConfig)
+                        store.assignNumbersAndRoles(names: validInput, numberOfBots: numberOfBots, customRoleConfig: selectedRoleConfig)
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "arrow.right.circle.fill")
@@ -390,7 +488,12 @@ struct SetupView: View {
 
     private var isValid: Bool {
         let trimmed = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        guard trimmed.count >= minPlayers && trimmed.count <= maxPlayers else { return false }
+        let totalPlayers = trimmed.count + numberOfBots
+
+        // Must have at least minPlayers total (humans + bots)
+        guard totalPlayers >= minPlayers && totalPlayers <= maxPlayers else { return false }
+
+        // Human names must be unique
         let set = Set(trimmed.map { $0.lowercased() })
         return set.count == trimmed.count
     }

@@ -5,6 +5,9 @@ struct DayManagementView: View {
     @State private var removedToday: [UUID: Bool] = [:]
     @State private var notes: [UUID: String] = [:]
     @State private var showEndGameConfirmation = false
+    @State private var botVotes: [UUID: UUID] = [:] // Bot ID -> Target ID
+    @State private var botsHaveVoted = false
+    private let botService = BotDecisionService()
 
     var body: some View {
         ScrollView {
@@ -55,6 +58,50 @@ struct DayManagementView: View {
                 }
                 .padding(.horizontal)
 
+                // Bot votes summary
+                if !botVotes.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "cpu.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Design.Colors.brandGold)
+                            Text("Bot Votes")
+                                .font(Design.Typography.headline)
+                                .foregroundStyle(Design.Colors.textPrimary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(botVotes.keys), id: \.self) { botID in
+                                if let bot = store.player(by: botID),
+                                   let targetID = botVotes[botID],
+                                   let target = store.player(by: targetID) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "cpu")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(Design.Colors.textSecondary)
+                                        Text(bot.name)
+                                            .font(Design.Typography.body)
+                                            .foregroundStyle(Design.Colors.textSecondary)
+                                        Image(systemName: "arrow.right")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Design.Colors.textTertiary)
+                                        Text("#\(target.number) \(target.name)")
+                                            .font(Design.Typography.body)
+                                            .foregroundStyle(Design.Colors.textPrimary)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 12)
+                                    .background(Design.Colors.surface2)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
+                            }
+                        }
+                    }
+                    .cardStyle()
+                    .padding(.horizontal)
+                }
+
                 Spacer(minLength: 8)
             }
         }
@@ -78,6 +125,9 @@ struct DayManagementView: View {
         } message: {
             Text("This will end the current game without determining a winner.")
         }
+        .onAppear {
+            castBotVotes()
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
@@ -98,6 +148,37 @@ struct DayManagementView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(Design.Colors.surface0.opacity(0.95))
+        }
+    }
+
+    // MARK: - Bot Voting
+
+    /// Automatically casts votes for all alive bot players
+    private func castBotVotes() {
+        guard !botsHaveVoted else { return }
+
+        let aliveBots = store.aliveBots
+        guard !aliveBots.isEmpty else { return }
+
+        Task {
+            // Add a small delay to simulate bots "thinking"
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            await MainActor.run {
+                for bot in aliveBots {
+                    if let targetID = botService.chooseVotingTarget(
+                        botPlayer: bot,
+                        alivePlayers: store.alivePlayers,
+                        nightHistory: store.state.nightHistory,
+                        dayHistory: store.state.dayHistory
+                    ) {
+                        botVotes[bot.id] = targetID
+                        // Mark the target as removed in our tracking
+                        removedToday[targetID] = true
+                    }
+                }
+                botsHaveVoted = true
+            }
         }
     }
 }

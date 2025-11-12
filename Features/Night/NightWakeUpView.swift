@@ -13,13 +13,19 @@ struct NightWakeUpView: View {
     @State private var wakeUpSoundPlayer: AVAudioPlayer?
     @State private var awaitingMafiaWakeCue = true
     @State private var isAudioSessionConfigured = false
+    @State private var showBotActing = false
+    @State private var botActingRole: Role?
+    private let botService = BotDecisionService()
 
     var body: some View {
         ZStack {
             Design.Colors.surface0
                 .ignoresSafeArea()
 
-            if showStartNightTransition {
+            if showBotActing, let role = botActingRole {
+                botActingView(for: role)
+                    .transition(.opacity)
+            } else if showStartNightTransition {
                 TransitionBlurView()
                     .transition(.opacity)
             } else if showTransition {
@@ -60,12 +66,14 @@ struct NightWakeUpView: View {
                 awaitingMafiaWakeCue = true
             }
             maybePlayCurrentWakeUpSound()
+            checkForBotAction()
         }
         .onChange(of: store.state.currentPhase) { _, newPhase in
             if case .nightWakeUp(let role) = newPhase, role == .mafia {
                 awaitingMafiaWakeCue = true
             }
             maybePlayCurrentWakeUpSound()
+            checkForBotAction()
         }
         .onChange(of: store.currentNightIndex) { _, _ in
             // Reset sleep screen for each new night
@@ -697,6 +705,188 @@ struct NightWakeUpView: View {
             return "doctor_ecg"
         case .citizen:
             return nil
+        }
+    }
+
+    // MARK: - Bot Handling
+
+    /// Checks if the current role belongs to a bot and auto-executes if so
+    private func checkForBotAction() {
+        guard case .nightWakeUp(let role) = store.state.currentPhase else { return }
+
+        // Skip initial sleep screen for Mafia
+        if role == .mafia && showInitialSleepScreen {
+            return
+        }
+
+        // Check if current role is played by a bot
+        let rolePlayersForCurrentRole = store.alivePlayers.filter { $0.role == role }
+        let hasBot = rolePlayersForCurrentRole.contains(where: { $0.isBot })
+
+        if hasBot {
+            // Show bot acting animation and execute after delay
+            botActingRole = role
+            withAnimation {
+                showBotActing = true
+            }
+
+            Task {
+                await botService.simulateThinking()
+
+                // Execute bot decision
+                await executeBotAction(for: role)
+
+                // Hide bot animation and transition
+                await MainActor.run {
+                    withAnimation {
+                        showBotActing = false
+                    }
+                }
+            }
+        }
+    }
+
+    /// Executes a bot's action for the given role
+    private func executeBotAction(for role: Role) async {
+        await MainActor.run {
+            switch role {
+            case .mafia:
+                executeBotMafiaAction()
+            case .inspector:
+                executeBotInspectorAction()
+            case .doctor:
+                executeBotDoctorAction()
+            case .citizen:
+                break
+            }
+        }
+    }
+
+    private func executeBotMafiaAction() {
+        // Find bot Mafia player(s)
+        let botMafia = store.aliveMafia.filter { $0.isBot }
+        guard let botMafiaPlayer = botMafia.first else { return }
+
+        // Get bot decision
+        let targetID = botService.chooseMafiaTarget(
+            botPlayer: botMafiaPlayer,
+            alivePlayers: store.alivePlayers,
+            nightHistory: store.state.nightHistory
+        )
+
+        // Record action
+        let currentNight = store.state.nightHistory.last
+        let isCurrentNight = currentNight?.isResolved == false
+
+        store.endNight(
+            mafiaTargetID: targetID,
+            inspectorCheckedID: isCurrentNight ? currentNight?.inspectorCheckedPlayerID : nil,
+            doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
+        )
+
+        // Transition to next role
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            store.completeRoleAction()
+            store.transitionToNextRole()
+        }
+    }
+
+    private func executeBotInspectorAction() {
+        // Find bot Inspector
+        let botInspectors = store.alivePlayers.filter { $0.role == .inspector && $0.isBot }
+        guard let botInspector = botInspectors.first else { return }
+
+        // Get bot decision
+        let targetID = botService.chooseInspectorTarget(
+            botPlayer: botInspector,
+            alivePlayers: store.alivePlayers,
+            nightHistory: store.state.nightHistory
+        )
+
+        // Record action (no need to show result to bot)
+        let currentNight = store.state.nightHistory.last
+        let isCurrentNight = currentNight?.isResolved == false
+
+        store.endNight(
+            mafiaTargetID: isCurrentNight ? currentNight?.mafiaTargetPlayerID : nil,
+            inspectorCheckedID: targetID,
+            doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
+        )
+
+        // Transition to next role
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            store.completeRoleAction()
+            store.transitionToNextRole()
+        }
+    }
+
+    private func executeBotDoctorAction() {
+        // Find bot Doctor
+        let botDoctors = store.alivePlayers.filter { $0.role == .doctor && $0.isBot }
+        guard let botDoctor = botDoctors.first else { return }
+
+        // Get bot decision
+        let targetID = botService.chooseDoctorProtection(
+            botPlayer: botDoctor,
+            alivePlayers: store.alivePlayers,
+            nightHistory: store.state.nightHistory
+        )
+
+        // Record action
+        let currentNight = store.state.nightHistory.last
+        let isCurrentNight = currentNight?.isResolved == false
+
+        store.endNight(
+            mafiaTargetID: isCurrentNight ? currentNight?.mafiaTargetPlayerID : nil,
+            inspectorCheckedID: isCurrentNight ? currentNight?.inspectorCheckedPlayerID : nil,
+            doctorProtectedID: targetID
+        )
+
+        // Transition to next role (morning)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            store.completeRoleAction()
+            store.transitionToNextRole()
+        }
+    }
+
+    /// View shown when a bot is taking their turn
+    private func botActingView(for role: Role) -> some View {
+        VStack(spacing: 40) {
+            Spacer()
+
+            VStack(spacing: 32) {
+                // Bot icon with pulsing animation
+                ZStack {
+                    Circle()
+                        .fill(role.accentColor.opacity(0.2))
+                        .frame(width: 120, height: 120)
+                        .shadow(color: role.accentColor.opacity(0.5), radius: 20)
+
+                    Image(systemName: "cpu.fill")
+                        .font(.system(size: 60, weight: .bold))
+                        .foregroundStyle(role.accentColor)
+                }
+                .scaleEffect(showBotActing ? 1.1 : 1.0)
+                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: showBotActing)
+
+                VStack(spacing: 16) {
+                    Text("Bot is Deciding...")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(role.accentColor)
+
+                    Text(role.displayName)
+                        .font(Design.Typography.title3)
+                        .foregroundColor(Design.Colors.textSecondary)
+                }
+
+                // Progress indicator
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(role.accentColor)
+                    .scaleEffect(1.5)
+            }
+
+            Spacer()
         }
     }
 }

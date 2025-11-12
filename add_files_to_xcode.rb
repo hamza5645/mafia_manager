@@ -20,7 +20,8 @@ files_to_add = {
     'Core/Services/AuthService.swift',
     'Core/Services/DatabaseService.swift',
     'Core/Services/SupabaseConfig.swift',
-    'Core/Services/SupabaseService.swift'
+    'Core/Services/SupabaseService.swift',
+    'Core/Services/BotDecisionService.swift'
   ],
   'Core/Store' => [
     'Core/Store/AuthStore.swift'

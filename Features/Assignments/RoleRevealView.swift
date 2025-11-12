@@ -106,19 +106,26 @@ struct RoleRevealView: View {
             }
 
             VStack(spacing: 12) {
-                Text("Give phone to")
+                Text(player.isBot ? "Bot Player" : "Give phone to")
                     .font(Design.Typography.title3)
                     .foregroundColor(Design.Colors.textSecondary)
 
-                Text(player.name)
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Design.Colors.brandGold, Design.Colors.brandGold.opacity(0.7)],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                HStack(spacing: 12) {
+                    if player.isBot {
+                        Image(systemName: "cpu.fill")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(Design.Colors.brandGold)
+                    }
+                    Text(player.name)
+                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Design.Colors.brandGold, Design.Colors.brandGold.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
+                }
             }
 
             Button {
@@ -173,9 +180,16 @@ struct RoleRevealView: View {
                     .shadow(color: palette.glowColor.opacity(0.5), radius: 8)
 
                 // Player name
-                Text(player.name)
-                    .font(Design.Typography.title2)
-                    .foregroundColor(Design.Colors.textPrimary)
+                HStack(spacing: 8) {
+                    if player.isBot {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Design.Colors.textSecondary)
+                    }
+                    Text(player.name)
+                        .font(Design.Typography.title2)
+                        .foregroundColor(Design.Colors.textPrimary)
+                }
 
                 // Role description
                 Text(roleDescription(for: player.role))

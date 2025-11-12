@@ -134,11 +134,23 @@ private struct PlayerRoleCard: View {
                 }
                 .frame(width: 36, height: 36)
 
-                Text(player.name)
-                    .font(Design.Typography.headline)
-                    .foregroundStyle(Design.Colors.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(player.name)
+                        .font(Design.Typography.headline)
+                        .foregroundStyle(Design.Colors.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+
+                    if player.isBot {
+                        HStack(spacing: 4) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 10))
+                            Text("Bot")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundStyle(Design.Colors.textSecondary)
+                    }
+                }
 
                 Spacer()
             }

@@ -54,7 +54,7 @@ final class GameStore: ObservableObject {
         }
     }
 
-    func assignNumbersAndRoles(names: [String], customRoleConfig: CustomRoleConfig? = nil) {
+    func assignNumbersAndRoles(names: [String], numberOfBots: Int = 0, customRoleConfig: CustomRoleConfig? = nil) {
         // SECURITY FIX: Validate all player names
         var validatedNames: [String] = []
         for name in names {
@@ -67,12 +67,18 @@ final class GameStore: ObservableObject {
             }
         }
 
-        guard validatedNames.count >= 4 && validatedNames.count <= 19 else { return }
+        // Add bot player names
+        var allNames = validatedNames
+        for i in 1...numberOfBots {
+            allNames.append("Bot \(i)")
+        }
+
+        guard allNames.count >= 4 && allNames.count <= 19 else { return }
 
         // Ensure names are unique while preserving order
         var seen = Set<String>()
-        let unique = validatedNames.filter { seen.insert($0).inserted }
-        guard unique.count == validatedNames.count else { return }
+        let unique = allNames.filter { seen.insert($0).inserted }
+        guard unique.count == allNames.count else { return }
 
         // Random unique numbers from 1..(2 * playerCount)
         let count = unique.count
@@ -127,10 +133,13 @@ final class GameStore: ObservableObject {
 
         // Build players - preserve entry order of names
         var players: [Player] = []
+        let humanPlayerCount = validatedNames.count
         for (idx, name) in unique.enumerated() {
             let number = assignedNumbers[idx]
             let role = roles[idx]
-            players.append(Player(id: UUID(), number: number, name: name, role: role, alive: true, removalNote: nil))
+            // Mark as bot if index is beyond human players
+            let isBot = idx >= humanPlayerCount
+            players.append(Player(id: UUID(), number: number, name: name, role: role, alive: true, isBot: isBot, removalNote: nil))
         }
 
         state = GameState(players: players, nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil, currentPhase: .roleReveal(currentPlayerIndex: 0))
@@ -301,6 +310,10 @@ final class GameStore: ObservableObject {
     var mafiaPlayers: [Player] { state.players.filter { $0.role == .mafia } }
     var aliveMafia: [Player] { state.players.filter { $0.role == .mafia && $0.alive } }
     var aliveNonMafia: [Player] { state.players.filter { $0.role != .mafia && $0.alive } }
+    var botPlayers: [Player] { state.players.filter { $0.isBot } }
+    var humanPlayers: [Player] { state.players.filter { !$0.isBot } }
+    var aliveBots: [Player] { state.players.filter { $0.isBot && $0.alive } }
+    var aliveHumans: [Player] { state.players.filter { !$0.isBot && $0.alive } }
     var currentNightIndex: Int {
         if let lastNight = state.nightHistory.last {
             // If last night is resolved, we're on the next night
