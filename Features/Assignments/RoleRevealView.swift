@@ -74,14 +74,18 @@ struct RoleRevealView: View {
 
     private func instructionView(for player: Player, at index: Int) -> some View {
         VStack(spacing: 32) {
-            // Progress indicator
-            HStack(spacing: 8) {
+            // Progress indicator with auto-wrapping grid
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.fixed(8), spacing: 8), count: min(store.state.players.count, 30)),
+                spacing: 8
+            ) {
                 ForEach(0..<store.state.players.count, id: \.self) { i in
                     Circle()
                         .fill(i <= index ? Design.Colors.brandGold : Design.Colors.surface2)
                         .frame(width: 8, height: 8)
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.bottom, 8)
 
             // Icon
@@ -310,3 +314,4 @@ private struct RoleCardPalette {
         )
     }
 }
+

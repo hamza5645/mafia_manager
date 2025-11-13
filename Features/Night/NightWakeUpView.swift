@@ -369,11 +369,11 @@ struct NightWakeUpView: View {
                 } else if let result = investigationResult {
                     investigationResultView(result: result)
                 }
-
-                Spacer(minLength: 100)
             }
             .padding(.horizontal, Design.Spacing.lg)
             .padding(.top, Design.Spacing.xl)
+            // Add actual bottom padding to prevent overlap with action button
+            .padding(.bottom, 120)
         }
         .safeAreaInset(edge: .bottom) {
             actionButton(for: role)
@@ -396,8 +396,12 @@ struct NightWakeUpView: View {
     }
 
     private func playerSelectionList(for role: Role) -> some View {
-        LazyVStack(spacing: 12) {
-            ForEach(filteredPlayers(for: role)) { player in
+        let players = filteredPlayers(for: role)
+        // Adaptive spacing: use smaller spacing when there are many players
+        let spacing: CGFloat = players.count > 10 ? 8 : 12
+
+        return LazyVStack(spacing: spacing) {
+            ForEach(players) { player in
                 PlayerSelectionRow(
                     player: player,
                     isSelected: selectedTargetID == player.id,

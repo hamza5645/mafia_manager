@@ -20,8 +20,12 @@ struct DayManagementView: View {
                 }
                 .padding(.horizontal)
 
-                VStack(spacing: 10) {
-                    ForEach(store.alivePlayers.sorted(by: { $0.number < $1.number })) { p in
+                // Adaptive spacing based on player count
+                let alivePlayers = store.alivePlayers.sorted(by: { $0.number < $1.number })
+                let cardSpacing: CGFloat = alivePlayers.count > 10 ? 8 : 10
+
+                VStack(spacing: cardSpacing) {
+                    ForEach(alivePlayers) { p in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 12) {
                                 Text(p.name)
@@ -101,9 +105,9 @@ struct DayManagementView: View {
                     .cardStyle()
                     .padding(.horizontal)
                 }
-
-                Spacer(minLength: 8)
             }
+            // Add actual bottom padding to prevent overlap with Lock Votes button
+            .padding(.bottom, 100)
         }
         .navigationTitle("Day \(store.currentDayIndex + 1)")
         .navigationBarBackButtonHidden(true)

@@ -93,19 +93,26 @@ struct DeathRevealView: View {
     }
 
     private var deathRevealContent: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        // Adaptive spacing based on number of deaths
+        let cardSpacing: CGFloat = deadPlayers.count > 2 ? 20 : 32
+        let topPadding: CGFloat = deadPlayers.count == 1 ? 40 : 20
 
-            // Death cards
-            ForEach(deadPlayers, id: \.id) { player in
-                deathCard(for: player)
+        return ScrollView {
+            VStack(spacing: cardSpacing) {
+                // Death cards
+                ForEach(deadPlayers, id: \.id) { player in
+                    deathCard(for: player)
+                }
+
+                // Continue button
+                continueButton
+                    .padding(.top, 16)
             }
-
-            Spacer()
-
-            continueButton
+            .padding(.horizontal, Design.Spacing.lg)
+            // Add actual padding instead of Spacers for proper scrolling
+            .padding(.top, topPadding)
+            .padding(.bottom, 60)
         }
-        .padding(.horizontal, Design.Spacing.lg)
     }
 
     private func deathCard(for player: Player) -> some View {

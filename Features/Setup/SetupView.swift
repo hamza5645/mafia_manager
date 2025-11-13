@@ -255,10 +255,12 @@ struct SetupView: View {
                 .frame(maxWidth: .infinity)
                 .cardStyle(padding: 20)
                 .padding(.horizontal, 20)
-
-                // Add significant bottom padding to prevent overlap with bottom buttons
-                Spacer(minLength: 180)
             }
+            // Add actual bottom padding to prevent overlap with bottom buttons
+            // Extra padding for authenticated users who have more buttons (Load Group + Load Roles + Continue)
+            // Using Color.clear with explicit height to ensure proper spacing at bottom
+            Color.clear
+                .frame(height: authStore.isAuthenticated ? 220 : 120)
         }
         .background(Design.Colors.surface0)
         .navigationBarTitleDisplayMode(.inline)
@@ -383,8 +385,9 @@ struct SetupView: View {
             .padding(.vertical, Design.Spacing.md)
             .background(
                 ZStack {
-                    // Glassmorphic background
+                    // Glassmorphic background that extends to screen bottom
                     Design.Colors.surface0.opacity(0.98)
+                        .ignoresSafeArea(edges: .bottom)
 
                     // Top border gradient
                     LinearGradient(
