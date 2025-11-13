@@ -11,6 +11,10 @@ final class GameStore: ObservableObject {
     @Published var persistenceError: String?
     // Store previous player names for "Play Again" feature
     @Published var previousPlayerNames: [String] = []
+    // Track previous bot count so the bot slider can be restored accurately
+    @Published var previousBotCount: Int = 0
+    // Surface setup validation errors to the UI
+    @Published var setupError: String?
 
     private let databaseService = DatabaseService()
     // BUG FIX: Use weak reference to prevent potential retain cycle
@@ -39,8 +43,20 @@ final class GameStore: ObservableObject {
     var hasSavedGame: Bool { Persistence.shared.hasSavedState() }
 
     func resetAll() {
-        // Preserve player names for "Play Again" feature
-        previousPlayerNames = state.players.map { $0.name }
+        // Preserve human player names and bot count for "Play Again" feature
+        var humanNames: [String] = []
+        var botCount = 0
+        for player in state.players {
+            if player.isBot {
+                botCount += 1
+            } else {
+                humanNames.append(player.name)
+            }
+        }
+
+        previousPlayerNames = humanNames
+        previousBotCount = botCount
+        setupError = nil
         state = .empty
         isFreshSetup = true
         Persistence.shared.reset()
@@ -55,11 +71,17 @@ final class GameStore: ObservableObject {
     }
 
     func assignNumbersAndRoles(names: [String], numberOfBots: Int = 0, customRoleConfig: CustomRoleConfig? = nil) {
+        setupError = nil
         // SECURITY FIX: Validate all player names
         var validatedNames: [String] = []
         for name in names {
             switch InputValidator.validatePlayerName(name) {
             case .success(let validName):
+                if InputValidator.isReservedBotName(validName) {
+                    setupError = "\"\(validName)\" is reserved for bot players. Please choose a different name."
+                    return
+                }
+
                 validatedNames.append(validName)
             case .failure:
                 // Skip invalid names
@@ -69,16 +91,36 @@ final class GameStore: ObservableObject {
 
         // Add bot player names
         var allNames = validatedNames
-        for i in 1...numberOfBots {
-            allNames.append("Bot \(i)")
+        let botNames: [String]
+        if numberOfBots > 0 {
+            botNames = (1...numberOfBots).map { "Bot \($0)" }
+            allNames.append(contentsOf: botNames)
+        } else {
+            botNames = []
         }
 
-        guard allNames.count >= 4 && allNames.count <= 19 else { return }
+        guard allNames.count >= 4 && allNames.count <= 19 else {
+            setupError = "Games require between 4 and 19 total players (humans + bots)."
+            return
+        }
 
-        // Ensure names are unique while preserving order
+        // Ensure names are unique while preserving order (case-insensitive)
         var seen = Set<String>()
-        let unique = allNames.filter { seen.insert($0).inserted }
-        guard unique.count == allNames.count else { return }
+        var unique: [String] = []
+        let botNameSet = Set(botNames.map { $0.lowercased() })
+        for name in allNames {
+            let key = name.lowercased()
+            if seen.insert(key).inserted {
+                unique.append(name)
+            } else {
+                if botNameSet.contains(key) {
+                    setupError = "Names like \"Bot 1\" are reserved for bot players. Please rename your human or lower the bot count."
+                } else {
+                    setupError = "Player names must be unique."
+                }
+                return
+            }
+        }
 
         // Random unique numbers from 1..(2 * playerCount)
         let count = unique.count

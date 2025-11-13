@@ -276,8 +276,8 @@ struct SetupView: View {
         }
         .onAppear {
             if store.isFreshSetup {
-                // Check if we have previous player names from "Play Again"
-                if !store.previousPlayerNames.isEmpty {
+                // Check if we have previous player info from "Play Again"
+                if !store.previousPlayerNames.isEmpty || store.previousBotCount > 0 {
                     loadPreviousPlayers(animated: false)
                 } else {
                     resetNameFields(animated: false)
@@ -286,13 +286,27 @@ struct SetupView: View {
         }
         .onChange(of: store.isFreshSetup) { fresh in
             if fresh {
-                // Check if we have previous player names from "Play Again"
-                if !store.previousPlayerNames.isEmpty {
+                // Check if we have previous player info from "Play Again"
+                if !store.previousPlayerNames.isEmpty || store.previousBotCount > 0 {
                     loadPreviousPlayers()
                 } else {
                     resetNameFields()
                 }
             }
+        }
+        .alert("Setup Error", isPresented: Binding(
+            get: { store.setupError != nil },
+            set: { presented in
+                if !presented {
+                    store.setupError = nil
+                }
+            }
+        )) {
+            Button("OK", role: .cancel) {
+                store.setupError = nil
+            }
+        } message: {
+            Text(store.setupError ?? "Something went wrong.")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: Design.Spacing.md) {
@@ -496,15 +510,24 @@ struct SetupView: View {
 
     private func loadPreviousPlayers(animated: Bool = true) {
         let previousNames = store.previousPlayerNames
+        let previousBots = store.previousBotCount
+        let targetNames = previousNames.isEmpty ? [""] : previousNames
+
+        let applyChanges = {
+            names = targetNames
+            numberOfBots = previousBots
+        }
+
         if animated {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0.25)) {
-                names = previousNames
+                applyChanges()
             }
         } else {
-            names = previousNames
+            applyChanges()
         }
-        // Clear the previous names after loading so they don't persist
+        // Clear the previous data after loading so it doesn't persist
         store.previousPlayerNames = []
+        store.previousBotCount = 0
     }
 
     private func loadCustomRoleConfigs() async {

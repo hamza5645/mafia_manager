@@ -67,6 +67,28 @@ enum InputValidator {
         return .success(trimmed)
     }
 
+    // MARK: - Bot Naming Rules
+
+    /// Returns true when the provided name matches the auto-generated bot name pattern (e.g. "Bot 1", "bot1", "BOT-3").
+    static func isReservedBotName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 4 else { return false }
+
+        let lowercase = trimmed.lowercased()
+        guard lowercase.hasPrefix("bot") else { return false }
+
+        // Strip typical separators so variations like "bot-1" or "bot 1" are caught
+        let suffix = lowercase.dropFirst(3)
+        let normalizedSuffix = suffix
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "#", with: "")
+
+        guard !normalizedSuffix.isEmpty else { return false }
+        return normalizedSuffix.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil
+    }
+
     // MARK: - Email Validation
 
     static func validateEmail(_ email: String) -> Result<String, ValidationError> {
