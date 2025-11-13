@@ -156,6 +156,11 @@ final class GameStore: ObservableObject {
     func startRoleReveal() {
         state.currentPhase = .roleReveal(currentPlayerIndex: 0)
         save()
+
+        // If the first player is a bot, advance to the first human
+        if !state.players.isEmpty && state.players[0].isBot {
+            advanceToNextPlayer()
+        }
     }
 
     func revealRoleToPlayer(at index: Int) {
@@ -172,8 +177,16 @@ final class GameStore: ObservableObject {
             // All players have seen their roles - start night phase
             completeRoleReveal()
         } else {
-            state.currentPhase = .roleReveal(currentPlayerIndex: nextIndex)
-            save()
+            // Check if the next player is a bot - if so, skip them
+            let nextPlayer = state.players[nextIndex]
+            if nextPlayer.isBot {
+                // Skip this bot player by recursively advancing
+                state.currentPhase = .roleReveal(currentPlayerIndex: nextIndex)
+                advanceToNextPlayer()
+            } else {
+                state.currentPhase = .roleReveal(currentPlayerIndex: nextIndex)
+                save()
+            }
         }
     }
 
@@ -325,6 +338,22 @@ final class GameStore: ObservableObject {
         }
     }
     var currentDayIndex: Int { state.dayIndex }
+
+    // MARK: - Role-based queries
+
+    func playersWithRole(_ role: Role) -> [Player] {
+        state.players.filter { $0.role == role }
+    }
+
+    func alivePlayersWithRole(_ role: Role) -> [Player] {
+        state.players.filter { $0.role == role && $0.alive }
+    }
+
+    func allBotsForRole(_ role: Role) -> Bool {
+        let alivePlayers = alivePlayersWithRole(role)
+        guard !alivePlayers.isEmpty else { return false }
+        return alivePlayers.allSatisfy { $0.isBot }
+    }
 
     func player(by id: UUID?) -> Player? {
         guard let id else { return nil }

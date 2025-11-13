@@ -15,6 +15,7 @@ struct NightWakeUpView: View {
     @State private var isAudioSessionConfigured = false
     @State private var showBotActing = false
     @State private var botActingRole: Role?
+    @State private var isExecutingSilently = false
     private let botService = BotDecisionService()
 
     var body: some View {
@@ -60,6 +61,8 @@ struct NightWakeUpView: View {
         }
         .onAppear {
             configureAudioSessionIfNeeded()
+            isExecutingSilently = false
+
             // Show initial sleep screen when entering night for the first time
             if case .nightWakeUp(.mafia) = store.state.currentPhase {
                 showInitialSleepScreen = true
@@ -67,13 +70,24 @@ struct NightWakeUpView: View {
             }
             maybePlayCurrentWakeUpSound()
             checkForBotAction()
+
+            // Check if all players of this role are bots - if so, auto-progress
+            if shouldAutoExecuteForAllBots() {
+                scheduleAutoContinueForAllBots()
+            }
         }
         .onChange(of: store.state.currentPhase) { _, newPhase in
+            isExecutingSilently = false
             if case .nightWakeUp(let role) = newPhase, role == .mafia {
                 awaitingMafiaWakeCue = true
             }
             maybePlayCurrentWakeUpSound()
             checkForBotAction()
+
+            // Check if all players of this role are bots - if so, auto-progress
+            if shouldAutoExecuteForAllBots() {
+                scheduleAutoContinueForAllBots()
+            }
         }
         .onChange(of: store.currentNightIndex) { _, _ in
             // Reset sleep screen for each new night
@@ -185,26 +199,30 @@ struct NightWakeUpView: View {
     // MARK: - Wake Up Screens
 
     private func wakeUpScreen(for role: Role) -> some View {
-        VStack(spacing: 40) {
-            Spacer()
-
-            // Role-specific wake up content
-            Group {
-                switch role {
-                case .mafia:
-                    mafiaWakeUpContent
-                case .inspector:
-                    policeWakeUpContent
-                case .doctor:
-                    doctorWakeUpContent
-                case .citizen:
-                    EmptyView()
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 32) {
+                // Role-specific wake up content
+                Group {
+                    switch role {
+                    case .mafia:
+                        mafiaWakeUpContent
+                    case .inspector:
+                        policeWakeUpContent
+                    case .doctor:
+                        doctorWakeUpContent
+                    case .citizen:
+                        EmptyView()
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-
-            Spacer()
-
-            // Continue button
+            .padding(.horizontal, Design.Spacing.lg)
+            .padding(.top, Design.Spacing.xl)
+            // Leave room for the pinned button
+            .padding(.bottom, 120)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             Button {
                 // Play haptic
                 let generator = UINotificationFeedbackGenerator()
@@ -223,6 +241,13 @@ struct NightWakeUpView: View {
             }
             .buttonStyle(CTAButtonStyle(kind: .primary))
             .padding(.horizontal, Design.Spacing.lg)
+            .padding(.top, Design.Spacing.md)
+            .padding(.bottom, Design.Spacing.lg)
+            .background(
+                Design.Colors.surface0
+                    .opacity(0.98)
+                    .ignoresSafeArea()
+            )
         }
     }
 
@@ -239,60 +264,71 @@ struct NightWakeUpView: View {
                     .font(.system(size: 60, weight: .bold))
                     .foregroundStyle(Design.Colors.dangerRed)
             }
+            .frame(maxWidth: .infinity)
 
             VStack(spacing: 16) {
                 Text("Mafia, Wake Up")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundStyle(Design.Colors.dangerRed)
+                    .frame(maxWidth: .infinity)
 
-                Text("All mafia members:")
-                    .font(Design.Typography.title3)
-                    .foregroundColor(Design.Colors.textSecondary)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("All mafia members:")
+                        .font(Design.Typography.title3)
+                        .foregroundColor(Design.Colors.textSecondary)
 
-                // Show all mafia members
-                VStack(spacing: 12) {
-                    ForEach(store.mafiaPlayers) { player in
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(Design.Colors.dangerRed.opacity(0.3))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Text(player.name.prefix(1).uppercased())
-                                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                                        .foregroundColor(Design.Colors.dangerRed)
-                                )
+                    // Show all mafia members
+                    VStack(spacing: 12) {
+                        ForEach(store.mafiaPlayers) { player in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Design.Colors.dangerRed.opacity(0.3))
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Text(player.name.prefix(1).uppercased())
+                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .foregroundColor(Design.Colors.dangerRed)
+                                    )
 
-                            Text(player.name)
-                                .font(Design.Typography.headline)
-                                .foregroundColor(Design.Colors.textPrimary)
+                                Text(player.name)
+                                    .font(Design.Typography.headline)
+                                    .foregroundColor(Design.Colors.textPrimary)
 
-                            if !player.alive {
-                                Text("(Dead)")
-                                    .font(Design.Typography.caption)
-                                    .foregroundColor(Design.Colors.textTertiary)
+                                if !player.alive {
+                                    Text("(Dead)")
+                                        .font(Design.Typography.caption)
+                                        .foregroundColor(Design.Colors.textTertiary)
+                                }
+
+                                Spacer()
                             }
-
-                            Spacer()
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Design.Colors.surface1)
+                            .cornerRadius(Design.Radii.medium)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Design.Colors.surface1)
-                        .cornerRadius(Design.Radii.medium)
                     }
-                }
-                .padding(.horizontal, Design.Spacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Design.Spacing.lg)
 
-                Text("Discuss among yourselves and choose a target")
-                    .font(Design.Typography.body)
-                    .foregroundColor(Design.Colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    Text("Discuss among yourselves and choose a target")
+                        .font(Design.Typography.body)
+                        .foregroundColor(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.horizontal, 32)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private var policeWakeUpContent: some View {
-        VStack(spacing: 32) {
+        let inspectorPlayers = store.state.players.filter { $0.role == .inspector }
+        return VStack(spacing: 32) {
             // Icon
             ZStack {
                 Circle()
@@ -304,27 +340,70 @@ struct NightWakeUpView: View {
                     .font(.system(size: 60, weight: .bold))
                     .foregroundStyle(Design.Colors.actionBlue)
             }
+            .frame(maxWidth: .infinity)
 
             VStack(spacing: 16) {
                 Text("Police, Wake Up")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundStyle(Design.Colors.actionBlue)
+                    .frame(maxWidth: .infinity)
 
-                Text("You are the Police")
-                    .font(Design.Typography.title2)
-                    .foregroundColor(Design.Colors.textPrimary)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("All police members:")
+                        .font(Design.Typography.title3)
+                        .foregroundColor(Design.Colors.textSecondary)
 
-                Text("You can investigate one player to discover their role")
-                    .font(Design.Typography.body)
-                    .foregroundColor(Design.Colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    VStack(spacing: 12) {
+                        ForEach(inspectorPlayers) { player in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Design.Colors.actionBlue.opacity(0.3))
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Text(player.name.prefix(1).uppercased())
+                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .foregroundColor(Design.Colors.actionBlue)
+                                    )
+
+                                Text(player.name)
+                                    .font(Design.Typography.headline)
+                                    .foregroundColor(Design.Colors.textPrimary)
+
+                                if !player.alive {
+                                    Text("(Dead)")
+                                        .font(Design.Typography.caption)
+                                        .foregroundColor(Design.Colors.textTertiary)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Design.Colors.surface1)
+                            .cornerRadius(Design.Radii.medium)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Design.Spacing.lg)
+
+                    Text("You can investigate one player to discover their role")
+                        .font(Design.Typography.body)
+                        .foregroundColor(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.horizontal, 32)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private var doctorWakeUpContent: some View {
-        VStack(spacing: 32) {
+        let doctorPlayers = store.state.players.filter { $0.role == .doctor }
+        return VStack(spacing: 32) {
             // Icon
             ZStack {
                 Circle()
@@ -336,23 +415,65 @@ struct NightWakeUpView: View {
                     .font(.system(size: 60, weight: .bold))
                     .foregroundStyle(Design.Colors.successGreen)
             }
+            .frame(maxWidth: .infinity)
 
             VStack(spacing: 16) {
                 Text("Doctor, Wake Up")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundStyle(Design.Colors.successGreen)
+                    .frame(maxWidth: .infinity)
 
-                Text("You are the Doctor")
-                    .font(Design.Typography.title2)
-                    .foregroundColor(Design.Colors.textPrimary)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("All doctors:")
+                        .font(Design.Typography.title3)
+                        .foregroundColor(Design.Colors.textSecondary)
 
-                Text("You can protect one player from the Mafia's attack tonight")
-                    .font(Design.Typography.body)
-                    .foregroundColor(Design.Colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    VStack(spacing: 12) {
+                        ForEach(doctorPlayers) { player in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Design.Colors.successGreen.opacity(0.3))
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Text(player.name.prefix(1).uppercased())
+                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .foregroundColor(Design.Colors.successGreen)
+                                    )
+
+                                Text(player.name)
+                                    .font(Design.Typography.headline)
+                                    .foregroundColor(Design.Colors.textPrimary)
+
+                                if !player.alive {
+                                    Text("(Dead)")
+                                        .font(Design.Typography.caption)
+                                        .foregroundColor(Design.Colors.textTertiary)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Design.Colors.surface1)
+                            .cornerRadius(Design.Radii.medium)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Design.Spacing.lg)
+
+                    Text("You can protect one player from the Mafia's attack tonight")
+                        .font(Design.Typography.body)
+                        .foregroundColor(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.horizontal, 32)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     // MARK: - Action Screens
@@ -714,37 +835,68 @@ struct NightWakeUpView: View {
 
     // MARK: - Bot Handling
 
-    /// Checks if the current role belongs to a bot and auto-executes if so
-    private func checkForBotAction() {
+    /// Checks if ALL players with the current role are bots (silent execution mode)
+    private func shouldAutoExecuteForAllBots() -> Bool {
+        // Check for both wake-up and action phases
+        if case .nightWakeUp(let role) = store.state.currentPhase {
+            return store.allBotsForRole(role)
+        }
+        if case .nightAction(let role) = store.state.currentPhase {
+            return store.allBotsForRole(role)
+        }
+        return false
+    }
+
+    /// Schedules automatic progression through the UI when all role players are bots
+    private func scheduleAutoContinueForAllBots() {
         guard case .nightWakeUp(let role) = store.state.currentPhase else { return }
 
-        // Skip initial sleep screen for Mafia
-        if role == .mafia && showInitialSleepScreen {
-            return
+        // Auto-click "Continue" button after a realistic delay (4-6 seconds)
+        // Longer delay prevents humans from getting suspicious about short bot turns
+        let delay = Double.random(in: 4.0...6.0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // Check if we're still in the wake-up phase for this role
+            if case .nightWakeUp(let currentRole) = self.store.state.currentPhase,
+               currentRole == role {
+                // Haptic feedback
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+
+                // Transition to action phase
+                self.store.beginRoleAction(role)
+            }
+        }
+    }
+
+    /// Checks if the current role belongs to a bot and auto-executes if so
+    private func checkForBotAction() {
+        // Only handle action phase - auto-execute if all role players are bots
+        if case .nightAction(let role) = store.state.currentPhase {
+            if shouldAutoExecuteForAllBots() {
+                scheduleAutoBotActionInActionPhase(for: role)
+            }
+        }
+    }
+
+    /// Schedules automatic bot action execution during the action phase when all role players are bots
+    private func scheduleAutoBotActionInActionPhase(for role: Role) {
+        // Show bot acting animation
+        botActingRole = role
+        withAnimation {
+            showBotActing = true
         }
 
-        // Check if current role is played by a bot
-        let rolePlayersForCurrentRole = store.alivePlayers.filter { $0.role == role }
-        let hasBot = rolePlayersForCurrentRole.contains(where: { $0.isBot })
+        Task {
+            // Simulate thinking delay for realism (2-3 seconds)
+            await botService.simulateThinking()
 
-        if hasBot {
-            // Show bot acting animation and execute after delay
-            botActingRole = role
-            withAnimation {
-                showBotActing = true
-            }
+            // Execute the bot action
+            await executeBotAction(for: role)
 
-            Task {
-                await botService.simulateThinking()
-
-                // Execute bot decision
-                await executeBotAction(for: role)
-
-                // Hide bot animation and transition
-                await MainActor.run {
-                    withAnimation {
-                        showBotActing = false
-                    }
+            // Hide bot animation
+            await MainActor.run {
+                withAnimation {
+                    showBotActing = false
                 }
             }
         }

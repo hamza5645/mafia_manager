@@ -72,16 +72,31 @@ struct RoleRevealView: View {
         }
     }
 
+    // MARK: - Helper Properties & Methods
+
+    private var humanPlayers: [Player] {
+        store.state.players.filter { !$0.isBot }
+    }
+
+    private var currentHumanIndex: Int {
+        guard case .roleReveal(let currentIndex) = store.state.currentPhase,
+              currentIndex < store.state.players.count else { return 0 }
+
+        // Count how many human players have been revealed so far
+        let revealedPlayers = store.state.players.prefix(currentIndex + 1)
+        return revealedPlayers.filter { !$0.isBot }.count
+    }
+
     private func instructionView(for player: Player, at index: Int) -> some View {
         VStack(spacing: 32) {
-            // Progress indicator with auto-wrapping grid
+            // Progress indicator with auto-wrapping grid (only showing human players)
             LazyVGrid(
-                columns: Array(repeating: GridItem(.fixed(8), spacing: 8), count: min(store.state.players.count, 30)),
+                columns: Array(repeating: GridItem(.fixed(8), spacing: 8), count: min(humanPlayers.count, 30)),
                 spacing: 8
             ) {
-                ForEach(0..<store.state.players.count, id: \.self) { i in
+                ForEach(0..<humanPlayers.count, id: \.self) { i in
                     Circle()
-                        .fill(i <= index ? Design.Colors.brandGold : Design.Colors.surface2)
+                        .fill(i < currentHumanIndex ? Design.Colors.brandGold : Design.Colors.surface2)
                         .frame(width: 8, height: 8)
                 }
             }

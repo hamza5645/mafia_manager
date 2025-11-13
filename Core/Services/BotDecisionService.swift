@@ -154,8 +154,9 @@ final class BotDecisionService {
 
     /// Adds a small delay to simulate bot "thinking"
     func simulateThinking() async {
-        // Random delay between 1.0 and 2.0 seconds for realism
-        let delay = Double.random(in: 1.0...2.0)
+        // Random delay between 3.0 and 5.0 seconds for realism
+        // Longer delay prevents humans from getting suspicious about short bot turns
+        let delay = Double.random(in: 3.0...5.0)
         try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
     }
 }
