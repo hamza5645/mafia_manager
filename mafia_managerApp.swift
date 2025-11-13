@@ -62,8 +62,12 @@ struct RootView: View {
             MorningSummaryView()
         case .deathReveal:
             DeathRevealView()
-        case .day:
-            DayManagementView()
+        case .botVotingReveal:
+            BotVotingRevealView()
+        case .votingIndividual(let currentPlayerIndex):
+            VotingView(currentPlayerIndex: currentPlayerIndex)
+        case .votingResults:
+            VoteResultsView()
         case .gameOver:
             GameOverView()
         }

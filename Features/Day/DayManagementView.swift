@@ -135,16 +135,10 @@ struct DayManagementView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
-                    store.applyDayRemovals(removed: removedToday, notes: notes)
-
-                    // Check if game is over, otherwise start next night
-                    if !store.state.isGameOver {
-                        // Start next night by waking up mafia
-                        store.wakeUpRole(.mafia)
-                    }
-                    // If game is over, phase is already set to .gameOver in evaluateWinners
+                    // Start the individual voting phase
+                    store.startVoting()
                 } label: {
-                    Text("Lock Votes")
+                    Text("Start Voting")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(CTAButtonStyle(kind: .primary))

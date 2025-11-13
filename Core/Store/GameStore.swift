@@ -123,8 +123,10 @@ final class GameStore: ObservableObject {
         }
 
         // Random unique numbers from 1..(2 * playerCount)
+        // Use explicit SystemRandomNumberGenerator for true randomness
         let count = unique.count
-        let numberPool = Array(1...(count * 2)).shuffled()
+        var rng = SystemRandomNumberGenerator()
+        let numberPool = Array(1...(count * 2)).shuffled(using: &rng)
         let assignedNumbers = Array(numberPool.prefix(count))
 
         // Roles - use custom config if provided, otherwise use default distribution
@@ -171,7 +173,8 @@ final class GameStore: ObservableObject {
         roles += Array(repeating: .inspector, count: roleCounts.inspectors)
         let remaining = max(0, count - roles.count)
         roles += Array(repeating: .citizen, count: remaining)
-        roles.shuffle()
+        // Use explicit SystemRandomNumberGenerator for true randomness
+        roles.shuffle(using: &rng)
 
         // Build players - preserve entry order of names
         var players: [Player] = []
@@ -330,12 +333,123 @@ final class GameStore: ObservableObject {
     }
 
     func transitionToDay() {
-        state.currentPhase = .day
-        save()
+        // Skip the old day management view and go directly to voting
+        startVoting()
     }
 
     func transitionToGameOver() {
         state.currentPhase = .gameOver
+        save()
+    }
+
+    // MARK: - Voting Phase
+
+    func startVoting() {
+        // Create new voting session
+        state.currentVotingSession = VotingSession(dayIndex: currentDayIndex)
+
+        // Auto-cast all bot votes first
+        let aliveBots = state.players.filter { $0.alive && $0.isBot }
+        let botService = BotDecisionService()
+
+        for bot in aliveBots {
+            if let targetID = botService.chooseVotingTarget(
+                botPlayer: bot,
+                alivePlayers: alivePlayers,
+                nightHistory: state.nightHistory,
+                dayHistory: state.dayHistory
+            ) {
+                recordVote(from: bot.id, for: targetID)
+            }
+        }
+
+        // If there are bots, show their votes first
+        if !aliveBots.isEmpty {
+            state.currentPhase = .botVotingReveal
+        } else {
+            // No bots, go directly to first human voter
+            startHumanVoting()
+        }
+
+        save()
+    }
+
+    func startHumanVoting() {
+        // Find first alive human player
+        if let firstHumanIndex = state.players.firstIndex(where: { $0.alive && !$0.isBot }) {
+            state.currentPhase = .votingIndividual(currentPlayerIndex: firstHumanIndex)
+        } else {
+            // No human players alive, go directly to results
+            completeVoting()
+        }
+        save()
+    }
+
+    func recordVote(from voterID: UUID, for targetID: UUID) {
+        guard var votingSession = state.currentVotingSession else { return }
+        votingSession.recordVote(from: voterID, for: targetID)
+        state.currentVotingSession = votingSession
+        save()
+    }
+
+    func advanceToNextVoter() {
+        guard case .votingIndividual(let currentIndex) = state.currentPhase else { return }
+
+        // Find next alive human player after current index
+        let nextHumanIndex = state.players[(currentIndex + 1)...].firstIndex(where: { $0.alive && !$0.isBot })
+
+        if let nextIndex = nextHumanIndex {
+            // Found next human player
+            state.currentPhase = .votingIndividual(currentPlayerIndex: nextIndex)
+            save()
+        } else {
+            // No more human players - all voting complete
+            completeVoting()
+        }
+    }
+
+    func completeVoting() {
+        guard var votingSession = state.currentVotingSession else { return }
+
+        // Tally votes and determine elimination
+        _ = votingSession.tallyVotes()
+        state.currentVotingSession = votingSession
+
+        // Transition to results view
+        state.currentPhase = .votingResults
+        save()
+    }
+
+    func applyVotingResult() {
+        guard let votingSession = state.currentVotingSession,
+              let eliminatedID = votingSession.eliminatedPlayerID else {
+            // No elimination (tie or no votes) - move to next night
+            state.currentVotingSession = nil
+            wakeUpRole(.mafia)
+            return
+        }
+
+        // Mark player as eliminated
+        if let index = state.players.firstIndex(where: { $0.id == eliminatedID }) {
+            state.players[index].alive = false
+        }
+
+        // Record in day history
+        let dayAction = DayAction(dayIndex: currentDayIndex, removedPlayerIDs: [eliminatedID])
+        state.dayHistory.append(dayAction)
+        state.dayIndex += 1
+
+        // Clear voting session
+        state.currentVotingSession = nil
+
+        // Check for winners
+        evaluateWinners(startOfDay: false)
+
+        // If game isn't over, start next night
+        if !state.isGameOver {
+            wakeUpRole(.mafia)
+        }
+
         save()
     }
 
@@ -611,6 +725,14 @@ final class GameStore: ObservableObject {
         state.currentPhase = .gameOver
         save()
     }
+
+    // MARK: - Testing Helpers
+
+    #if DEBUG
+    func setVotingSessionForPreview(_ session: VotingSession) {
+        state.currentVotingSession = session
+    }
+    #endif
 
     // MARK: - Export
 
