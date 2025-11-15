@@ -763,7 +763,8 @@ struct NightWakeUpView: View {
                 // Resolve night outcome and go to morning
                 // Get the updated night record after endNight
                 let updatedNight = store.state.nightHistory.last
-                let wasSaved = updatedNight?.mafiaTargetPlayerID == selectedTargetID
+                // Check if doctor's protection matches mafia's target
+                let wasSaved = updatedNight?.mafiaTargetPlayerID == updatedNight?.doctorProtectedPlayerID
                 store.resolveNightOutcome(targetWasSaved: wasSaved)
                 store.transitionToMorning()
 
@@ -1001,7 +1002,12 @@ struct NightWakeUpView: View {
         // Transition to next role (morning)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             store.completeRoleAction()
-            store.transitionToNextRole()
+
+            let updatedNight = store.state.nightHistory.last
+            // Check if doctor's protection matches mafia's target
+            let wasSaved = updatedNight?.mafiaTargetPlayerID == updatedNight?.doctorProtectedPlayerID
+            store.resolveNightOutcome(targetWasSaved: wasSaved)
+            store.transitionToMorning()
         }
     }
 

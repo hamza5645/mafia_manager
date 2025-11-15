@@ -23,42 +23,41 @@ struct VotingView: View {
             Design.Colors.surface0.ignoresSafeArea()
 
             if let currentPlayer = currentPlayer {
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Text("\(currentPlayer.name)")
-                            .font(Design.Typography.title2)
-                            .foregroundStyle(Design.Colors.textPrimary)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header
+                        VStack(spacing: 8) {
+                            Text("\(currentPlayer.name)")
+                                .font(Design.Typography.title2)
+                                .foregroundStyle(Design.Colors.textPrimary)
 
-                        Text("Who do you want to vote out?")
-                            .font(Design.Typography.body)
-                            .foregroundStyle(Design.Colors.textSecondary)
-                    }
-                    .padding(.top, 40)
+                            Text("Who do you want to vote out?")
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                        }
+                        .padding(.top, 40)
 
-                    // Alive players to vote for
-                    ScrollView {
-                        VStack(spacing: 12) {
+                        // Alive players to vote for (Grid layout)
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 12) {
                             ForEach(alivePlayers.sorted(by: { $0.number < $1.number })) { player in
                                 VotingPlayerCard(
                                     player: player,
                                     isSelected: selectedTargetID == player.id,
                                     onTap: {
-                                        selectedTargetID = player.id
+                                        withAnimation(.spring(response: 0.3)) {
+                                            selectedTargetID = player.id
+                                        }
                                     }
                                 )
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
                     }
-
-                    Spacer()
                 }
-
-                // Bottom button
-                VStack {
-                    Spacer()
-
+                .safeAreaInset(edge: .bottom, spacing: 0) {
                     Button {
                         showConfirmation = true
                     } label: {
@@ -66,10 +65,10 @@ struct VotingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(CTAButtonStyle(kind: .primary))
-                    .padding(.horizontal)
-                    .padding(.bottom, 20)
                     .disabled(selectedTargetID == nil)
-                    .opacity(selectedTargetID == nil ? 0.5 : 1.0)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Design.Colors.surface0.opacity(0.95))
                 }
             } else {
                 Text("Error: Player not found")
@@ -85,7 +84,7 @@ struct VotingView: View {
         } message: {
             if let targetID = selectedTargetID,
                let target = store.player(by: targetID) {
-                Text("You are voting to eliminate #\(target.number) \(target.name). This cannot be changed.")
+                Text("You are voting to eliminate \(target.name). This cannot be changed.")
             }
         }
     }
@@ -106,40 +105,59 @@ struct VotingPlayerCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 16) {
-                // Player number badge
-                Text("#\(player.number)")
-                    .font(Design.Typography.headline)
-                    .foregroundStyle(Design.Colors.textPrimary)
-                    .frame(width: 50)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Design.Colors.surface2)
-                    )
+            VStack(spacing: 12) {
+                // Player avatar circle
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? Design.Colors.brandGold.opacity(0.2) : Design.Colors.surface2)
+                        .frame(width: 60, height: 60)
+                        .overlay(
+                            Circle()
+                                .stroke(isSelected ? Design.Colors.brandGold : Design.Colors.stroke, lineWidth: 2)
+                        )
+
+                    Text(player.name.prefix(1).uppercased())
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(isSelected ? Design.Colors.brandGold : Design.Colors.textSecondary)
+                }
 
                 // Player name
                 Text(player.name)
-                    .font(Design.Typography.body)
+                    .font(.subheadline.bold())
                     .foregroundStyle(Design.Colors.textPrimary)
-
-                Spacer()
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(height: 36)
 
                 // Selection indicator
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(Design.Colors.brandGold)
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                        Text("Selected")
+                            .font(.caption2.bold())
+                    }
+                    .foregroundStyle(Design.Colors.brandGold)
+                } else {
+                    Text(" ")
+                        .font(.caption2)
                 }
             }
-            .padding(16)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 8)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Design.Colors.surface2 : Design.Colors.surface1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isSelected ? Design.Colors.brandGold.opacity(0.1) : Design.Colors.surface1)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isSelected ? Design.Colors.brandGold : Color.clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(isSelected ? Design.Colors.brandGold : Design.Colors.stroke, lineWidth: isSelected ? 2 : 1)
                     )
+            )
+            .shadow(
+                color: isSelected ? Design.Colors.brandGold.opacity(0.2) : Color.clear,
+                radius: isSelected ? 8 : 0,
+                y: isSelected ? 4 : 0
             )
         }
         .buttonStyle(.plain)

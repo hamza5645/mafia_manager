@@ -436,7 +436,7 @@ struct SetupView: View {
                 customRoleConfigs: customRoleConfigs,
                 isLoading: isLoadingConfigs,
                 selectedConfig: selectedRoleConfig,
-                playerCount: validInput.count,
+                totalPlayerCount: validInput.count + numberOfBots,
                 onSelect: { config in
                     selectedRoleConfig = config
                     showLoadRoleConfigSheet = false
@@ -642,7 +642,7 @@ struct LoadCustomRoleConfigSheet: View {
     let customRoleConfigs: [CustomRoleConfig]
     let isLoading: Bool
     let selectedConfig: CustomRoleConfig?
-    let playerCount: Int
+    let totalPlayerCount: Int
     let onSelect: (CustomRoleConfig) -> Void
     let onClearSelection: () -> Void
     @Environment(\.dismiss) var dismiss
@@ -711,7 +711,7 @@ struct LoadCustomRoleConfigSheet: View {
                             } else {
                                 // Custom configs
                                 ForEach(customRoleConfigs) { config in
-                                    let isMatchingPlayerCount = config.roleDistribution.totalPlayers == playerCount
+                                    let isMatchingPlayerCount = config.roleDistribution.totalPlayers == totalPlayerCount
                                     let isSelected = selectedConfig?.id == config.id
 
                                     Button {
@@ -749,7 +749,7 @@ struct LoadCustomRoleConfigSheet: View {
                                             .font(.caption)
 
                                             if !isMatchingPlayerCount {
-                                                Text("⚠️ Requires exactly \(config.roleDistribution.totalPlayers) players (currently \(playerCount))")
+                                                Text("⚠️ Requires exactly \(config.roleDistribution.totalPlayers) total players (currently \(totalPlayerCount) incl. bots)")
                                                     .font(.caption2)
                                                     .foregroundColor(Design.Colors.dangerRed.opacity(0.8))
                                             }

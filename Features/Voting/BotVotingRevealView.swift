@@ -79,15 +79,9 @@ struct BotVoteCard: View {
                     .font(.system(size: 18))
                     .foregroundStyle(Design.Colors.brandGold)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(bot.name)
-                        .font(Design.Typography.headline)
-                        .foregroundStyle(Design.Colors.textPrimary)
-
-                    Text("#\(bot.number)")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
+                Text(bot.name)
+                    .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.textPrimary)
             }
 
             Spacer()
@@ -101,15 +95,9 @@ struct BotVoteCard: View {
 
             // Target info
             HStack(spacing: 12) {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(target.name)
-                        .font(Design.Typography.headline)
-                        .foregroundStyle(Design.Colors.textPrimary)
-
-                    Text("#\(target.number)")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
+                Text(target.name)
+                    .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.textPrimary)
 
                 Image(systemName: "hand.raised.fill")
                     .font(.system(size: 18))
