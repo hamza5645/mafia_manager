@@ -1,0 +1,482 @@
+import Foundation
+import Supabase
+
+@MainActor
+final class SessionService {
+    private let supabase = SupabaseService.shared.client
+
+    // MARK: - Session Management
+
+    /// Create a new game session with a unique room code
+    func createSession(
+        hostUserId: UUID,
+        maxPlayers: Int = 19,
+        botCount: Int = 0,
+        nightTimerSeconds: Int = 60,
+        dayTimerSeconds: Int = 180
+    ) async throws -> GameSession {
+        // Generate room code via RPC function
+        let roomCode: String = try await supabase
+            .rpc("generate_room_code")
+            .execute()
+            .value
+
+        struct CreateSessionData: Encodable {
+            let roomCode: String
+            let hostUserId: String
+            let status: String
+            let maxPlayers: Int
+            let botCount: Int
+            let nightTimerSeconds: Int
+            let dayTimerSeconds: Int
+            let currentPhase: String
+            let dayIndex: Int
+            let isGameOver: Bool
+            let assignedNumbers: String // Empty JSON array
+            let nightHistory: String // Empty JSON array
+            let dayHistory: String // Empty JSON array
+
+            enum CodingKeys: String, CodingKey {
+                case roomCode = "room_code"
+                case hostUserId = "host_user_id"
+                case status
+                case maxPlayers = "max_players"
+                case botCount = "bot_count"
+                case nightTimerSeconds = "night_timer_seconds"
+                case dayTimerSeconds = "day_timer_seconds"
+                case currentPhase = "current_phase"
+                case dayIndex = "day_index"
+                case isGameOver = "is_game_over"
+                case assignedNumbers = "assigned_numbers"
+                case nightHistory = "night_history"
+                case dayHistory = "day_history"
+            }
+        }
+
+        let createData = CreateSessionData(
+            roomCode: roomCode,
+            hostUserId: hostUserId.uuidString,
+            status: "waiting",
+            maxPlayers: maxPlayers,
+            botCount: botCount,
+            nightTimerSeconds: nightTimerSeconds,
+            dayTimerSeconds: dayTimerSeconds,
+            currentPhase: "lobby",
+            dayIndex: 0,
+            isGameOver: false,
+            assignedNumbers: "[]",
+            nightHistory: "[]",
+            dayHistory: "[]"
+        )
+
+        let sessions: [GameSession] = try await supabase
+            .from("game_sessions")
+            .insert(createData)
+            .select()
+            .execute()
+            .value
+
+        guard let session = sessions.first else {
+            throw SessionError.sessionNotCreated
+        }
+
+        return session
+    }
+
+    /// Join an existing session by room code
+    func joinSession(roomCode: String, userId: UUID, playerName: String) async throws -> (GameSession, SessionPlayer) {
+        // Find session by room code
+        let sessions: [GameSession] = try await supabase
+            .from("game_sessions")
+            .select()
+            .eq("room_code", value: roomCode.uppercased())
+            .eq("status", value: "waiting")
+            .execute()
+            .value
+
+        guard let session = sessions.first else {
+            throw SessionError.sessionNotFound
+        }
+
+        // Check if session is full
+        let existingPlayers: [SessionPlayer] = try await getSessionPlayers(sessionId: session.id)
+        if existingPlayers.count >= session.maxPlayers {
+            throw SessionError.sessionFull
+        }
+
+        // Check if user already in session
+        if existingPlayers.contains(where: { $0.userId == userId }) {
+            throw SessionError.alreadyInSession
+        }
+
+        // Create player entry
+        let player = try await addPlayer(
+            sessionId: session.id,
+            userId: userId,
+            playerName: playerName,
+            isBot: false
+        )
+
+        return (session, player)
+    }
+
+    /// Leave a session
+    func leaveSession(sessionId: UUID, userId: UUID) async throws {
+        // Get player record
+        let players: [SessionPlayer] = try await supabase
+            .from("session_players")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+
+        guard let player = players.first else {
+            return // Already not in session
+        }
+
+        // Delete player
+        try await supabase
+            .from("session_players")
+            .delete()
+            .eq("id", value: player.id.uuidString)
+            .execute()
+    }
+
+    /// Get session by ID
+    func getSession(sessionId: UUID) async throws -> GameSession? {
+        let sessions: [GameSession] = try await supabase
+            .from("game_sessions")
+            .select()
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+            .value
+
+        return sessions.first
+    }
+
+    /// Get session by room code
+    func getSessionByRoomCode(roomCode: String) async throws -> GameSession? {
+        let sessions: [GameSession] = try await supabase
+            .from("game_sessions")
+            .select()
+            .eq("room_code", value: roomCode.uppercased())
+            .execute()
+            .value
+
+        return sessions.first
+    }
+
+    /// Update session status
+    func updateSessionStatus(sessionId: UUID, status: SessionStatus) async throws {
+        struct UpdateData: Encodable {
+            let status: String
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(UpdateData(status: status.rawValue))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+
+    /// Update session phase
+    func updateSessionPhase(
+        sessionId: UUID,
+        currentPhase: String,
+        phaseData: PhaseData?
+    ) async throws {
+        struct UpdateData: Encodable {
+            let currentPhase: String
+            let currentPhaseData: PhaseData?
+
+            enum CodingKeys: String, CodingKey {
+                case currentPhase = "current_phase"
+                case currentPhaseData = "current_phase_data"
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(UpdateData(currentPhase: currentPhase, currentPhaseData: phaseData))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Player Management
+
+    /// Get all players in a session
+    func getSessionPlayers(sessionId: UUID) async throws -> [SessionPlayer] {
+        let players: [SessionPlayer] = try await supabase
+            .from("session_players")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .order("joined_at")
+            .execute()
+            .value
+
+        return players
+    }
+
+    /// Add a player to a session
+    func addPlayer(
+        sessionId: UUID,
+        userId: UUID?,
+        playerName: String,
+        isBot: Bool
+    ) async throws -> SessionPlayer {
+        struct CreatePlayerData: Encodable {
+            let sessionId: String
+            let userId: String?
+            let playerId: String
+            let playerName: String
+            let isBot: Bool
+            let isAlive: Bool
+            let isOnline: Bool
+            let isReady: Bool
+
+            enum CodingKeys: String, CodingKey {
+                case sessionId = "session_id"
+                case userId = "user_id"
+                case playerId = "player_id"
+                case playerName = "player_name"
+                case isBot = "is_bot"
+                case isAlive = "is_alive"
+                case isOnline = "is_online"
+                case isReady = "is_ready"
+            }
+        }
+
+        let playerId = UUID()
+
+        let createData = CreatePlayerData(
+            sessionId: sessionId.uuidString,
+            userId: userId?.uuidString,
+            playerId: playerId.uuidString,
+            playerName: playerName,
+            isBot: isBot,
+            isAlive: true,
+            isOnline: !isBot, // Bots start offline
+            isReady: isBot // Bots are always ready
+        )
+
+        let players: [SessionPlayer] = try await supabase
+            .from("session_players")
+            .insert(createData)
+            .select()
+            .execute()
+            .value
+
+        guard let player = players.first else {
+            throw SessionError.playerNotCreated
+        }
+
+        return player
+    }
+
+    /// Update player ready status
+    func updatePlayerReady(playerId: UUID, isReady: Bool) async throws {
+        struct UpdateData: Encodable {
+            let isReady: Bool
+
+            enum CodingKeys: String, CodingKey {
+                case isReady = "is_ready"
+            }
+        }
+
+        try await supabase
+            .from("session_players")
+            .update(UpdateData(isReady: isReady))
+            .eq("id", value: playerId.uuidString)
+            .execute()
+    }
+
+    /// Update player heartbeat
+    func updatePlayerHeartbeat(playerId: UUID) async throws {
+        struct UpdateData: Encodable {
+            let lastHeartbeat: String
+            let isOnline: Bool
+
+            enum CodingKeys: String, CodingKey {
+                case lastHeartbeat = "last_heartbeat"
+                case isOnline = "is_online"
+            }
+        }
+
+        let updateData = UpdateData(
+            lastHeartbeat: ISO8601DateFormatter().string(from: Date()),
+            isOnline: true
+        )
+
+        try await supabase
+            .from("session_players")
+            .update(updateData)
+            .eq("id", value: playerId.uuidString)
+            .execute()
+    }
+
+    /// Assign roles and numbers to all players
+    func assignRolesAndNumbers(
+        sessionId: UUID,
+        assignments: [(playerId: UUID, role: Role, number: Int)]
+    ) async throws {
+        // Update each player with their role and number
+        for assignment in assignments {
+            struct UpdateData: Encodable {
+                let playerNumber: Int
+                let role: String
+
+                enum CodingKeys: String, CodingKey {
+                    case playerNumber = "player_number"
+                    case role
+                }
+            }
+
+            let updateData = UpdateData(
+                playerNumber: assignment.number,
+                role: assignment.role.rawValue
+            )
+
+            try await supabase
+                .from("session_players")
+                .update(updateData)
+                .eq("session_id", value: sessionId.uuidString)
+                .eq("player_id", value: assignment.playerId.uuidString)
+                .execute()
+        }
+
+        // Update session with assigned numbers
+        let numberAssignments = assignments.map {
+            PlayerNumberAssignment(playerId: $0.playerId, number: $0.number)
+        }
+
+        struct UpdateSessionData: Encodable {
+            let assignedNumbers: [PlayerNumberAssignment]
+
+            enum CodingKeys: String, CodingKey {
+                case assignedNumbers = "assigned_numbers"
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(UpdateSessionData(assignedNumbers: numberAssignments))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Game Actions
+
+    /// Submit a game action
+    func submitAction(_ action: GameAction) async throws {
+        try await supabase
+            .from("game_actions")
+            .upsert(action)
+            .execute()
+    }
+
+    /// Get actions for a specific phase
+    func getActionsForPhase(
+        sessionId: UUID,
+        actionType: ActionType,
+        phaseIndex: Int
+    ) async throws -> [GameAction] {
+        let actions: [GameAction] = try await supabase
+            .from("game_actions")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .eq("action_type", value: actionType.rawValue)
+            .eq("phase_index", value: phaseIndex)
+            .order("created_at")
+            .execute()
+            .value
+
+        return actions
+    }
+
+    /// Get all actions for a session
+    func getAllActions(sessionId: UUID) async throws -> [GameAction] {
+        let actions: [GameAction] = try await supabase
+            .from("game_actions")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .order("created_at")
+            .execute()
+            .value
+
+        return actions
+    }
+
+    // MARK: - Phase Timers
+
+    /// Create a phase timer
+    func createPhaseTimer(_ timer: PhaseTimer) async throws {
+        try await supabase
+            .from("phase_timers")
+            .upsert(timer)
+            .execute()
+    }
+
+    /// Get active timer for a session
+    func getActiveTimer(sessionId: UUID) async throws -> PhaseTimer? {
+        let timers: [PhaseTimer] = try await supabase
+            .from("phase_timers")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .eq("is_expired", value: false)
+            .order("started_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+
+        return timers.first
+    }
+
+    /// Mark timer as expired
+    func expireTimer(timerId: UUID) async throws {
+        struct UpdateData: Encodable {
+            let isExpired: Bool
+
+            enum CodingKeys: String, CodingKey {
+                case isExpired = "is_expired"
+            }
+        }
+
+        try await supabase
+            .from("phase_timers")
+            .update(UpdateData(isExpired: true))
+            .eq("id", value: timerId.uuidString)
+            .execute()
+    }
+}
+
+// MARK: - Errors
+
+enum SessionError: LocalizedError {
+    case sessionNotCreated
+    case sessionNotFound
+    case sessionFull
+    case alreadyInSession
+    case playerNotCreated
+    case notHost
+    case invalidPhase
+
+    var errorDescription: String? {
+        switch self {
+        case .sessionNotCreated:
+            return "Failed to create game session"
+        case .sessionNotFound:
+            return "Game session not found"
+        case .sessionFull:
+            return "Game session is full"
+        case .alreadyInSession:
+            return "You are already in this session"
+        case .playerNotCreated:
+            return "Failed to add player to session"
+        case .notHost:
+            return "Only the host can perform this action"
+        case .invalidPhase:
+            return "Cannot perform this action in the current phase"
+        }
+    }
+}
