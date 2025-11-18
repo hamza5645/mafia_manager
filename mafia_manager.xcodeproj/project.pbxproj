@@ -46,6 +46,7 @@
 		4F4E46B0C916E8916D77F815 /* MultiplayerMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */; };
 		54B8A8966BF3B9D082D0E4DC /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1709435DE4A42E7402F6A60 /* PlayerStats.swift */; };
 		650E154B6CD70025846E975D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3203E55E05959A3B5751E94 /* LoginView.swift */; };
+		67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */; };
 		69AF3A66B3BA49B605CDFE01 /* VotingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14862413A29957F28E086D12 /* VotingSession.swift */; };
 		69F628B35751454DDC5EABEC /* MultiplayerNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */; };
 		6D0DF051E56F80AA419BEAD4 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */; };
@@ -148,6 +149,7 @@
 		B3203E55E05959A3B5751E94 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoginView.swift; path = Features/Auth/LoginView.swift; sourceTree = SOURCE_ROOT; };
 		B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SignupView.swift; path = Features/Auth/SignupView.swift; sourceTree = SOURCE_ROOT; };
 		BE756B643538C66E089F8E6C /* SessionPlayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionPlayer.swift; sourceTree = "<group>"; };
+		BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerRoleRevealView.swift; sourceTree = "<group>"; };
 		C555B969C34DF85304449F7D /* BotVotingRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BotVotingRevealView.swift; sourceTree = "<group>"; };
 		CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainHelper.swift; path = Core/Services/KeychainHelper.swift; sourceTree = SOURCE_ROOT; };
 		D21D488C56C94775B5A786B0 /* police_siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = police_siren.wav; sourceTree = "<group>"; };
@@ -404,6 +406,7 @@
 				AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */,
 				8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */,
 				3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */,
+				BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */,
 			);
 			name = Multiplayer;
 			path = Multiplayer;
@@ -603,6 +606,7 @@
 				4F4E46B0C916E8916D77F815 /* MultiplayerMenuView.swift in Sources */,
 				69F628B35751454DDC5EABEC /* MultiplayerNightView.swift in Sources */,
 				851EFB2472651BC23AF3F12D /* MultiplayerVotingView.swift in Sources */,
+				67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

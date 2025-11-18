@@ -11,6 +11,31 @@ final class RealtimeService: ObservableObject {
     // Published state for connection status
     @Published var isConnected: Bool = false
     @Published var connectionError: String?
+    
+    // Custom decoder for Supabase dates
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // Try ISO8601 with fractional seconds first
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            
+            // Try without fractional seconds
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string \(dateString)")
+        }
+        return decoder
+    }()
 
     // MARK: - Channel Management
 
@@ -40,14 +65,31 @@ final class RealtimeService: ObservableObject {
                 Task { @MainActor in
                     switch payload {
                     case .insert(let action):
-                        if let session = try? action.decodeRecord(as: GameSession.self, decoder: JSONDecoder()) {
+                        print("🟢 [RealtimeService] Session INSERT event received")
+                        do {
+                            let session = try action.decodeRecord(as: GameSession.self, decoder: self.decoder)
+                            print("✅ [RealtimeService] Session decoded: phase=\(session.currentPhase)")
                             onSessionUpdate(session)
+                        } catch {
+                            print("❌ [RealtimeService] Failed to decode session from INSERT: \(error)")
+                            if let jsonData = try? JSONEncoder().encode(action.record) {
+                                print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
+                            }
                         }
                     case .update(let action):
-                        if let session = try? action.decodeRecord(as: GameSession.self, decoder: JSONDecoder()) {
+                        print("🟡 [RealtimeService] Session UPDATE event received")
+                        do {
+                            let session = try action.decodeRecord(as: GameSession.self, decoder: self.decoder)
+                            print("✅ [RealtimeService] Session decoded: phase=\(session.currentPhase), phaseData=\(String(describing: session.currentPhaseData))")
                             onSessionUpdate(session)
+                        } catch {
+                            print("❌ [RealtimeService] Failed to decode session from UPDATE: \(error)")
+                            if let jsonData = try? JSONEncoder().encode(action.record) {
+                                print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
+                            }
                         }
                     case .delete:
+                        print("🔴 [RealtimeService] Session DELETE event received")
                         // Session deleted - handle cleanup
                         break
                     }
@@ -66,23 +108,24 @@ final class RealtimeService: ObservableObject {
                     switch payload {
                     case .insert(let action):
                         print("🟢 [RealtimeService] Player INSERT event received")
-                        if let player = try? action.decodeRecord(as: SessionPlayer.self, decoder: JSONDecoder()) {
+                        do {
+                            let player = try action.decodeRecord(as: SessionPlayer.self, decoder: self.decoder)
                             print("✅ [RealtimeService] Player decoded successfully: \(player.playerName) (ID: \(player.id))")
                             onPlayerUpdate(player)
-                        } else {
-                            print("❌ [RealtimeService] Failed to decode player from INSERT event")
-                            // Log raw JSON data for debugging
+                        } catch {
+                            print("❌ [RealtimeService] Failed to decode player from INSERT: \(error)")
                             if let jsonData = try? JSONEncoder().encode(action.record) {
                                 print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
                             }
                         }
                     case .update(let action):
                         print("🟡 [RealtimeService] Player UPDATE event received")
-                        if let player = try? action.decodeRecord(as: SessionPlayer.self, decoder: JSONDecoder()) {
+                        do {
+                            let player = try action.decodeRecord(as: SessionPlayer.self, decoder: self.decoder)
                             print("✅ [RealtimeService] Player updated: \(player.playerName) (ID: \(player.id))")
                             onPlayerUpdate(player)
-                        } else {
-                            print("❌ [RealtimeService] Failed to decode player from UPDATE event")
+                        } catch {
+                            print("❌ [RealtimeService] Failed to decode player from UPDATE: \(error)")
                         }
                     case .delete(let action):
                         print("🔴 [RealtimeService] Player DELETE event received")
@@ -105,12 +148,18 @@ final class RealtimeService: ObservableObject {
                 Task { @MainActor in
                     switch payload {
                     case .insert(let action):
-                        if let gameAction = try? action.decodeRecord(as: GameAction.self, decoder: JSONDecoder()) {
+                        do {
+                            let gameAction = try action.decodeRecord(as: GameAction.self, decoder: self.decoder)
                             onActionUpdate(gameAction)
+                        } catch {
+                            print("❌ [RealtimeService] Failed to decode action from INSERT: \(error)")
                         }
                     case .update(let action):
-                        if let gameAction = try? action.decodeRecord(as: GameAction.self, decoder: JSONDecoder()) {
+                        do {
+                            let gameAction = try action.decodeRecord(as: GameAction.self, decoder: self.decoder)
                             onActionUpdate(gameAction)
+                        } catch {
+                            print("❌ [RealtimeService] Failed to decode action from UPDATE: \(error)")
                         }
                     case .delete:
                         break

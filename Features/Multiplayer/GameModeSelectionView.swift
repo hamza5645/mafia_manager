@@ -6,7 +6,7 @@ struct GameModeSelectionView: View {
     @State private var showingAuth = false
     @State private var showingSettings = false
 
-    enum GameMode {
+    enum GameMode: Hashable {
         case local
         case online
     }

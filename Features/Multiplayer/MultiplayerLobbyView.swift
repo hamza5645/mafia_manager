@@ -13,15 +13,71 @@ struct MultiplayerLobbyView: View {
             Design.Colors.surface0.ignoresSafeArea()
 
             if let session = multiplayerStore.currentSession {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Room Code Display
-                        VStack(spacing: 12) {
-                            Text("Room Code")
-                                .font(Design.Typography.caption)
-                                .foregroundStyle(Design.Colors.textSecondary)
+                // Debug logging
+                let _ = print("🔍 [MultiplayerLobbyView] Current phase: \(session.currentPhase)")
+                let _ = print("🔍 [MultiplayerLobbyView] Current phaseData: \(String(describing: session.currentPhaseData))")
+                
+                // Phase-based routing
+                Group {
+                    switch session.currentPhaseData {
+                    case .lobby, .none:
+                        let _ = print("📍 [MultiplayerLobbyView] Showing lobby content")
+                        lobbyContent
+                        
+                    case .roleReveal(let index):
+                        let _ = print("📍 [MultiplayerLobbyView] Showing role reveal (index: \(index))")
+                        MultiplayerRoleRevealView(currentPlayerIndex: index)
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        
+                    case .night:
+                        let _ = print("📍 [MultiplayerLobbyView] Showing night view")
+                        MultiplayerNightView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        
+                    case .voting:
+                        let _ = print("📍 [MultiplayerLobbyView] Showing voting view")
+                        MultiplayerVotingView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        
+                    case .gameOver:
+                        let _ = print("📍 [MultiplayerLobbyView] Showing game over view")
+                        GameOverView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                        
+                    default:
+                        let _ = print("📍 [MultiplayerLobbyView] Showing default phase view")
+                        Text("Phase: \(session.currentPhase)")
+                            .font(Design.Typography.title2)
+                            .foregroundStyle(Design.Colors.textPrimary)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.3), value: session.currentPhaseData)
+            } else {
+                ProgressView()
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .confirmationDialog("Leave Game", isPresented: $showingLeaveConfirmation) {
+            Button("Leave", role: .destructive) {
+                leaveGame()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to leave this game?")
+        }
+    }
+    
+    private var lobbyContent: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Room Code Display
+                if let session = multiplayerStore.currentSession {
+                    VStack(spacing: 12) {
+                        Text("Room Code")
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.textSecondary)
 
-                            Text(session.roomCode)
+                        Text(session.roomCode)
                                 .font(.system(size: 48, weight: .bold, design: .monospaced))
                                 .foregroundStyle(Design.Colors.brandGold)
                                 .tracking(8)
@@ -40,9 +96,10 @@ struct MultiplayerLobbyView: View {
                         }
                         .padding(.top, 20)
                         .padding(.horizontal, 20)
+                    }
 
-                        // Game Status
-                        HStack(spacing: 16) {
+                    // Game Status
+                    HStack(spacing: 16) {
                             StatusBadge(
                                 icon: "person.3.fill",
                                 label: "\(multiplayerStore.visiblePlayers.count)",
@@ -63,9 +120,10 @@ struct MultiplayerLobbyView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 20)
+                    .padding(.horizontal, 20)
 
-                        // Players List
+                    // Players List
+                    if let session = multiplayerStore.currentSession {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Players (\(multiplayerStore.visiblePlayers.count)/\(session.maxPlayers))")
                                 .font(Design.Typography.body)
@@ -83,8 +141,9 @@ struct MultiplayerLobbyView: View {
                             }
                             .padding(.horizontal, 20)
                         }
+                    }
 
-                        // Ready Status (if not host)
+                    // Ready Status (if not host)
                         if !multiplayerStore.isHost, let myPlayer = multiplayerStore.myPlayer {
                             Button {
                                 Task {
@@ -170,22 +229,9 @@ struct MultiplayerLobbyView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 40)
-                    }
-                }
-            } else {
-                ProgressView()
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .confirmationDialog("Leave Game", isPresented: $showingLeaveConfirmation) {
-            Button("Leave", role: .destructive) {
-                leaveGame()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Are you sure you want to leave this game?")
         }
     }
 
@@ -195,22 +241,34 @@ struct MultiplayerLobbyView: View {
     }
 
     private func startGame() {
-        guard multiplayerStore.isHost else { return }
+        print("🔘 [MultiplayerLobbyView] Start Game button tapped")
+        print("🔘 [MultiplayerLobbyView] isHost: \(multiplayerStore.isHost)")
+        
+        guard multiplayerStore.isHost else {
+            print("❌ [MultiplayerLobbyView] Not host, returning early")
+            return
+        }
 
+        print("🔘 [MultiplayerLobbyView] Setting isStarting = true")
         isStarting = true
 
         Task {
             do {
+                print("🔘 [MultiplayerLobbyView] Calling multiplayerStore.startGame()...")
                 try await multiplayerStore.startGame()
+                print("✅ [MultiplayerLobbyView] Game started successfully")
                 // Game has started - navigation will be handled by phase updates
                 await MainActor.run {
                     isStarting = false
+                    print("🔘 [MultiplayerLobbyView] isStarting = false")
                 }
             } catch {
+                print("❌ [MultiplayerLobbyView] Failed to start game: \(error)")
+                print("❌ [MultiplayerLobbyView] Error description: \(error.localizedDescription)")
                 await MainActor.run {
                     isStarting = false
                     // Show error
-                    print("Failed to start game: \(error.localizedDescription)")
+                    print("❌ [MultiplayerLobbyView] isStarting = false (error path)")
                 }
             }
         }

@@ -269,6 +269,14 @@ final class MultiplayerGameStore: ObservableObject {
 
     // MARK: - Player Management
 
+    private func refreshSession() async throws {
+        guard let sessionId = currentSession?.id else { return }
+        
+        if let latestSession = try await sessionService.getSession(sessionId: sessionId) {
+            currentSession = latestSession
+        }
+    }
+    
     private func refreshPlayers() async throws {
         guard let sessionId = currentSession?.id else { return }
 
@@ -311,43 +319,111 @@ final class MultiplayerGameStore: ObservableObject {
         // Update optimistically
         myPlayer?.isReady = newReadyStatus
     }
+    
+    /// Mark that player has seen their role
+    func markRoleAsSeen() async throws {
+        guard let playerId = myPlayer?.id else { return }
+        
+        print("🎭 [MultiplayerGameStore] Player marking role as seen")
+        
+        // Mark player as having seen their role by setting ready status
+        try await sessionService.updatePlayerReady(playerId: playerId, isReady: true)
+        
+        // Update optimistically
+        myPlayer?.isReady = true
+        
+        // If host and all players have seen their roles, advance to night phase
+        if isHost {
+            // Refresh to get latest ready states
+            try await refreshPlayers()
+            
+            let allPlayersReady = allPlayers.allSatisfy { $0.isReady }
+            
+            if allPlayersReady {
+                print("✅ [MultiplayerGameStore] All players have seen roles, advancing to night phase")
+                
+                guard let session = currentSession else { return }
+                
+                // Reset ready status for next phase
+                for player in allPlayers {
+                    try? await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
+                }
+                
+                // Advance to night phase
+                try await sessionService.updateSessionPhase(
+                    sessionId: session.id,
+                    currentPhase: "night",
+                    phaseData: .night(nightIndex: 0, activeRole: nil)
+                )
+                
+                // Refresh to get updated phase
+                try await refreshSession()
+                try await refreshPlayers()
+            } else {
+                print("⏳ [MultiplayerGameStore] Waiting for other players to see their roles")
+            }
+        }
+    }
 
     // MARK: - Game Flow (Host Only)
 
     /// Start the game (host only)
     func startGame() async throws {
+        print("🎮 [MultiplayerGameStore] startGame() called")
+        print("🎮 [MultiplayerGameStore] isHost: \(isHost)")
+        print("🎮 [MultiplayerGameStore] currentSession: \(currentSession?.id.uuidString ?? "nil")")
+        
         guard isHost, let session = currentSession else {
+            print("❌ [MultiplayerGameStore] Not host or no session")
             throw SessionError.notHost
         }
 
         // Ensure we have enough players
-        let _ = allPlayers.filter { !$0.isBot }
+        let humanPlayers = allPlayers.filter { !$0.isBot }
         let totalPlayers = allPlayers.count
+        
+        print("🎮 [MultiplayerGameStore] Total players: \(totalPlayers)")
+        print("🎮 [MultiplayerGameStore] Human players: \(humanPlayers.count)")
+        print("🎮 [MultiplayerGameStore] Bot players: \(totalPlayers - humanPlayers.count)")
 
         guard totalPlayers >= 4, totalPlayers <= 19 else {
+            print("❌ [MultiplayerGameStore] Invalid player count: \(totalPlayers)")
             throw SessionError.invalidPhase
         }
 
+        print("🎮 [MultiplayerGameStore] Assigning roles and numbers...")
         // Assign roles and numbers
         let playerNames = allPlayers.map { $0.playerName }
         let assignments = assignRolesAndNumbers(playerNames: playerNames)
+        
+        print("🎮 [MultiplayerGameStore] Assignments created: \(assignments.count)")
 
+        print("🎮 [MultiplayerGameStore] Updating database with role assignments...")
         // Update database with assignments
         try await sessionService.assignRolesAndNumbers(
             sessionId: session.id,
             assignments: assignments
         )
+        print("✅ [MultiplayerGameStore] Roles assigned in database")
 
+        print("🎮 [MultiplayerGameStore] Updating session status to inProgress...")
         // Update session status and phase
         try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress)
+        print("✅ [MultiplayerGameStore] Session status updated")
+        
+        print("🎮 [MultiplayerGameStore] Updating phase to role_reveal...")
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "role_reveal",
             phaseData: .roleReveal(currentPlayerIndex: 0)
         )
+        print("✅ [MultiplayerGameStore] Phase updated to role_reveal")
 
+        print("🎮 [MultiplayerGameStore] Refreshing local player state...")
         // Refresh local state
+        try await refreshSession()
         try await refreshPlayers()
+        print("✅ [MultiplayerGameStore] Game started successfully!")
     }
 
     private func assignRolesAndNumbers(playerNames: [String]) -> [(playerId: UUID, role: Role, number: Int)] {
@@ -524,6 +600,7 @@ final class MultiplayerGameStore: ObservableObject {
                 // Only refresh if we're in the lobby phase
                 if self.currentSession?.currentPhase == "lobby" {
                     print("🔄 [MultiplayerGameStore] Periodic player refresh triggered")
+                    try? await self.refreshSession()
                     try? await self.refreshPlayers()
                 }
             }
