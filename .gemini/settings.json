@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "XcodeBuildMCP": {
+      "command": ["npx", "-y", "xcodebuildmcp@latest"]
+    },
+    "ios-simulator": {
+      "command": ["npx", "-y", "ios-simulator-mcp"]
+    },
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0c3BzeHFtYmZ2Y3djempwenRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMDA0OTMsImV4cCI6MjA3Nzg3NjQ5M30.oskDsqIkikBYPEEUs7X9JfvJVZwq52agStg6OtelVxQ"
+      }
+    }
+  }
+}

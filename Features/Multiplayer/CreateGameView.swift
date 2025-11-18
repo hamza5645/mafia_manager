@@ -36,7 +36,7 @@ struct CreateGameView: View {
                         // Player Name
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Your Name")
-                                .font(Design.Typography.bodyMedium)
+                                .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.textPrimary)
 
                             TextField("Enter your name", text: $playerName)
@@ -58,13 +58,13 @@ struct CreateGameView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Bot Players")
-                                    .font(Design.Typography.bodyMedium)
+                                    .font(Design.Typography.body)
                                     .foregroundStyle(Design.Colors.textPrimary)
 
                                 Spacer()
 
                                 Text("\(botCount)")
-                                    .font(Design.Typography.bodyMedium)
+                                    .font(Design.Typography.body)
                                     .foregroundStyle(Design.Colors.brandGold)
                             }
 
@@ -83,7 +83,7 @@ struct CreateGameView: View {
                         // Timer Settings
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Timer Settings")
-                                .font(Design.Typography.bodyMedium)
+                                .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.textPrimary)
 
                             // Night Timer
@@ -101,7 +101,7 @@ struct CreateGameView: View {
                                     Text("120s").tag(120)
                                 }
                                 .pickerStyle(.menu)
-                                .tint(Design.Colors.accent)
+                                .tint(Design.Colors.brandGold)
                             }
 
                             // Day Timer
@@ -119,7 +119,7 @@ struct CreateGameView: View {
                                     Text("10 min").tag(600)
                                 }
                                 .pickerStyle(.menu)
-                                .tint(Design.Colors.accent)
+                                .tint(Design.Colors.brandGold)
                             }
                         }
                         .padding(16)
@@ -145,7 +145,7 @@ struct CreateGameView: View {
                                         .tint(.white)
                                 } else {
                                     Text("Create Room")
-                                        .font(Design.Typography.bodyMedium)
+                                        .font(Design.Typography.body)
                                 }
                             }
                             .frame(maxWidth: .infinity)

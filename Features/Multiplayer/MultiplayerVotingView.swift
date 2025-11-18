@@ -98,12 +98,12 @@ struct MultiplayerVotingView: View {
                                 .tint(.white)
                         } else {
                             Text(selectedTargetId == nil ? "Abstain" : "Submit Vote")
-                                .font(Design.Typography.bodyMedium)
+                                .font(Design.Typography.body)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Design.Colors.accent)
+                    .background(Design.Colors.brandGold)
                     .foregroundColor(Design.Colors.surface0)
                     .cornerRadius(Design.Radii.medium)
                 }
@@ -206,7 +206,7 @@ struct VoteTargetButton: View {
                     Circle()
                         .fill(
                             isSelected
-                                ? Design.Colors.accent.opacity(0.2)
+                                ? Design.Colors.brandGold.opacity(0.2)
                                 : Design.Colors.surface2
                         )
                         .frame(width: 52, height: 52)
@@ -216,7 +216,7 @@ struct VoteTargetButton: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(
                                 isSelected
-                                    ? Design.Colors.accent
+                                    ? Design.Colors.brandGold
                                     : Design.Colors.textPrimary
                             )
                     } else {
@@ -224,7 +224,7 @@ struct VoteTargetButton: View {
                             .font(.system(size: 20))
                             .foregroundStyle(
                                 isSelected
-                                    ? Design.Colors.accent
+                                    ? Design.Colors.brandGold
                                     : Design.Colors.textSecondary
                             )
                     }
@@ -233,7 +233,7 @@ struct VoteTargetButton: View {
                 // Player Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(playerInfo.playerName)
-                        .font(Design.Typography.bodyMedium)
+                        .font(Design.Typography.body)
                         .foregroundStyle(Design.Colors.textPrimary)
 
                     if playerInfo.isBot {
@@ -249,7 +249,7 @@ struct VoteTargetButton: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(Design.Colors.accent)
+                        .foregroundStyle(Design.Colors.brandGold)
                 } else {
                     Image(systemName: "circle")
                         .font(.system(size: 28))
@@ -259,7 +259,7 @@ struct VoteTargetButton: View {
             .padding(20)
             .background(
                 isSelected
-                    ? Design.Colors.accent.opacity(0.1)
+                    ? Design.Colors.brandGold.opacity(0.1)
                     : Design.Colors.surface1
             )
             .cornerRadius(Design.Radii.medium)
@@ -267,13 +267,13 @@ struct VoteTargetButton: View {
                 RoundedRectangle(cornerRadius: Design.Radii.medium)
                     .stroke(
                         isSelected
-                            ? Design.Colors.accent
+                            ? Design.Colors.brandGold
                             : Design.Colors.stroke.opacity(0.2),
                         lineWidth: isSelected ? 2 : 1
                     )
             )
             .shadow(
-                color: isSelected ? Design.Colors.accent.opacity(0.3) : .clear,
+                color: isSelected ? Design.Colors.brandGold.opacity(0.3) : .clear,
                 radius: 8,
                 y: 4
             )

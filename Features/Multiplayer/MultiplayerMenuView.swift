@@ -18,7 +18,7 @@ struct MultiplayerMenuView: View {
                         .kerning(1.2)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Design.Colors.accent, Design.Colors.accent.opacity(0.8)],
+                                colors: [Design.Colors.brandGold, Design.Colors.brandGold.opacity(0.8)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -69,7 +69,7 @@ struct MultiplayerMenuView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 48))
-                                .foregroundStyle(Design.Colors.accent)
+                                .foregroundStyle(Design.Colors.brandGold)
 
                             Text("Join Game")
                                 .font(Design.Typography.title3)
@@ -85,7 +85,7 @@ struct MultiplayerMenuView: View {
                         .cornerRadius(Design.Radii.large)
                         .overlay(
                             RoundedRectangle(cornerRadius: Design.Radii.large)
-                                .stroke(Design.Colors.accent.opacity(0.3), lineWidth: 1)
+                                .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 1)
                         )
                     }
                     .buttonStyle(PlainButtonStyle())

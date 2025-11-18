@@ -42,7 +42,7 @@ struct RootView: View {
                     }
                 )
             } else if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
-                SetupView()
+                GameModeSelectionView()
             } else {
                 phaseBasedView
             }

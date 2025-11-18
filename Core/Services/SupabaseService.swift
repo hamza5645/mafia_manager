@@ -8,10 +8,13 @@ final class SupabaseService {
     let client: SupabaseClient
 
     private init() {
-        // Initialize with default options - SDK should handle session persistence automatically
+        // Initialize Supabase client
+        // The SDK automatically handles session persistence via UserDefaults
         self.client = SupabaseClient(
             supabaseURL: URL(string: SupabaseConfig.supabaseURL)!,
             supabaseKey: SupabaseConfig.supabaseAnonKey
         )
+
+        print("✅ [SupabaseService] Initialized - session persistence enabled by default")
     }
 }

@@ -46,7 +46,7 @@ struct MultiplayerLobbyView: View {
                             StatusBadge(
                                 icon: "person.3.fill",
                                 label: "\(multiplayerStore.visiblePlayers.count)",
-                                color: Design.Colors.accent
+                                color: Design.Colors.brandGold
                             )
 
                             StatusBadge(
@@ -68,7 +68,7 @@ struct MultiplayerLobbyView: View {
                         // Players List
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Players (\(multiplayerStore.visiblePlayers.count)/\(session.maxPlayers))")
-                                .font(Design.Typography.bodyMedium)
+                                .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.textPrimary)
                                 .padding(.horizontal, 20)
 
@@ -96,7 +96,7 @@ struct MultiplayerLobbyView: View {
                                         .font(.system(size: 20))
 
                                     Text(myPlayer.isReady ? "Ready" : "Not Ready")
-                                        .font(Design.Typography.bodyMedium)
+                                        .font(Design.Typography.body)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
@@ -136,7 +136,7 @@ struct MultiplayerLobbyView: View {
                                                 .tint(.white)
                                         } else {
                                             Text("Start Game")
-                                                .font(Design.Typography.bodyMedium)
+                                                .font(Design.Typography.body)
                                         }
                                     }
                                     .frame(maxWidth: .infinity)
@@ -246,7 +246,7 @@ struct PlayerRow: View {
                     .fill(
                         playerInfo.isBot
                             ? Design.Colors.textSecondary.opacity(0.2)
-                            : Design.Colors.accent.opacity(0.2)
+                            : Design.Colors.brandGold.opacity(0.2)
                     )
                     .frame(width: 40, height: 40)
 
@@ -255,7 +255,7 @@ struct PlayerRow: View {
                     .foregroundStyle(
                         playerInfo.isBot
                             ? Design.Colors.textSecondary
-                            : Design.Colors.accent
+                            : Design.Colors.brandGold
                     )
             }
 
@@ -269,7 +269,7 @@ struct PlayerRow: View {
                     if isMe {
                         Text("(You)")
                             .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Colors.accent)
+                            .foregroundStyle(Design.Colors.brandGold)
                     }
 
                     if isHost {

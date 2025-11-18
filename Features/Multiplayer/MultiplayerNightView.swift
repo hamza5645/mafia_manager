@@ -72,7 +72,7 @@ struct MultiplayerNightView: View {
                                     .tint(.white)
                             } else {
                                 Text(selectedTargetId == nil ? "Skip Turn" : "Submit")
-                                    .font(Design.Typography.bodyMedium)
+                                    .font(Design.Typography.body)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -136,7 +136,7 @@ struct MultiplayerNightView: View {
             if !multiplayerStore.mafiaTeammates.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Your Team")
-                        .font(Design.Typography.bodyMedium)
+                        .font(Design.Typography.body)
                         .foregroundStyle(Design.Colors.textPrimary)
                         .padding(.horizontal, 20)
 
@@ -144,7 +144,7 @@ struct MultiplayerNightView: View {
                         ForEach(multiplayerStore.mafiaTeammates) { teammate in
                             HStack {
                                 Image(systemName: "person.fill")
-                                    .foregroundStyle(Design.Colors.mafiaRed)
+                                    .foregroundStyle(Design.Colors.dangerRed)
 
                                 Text(teammate.playerName)
                                     .font(Design.Typography.body)
@@ -153,7 +153,7 @@ struct MultiplayerNightView: View {
                                 Spacer()
                             }
                             .padding(12)
-                            .background(Design.Colors.mafiaRed.opacity(0.1))
+                            .background(Design.Colors.dangerRed.opacity(0.1))
                             .cornerRadius(Design.Radii.small)
                         }
                     }
@@ -257,11 +257,11 @@ struct MultiplayerNightView: View {
     private func roleAccentColor(for role: Role?) -> Color {
         switch role {
         case .mafia:
-            return Design.Colors.mafiaRed
+            return Design.Colors.dangerRed
         case .doctor:
-            return Design.Colors.doctorGreen
+            return Design.Colors.successGreen
         case .inspector:
-            return Design.Colors.policeBlue
+            return Design.Colors.actionBlue
         case .citizen, .none:
             return Design.Colors.textSecondary
         }
@@ -384,7 +384,7 @@ struct TimerView: View {
         HStack(spacing: 12) {
             Image(systemName: "clock.fill")
                 .font(.system(size: 20))
-                .foregroundStyle(Design.Colors.accent)
+                .foregroundStyle(Design.Colors.brandGold)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Time Remaining")
@@ -393,7 +393,7 @@ struct TimerView: View {
 
                 Text(timeString(from: timer.timeRemaining))
                     .font(.system(size: 24, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Design.Colors.accent)
+                    .foregroundStyle(Design.Colors.brandGold)
             }
 
             Spacer()

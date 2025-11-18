@@ -195,10 +195,11 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func handleSessionUpdate(_ session: GameSession) {
+        let previousPhase = currentSession?.currentPhase
         currentSession = session
 
         // Update timer if phase changed
-        if session.currentPhase != currentSession?.currentPhase {
+        if session.currentPhase != previousPhase {
             Task {
                 try? await refreshActiveTimer()
             }
@@ -233,7 +234,10 @@ final class MultiplayerGameStore: ObservableObject {
     private func refreshPlayers() async throws {
         guard let sessionId = currentSession?.id else { return }
 
-        allPlayers = try await sessionService.getSessionPlayers(sessionId: sessionId)
+        let players = try await sessionService.getSessionPlayers(sessionId: sessionId)
+        guard sessionId == currentSession?.id else { return } // Session changed; drop stale data.
+
+        allPlayers = players
 
         // Find my player
         if let userId = authStore?.currentUserId {
@@ -279,7 +283,7 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         // Ensure we have enough players
-        let humanPlayers = allPlayers.filter { !$0.isBot }
+        let _ = allPlayers.filter { !$0.isBot }
         let totalPlayers = allPlayers.count
 
         guard totalPlayers >= 4, totalPlayers <= 19 else {
@@ -428,7 +432,10 @@ final class MultiplayerGameStore: ObservableObject {
     private func refreshActiveTimer() async throws {
         guard let sessionId = currentSession?.id else { return }
 
-        activeTimer = try await sessionService.getActiveTimer(sessionId: sessionId)
+        let timer = try await sessionService.getActiveTimer(sessionId: sessionId)
+        guard sessionId == currentSession?.id else { return }
+
+        activeTimer = timer
 
         // Start auto-refresh timer
         startTimerAutoRefresh()
@@ -505,13 +512,13 @@ final class MultiplayerGameStore: ObservableObject {
                 targetId = botService.chooseMafiaTarget(
                     botPlayer: botAsPlayer,
                     alivePlayers: alivePlayers,
-                    nightHistory: [],
-                    dayHistory: []
+                    nightHistory: []
                 )
             case .doctor:
-                targetId = botService.chooseDoctorTarget(
+                targetId = botService.chooseDoctorProtection(
                     botPlayer: botAsPlayer,
-                    alivePlayers: alivePlayers
+                    alivePlayers: alivePlayers,
+                    nightHistory: []
                 )
             case .inspector:
                 targetId = botService.chooseInspectorTarget(
@@ -592,26 +599,12 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Cleanup
 
     deinit {
-        stopHeartbeat()
-        stopTimerAutoRefresh()
-    }
-}
-
-// Add roleDistribution as static method to GameStore so we can access it
-extension GameStore {
-    static func roleDistribution(for playerCount: Int) -> (mafia: Int, doctors: Int, inspectors: Int) {
-        let p = min(max(playerCount, 4), 19)
-        switch p {
-        case 4:
-            return (mafia: 1, doctors: 0, inspectors: 1)
-        case 5:
-            return (mafia: 1, doctors: 0, inspectors: 1)
-        case 6...8:
-            return (mafia: 2, doctors: 1, inspectors: 1)
-        case 9...14:
-            return (mafia: 4, doctors: 1, inspectors: 2)
-        default: // 15...19
-            return (mafia: 5, doctors: 2, inspectors: 2)
+        // Schedule cleanup on main thread since this is a @MainActor class
+        DispatchQueue.main.async { [weak self] in
+            self?.heartbeatTimer?.invalidate()
+            self?.heartbeatTimer = nil
+            self?.timerUpdateTimer?.invalidate()
+            self?.timerUpdateTimer = nil
         }
     }
 }

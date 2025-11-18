@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Query guide**: [`docs/ASKING_CLAUDE_EFFECTIVELY.md`](docs/ASKING_CLAUDE_EFFECTIVELY.md) — How to ask me for focused help without blowing the token budget.
 
+**Codex delegation**: [`docs/CODEX_DELEGATION.md`](docs/CODEX_DELEGATION.md) — When and how Claude Code should delegate tasks to Codex Agent CLI to save tokens.
+
 ## Build & Test Commands
 
 ### Running on Simulator
@@ -131,3 +133,42 @@ App works fully offline if you skip authentication (no cloud sync, but all game 
    - Known gotchas for next session
 
 8. **Respect the two-phase night pattern** — Any changes to night resolution must preserve the `endNight()` → `resolveNightOutcome()` flow. Don't fold them into one method.
+
+9. **Autonomously delegate tasks to Codex Agent** — Claude Code should proactively delegate tasks to Codex Agent (GPT-5.1 with high reasoning) to save tokens and leverage its capabilities. Codex is very capable and can handle complex tasks. Delegate using `./scripts/codex_analyze.sh "task" [files...]` and apply the recommendations. See delegation criteria below.
+
+## Autonomous Codex Delegation
+
+Claude Code has access to Codex Agent (GPT-5.1 with high reasoning) and should **autonomously delegate** tasks without asking. Use `./scripts/codex_analyze.sh` to get analysis and recommendations, then apply the changes.
+
+### When to Delegate (Do This Proactively)
+
+**Always Consider Delegating:**
+- Complex debugging tasks (Codex has high reasoning capabilities)
+- Refactoring across multiple files
+- Code analysis and optimization suggestions
+- Bug hunting and root cause analysis
+- Implementation planning for new features
+- Test case generation
+- Code review and security analysis
+- Performance optimization suggestions
+- When token budget is >50% used and task is suitable
+
+**Keep in Claude Code:**
+- Final file modifications (Codex provides recommendations, Claude applies them)
+- Direct user interaction and questions
+- Tasks requiring real-time project state (e.g., current git status, file checks)
+- Very simple one-liner changes (faster to do directly)
+
+### Delegation Pattern
+
+```bash
+# 1. Delegate to Codex for analysis
+CODEX_OUTPUT=$(./scripts/codex_analyze.sh "Analyze GameStore night resolution and suggest improvements" Core/Store/GameStore.swift)
+
+# 2. Review Codex's recommendations
+# 3. Apply the suggested changes using Claude Code's tools
+```
+
+**Example workflow:**
+- User: "Fix the multiplayer sync issues"
+- Claude Code: [Autonomously delegates to Codex] → Gets analysis → Applies recommended fixes → Reports to user

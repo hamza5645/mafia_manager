@@ -1,5 +1,15 @@
 {
   "mcpServers": {
+    "XcodeBuildMCP": {
+      "type": "command",
+      "command": "npx",
+      "args": ["xcodebuildmcp@latest"]
+    },
+    "ios-simulator": {
+      "type": "command",
+      "command": "npx",
+      "args": ["ios-simulator-mcp"]
+    },
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp"

@@ -35,7 +35,7 @@ struct JoinGameView: View {
                             // Player Name
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Your Name")
-                                    .font(Design.Typography.bodyMedium)
+                                    .font(Design.Typography.body)
                                     .foregroundStyle(Design.Colors.textPrimary)
 
                                 TextField("Enter your name", text: $playerName)
@@ -55,7 +55,7 @@ struct JoinGameView: View {
                             // Room Code
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Room Code")
-                                    .font(Design.Typography.bodyMedium)
+                                    .font(Design.Typography.body)
                                     .foregroundStyle(Design.Colors.textPrimary)
 
                                 TextField("XXXXXX", text: $roomCode)
@@ -68,7 +68,7 @@ struct JoinGameView: View {
                                     .cornerRadius(Design.Radii.medium)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                            .stroke(Design.Colors.accent.opacity(0.3), lineWidth: 2)
+                                            .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
                                     )
                                     .onChange(of: roomCode) { _, newValue in
                                         // Auto-uppercase and limit to 6 characters
@@ -100,14 +100,14 @@ struct JoinGameView: View {
                                         .tint(.white)
                                 } else {
                                     Text("Join Room")
-                                        .font(Design.Typography.bodyMedium)
+                                        .font(Design.Typography.body)
                                 }
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
                                 canJoin
-                                    ? Design.Colors.accent
+                                    ? Design.Colors.brandGold
                                     : Design.Colors.textSecondary.opacity(0.3)
                             )
                             .foregroundColor(Design.Colors.surface0)

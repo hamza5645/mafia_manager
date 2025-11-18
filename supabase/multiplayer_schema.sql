@@ -150,6 +150,50 @@ ON public.game_sessions
 FOR DELETE
 USING (auth.uid() = host_user_id);
 
+-- Helper needed by session_players policies (must be defined before those policies run)
+CREATE OR REPLACE FUNCTION public.session_is_joinable(p_session_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE((
+        SELECT status = 'waiting'
+        FROM public.game_sessions
+        WHERE id = p_session_id
+    ), false);
+$$;
+
+-- Helper to check if user is in a session (bypasses RLS to avoid infinite recursion)
+CREATE OR REPLACE FUNCTION public.user_is_in_session(p_session_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT EXISTS(
+        SELECT 1
+        FROM public.session_players
+        WHERE session_id = p_session_id AND user_id = p_user_id
+    );
+$$;
+
+-- Helper to check if user is in a session with a specific player_id (bypasses RLS to avoid infinite recursion)
+CREATE OR REPLACE FUNCTION public.user_is_player_in_session(p_session_id UUID, p_user_id UUID, p_player_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT EXISTS(
+        SELECT 1
+        FROM public.session_players
+        WHERE session_id = p_session_id 
+        AND user_id = p_user_id
+        AND player_id = p_player_id
+    );
+$$;
+
 -- =====================================================
 -- 5. SESSION_PLAYERS TABLE POLICIES
 -- =====================================================
@@ -161,41 +205,56 @@ DROP POLICY IF EXISTS "Users can leave a session" ON public.session_players;
 DROP POLICY IF EXISTS "Host can manage all players in their session" ON public.session_players;
 
 -- Allow players to view all players in their session (but roles are filtered by function)
+-- Uses SECURITY DEFINER function to avoid infinite recursion
 CREATE POLICY "Players can view players in their session"
 ON public.session_players
 FOR SELECT
 USING (
+    -- Use SECURITY DEFINER function to avoid recursion
+    public.user_is_in_session(session_id, auth.uid())
+    OR
+    -- OR if you're the host of the session
     session_id IN (
-        SELECT session_id FROM public.session_players WHERE user_id = auth.uid()
+        SELECT id FROM public.game_sessions WHERE host_user_id = auth.uid()
     )
 );
 
 -- Allow users to join a session
+-- This needs to work for BOTH host creating and non-host joining
 CREATE POLICY "Users can join a session"
 ON public.session_players
 FOR INSERT
 WITH CHECK (
-    auth.uid() = user_id AND
-    (SELECT status FROM public.game_sessions WHERE id = session_id) = 'waiting'
+    -- Either you're inserting yourself (authenticated user)
+    (auth.uid() = user_id)
+    OR
+    -- OR you're the host inserting a bot (user_id IS NULL)
+    (user_id IS NULL AND session_id IN (
+        SELECT id FROM public.game_sessions WHERE host_user_id = auth.uid()
+    ))
 );
 
 -- Allow users to update their own player status (ready, heartbeat)
 CREATE POLICY "Users can update their own player status"
 ON public.session_players
 FOR UPDATE
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id
+    OR
+    -- Host can update any player in their session
+    session_id IN (
+        SELECT id FROM public.game_sessions WHERE host_user_id = auth.uid()
+    )
+);
 
 -- Allow users to leave a session
 CREATE POLICY "Users can leave a session"
 ON public.session_players
 FOR DELETE
-USING (auth.uid() = user_id);
-
--- Allow host to manage all players (for bots, kicking, etc.)
-CREATE POLICY "Host can manage all players in their session"
-ON public.session_players
-FOR ALL
 USING (
+    auth.uid() = user_id
+    OR
+    -- Host can remove any player from their session
     session_id IN (
         SELECT id FROM public.game_sessions WHERE host_user_id = auth.uid()
     )
@@ -210,33 +269,30 @@ DROP POLICY IF EXISTS "Players can create their own actions" ON public.game_acti
 DROP POLICY IF EXISTS "Players can update their own actions" ON public.game_actions;
 
 -- Allow players to view actions (with privacy filters applied)
+-- Uses SECURITY DEFINER function to avoid infinite recursion
 CREATE POLICY "Players can view actions in their session"
 ON public.game_actions
 FOR SELECT
 USING (
-    session_id IN (
-        SELECT session_id FROM public.session_players WHERE user_id = auth.uid()
-    )
+    public.user_is_in_session(session_id, auth.uid())
 );
 
 -- Allow players to create their own actions
+-- Uses SECURITY DEFINER function to avoid infinite recursion
 CREATE POLICY "Players can create their own actions"
 ON public.game_actions
 FOR INSERT
 WITH CHECK (
-    session_id IN (
-        SELECT session_id FROM public.session_players WHERE user_id = auth.uid() AND player_id = actor_player_id
-    )
+    public.user_is_player_in_session(session_id, auth.uid(), actor_player_id)
 );
 
 -- Allow players to update their own actions (within same phase)
+-- Uses SECURITY DEFINER function to avoid infinite recursion
 CREATE POLICY "Players can update their own actions"
 ON public.game_actions
 FOR UPDATE
 USING (
-    session_id IN (
-        SELECT session_id FROM public.session_players WHERE user_id = auth.uid() AND player_id = actor_player_id
-    )
+    public.user_is_player_in_session(session_id, auth.uid(), actor_player_id)
 );
 
 -- =====================================================
@@ -247,13 +303,12 @@ DROP POLICY IF EXISTS "Players can view timers in their session" ON public.phase
 DROP POLICY IF EXISTS "Host can manage timers" ON public.phase_timers;
 
 -- Allow players to view timers
+-- Uses SECURITY DEFINER function to avoid infinite recursion
 CREATE POLICY "Players can view timers in their session"
 ON public.phase_timers
 FOR SELECT
 USING (
-    session_id IN (
-        SELECT session_id FROM public.session_players WHERE user_id = auth.uid()
-    )
+    public.user_is_in_session(session_id, auth.uid())
 );
 
 -- Allow host to manage timers
@@ -274,6 +329,8 @@ USING (
 CREATE OR REPLACE FUNCTION public.generate_room_code()
 RETURNS TEXT
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     chars TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- Exclude ambiguous chars
@@ -407,13 +464,70 @@ CREATE TRIGGER update_game_sessions_updated_at
 -- 9. REALTIME CONFIGURATION
 -- =====================================================
 
--- Enable Realtime for multiplayer tables
--- Note: This needs to be enabled in Supabase Dashboard > Database > Replication
--- Or via SQL:
-ALTER PUBLICATION supabase_realtime ADD TABLE public.game_sessions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.session_players;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.game_actions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
+-- Enable Realtime for multiplayer tables (idempotent - only adds missing entries)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_publication_rel rel
+        JOIN pg_catalog.pg_class cls ON cls.oid = rel.prrelid
+        WHERE rel.prpubid = (SELECT oid FROM pg_catalog.pg_publication WHERE pubname = 'supabase_realtime')
+          AND cls.relnamespace = 'public'::regnamespace
+          AND cls.relname = 'game_sessions'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.game_sessions;
+    END IF;
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_publication_rel rel
+        JOIN pg_catalog.pg_class cls ON cls.oid = rel.prrelid
+        WHERE rel.prpubid = (SELECT oid FROM pg_catalog.pg_publication WHERE pubname = 'supabase_realtime')
+          AND cls.relnamespace = 'public'::regnamespace
+          AND cls.relname = 'session_players'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.session_players;
+    END IF;
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_publication_rel rel
+        JOIN pg_catalog.pg_class cls ON cls.oid = rel.prrelid
+        WHERE rel.prpubid = (SELECT oid FROM pg_catalog.pg_publication WHERE pubname = 'supabase_realtime')
+          AND cls.relnamespace = 'public'::regnamespace
+          AND cls.relname = 'game_actions'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.game_actions;
+    END IF;
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_publication_rel rel
+        JOIN pg_catalog.pg_class cls ON cls.oid = rel.prrelid
+        WHERE rel.prpubid = (SELECT oid FROM pg_catalog.pg_publication WHERE pubname = 'supabase_realtime')
+          AND cls.relnamespace = 'public'::regnamespace
+          AND cls.relname = 'phase_timers'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
+    END IF;
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
 
 -- =====================================================
 -- SETUP COMPLETE!

@@ -15,6 +15,17 @@ final class SessionService {
         nightTimerSeconds: Int = 60,
         dayTimerSeconds: Int = 180
     ) async throws -> GameSession {
+        // CRITICAL: Verify auth session is valid before creating a session
+        // The RLS policy checks auth.uid() = host_user_id
+        guard let currentSession = try? await supabase.auth.session else {
+            throw SessionError.notAuthenticated
+        }
+
+        // Verify the session's user ID matches the requested hostUserId
+        guard currentSession.user.id == hostUserId else {
+            throw SessionError.sessionMismatch
+        }
+
         // Generate room code via RPC function
         let roomCode: String = try await supabase
             .rpc("generate_room_code")
@@ -32,9 +43,9 @@ final class SessionService {
             let currentPhase: String
             let dayIndex: Int
             let isGameOver: Bool
-            let assignedNumbers: String // Empty JSON array
-            let nightHistory: String // Empty JSON array
-            let dayHistory: String // Empty JSON array
+            let assignedNumbers: [Int] // Empty JSON array
+            let nightHistory: [String] // Empty JSON array
+            let dayHistory: [String] // Empty JSON array
 
             enum CodingKeys: String, CodingKey {
                 case roomCode = "room_code"
@@ -64,9 +75,9 @@ final class SessionService {
             currentPhase: "lobby",
             dayIndex: 0,
             isGameOver: false,
-            assignedNumbers: "[]",
-            nightHistory: "[]",
-            dayHistory: "[]"
+            assignedNumbers: [],
+            nightHistory: [],
+            dayHistory: []
         )
 
         let sessions: [GameSession] = try await supabase
@@ -85,6 +96,25 @@ final class SessionService {
 
     /// Join an existing session by room code
     func joinSession(roomCode: String, userId: UUID, playerName: String) async throws -> (GameSession, SessionPlayer) {
+        // CRITICAL: Verify auth session is valid before attempting to join
+        // The RLS policy checks auth.uid() = user_id, so we need a valid JWT session
+        guard let currentSession = try? await supabase.auth.session else {
+            print("❌ [SessionService] No Supabase auth session found")
+            throw SessionError.notAuthenticated
+        }
+
+        print("✅ [SessionService] Auth session found - User ID: \(currentSession.user.id)")
+        print("📝 [SessionService] Requested user ID: \(userId)")
+        print("🔑 [SessionService] Access token present: \(!currentSession.accessToken.isEmpty)")
+
+        // Verify the session's user ID matches the requested userId
+        guard currentSession.user.id == userId else {
+            print("❌ [SessionService] User ID mismatch! Session: \(currentSession.user.id), Requested: \(userId)")
+            throw SessionError.sessionMismatch
+        }
+
+        print("✅ [SessionService] User ID verified, proceeding to join session")
+
         // Find session by room code
         let sessions: [GameSession] = try await supabase
             .from("game_sessions")
@@ -247,6 +277,14 @@ final class SessionService {
             }
         }
 
+        // Debug: Check current auth session before insert
+        if let authSession = try? await supabase.auth.session {
+            print("🔐 [addPlayer] Auth session exists - User: \(authSession.user.id)")
+            print("🔐 [addPlayer] Inserting player with userId: \(userId?.uuidString ?? "nil (bot)")")
+        } else {
+            print("❌ [addPlayer] WARNING: No auth session found!")
+        }
+
         let playerId = UUID()
 
         let createData = CreatePlayerData(
@@ -260,18 +298,38 @@ final class SessionService {
             isReady: isBot // Bots are always ready
         )
 
-        let players: [SessionPlayer] = try await supabase
-            .from("session_players")
-            .insert(createData)
-            .select()
-            .execute()
-            .value
+        print("📤 [addPlayer] Attempting insert with data: session=\(sessionId), user=\(userId?.uuidString ?? "nil"), name=\(playerName)")
 
-        guard let player = players.first else {
-            throw SessionError.playerNotCreated
+        do {
+            // CRITICAL: Verify session is still valid right before insert
+            // This ensures the JWT token is fresh and included in the request
+            guard let authSession = try? await supabase.auth.session else {
+                print("❌ [addPlayer] Auth session lost right before insert!")
+                throw SessionError.notAuthenticated
+            }
+            
+            print("🔐 [addPlayer] Auth token verified before insert")
+            let expiryDate = Date(timeIntervalSince1970: authSession.expiresAt)
+            print("🔐 [addPlayer] Token expires at: \(expiryDate)")
+            
+            let players: [SessionPlayer] = try await supabase
+                .from("session_players")
+                .insert(createData)
+                .select()
+                .execute()
+                .value
+
+            guard let player = players.first else {
+                throw SessionError.playerNotCreated
+            }
+
+            print("✅ [addPlayer] Player created successfully: \(player.id)")
+            return player
+        } catch {
+            print("❌ [addPlayer] Insert failed with error: \(error)")
+            print("❌ [addPlayer] Error details: \(error.localizedDescription)")
+            throw error
         }
-
-        return player
     }
 
     /// Update player ready status
@@ -460,6 +518,8 @@ enum SessionError: LocalizedError {
     case playerNotCreated
     case notHost
     case invalidPhase
+    case notAuthenticated
+    case sessionMismatch
 
     var errorDescription: String? {
         switch self {
@@ -477,6 +537,10 @@ enum SessionError: LocalizedError {
             return "Only the host can perform this action"
         case .invalidPhase:
             return "Cannot perform this action in the current phase"
+        case .notAuthenticated:
+            return "Please sign in to join a multiplayer game"
+        case .sessionMismatch:
+            return "Authentication error. Please sign out and sign in again"
         }
     }
 }

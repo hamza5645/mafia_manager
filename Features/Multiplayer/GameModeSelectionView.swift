@@ -4,6 +4,7 @@ struct GameModeSelectionView: View {
     @EnvironmentObject private var authStore: AuthStore
     @State private var selectedMode: GameMode?
     @State private var showingAuth = false
+    @State private var showingSettings = false
 
     enum GameMode {
         case local
@@ -58,7 +59,7 @@ struct GameModeSelectionView: View {
                                 subtitle: "Multiplayer",
                                 description: "Each player uses their own phone. Create or join a room to play together.",
                                 icon: "person.3.fill",
-                                accentColor: Design.Colors.accent,
+                                accentColor: Design.Colors.brandGold,
                                 isSelected: selectedMode == .online,
                                 isLocked: !authStore.isAuthenticated
                             ) {
@@ -82,14 +83,14 @@ struct GameModeSelectionView: View {
                         if selectedMode != nil {
                             NavigationLink(value: selectedMode!) {
                                 Text("Continue")
-                                    .font(Design.Typography.bodyMedium)
+                                    .font(Design.Typography.body)
                                     .foregroundColor(Design.Colors.surface0)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 16)
                                     .background(
                                         selectedMode == .local
                                             ? Design.Colors.brandGold
-                                            : Design.Colors.accent
+                                            : Design.Colors.brandGold
                                     )
                                     .cornerRadius(Design.Radii.medium)
                             }
@@ -109,8 +110,22 @@ struct GameModeSelectionView: View {
                     MultiplayerMenuView()
                 }
             }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Design.Colors.brandGold)
+                    }
+                }
+            }
             .sheet(isPresented: $showingAuth) {
                 LoginView()
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
         }
     }

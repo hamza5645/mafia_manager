@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import Realtime
+import Combine
 
 @MainActor
 final class RealtimeService: ObservableObject {
@@ -103,7 +104,7 @@ final class RealtimeService: ObservableObject {
             }
 
         // Subscribe to the channel
-        await channel.subscribe()
+        try await channel.subscribeWithError()
 
         // Store channel reference
         channels[channelName] = channel
@@ -126,7 +127,7 @@ final class RealtimeService: ObservableObject {
 
         // Track my presence
         let presenceState = PresenceState(playerId: myPlayerId, lastSeen: Date())
-        await channel.track(presenceState)
+        try await channel.track(presenceState)
 
         // Listen to presence changes
         await channel.onPresenceChange { payload in
@@ -135,11 +136,9 @@ final class RealtimeService: ObservableObject {
                 var presenceMap: [UUID: PresenceState] = [:]
 
                 // Parse joins
-                for (key, values) in payload.joins {
-                    if let playerId = UUID(uuidString: key),
-                       let value = values.first,
-                       let state = try? JSONDecoder().decode(PresenceState.self, from: JSONEncoder().encode(value)) {
-                        presenceMap[playerId] = state
+                for (key, _) in payload.joins {
+                    if let playerId = UUID(uuidString: key) {
+                        presenceMap[playerId] = PresenceState(playerId: playerId, lastSeen: Date())
                     }
                 }
 
@@ -155,7 +154,7 @@ final class RealtimeService: ObservableObject {
         }
 
         // Subscribe
-        await channel.subscribe()
+        try await channel.subscribeWithError()
 
         // Store channel reference
         channels[channelName] = channel
@@ -179,10 +178,10 @@ final class RealtimeService: ObservableObject {
     }
 
     /// Send a broadcast message to all players in a session
-    func broadcastMessage(
+    func broadcastMessage<T: Codable>(
         sessionId: UUID,
         event: String,
-        payload: [String: Any]
+        payload: T
     ) async throws {
         let channelName = "session:\(sessionId.uuidString)"
 
@@ -190,7 +189,7 @@ final class RealtimeService: ObservableObject {
             throw RealtimeError.channelNotFound
         }
 
-        await channel.broadcast(event: event, message: payload)
+        try await channel.broadcast(event: event, message: payload)
     }
 }
 

@@ -36,6 +36,8 @@ This creates:
 - `game_actions` - Night and day actions
 - `phase_timers` - Phase countdown timers
 
+> **Update:** Re-run this script after pulling the latest code so the `session_is_joinable()` helper and updated RLS policy are installed. Without it, joining a room fails with `row-level security` errors.
+
 ### 2. Enable Realtime
 
 In Supabase Dashboard → Database → Replication:
@@ -148,7 +150,9 @@ MultiplayerVotingView    // Private voting
 
 Implemented via:
 1. **RLS Policies**: Database-level filtering
-2. **Helper Function**: `get_visible_role()` determines what each player can see
+2. **Helper Functions**:
+   - `session_is_joinable(session_id)` - SECURITY DEFINER helper that safely checks if a lobby still accepts players (prevents false RLS failures when joining)
+   - `get_visible_role(session_id, player_id, viewing_user_id)` - determines what each player can see
 3. **Client Filtering**: MultiplayerGameStore exposes only visible data
 
 **Privacy Rules:**
