@@ -123,3 +123,12 @@ extension GameAction {
         )
     }
 }
+
+// RPC Parameters for submitting actions
+struct ActionParams: Encodable, Sendable {
+    let p_session_id: UUID
+    let p_action_type: String
+    let p_phase_index: Int
+    let p_actor_player_id: UUID
+    let p_target_player_id: UUID?
+}

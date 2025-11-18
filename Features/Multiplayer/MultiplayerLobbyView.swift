@@ -13,39 +13,37 @@ struct MultiplayerLobbyView: View {
             Design.Colors.surface0.ignoresSafeArea()
 
             if let session = multiplayerStore.currentSession {
-                // Debug logging
-                let _ = print("🔍 [MultiplayerLobbyView] Current phase: \(session.currentPhase)")
-                let _ = print("🔍 [MultiplayerLobbyView] Current phaseData: \(String(describing: session.currentPhaseData))")
-                
                 // Phase-based routing
                 Group {
                     switch session.currentPhaseData {
                     case .lobby, .none:
-                        let _ = print("📍 [MultiplayerLobbyView] Showing lobby content")
                         lobbyContent
                         
                     case .roleReveal(let index):
-                        let _ = print("📍 [MultiplayerLobbyView] Showing role reveal (index: \(index))")
                         MultiplayerRoleRevealView(currentPlayerIndex: index)
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         
                     case .night:
-                        let _ = print("📍 [MultiplayerLobbyView] Showing night view")
                         MultiplayerNightView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+
+                    case .morning(let nightIndex):
+                        MultiplayerMorningView(nightIndex: nightIndex)
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+
+                    case .deathReveal(let nightIndex):
+                        MultiplayerDeathRevealView(nightIndex: nightIndex)
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         
                     case .voting:
-                        let _ = print("📍 [MultiplayerLobbyView] Showing voting view")
                         MultiplayerVotingView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         
                     case .gameOver:
-                        let _ = print("📍 [MultiplayerLobbyView] Showing game over view")
                         GameOverView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         
                     default:
-                        let _ = print("📍 [MultiplayerLobbyView] Showing default phase view")
                         Text("Phase: \(session.currentPhase)")
                             .font(Design.Typography.title2)
                             .foregroundStyle(Design.Colors.textPrimary)
@@ -387,5 +385,213 @@ struct StatusBadge: View {
             .environmentObject(MultiplayerGameStore())
             .environmentObject(AuthStore())
             .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Morning & Death Reveal Views
+
+struct MultiplayerMorningView: View {
+    @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
+    let nightIndex: Int
+
+    private var nightRecord: NightActionRecord? {
+        multiplayerStore.currentSession?.nightHistory.first(where: { $0.nightIndex == nightIndex })
+    }
+
+    private var playerLookup: [UUID: PublicPlayerInfo] {
+        Dictionary(uniqueKeysWithValues: multiplayerStore.visiblePlayers.map { ($0.playerId, $0) })
+    }
+
+    private var eliminatedPlayers: [PublicPlayerInfo] {
+        guard let record = nightRecord else { return [] }
+        return record.resultingDeaths.compactMap { playerLookup[$0] }
+    }
+
+    private func playerName(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return playerLookup[id]?.playerName
+    }
+
+    var body: some View {
+        ZStack {
+            Design.Colors.surface0.ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer()
+
+                VStack(spacing: 8) {
+                    Text("Morning \(nightIndex + 1)")
+                        .font(Design.Typography.title1)
+                        .foregroundStyle(Design.Colors.textPrimary)
+
+                    Text("Night has ended. Here's what happened.")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+
+                if let record = nightRecord {
+                    summaryView(for: record)
+                } else {
+                    ProgressView()
+                        .tint(Design.Colors.brandGold)
+                        .padding(.vertical, 40)
+                }
+
+                Spacer()
+
+                Text("Waiting for host to reveal the day phase…")
+                    .font(Design.Typography.footnote)
+                    .foregroundStyle(Design.Colors.textSecondary)
+                    .padding(.bottom, 32)
+            }
+            .padding(24)
+        }
+        .navigationBarBackButtonHidden(true)
+    }
+
+    @ViewBuilder
+    private func summaryView(for record: NightActionRecord) -> some View {
+        VStack(spacing: 16) {
+            if eliminatedPlayers.isEmpty {
+                Label("No one was eliminated last night", systemImage: "sun.max.fill")
+                    .font(Design.Typography.body)
+                    .foregroundStyle(Design.Colors.successGreen)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Design.Colors.surface1)
+                    .cornerRadius(Design.Radii.medium)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Eliminated Players")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.textPrimary)
+
+                    ForEach(eliminatedPlayers) { player in
+                        HStack {
+                            Image(systemName: "person.fill.xmark")
+                                .foregroundStyle(Design.Colors.dangerRed)
+                            Text(player.playerName)
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textPrimary)
+                            Spacer()
+                            if let number = player.playerNumber {
+                                Text("#\(number)")
+                                    .font(Design.Typography.caption)
+                                    .foregroundStyle(Design.Colors.textSecondary)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Design.Colors.surface1)
+                .cornerRadius(Design.Radii.medium)
+            }
+
+            if let protectedName = playerName(for: record.doctorProtectedId), record.resultingDeaths.isEmpty {
+                Label("Doctor protected \(protectedName)", systemImage: "shield.checkerboard")
+                    .font(Design.Typography.caption)
+                    .foregroundStyle(Design.Colors.successGreen)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let targetName = playerName(for: record.mafiaTargetId) {
+                Text("Mafia targeted \(targetName)")
+                    .font(Design.Typography.caption)
+                    .foregroundStyle(Design.Colors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+struct MultiplayerDeathRevealView: View {
+    @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
+    let nightIndex: Int
+
+    private var nightRecord: NightActionRecord? {
+        multiplayerStore.currentSession?.nightHistory.first(where: { $0.nightIndex == nightIndex })
+    }
+
+    private var playerLookup: [UUID: PublicPlayerInfo] {
+        Dictionary(uniqueKeysWithValues: multiplayerStore.visiblePlayers.map { ($0.playerId, $0) })
+    }
+
+    private var eliminatedPlayers: [PublicPlayerInfo] {
+        guard let record = nightRecord else { return [] }
+        return record.resultingDeaths.compactMap { playerLookup[$0] }
+    }
+
+    var body: some View {
+        ZStack {
+            Design.Colors.surface0.ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer()
+
+                VStack(spacing: 8) {
+                    Text("Death Reveal")
+                        .font(Design.Typography.title1)
+                        .foregroundStyle(Design.Colors.textPrimary)
+
+                    Text("Night \(nightIndex + 1) results")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.textSecondary)
+                }
+
+                if eliminatedPlayers.isEmpty {
+                    Label("No deaths were reported", systemImage: "sparkles")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.successGreen)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Design.Colors.surface1)
+                        .cornerRadius(Design.Radii.medium)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Fallen Players")
+                            .font(Design.Typography.body)
+                            .foregroundStyle(Design.Colors.textPrimary)
+
+                        ForEach(eliminatedPlayers) { player in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(player.playerName)
+                                        .font(Design.Typography.body)
+                                        .foregroundStyle(Design.Colors.textPrimary)
+                                    Spacer()
+                                    if let number = player.playerNumber {
+                                        Text("#\(number)")
+                                            .font(Design.Typography.caption)
+                                            .foregroundStyle(Design.Colors.textSecondary)
+                                    }
+                                }
+                                Text("Removed during the night")
+                                    .font(Design.Typography.caption)
+                                    .foregroundStyle(Design.Colors.textSecondary)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Design.Colors.surface2)
+                            .cornerRadius(Design.Radii.small)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Design.Colors.surface1)
+                    .cornerRadius(Design.Radii.medium)
+                }
+
+                Spacer()
+
+                Text("Get ready to vote. Host will continue shortly.")
+                    .font(Design.Typography.footnote)
+                    .foregroundStyle(Design.Colors.textSecondary)
+                    .padding(.bottom, 32)
+            }
+            .padding(24)
+        }
+        .navigationBarBackButtonHidden(true)
     }
 }

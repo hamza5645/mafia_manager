@@ -233,12 +233,82 @@ final class SessionService {
             .execute()
     }
 
+    /// Update multiple session fields atomically (phase, history, status, etc.)
+    func updateSessionState(
+        sessionId: UUID,
+        currentPhase: String? = nil,
+        phaseData: PhaseData? = nil,
+        dayIndex: Int? = nil,
+        nightHistory: [NightActionRecord]? = nil,
+        dayHistory: [DayActionRecord]? = nil,
+        isGameOver: Bool? = nil,
+        winner: Role? = nil
+    ) async throws {
+        struct UpdateData: Encodable {
+            let currentPhase: String?
+            let currentPhaseData: PhaseData?
+            let dayIndex: Int?
+            let nightHistory: [NightActionRecord]?
+            let dayHistory: [DayActionRecord]?
+            let isGameOver: Bool?
+            let winner: String?
+
+            enum CodingKeys: String, CodingKey {
+                case currentPhase = "current_phase"
+                case currentPhaseData = "current_phase_data"
+                case dayIndex = "day_index"
+                case nightHistory = "night_history"
+                case dayHistory = "day_history"
+                case isGameOver = "is_game_over"
+                case winner
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encodeIfPresent(currentPhase, forKey: .currentPhase)
+                try container.encodeIfPresent(currentPhaseData, forKey: .currentPhaseData)
+                try container.encodeIfPresent(dayIndex, forKey: .dayIndex)
+                try container.encodeIfPresent(nightHistory, forKey: .nightHistory)
+                try container.encodeIfPresent(dayHistory, forKey: .dayHistory)
+                try container.encodeIfPresent(isGameOver, forKey: .isGameOver)
+                try container.encodeIfPresent(winner, forKey: .winner)
+            }
+        }
+
+        let hasUpdates = currentPhase != nil ||
+                         phaseData != nil ||
+                         dayIndex != nil ||
+                         nightHistory != nil ||
+                         dayHistory != nil ||
+                         isGameOver != nil ||
+                         winner != nil
+
+        guard hasUpdates else { return }
+
+        let updateData = UpdateData(
+            currentPhase: currentPhase,
+            currentPhaseData: phaseData,
+            dayIndex: dayIndex,
+            nightHistory: nightHistory,
+            dayHistory: dayHistory,
+            isGameOver: isGameOver,
+            winner: winner?.rawValue
+        )
+
+        try await supabase
+            .from("game_sessions")
+            .update(updateData)
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+
     // MARK: - Player Management
 
     /// Get all players in a session
     func getSessionPlayers(sessionId: UUID) async throws -> [SessionPlayer] {
+        // Use the secure view that masks roles
         let players: [SessionPlayer] = try await supabase
-            .from("session_players")
+            .from("game_session_players")
             .select()
             .eq("session_id", value: sessionId.uuidString)
             .order("joined_at")
@@ -349,6 +419,37 @@ final class SessionService {
             .execute()
     }
 
+    /// Update a player's alive status and optional removal note
+    func updatePlayerLifeStatus(
+        recordId: UUID,
+        isAlive: Bool,
+        removalNote: String?
+    ) async throws {
+        struct UpdateData: Encodable {
+            let isAlive: Bool
+            let removalNote: String?
+
+            enum CodingKeys: String, CodingKey {
+                case isAlive = "is_alive"
+                case removalNote = "removal_note"
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(isAlive, forKey: .isAlive)
+                try container.encodeIfPresent(removalNote, forKey: .removalNote)
+            }
+        }
+
+        let updateData = UpdateData(isAlive: isAlive, removalNote: removalNote)
+
+        try await supabase
+            .from("session_players")
+            .update(updateData)
+            .eq("id", value: recordId.uuidString)
+            .execute()
+    }
+
     /// Update player heartbeat
     func updatePlayerHeartbeat(playerId: UUID) async throws {
         struct UpdateData: Encodable {
@@ -426,11 +527,23 @@ final class SessionService {
     // MARK: - Game Actions
 
     /// Submit a game action
-    func submitAction(_ action: GameAction) async throws {
-        try await supabase
-            .from("game_actions")
-            .upsert(action)
+    @discardableResult
+    func submitAction(_ action: GameAction) async throws -> ActionResponse {
+        let params: [String: AnyJSON] = [
+            "p_session_id": .string(action.sessionId.uuidString),
+            "p_action_type": .string(action.actionType.rawValue),
+            "p_phase_index": .integer(action.phaseIndex),
+            "p_actor_player_id": .string(action.actorPlayerId.uuidString),
+            "p_target_player_id": action.targetPlayerId.map { .string($0.uuidString) } ?? .null
+        ]
+
+        // Use RPC to handle action submission securely (especially for Inspector logic)
+        let response: ActionResponse = try await supabase
+            .rpc("submit_game_action", params: params)
             .execute()
+            .value
+            
+        return response
     }
 
     /// Get actions for a specific phase
@@ -506,6 +619,14 @@ final class SessionService {
             .eq("id", value: timerId.uuidString)
             .execute()
     }
+}
+
+// MARK: - Helper Structs
+
+struct ActionResponse: Decodable, Sendable {
+    let success: Bool
+    let action_id: UUID
+    let result: String?
 }
 
 // MARK: - Errors
