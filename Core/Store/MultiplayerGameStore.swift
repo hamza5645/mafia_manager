@@ -76,13 +76,15 @@ final class MultiplayerGameStore: ObservableObject {
             )
 
             // Add bots
-            for i in 1...botCount {
-                _ = try await sessionService.addPlayer(
-                    sessionId: session.id,
-                    userId: nil,
-                    playerName: "Bot \(i)",
-                    isBot: true
-                )
+            if botCount > 0 {
+                for i in 1...botCount {
+                    _ = try await sessionService.addPlayer(
+                        sessionId: session.id,
+                        userId: nil,
+                        playerName: "Bot \(i)",
+                        isBot: true
+                    )
+                }
             }
 
             // Update local state
