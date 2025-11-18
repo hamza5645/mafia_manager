@@ -65,16 +65,31 @@ final class RealtimeService: ObservableObject {
                 Task { @MainActor in
                     switch payload {
                     case .insert(let action):
+                        print("🟢 [RealtimeService] Player INSERT event received")
                         if let player = try? action.decodeRecord(as: SessionPlayer.self, decoder: JSONDecoder()) {
+                            print("✅ [RealtimeService] Player decoded successfully: \(player.playerName) (ID: \(player.id))")
                             onPlayerUpdate(player)
+                        } else {
+                            print("❌ [RealtimeService] Failed to decode player from INSERT event")
+                            // Log raw JSON data for debugging
+                            if let jsonData = try? JSONEncoder().encode(action.record) {
+                                print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
+                            }
                         }
                     case .update(let action):
+                        print("🟡 [RealtimeService] Player UPDATE event received")
                         if let player = try? action.decodeRecord(as: SessionPlayer.self, decoder: JSONDecoder()) {
+                            print("✅ [RealtimeService] Player updated: \(player.playerName) (ID: \(player.id))")
                             onPlayerUpdate(player)
+                        } else {
+                            print("❌ [RealtimeService] Failed to decode player from UPDATE event")
                         }
-                    case .delete:
-                        // Player left - handle in the callback
-                        break
+                    case .delete(let action):
+                        print("🔴 [RealtimeService] Player DELETE event received")
+                        // For deletions, we can't decode a full player object
+                        // The store will handle this by refreshing the players list
+                        // This ensures we get the current state from the server
+                        print("✅ [RealtimeService] Player deletion detected - refresh will be handled by store")
                     }
                 }
             }

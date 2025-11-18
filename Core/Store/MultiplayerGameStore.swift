@@ -32,6 +32,7 @@ final class MultiplayerGameStore: ObservableObject {
     // Heartbeat timer
     private var heartbeatTimer: Timer?
     private var timerUpdateTimer: Timer?
+    private var playerRefreshTimer: Timer?
 
     // Auth store reference
     private weak var authStore: AuthStore?
@@ -98,6 +99,9 @@ final class MultiplayerGameStore: ObservableObject {
 
             // Refresh players
             try await refreshPlayers()
+            
+            // Start periodic player refresh (fallback for missed real-time events)
+            startPlayerRefreshTimer()
 
             isConnecting = false
         } catch {
@@ -137,6 +141,9 @@ final class MultiplayerGameStore: ObservableObject {
 
             // Refresh players
             try await refreshPlayers()
+            
+            // Start periodic player refresh (fallback for missed real-time events)
+            startPlayerRefreshTimer()
 
             isConnecting = false
         } catch {
@@ -154,6 +161,7 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         stopHeartbeat()
+        stopPlayerRefreshTimer()
         await realtimeService.unsubscribeAll()
 
         try await sessionService.leaveSession(sessionId: sessionId, userId: userId)
@@ -174,15 +182,18 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Real-time Subscriptions
 
     private func subscribeToSession(sessionId: UUID) async throws {
+        print("🔔 [MultiplayerGameStore] Subscribing to session: \(sessionId)")
         try await realtimeService.subscribeToSession(
             sessionId: sessionId,
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
+                    print("📨 [MultiplayerGameStore] Session update received")
                     self?.handleSessionUpdate(session)
                 }
             },
             onPlayerUpdate: { [weak self] player in
                 Task { @MainActor in
+                    print("📨 [MultiplayerGameStore] Player update received via callback")
                     self?.handlePlayerUpdate(player)
                 }
             },
@@ -192,6 +203,7 @@ final class MultiplayerGameStore: ObservableObject {
                 }
             }
         )
+        print("✅ [MultiplayerGameStore] Successfully subscribed to session updates")
     }
 
     private func handleSessionUpdate(_ session: GameSession) {
@@ -207,9 +219,13 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func handlePlayerUpdate(_ player: SessionPlayer) {
+        print("📥 [MultiplayerGameStore] handlePlayerUpdate called for player: \(player.playerName) (ID: \(player.id))")
+        
         if let index = allPlayers.firstIndex(where: { $0.id == player.id }) {
+            print("🔄 [MultiplayerGameStore] Updating existing player at index \(index)")
             allPlayers[index] = player
         } else {
+            print("➕ [MultiplayerGameStore] Adding new player to list (current count: \(allPlayers.count))")
             allPlayers.append(player)
         }
 
@@ -220,7 +236,29 @@ final class MultiplayerGameStore: ObservableObject {
             myNumber = player.playerNumber
         }
 
+        print("👥 [MultiplayerGameStore] Total players after update: \(allPlayers.count)")
         updateVisiblePlayers()
+        print("👁️ [MultiplayerGameStore] Visible players count: \(visiblePlayers.count)")
+    }
+    
+    /// Handle player removal (called when a player leaves)
+    private func handlePlayerRemoval(playerId: UUID) {
+        print("🗑️ [MultiplayerGameStore] Player removed: \(playerId)")
+        allPlayers.removeAll(where: { $0.id == playerId })
+        
+        // If it was me, clear my player state
+        if playerId == myPlayer?.id {
+            myPlayer = nil
+            myRole = nil
+            myNumber = nil
+        }
+        
+        updateVisiblePlayers()
+        
+        // Refresh players from server to ensure consistency
+        Task {
+            try? await refreshPlayers()
+        }
     }
 
     private func handleActionUpdate(_ action: GameAction) {
@@ -472,6 +510,30 @@ final class MultiplayerGameStore: ObservableObject {
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
     }
+    
+    // MARK: - Player Refresh Timer
+    
+    /// Start periodic refresh of players list (fallback for missed real-time events)
+    private func startPlayerRefreshTimer() {
+        stopPlayerRefreshTimer()
+        
+        // Refresh every 3 seconds as a fallback
+        playerRefreshTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self, self.isInSession else { return }
+                // Only refresh if we're in the lobby phase
+                if self.currentSession?.currentPhase == "lobby" {
+                    print("🔄 [MultiplayerGameStore] Periodic player refresh triggered")
+                    try? await self.refreshPlayers()
+                }
+            }
+        }
+    }
+    
+    private func stopPlayerRefreshTimer() {
+        playerRefreshTimer?.invalidate()
+        playerRefreshTimer = nil
+    }
 
     // MARK: - Bot Actions (Host Only)
 
@@ -605,6 +667,8 @@ final class MultiplayerGameStore: ObservableObject {
             self?.heartbeatTimer = nil
             self?.timerUpdateTimer?.invalidate()
             self?.timerUpdateTimer = nil
+            self?.playerRefreshTimer?.invalidate()
+            self?.playerRefreshTimer = nil
         }
     }
 }
