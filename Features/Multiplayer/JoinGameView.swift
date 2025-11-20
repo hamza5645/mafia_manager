@@ -133,6 +133,11 @@ struct JoinGameView: View {
                     .environmentObject(multiplayerStore)
                     .environmentObject(authStore)
             }
+            .onAppear {
+                if let displayName = authStore.userProfile?.displayName, !displayName.isEmpty {
+                    playerName = displayName
+                }
+            }
         }
     }
 

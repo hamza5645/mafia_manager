@@ -73,6 +73,7 @@ struct CreateGameView: View {
                                 set: { botCount = Int($0) }
                             ), in: 0...10, step: 1)
                             .tint(Design.Colors.brandGold)
+                            .sensoryFeedback(.selection, trigger: botCount)
 
                             Text("Add AI players to fill the game")
                                 .font(Design.Typography.footnote)
@@ -178,6 +179,11 @@ struct CreateGameView: View {
                 MultiplayerLobbyView()
                     .environmentObject(multiplayerStore)
                     .environmentObject(authStore)
+            }
+            .onAppear {
+                if let displayName = authStore.userProfile?.displayName, !displayName.isEmpty {
+                    playerName = displayName
+                }
             }
         }
     }

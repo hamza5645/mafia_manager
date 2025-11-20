@@ -71,19 +71,23 @@ struct MultiplayerNightView: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text(selectedTargetId == nil ? "Skip Turn" : "Submit")
+                                Text("Submit Action")
                                     .font(Design.Typography.body)
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(roleAccentColor(for: myRole))
+                        .background(
+                            selectedTargetId == nil
+                                ? Design.Colors.textSecondary.opacity(0.3)
+                                : roleAccentColor(for: myRole)
+                        )
                         .foregroundColor(Design.Colors.surface0)
                         .cornerRadius(Design.Radii.medium)
                     }
-                    .disabled(isSubmitting)
+                    .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
                 } else if hasSubmitted {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
@@ -98,11 +102,51 @@ struct MultiplayerNightView: View {
                             .font(Design.Typography.body)
                             .foregroundStyle(Design.Colors.textSecondary)
                     }
+                    .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
+                }
+                
+                // Host Controls
+                if multiplayerStore.isHost {
+                    Button {
+                        advancePhase()
+                    } label: {
+                        HStack {
+                            Text("Finish Night Phase")
+                                .fontWeight(.bold)
+                            
+                            if multiplayerStore.isPhaseReadyToAdvance {
+                                Image(systemName: "arrow.right.circle.fill")
+                            } else {
+                                Image(systemName: "clock.fill")
+                            }
+                        }
+                        .font(Design.Typography.body)
+                        .foregroundStyle(
+                            multiplayerStore.isPhaseReadyToAdvance
+                                ? Design.Colors.brandGold
+                                : Design.Colors.textSecondary.opacity(0.5)
+                        )
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(
+                            multiplayerStore.isPhaseReadyToAdvance
+                                ? Design.Colors.brandGold.opacity(0.1)
+                                : Color.clear
+                        )
+                        .cornerRadius(Design.Radii.medium)
+                    }
+                    .disabled(!multiplayerStore.isPhaseReadyToAdvance)
                     .padding(.bottom, 40)
                 }
             }
         }
         .navigationBarBackButtonHidden(true)
+    }
+
+    private func advancePhase() {
+        Task {
+            try? await multiplayerStore.completeNightPhase()
+        }
     }
 
     @ViewBuilder

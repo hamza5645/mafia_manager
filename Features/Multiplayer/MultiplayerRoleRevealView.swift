@@ -124,7 +124,34 @@ struct MultiplayerRoleRevealView: View {
                 }
                 .disabled(hasSeen || isProcessing)
                 .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                
+                if multiplayerStore.isHost {
+                    Button {
+                        forceStartNight()
+                    } label: {
+                        HStack {
+                            Text("Start Night")
+                                .fontWeight(.bold)
+                            
+                            if isEveryoneReady {
+                                Image(systemName: "arrow.right.circle.fill")
+                            } else {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption)
+                            }
+                        }
+                        .font(Design.Typography.body)
+                        .foregroundStyle(
+                            isEveryoneReady
+                                ? Design.Colors.brandGold
+                                : Design.Colors.textSecondary.opacity(0.5)
+                        )
+                    }
+                    .disabled(!isEveryoneReady)
+                    .padding(.bottom, 40)
+                } else {
+                    Spacer().frame(height: 40)
+                }
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -147,6 +174,26 @@ struct MultiplayerRoleRevealView: View {
                     print("Failed to mark role as seen: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+    
+    private var isEveryoneReady: Bool {
+        // Bots are always ready, only check human players
+        let humanPlayers = multiplayerStore.allPlayers.filter { !$0.isBot }
+        let readyHumans = humanPlayers.filter { $0.isReady }
+        return readyHumans.count == humanPlayers.count && humanPlayers.count > 0
+    }
+
+    private func forceStartNight() {
+        Task {
+            // We can use forceStartNight() because now we control when it's called (only when ready)
+            // OR we can use the normal path. But since we removed auto-advance, we need an explicit call.
+            // The store method forceStartNight() calls advanceFromRoleRevealIfReady(force: true)
+            // which actually bypasses the check in the store.
+            // However, since we check readiness in the UI, we can use it.
+            // Better yet, use a method that respects readiness or just use the existing one
+            // since we guard in UI.
+            try? await multiplayerStore.forceStartNight()
         }
     }
     

@@ -28,6 +28,9 @@ final class MultiplayerGameStore: ObservableObject {
 
     // Current phase timer
     @Published var activeTimer: PhaseTimer?
+    
+    // Phase progression state
+    @Published var isPhaseReadyToAdvance: Bool = false
 
     // Heartbeat timer
     private var heartbeatTimer: Timer?
@@ -183,6 +186,65 @@ final class MultiplayerGameStore: ObservableObject {
         myNumber = nil
         mafiaTeammates = []
         activeTimer = nil
+    }
+
+    /// Remove a player from the session (Host only)
+    func removePlayer(withId playerId: UUID) async throws {
+        guard isHost, let sessionId = currentSession?.id else { return }
+        guard let player = allPlayers.first(where: { $0.id == playerId }) else { return }
+        
+        // If removing a bot, we just delete the record
+        // If removing a human, same thing, they will get disconnected
+        
+        // Using sessionService directly to delete the player record
+        // Note: We're using the player.id (UUID) which is the primary key of session_players
+        // The SessionService.leaveSession uses userId, but we might want to remove by player ID
+        
+        // We'll assume we can use the same mechanism as leaveSession if we have userId
+        if let userId = player.userId {
+            try await sessionService.leaveSession(sessionId: sessionId, userId: userId)
+        } else {
+            // For bots or if we need to remove by player ID directly...
+            // Since SessionService.leaveSession takes userId, let's add a specific removePlayer method to SessionService later if needed.
+            // For now, I'll check if I can use the existing leaveSession or if I need to extend it.
+            // The existing leaveSession selects by userId. Bots don't have userId.
+            
+            // Workaround: Since I can't easily add to SessionService without editing it (which I should avoid if possible or do in a separate step), 
+            // I will rely on the fact that I'm the host and I can probably delete the record.
+            // But wait, I can edit SessionService. The plan says "Ensure sessionService has removePlayer".
+            
+            // Let's skip the implementation details here and assume I'll add `removePlayer(playerId:)` to SessionService.
+            // Wait, I previously used try await sessionService.removePlayer(playerId: player.id)
+            // But I didn't add it to SessionService yet.
+            
+            // I will add it to SessionService in the next step.
+             try await sessionService.removePlayer(playerId: player.id)
+        }
+        
+        // Local cleanup will happen via real-time update, but we can do it optimistically
+        handlePlayerRemoval(playerId: player.id)
+    }
+    
+    /// Force start the night phase (Host only)
+    func forceStartNight() async throws {
+        guard isHost else { return }
+        try await advanceFromRoleRevealIfReady(forceRefresh: true, forceStart: true)
+    }
+    
+    /// Manually complete the night phase (Host only)
+    func completeNightPhase() async throws {
+        guard isHost, 
+              case .night(let nightIndex, _) = currentSession?.currentPhaseData else { return }
+        
+        try await resolveNightPhase(nightIndex: nightIndex)
+    }
+    
+    /// Manually complete the voting phase (Host only)
+    func completeVotingPhase() async throws {
+        guard isHost, 
+              case .voting(let dayIndex) = currentSession?.currentPhaseData else { return }
+              
+        try await resolveVotingPhase(dayIndex: dayIndex)
     }
 
     // MARK: - Real-time Subscriptions
@@ -373,7 +435,7 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Host-only helper to advance to the first night once every player confirmed their role
-    private func advanceFromRoleRevealIfReady(forceRefresh: Bool) async throws {
+    private func advanceFromRoleRevealIfReady(forceRefresh: Bool, forceStart: Bool = false) async throws {
         guard isHost else { return }
         
         if forceRefresh {
@@ -382,15 +444,19 @@ final class MultiplayerGameStore: ObservableObject {
         
         guard currentSession?.currentPhase == "role_reveal" else { return }
         
-        let readyCount = allPlayers.filter { $0.isReady }.count
-        let totalCount = allPlayers.count
+        // Check readiness: bots are always ready, humans must confirm their role
+        let humanPlayers = allPlayers.filter { !$0.isBot }
+        let readyHumans = humanPlayers.filter { $0.isReady }
         
-        guard readyCount == totalCount else {
-            print("⏳ [MultiplayerGameStore] Waiting for all players to confirm roles (\(readyCount)/\(totalCount))")
-            return
+        if !forceStart {
+            // All humans must have confirmed their role, bots are always considered ready
+            guard readyHumans.count == humanPlayers.count else {
+                print("⏳ [MultiplayerGameStore] Waiting for all human players to confirm roles (\(readyHumans.count)/\(humanPlayers.count))")
+                return
+            }
         }
         
-        print("✅ [MultiplayerGameStore] All players ready — advancing to night phase")
+        print("✅ [MultiplayerGameStore] All players ready (or forced) — advancing to night phase")
         guard let session = currentSession else { return }
         
         // 1. Update phase first so clients transition to Night view immediately
@@ -433,6 +499,15 @@ final class MultiplayerGameStore: ObservableObject {
         print("🎮 [MultiplayerGameStore] Human players: \(humanPlayers.count)")
         print("🎮 [MultiplayerGameStore] Bot players: \(totalPlayers - humanPlayers.count)")
 
+        // Check readiness: bots are always ready, humans must be explicitly ready
+        let readyHumans = humanPlayers.filter { $0.isReady }
+        
+        // All humans must be ready, bots are always considered ready
+        guard readyHumans.count == humanPlayers.count else {
+            print("❌ [MultiplayerGameStore] Cannot start: Not all human players are ready (\(readyHumans.count)/\(humanPlayers.count))")
+            throw SessionError.invalidPhase
+        }
+        
         guard totalPlayers >= 4, totalPlayers <= 19 else {
             print("❌ [MultiplayerGameStore] Invalid player count: \(totalPlayers)")
             throw SessionError.invalidPhase
@@ -724,9 +799,9 @@ final class MultiplayerGameStore: ObservableObject {
             try await refreshPlayers()
             switch phaseData {
             case .night(let nightIndex, _):
-                try await resolveNightIfReady(nightIndex: nightIndex)
+                try await checkNightPhaseReadiness(nightIndex: nightIndex)
             case .voting(let dayIndex):
-                try await resolveVotingIfReady(dayIndex: dayIndex)
+                try await checkVotingPhaseReadiness(dayIndex: dayIndex)
             default:
                 break
             }
@@ -735,7 +810,7 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
-    private func resolveNightIfReady(nightIndex: Int) async throws {
+    private func checkNightPhaseReadiness(nightIndex: Int) async throws {
         guard isHost else { return }
         guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
               activeNightIndex == nightIndex else {
@@ -767,23 +842,44 @@ final class MultiplayerGameStore: ObservableObject {
             guard !requiredPlayers.isEmpty else { return true }
             let actors = Set(actions.map { $0.actorPlayerId })
             let ready = actors.count >= requiredPlayers.count
-            
-            if !ready {
-                let missingIds = requiredPlayers.filter { !actors.contains($0.playerId) }.map { $0.playerName }
-                print("⏳ [MultiplayerGameStore] Waiting for \(roleName): Missing \(missingIds.joined(separator: ", "))")
-            }
-            
             return ready
         }
 
         let mafiaReady = didEveryoneAct(requiredPlayers: aliveMafia, actions: mafiaActions, roleName: "Mafia")
         let doctorReady = didEveryoneAct(requiredPlayers: aliveDoctors, actions: doctorActions, roleName: "Doctor")
         let inspectorReady = didEveryoneAct(requiredPlayers: aliveInspectors, actions: inspectorActions, roleName: "Inspector")
-
-        guard mafiaReady && doctorReady && inspectorReady else {
-            print("⏳ [MultiplayerGameStore] Night phase incomplete (Mafia: \(mafiaReady), Doc: \(doctorReady), Cop: \(inspectorReady))")
+        
+        let allReady = mafiaReady && doctorReady && inspectorReady
+        
+        await MainActor.run {
+            self.isPhaseReadyToAdvance = allReady
+        }
+    }
+    
+    private func resolveNightPhase(nightIndex: Int) async throws {
+        guard isHost else { return }
+        guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
+              activeNightIndex == nightIndex else {
             return
         }
+        guard let session = currentSession else { return }
+        
+        // Re-fetch actions to ensure we have latest state
+        let mafiaActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .mafiaTarget,
+            phaseIndex: nightIndex
+        )
+        let inspectorActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .inspectorCheck,
+            phaseIndex: nightIndex
+        )
+        let doctorActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .doctorProtect,
+            phaseIndex: nightIndex
+        )
 
         let mafiaTargetId = determineMajorityTarget(from: mafiaActions)
         let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
@@ -822,6 +918,11 @@ final class MultiplayerGameStore: ObservableObject {
             nextPhaseName = "morning"
             nextPhaseData = .morning(nightIndex: nightIndex)
         }
+        
+        // Reset readiness flag
+        await MainActor.run {
+            self.isPhaseReadyToAdvance = false
+        }
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
@@ -833,7 +934,7 @@ final class MultiplayerGameStore: ObservableObject {
         )
     }
 
-    private func resolveVotingIfReady(dayIndex: Int) async throws {
+    private func checkVotingPhaseReadiness(dayIndex: Int) async throws {
         guard isHost else { return }
         guard case .voting(let activeDayIndex) = currentSession?.currentPhaseData,
               activeDayIndex == dayIndex else {
@@ -849,10 +950,26 @@ final class MultiplayerGameStore: ObservableObject {
         )
 
         let uniqueVoters = Set(votes.map { $0.actorPlayerId })
-        guard uniqueVoters.count >= alivePlayers.count else {
-            print("⏳ [MultiplayerGameStore] Waiting for votes (\(uniqueVoters.count)/\(alivePlayers.count))")
+        let ready = uniqueVoters.count >= alivePlayers.count
+        
+        await MainActor.run {
+            self.isPhaseReadyToAdvance = ready
+        }
+    }
+    
+    private func resolveVotingPhase(dayIndex: Int) async throws {
+        guard isHost else { return }
+        guard case .voting(let activeDayIndex) = currentSession?.currentPhaseData,
+              activeDayIndex == dayIndex else {
             return
         }
+        guard let session = currentSession else { return }
+
+        let votes = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex
+        )
 
         var voteCounts: [UUID: Int] = [:]
         for action in votes {
@@ -897,6 +1014,11 @@ final class MultiplayerGameStore: ObservableObject {
             let nextNightIndex = dayIndex + 1
             nextPhaseName = "night"
             nextPhaseData = .night(nightIndex: nextNightIndex, activeRole: nil)
+        }
+        
+        // Reset readiness flag
+        await MainActor.run {
+            self.isPhaseReadyToAdvance = false
         }
 
         try await sessionService.updateSessionState(
@@ -967,26 +1089,19 @@ final class MultiplayerGameStore: ObservableObject {
     private func scheduleAutoAdvance(for phaseData: PhaseData?) {
         pendingAutoAdvanceTask?.cancel()
         pendingAutoAdvanceTask = nil
+        
+        // Automatic advancement is disabled per user request
+        // Host must manually advance phases
+    }
 
-        guard isHost else { return }
-        guard let phaseData else { return }
-
-        switch phaseData {
-        case .morning(let nightIndex):
-            pendingAutoAdvanceTask = Task { [weak self] in
-                // Give players time to read the summary (and clients time to sync)
-                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5s
-                await self?.advanceToDeathRevealIfStillOn(nightIndex: nightIndex)
-            }
-        case .deathReveal(let nightIndex):
-            pendingAutoAdvanceTask = Task { [weak self] in
-                // Give players time to see who died
-                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5s
-                await self?.advanceToVotingIfStillOn(nightIndex: nightIndex)
-            }
-        default:
-            break
-        }
+    func advanceToDeathRevealManual(nightIndex: Int) async throws {
+        guard isHost else { throw SessionError.notHost }
+        try await advanceToDeathReveal(nightIndex: nightIndex)
+    }
+    
+    func advanceToVotingManual(nightIndex: Int) async throws {
+        guard isHost else { throw SessionError.notHost }
+        try await advanceToVoting(afterNightIndex: nightIndex)
     }
 
     private func advanceToDeathRevealIfStillOn(nightIndex: Int) async {

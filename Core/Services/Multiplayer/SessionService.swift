@@ -166,10 +166,15 @@ final class SessionService {
         }
 
         // Delete player
+        try await removePlayer(playerId: player.id)
+    }
+    
+    /// Remove a player by ID
+    func removePlayer(playerId: UUID) async throws {
         try await supabase
             .from("session_players")
             .delete()
-            .eq("id", value: player.id.uuidString)
+            .eq("id", value: playerId.uuidString)
             .execute()
     }
 

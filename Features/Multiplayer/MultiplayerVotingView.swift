@@ -89,27 +89,40 @@ struct MultiplayerVotingView: View {
                 Spacer()
 
                 // Submit Vote Button
-                Button {
-                    submitVote()
-                } label: {
-                    HStack {
-                        if isSubmitting {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text(selectedTargetId == nil ? "Abstain" : "Submit Vote")
-                                .font(Design.Typography.body)
+                if !hasSubmitted {
+                    Button {
+                        submitVote()
+                    } label: {
+                        HStack {
+                            if isSubmitting {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Text(selectedTargetId == nil ? "Abstain" : "Submit Vote")
+                                    .font(Design.Typography.body)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            (selectedTargetId == nil && dayIndex > 0) 
+                                ? Design.Colors.textSecondary.opacity(0.3)
+                                : Design.Colors.brandGold
+                        )
+                        .foregroundColor(Design.Colors.surface0)
+                        .cornerRadius(Design.Radii.medium)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Design.Colors.brandGold)
-                    .foregroundColor(Design.Colors.surface0)
-                    .cornerRadius(Design.Radii.medium)
+                    .disabled(isSubmitting || (selectedTargetId == nil && dayIndex > 0))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
+                    
+                    if selectedTargetId == nil && dayIndex > 0 {
+                        Text("You must vote for someone after the first day")
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.dangerRed)
+                            .padding(.bottom, 8)
+                    }
                 }
-                .disabled(isSubmitting)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
             } else {
                 // Vote Submitted Confirmation
                 Spacer()
@@ -139,8 +152,43 @@ struct MultiplayerVotingView: View {
                         .foregroundStyle(Design.Colors.textSecondary)
                         .padding(.top, 8)
                 }
+                .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
 
                 Spacer()
+            }
+            
+            // Host Controls
+            if multiplayerStore.isHost {
+                Button {
+                    endVoting()
+                } label: {
+                    HStack {
+                        Text("End Voting")
+                            .fontWeight(.bold)
+                        
+                        if multiplayerStore.isPhaseReadyToAdvance {
+                            Image(systemName: "arrow.right.circle.fill")
+                        } else {
+                            Image(systemName: "clock.fill")
+                        }
+                    }
+                    .font(Design.Typography.body)
+                    .foregroundStyle(
+                        multiplayerStore.isPhaseReadyToAdvance
+                            ? Design.Colors.brandGold
+                            : Design.Colors.textSecondary.opacity(0.5)
+                    )
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(
+                        multiplayerStore.isPhaseReadyToAdvance
+                            ? Design.Colors.brandGold.opacity(0.1)
+                            : Color.clear
+                    )
+                    .cornerRadius(Design.Radii.medium)
+                }
+                .disabled(!multiplayerStore.isPhaseReadyToAdvance)
+                .padding(.bottom, 40)
             }
         }
     }
@@ -164,6 +212,12 @@ struct MultiplayerVotingView: View {
                 .padding(.horizontal, 40)
 
             Spacer()
+        }
+    }
+
+    private func endVoting() {
+        Task {
+            try? await multiplayerStore.completeVotingPhase()
         }
     }
 

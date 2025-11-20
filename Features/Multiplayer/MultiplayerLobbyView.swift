@@ -7,6 +7,7 @@ struct MultiplayerLobbyView: View {
 
     @State private var showingLeaveConfirmation = false
     @State private var isStarting = false
+    @State private var hasLeftSession = false
 
     var body: some View {
         ZStack {
@@ -55,6 +56,28 @@ struct MultiplayerLobbyView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    leaveGame()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(Design.Colors.brandGold)
+                }
+            }
+        }
+        .onDisappear {
+            // Automatically leave the session when the view is dismissed
+            if !hasLeftSession {
+                Task {
+                    try? await multiplayerStore.leaveSession()
+                    await MainActor.run {
+                        hasLeftSession = true
+                    }
+                }
+            }
+        }
         .confirmationDialog("Leave Game", isPresented: $showingLeaveConfirmation) {
             Button("Leave", role: .destructive) {
                 leaveGame()
@@ -133,7 +156,10 @@ struct MultiplayerLobbyView: View {
                                     PlayerRow(
                                         playerInfo: playerInfo,
                                         isMe: playerInfo.id == multiplayerStore.myPlayer?.id,
-                                        isHost: playerInfo.id == multiplayerStore.allPlayers.first?.id
+                                        isHost: playerInfo.id == multiplayerStore.allPlayers.first?.id,
+                                        onRemove: (multiplayerStore.isHost && playerInfo.id != multiplayerStore.myPlayer?.id) ? {
+                                            removePlayer(playerInfo)
+                                        } : nil
                                     )
                                 }
                             }
@@ -221,7 +247,7 @@ struct MultiplayerLobbyView: View {
                         Button {
                             showingLeaveConfirmation = true
                         } label: {
-                            Text("Leave Game")
+                            Text("Leave & Quit")
                                 .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.dangerRed)
                                 .frame(maxWidth: .infinity)
@@ -273,11 +299,19 @@ struct MultiplayerLobbyView: View {
     }
 
     private func leaveGame() {
+        guard !hasLeftSession else { return }
+        hasLeftSession = true
         Task {
             try? await multiplayerStore.leaveSession()
             await MainActor.run {
                 dismiss()
             }
+        }
+    }
+    
+    private func removePlayer(_ playerInfo: PublicPlayerInfo) {
+        Task {
+            try? await multiplayerStore.removePlayer(withId: playerInfo.id)
         }
     }
 }
@@ -288,6 +322,7 @@ struct PlayerRow: View {
     let playerInfo: PublicPlayerInfo
     let isMe: Bool
     let isHost: Bool
+    var onRemove: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -349,6 +384,16 @@ struct PlayerRow: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(Design.Colors.successGreen)
+            }
+            
+            // Remove Button (Host only)
+            if let onRemove = onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Design.Colors.dangerRed)
+                }
+                .padding(.leading, 8)
             }
         }
         .padding(12)
@@ -444,7 +489,23 @@ struct MultiplayerMorningView: View {
                 Text("Waiting for host to reveal the day phase…")
                     .font(Design.Typography.footnote)
                     .foregroundStyle(Design.Colors.textSecondary)
-                    .padding(.bottom, 32)
+                    .padding(.bottom, multiplayerStore.isHost ? 16 : 32)
+                
+                if multiplayerStore.isHost {
+                    Button {
+                        Task { try? await multiplayerStore.advanceToDeathRevealManual(nightIndex: nightIndex) }
+                    } label: {
+                        Text("Reveal Deaths")
+                            .font(Design.Typography.body)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Design.Colors.surface0)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Design.Colors.brandGold)
+                            .cornerRadius(Design.Radii.medium)
+                    }
+                    .padding(.bottom, 40)
+                }
             }
             .padding(24)
         }
@@ -588,7 +649,23 @@ struct MultiplayerDeathRevealView: View {
                 Text("Get ready to vote. Host will continue shortly.")
                     .font(Design.Typography.footnote)
                     .foregroundStyle(Design.Colors.textSecondary)
-                    .padding(.bottom, 32)
+                    .padding(.bottom, multiplayerStore.isHost ? 16 : 32)
+                
+                if multiplayerStore.isHost {
+                    Button {
+                        Task { try? await multiplayerStore.advanceToVotingManual(nightIndex: nightIndex) }
+                    } label: {
+                        Text("Start Voting")
+                            .font(Design.Typography.body)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Design.Colors.surface0)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Design.Colors.brandGold)
+                            .cornerRadius(Design.Radii.medium)
+                    }
+                    .padding(.bottom, 40)
+                }
             }
             .padding(24)
         }

@@ -95,12 +95,12 @@ struct MultiplayerMenuView: View {
                 Spacer()
             }
         }
-        .sheet(isPresented: $showingCreateGame) {
+        .fullScreenCover(isPresented: $showingCreateGame) {
             CreateGameView()
                 .environmentObject(multiplayerStore)
                 .environmentObject(authStore)
         }
-        .sheet(isPresented: $showingJoinGame) {
+        .fullScreenCover(isPresented: $showingJoinGame) {
             JoinGameView()
                 .environmentObject(multiplayerStore)
                 .environmentObject(authStore)
