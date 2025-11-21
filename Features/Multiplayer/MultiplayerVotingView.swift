@@ -149,50 +149,6 @@ struct MultiplayerVotingView: View {
                     }
                 }
                 .padding(.bottom, 16)
-
-                // Continue button for non-host players
-                if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
-                    Button {
-                        Task {
-                            try? await multiplayerStore.toggleReady()
-                        }
-                    } label: {
-                        HStack {
-                            if myPlayer.isReady {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 20))
-                            }
-                            Text(myPlayer.isReady ? "Ready" : "Continue")
-                                .font(Design.Typography.body)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            myPlayer.isReady
-                                ? Design.Colors.successGreen.opacity(0.2)
-                                : Design.Colors.brandGold
-                        )
-                        .foregroundColor(
-                            myPlayer.isReady
-                                ? Design.Colors.successGreen
-                                : Design.Colors.surface0
-                        )
-                        .cornerRadius(Design.Radii.medium)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                .stroke(
-                                    myPlayer.isReady
-                                        ? Design.Colors.successGreen
-                                        : Color.clear,
-                                    lineWidth: 1
-                                )
-                        )
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
-                }
-
-                Spacer()
             }
             
             // Host Controls
@@ -268,6 +224,11 @@ struct MultiplayerVotingView: View {
                     dayIndex: dayIndex,
                     targetPlayerId: selectedTargetId
                 )
+
+                // Auto-mark non-host humans as ready after submitting a vote
+                if let me = multiplayerStore.myPlayer, me.isAlive, !multiplayerStore.isHost {
+                    try? await multiplayerStore.setReadyStatus(true)
+                }
 
                 await MainActor.run {
                     hasSubmitted = true

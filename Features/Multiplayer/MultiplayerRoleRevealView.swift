@@ -10,12 +10,14 @@ struct MultiplayerRoleRevealView: View {
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
-            
-            VStack(spacing: 32) {
-                Spacer()
-                
-                if let myRole = multiplayerStore.myRole,
-                   let myNumber = multiplayerStore.myNumber {
+
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 32) {
+                        Spacer().frame(height: 20)
+
+                        if let myRole = multiplayerStore.myRole,
+                           let myNumber = multiplayerStore.myNumber {
                     
                     // Role Icon
                     ZStack {
@@ -57,13 +59,23 @@ struct MultiplayerRoleRevealView: View {
                             )
                     }
                     
+                    // Role Description
+                    if let description = roleDescription(for: myRole) {
+                        Text(description)
+                            .font(Design.Typography.footnote)
+                            .foregroundStyle(Design.Colors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                            .padding(.top, 4)
+                    }
+
                     // Mafia teammates (if applicable)
                     if myRole == .mafia && !multiplayerStore.mafiaTeammates.isEmpty {
                         VStack(spacing: 12) {
                             Text("Your Mafia Teammates")
                                 .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.textSecondary)
-                            
+
                             VStack(spacing: 8) {
                                 ForEach(multiplayerStore.mafiaTeammates) { teammate in
                                     HStack {
@@ -85,23 +97,17 @@ struct MultiplayerRoleRevealView: View {
                             }
                         }
                         .padding(.horizontal, 20)
+                        .padding(.top, 8)
                     }
-                    
-                    // Role Description
-                    if let description = roleDescription(for: myRole) {
-                        Text(description)
-                            .font(Design.Typography.footnote)
-                            .foregroundStyle(Design.Colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
-                    
+
                 } else {
                     ProgressView()
                         .tint(Design.Colors.brandGold)
                 }
-                
-                Spacer()
+
+                        Spacer().frame(height: 40)
+                    }
+                }
 
                 // Confirm Button (non-admin players only)
                 if !multiplayerStore.isHost {

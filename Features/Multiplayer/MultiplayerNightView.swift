@@ -5,6 +5,7 @@ struct MultiplayerNightView: View {
     @State private var selectedTargetId: UUID?
     @State private var hasSubmitted = false
     @State private var isSubmitting = false
+    @State private var autoReadyApplied = false
 
     var nightIndex: Int {
         // Extract from current session phase data
@@ -55,8 +56,8 @@ struct MultiplayerNightView: View {
 
                 Spacer()
 
-                // Submit Button
-                if myRole != nil && myRole != .citizen && !hasSubmitted {
+                // Submit Button (non-host players with actions only)
+                if !multiplayerStore.isHost && myRole != nil && myRole != .citizen && !hasSubmitted {
                     Button {
                         submitAction()
                     } label: {
@@ -81,8 +82,9 @@ struct MultiplayerNightView: View {
                     }
                     .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
-                } else if hasSubmitted || myRole == .citizen {
+                    .padding(.bottom, 40)
+                } else if !multiplayerStore.isHost && (hasSubmitted || myRole == .citizen) {
+                    // Ready indicator for non-host players
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 48))
@@ -92,55 +94,11 @@ struct MultiplayerNightView: View {
                             .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textPrimary)
 
-                        if let myPlayer = multiplayerStore.myPlayer, myPlayer.isReady {
-                            Text("Waiting for other players...")
-                                .font(Design.Typography.body)
-                                .foregroundStyle(Design.Colors.textSecondary)
-                        }
+                        Text("Waiting for other players...")
+                            .font(Design.Typography.body)
+                            .foregroundStyle(Design.Colors.textSecondary)
                     }
-                    .padding(.bottom, 16)
-
-                    // Continue button for non-host players
-                    if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
-                        Button {
-                            Task {
-                                try? await multiplayerStore.toggleReady()
-                            }
-                        } label: {
-                            HStack {
-                                if myPlayer.isReady {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 20))
-                                }
-                                Text(myPlayer.isReady ? "Ready" : "Continue")
-                                    .font(Design.Typography.body)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                myPlayer.isReady
-                                    ? Design.Colors.successGreen.opacity(0.2)
-                                    : Design.Colors.brandGold
-                            )
-                            .foregroundColor(
-                                myPlayer.isReady
-                                    ? Design.Colors.successGreen
-                                    : Design.Colors.surface0
-                            )
-                            .cornerRadius(Design.Radii.medium)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                    .stroke(
-                                        myPlayer.isReady
-                                            ? Design.Colors.successGreen
-                                            : Color.clear,
-                                        lineWidth: 1
-                                    )
-                            )
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 40)
-                    }
+                    .padding(.bottom, 40)
                 }
                 
                 // Host Controls
@@ -179,6 +137,15 @@ struct MultiplayerNightView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .task {
+            await autoReadyIfPassive()
+        }
+        .onChange(of: myRole) { _, _ in
+            Task { await autoReadyIfPassive() }
+        }
+        .onChange(of: multiplayerStore.myPlayer?.isReady) { _, _ in
+            Task { await autoReadyIfPassive() }
+        }
     }
 
     private func advancePhase() {
@@ -369,6 +336,9 @@ struct MultiplayerNightView: View {
                     targetPlayerId: selectedTargetId
                 )
 
+                // Auto-mark ready after successful submission
+                try await multiplayerStore.setReadyStatus(true)
+
                 await MainActor.run {
                     hasSubmitted = true
                     isSubmitting = false
@@ -379,6 +349,22 @@ struct MultiplayerNightView: View {
                     print("Failed to submit action: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    private func autoReadyIfPassive() async {
+        // Citizens have no night action; auto-mark ready for non-host humans
+        guard !autoReadyApplied else { return }
+        guard let role = myRole, role == .citizen else { return }
+        guard let me = multiplayerStore.myPlayer, me.isAlive, !multiplayerStore.isHost else { return }
+
+        if me.isReady == false {
+            try? await multiplayerStore.setReadyStatus(true)
+        }
+
+        await MainActor.run {
+            hasSubmitted = true
+            autoReadyApplied = true
         }
     }
 }
