@@ -49,12 +49,6 @@ struct MultiplayerVotingView: View {
             }
             .padding(.top, 40)
 
-            // Timer (if active)
-            if let timer = multiplayerStore.activeTimer {
-                TimerView(timer: timer)
-                    .padding(.horizontal, 20)
-            }
-
             Spacer()
 
             if !hasSubmitted {
@@ -147,12 +141,56 @@ struct MultiplayerVotingView: View {
                             .foregroundStyle(Design.Colors.textSecondary)
                     }
 
-                    Text("Waiting for other players...")
-                        .font(Design.Typography.footnote)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                        .padding(.top, 8)
+                    if let myPlayer = multiplayerStore.myPlayer, myPlayer.isReady {
+                        Text("Waiting for other players...")
+                            .font(Design.Typography.footnote)
+                            .foregroundStyle(Design.Colors.textSecondary)
+                            .padding(.top, 8)
+                    }
                 }
-                .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
+                .padding(.bottom, 16)
+
+                // Continue button for non-host players
+                if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
+                    Button {
+                        Task {
+                            try? await multiplayerStore.toggleReady()
+                        }
+                    } label: {
+                        HStack {
+                            if myPlayer.isReady {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 20))
+                            }
+                            Text(myPlayer.isReady ? "Ready" : "Continue")
+                                .font(Design.Typography.body)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            myPlayer.isReady
+                                ? Design.Colors.successGreen.opacity(0.2)
+                                : Design.Colors.brandGold
+                        )
+                        .foregroundColor(
+                            myPlayer.isReady
+                                ? Design.Colors.successGreen
+                                : Design.Colors.surface0
+                        )
+                        .cornerRadius(Design.Radii.medium)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Design.Radii.medium)
+                                .stroke(
+                                    myPlayer.isReady
+                                        ? Design.Colors.successGreen
+                                        : Color.clear,
+                                    lineWidth: 1
+                                )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
+                }
 
                 Spacer()
             }

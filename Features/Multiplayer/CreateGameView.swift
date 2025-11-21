@@ -7,8 +7,6 @@ struct CreateGameView: View {
 
     @State private var playerName: String = ""
     @State private var botCount: Int = 0
-    @State private var nightTimerSeconds: Int = 60
-    @State private var dayTimerSeconds: Int = 180
     @State private var isCreating = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
@@ -79,53 +77,6 @@ struct CreateGameView: View {
                                 .font(Design.Typography.footnote)
                                 .foregroundStyle(Design.Colors.textSecondary)
                         }
-                        .padding(.horizontal, 20)
-
-                        // Timer Settings
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Timer Settings")
-                                .font(Design.Typography.body)
-                                .foregroundStyle(Design.Colors.textPrimary)
-
-                            // Night Timer
-                            HStack {
-                                Text("Night Phase")
-                                    .font(Design.Typography.body)
-                                    .foregroundStyle(Design.Colors.textSecondary)
-
-                                Spacer()
-
-                                Picker("Night Timer", selection: $nightTimerSeconds) {
-                                    Text("30s").tag(30)
-                                    Text("60s").tag(60)
-                                    Text("90s").tag(90)
-                                    Text("120s").tag(120)
-                                }
-                                .pickerStyle(.menu)
-                                .tint(Design.Colors.brandGold)
-                            }
-
-                            // Day Timer
-                            HStack {
-                                Text("Day Phase")
-                                    .font(Design.Typography.body)
-                                    .foregroundStyle(Design.Colors.textSecondary)
-
-                                Spacer()
-
-                                Picker("Day Timer", selection: $dayTimerSeconds) {
-                                    Text("2 min").tag(120)
-                                    Text("3 min").tag(180)
-                                    Text("5 min").tag(300)
-                                    Text("10 min").tag(600)
-                                }
-                                .pickerStyle(.menu)
-                                .tint(Design.Colors.brandGold)
-                            }
-                        }
-                        .padding(16)
-                        .background(Design.Colors.surface1)
-                        .cornerRadius(Design.Radii.medium)
                         .padding(.horizontal, 20)
 
                         // Error Message
@@ -203,9 +154,7 @@ struct CreateGameView: View {
             do {
                 try await multiplayerStore.createSession(
                     playerName: trimmedName,
-                    botCount: botCount,
-                    nightTimerSeconds: nightTimerSeconds,
-                    dayTimerSeconds: dayTimerSeconds
+                    botCount: botCount
                 )
 
                 await MainActor.run {

@@ -23,8 +23,6 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
     -- Game settings
     max_players INT DEFAULT 19 NOT NULL,
     bot_count INT DEFAULT 0 NOT NULL,
-    night_timer_seconds INT DEFAULT 60 NOT NULL,
-    day_timer_seconds INT DEFAULT 180 NOT NULL,
 
     -- Current game state (synced to all players)
     current_phase TEXT DEFAULT 'lobby', -- lobby, role_reveal, night, morning, death_reveal, voting, game_over
@@ -79,18 +77,6 @@ CREATE TABLE IF NOT EXISTS public.game_actions (
     UNIQUE(session_id, action_type, phase_index, actor_player_id)
 );
 
--- Phase Timer table: Track phase timeouts
-CREATE TABLE IF NOT EXISTS public.phase_timers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID NOT NULL REFERENCES public.game_sessions(id) ON DELETE CASCADE,
-    phase_name TEXT NOT NULL,
-    started_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    is_expired BOOLEAN DEFAULT false,
-
-    UNIQUE(session_id, phase_name)
-);
-
 -- =====================================================
 -- 2. CREATE INDEXES FOR PERFORMANCE
 -- =====================================================
@@ -106,8 +92,6 @@ CREATE INDEX IF NOT EXISTS idx_session_players_online ON public.session_players(
 CREATE INDEX IF NOT EXISTS idx_game_actions_session ON public.game_actions(session_id);
 CREATE INDEX IF NOT EXISTS idx_game_actions_phase ON public.game_actions(session_id, phase_index, action_type);
 
-CREATE INDEX IF NOT EXISTS idx_phase_timers_session ON public.phase_timers(session_id);
-
 -- =====================================================
 -- 3. ENABLE ROW LEVEL SECURITY
 -- =====================================================
@@ -115,7 +99,6 @@ CREATE INDEX IF NOT EXISTS idx_phase_timers_session ON public.phase_timers(sessi
 ALTER TABLE public.game_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.session_players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.game_actions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.phase_timers ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
 -- 4. GAME_SESSIONS TABLE POLICIES
@@ -296,33 +279,7 @@ USING (
 );
 
 -- =====================================================
--- 7. PHASE_TIMERS TABLE POLICIES
--- =====================================================
-
-DROP POLICY IF EXISTS "Players can view timers in their session" ON public.phase_timers;
-DROP POLICY IF EXISTS "Host can manage timers" ON public.phase_timers;
-
--- Allow players to view timers
--- Uses SECURITY DEFINER function to avoid infinite recursion
-CREATE POLICY "Players can view timers in their session"
-ON public.phase_timers
-FOR SELECT
-USING (
-    public.user_is_in_session(session_id, auth.uid())
-);
-
--- Allow host to manage timers
-CREATE POLICY "Host can manage timers"
-ON public.phase_timers
-FOR ALL
-USING (
-    session_id IN (
-        SELECT id FROM public.game_sessions WHERE host_user_id = auth.uid()
-    )
-);
-
--- =====================================================
--- 8. HELPER FUNCTIONS
+-- 7. HELPER FUNCTIONS
 -- =====================================================
 
 -- Generate unique 6-character room code
@@ -461,7 +418,7 @@ CREATE TRIGGER update_game_sessions_updated_at
     EXECUTE FUNCTION public.update_updated_at_column();
 
 -- =====================================================
--- 9. REALTIME CONFIGURATION
+-- 8. REALTIME CONFIGURATION
 -- =====================================================
 
 -- Enable Realtime for multiplayer tables (idempotent - only adds missing entries)
@@ -513,21 +470,55 @@ EXCEPTION WHEN duplicate_object THEN
     NULL;
 END $$;
 
-DO $$
+-- =====================================================
+-- 9. HOST TRANSFER ON LEAVE
+-- =====================================================
+
+-- Function to transfer host when current host leaves
+CREATE OR REPLACE FUNCTION public.transfer_host_on_leave()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    new_host_user_id UUID;
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_publication_rel rel
-        JOIN pg_catalog.pg_class cls ON cls.oid = rel.prrelid
-        WHERE rel.prpubid = (SELECT oid FROM pg_catalog.pg_publication WHERE pubname = 'supabase_realtime')
-          AND cls.relnamespace = 'public'::regnamespace
-          AND cls.relname = 'phase_timers'
-    ) THEN
-        ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
+    -- Check if deleted player was the host
+    IF OLD.user_id = (SELECT host_user_id FROM public.game_sessions WHERE id = OLD.session_id) THEN
+        -- Find the oldest remaining player (by joined_at) to become new host
+        SELECT user_id INTO new_host_user_id
+        FROM public.session_players
+        WHERE session_id = OLD.session_id
+        AND user_id IS NOT NULL -- Must be a real user, not a bot
+        ORDER BY joined_at ASC
+        LIMIT 1;
+
+        -- If we found a new host, transfer ownership
+        IF new_host_user_id IS NOT NULL THEN
+            UPDATE public.game_sessions
+            SET host_user_id = new_host_user_id
+            WHERE id = OLD.session_id;
+
+            RAISE NOTICE 'Host transferred to user % in session %', new_host_user_id, OLD.session_id;
+        ELSE
+            -- No remaining human players, session should probably be deleted
+            -- But we'll let it remain for now (host cleanup can be handled separately)
+            RAISE NOTICE 'No remaining players to transfer host in session %', OLD.session_id;
+        END IF;
     END IF;
-EXCEPTION WHEN duplicate_object THEN
-    NULL;
-END $$;
+
+    RETURN OLD;
+END;
+$$;
+
+-- Trigger that fires after a player leaves
+DROP TRIGGER IF EXISTS on_player_leave_transfer_host ON public.session_players;
+
+CREATE TRIGGER on_player_leave_transfer_host
+    AFTER DELETE ON public.session_players
+    FOR EACH ROW
+    EXECUTE FUNCTION public.transfer_host_on_leave();
 
 -- =====================================================
 -- SETUP COMPLETE!

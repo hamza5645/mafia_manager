@@ -102,29 +102,31 @@ struct MultiplayerRoleRevealView: View {
                 }
                 
                 Spacer()
-                
-                // Confirm Button
-                Button {
-                    markAsSeen()
-                } label: {
-                    HStack {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text(hasSeen ? "Waiting for others..." : "I've Seen My Role")
-                                .font(Design.Typography.body)
+
+                // Confirm Button (non-admin players only)
+                if !multiplayerStore.isHost {
+                    Button {
+                        markAsSeen()
+                    } label: {
+                        HStack {
+                            if isProcessing {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Text(hasSeen ? "Waiting for others..." : "I've Seen My Role")
+                                    .font(Design.Typography.body)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(hasSeen ? Design.Colors.textSecondary.opacity(0.3) : Design.Colors.brandGold)
+                        .foregroundColor(Design.Colors.surface0)
+                        .cornerRadius(Design.Radii.medium)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(hasSeen ? Design.Colors.textSecondary.opacity(0.3) : Design.Colors.brandGold)
-                    .foregroundColor(Design.Colors.surface0)
-                    .cornerRadius(Design.Radii.medium)
+                    .disabled(hasSeen || isProcessing)
+                    .padding(.horizontal, 20)
                 }
-                .disabled(hasSeen || isProcessing)
-                .padding(.horizontal, 20)
-                
+
                 if multiplayerStore.isHost {
                     Button {
                         forceStartNight()
@@ -178,10 +180,15 @@ struct MultiplayerRoleRevealView: View {
     }
     
     private var isEveryoneReady: Bool {
-        // Bots are always ready, only check human players
+        // Bots are always ready, host doesn't need to mark ready
+        // Only check non-host human players
+        guard let session = multiplayerStore.currentSession else { return false }
         let humanPlayers = multiplayerStore.allPlayers.filter { !$0.isBot }
-        let readyHumans = humanPlayers.filter { $0.isReady }
-        return readyHumans.count == humanPlayers.count && humanPlayers.count > 0
+        let nonHostHumans = humanPlayers.filter { $0.userId != session.hostUserId }
+        let readyNonHostHumans = nonHostHumans.filter { $0.isReady }
+        // If no non-host humans (only host + bots), ready to advance
+        // Otherwise, all non-host humans must be ready
+        return nonHostHumans.isEmpty || readyNonHostHumans.count == nonHostHumans.count
     }
 
     private func forceStartNight() {

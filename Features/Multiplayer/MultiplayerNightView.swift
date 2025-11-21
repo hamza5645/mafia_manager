@@ -43,12 +43,6 @@ struct MultiplayerNightView: View {
                 }
                 .padding(.top, 40)
 
-                // Timer (if active)
-                if let timer = multiplayerStore.activeTimer {
-                    TimerView(timer: timer)
-                        .padding(.horizontal, 20)
-                }
-
                 Spacer()
 
                 // Role-specific content
@@ -88,21 +82,65 @@ struct MultiplayerNightView: View {
                     .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
                     .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
-                } else if hasSubmitted {
+                } else if hasSubmitted || myRole == .citizen {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 48))
                             .foregroundStyle(Design.Colors.successGreen)
 
-                        Text("Action Submitted")
+                        Text(myRole == .citizen ? "Ready to Continue" : "Action Submitted")
                             .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textPrimary)
 
-                        Text("Waiting for other players...")
-                            .font(Design.Typography.body)
-                            .foregroundStyle(Design.Colors.textSecondary)
+                        if let myPlayer = multiplayerStore.myPlayer, myPlayer.isReady {
+                            Text("Waiting for other players...")
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                        }
                     }
-                    .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
+                    .padding(.bottom, 16)
+
+                    // Continue button for non-host players
+                    if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
+                        Button {
+                            Task {
+                                try? await multiplayerStore.toggleReady()
+                            }
+                        } label: {
+                            HStack {
+                                if myPlayer.isReady {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 20))
+                                }
+                                Text(myPlayer.isReady ? "Ready" : "Continue")
+                                    .font(Design.Typography.body)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                myPlayer.isReady
+                                    ? Design.Colors.successGreen.opacity(0.2)
+                                    : Design.Colors.brandGold
+                            )
+                            .foregroundColor(
+                                myPlayer.isReady
+                                    ? Design.Colors.successGreen
+                                    : Design.Colors.surface0
+                            )
+                            .cornerRadius(Design.Radii.medium)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Design.Radii.medium)
+                                    .stroke(
+                                        myPlayer.isReady
+                                            ? Design.Colors.successGreen
+                                            : Color.clear,
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 40)
+                    }
                 }
                 
                 // Host Controls
@@ -416,41 +454,6 @@ struct TargetPlayerButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Timer View
-
-struct TimerView: View {
-    let timer: PhaseTimer
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(Design.Colors.brandGold)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Time Remaining")
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.textSecondary)
-
-                Text(timeString(from: timer.timeRemaining))
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Design.Colors.brandGold)
-            }
-
-            Spacer()
-        }
-        .padding(16)
-        .background(Design.Colors.surface1)
-        .cornerRadius(Design.Radii.medium)
-    }
-
-    private func timeString(from interval: TimeInterval) -> String {
-        let minutes = Int(interval) / 60
-        let seconds = Int(interval) % 60
-        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

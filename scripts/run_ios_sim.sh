@@ -13,7 +13,7 @@ PROJECT_PATH="$PROJECT_ROOT/mafia_manager.xcodeproj"
 SCHEME="mafia_manager"
 CONFIGURATION="Debug"
 SIMULATOR_NAME="iPhone 17 Pro"
-DERIVED_DATA="$PROJECT_ROOT/DerivedData"
+DERIVED_DATA="$HOME/Library/Developer/Xcode/DerivedData/mafia_manager-run_ios_sim"
 
 echo "→ Building $SCHEME for $SIMULATOR_NAME..."
 xcodebuild \

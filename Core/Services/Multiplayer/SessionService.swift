@@ -11,9 +11,7 @@ final class SessionService {
     func createSession(
         hostUserId: UUID,
         maxPlayers: Int = 19,
-        botCount: Int = 0,
-        nightTimerSeconds: Int = 60,
-        dayTimerSeconds: Int = 180
+        botCount: Int = 0
     ) async throws -> GameSession {
         // CRITICAL: Verify auth session is valid before creating a session
         // The RLS policy checks auth.uid() = host_user_id
@@ -38,8 +36,6 @@ final class SessionService {
             let status: String
             let maxPlayers: Int
             let botCount: Int
-            let nightTimerSeconds: Int
-            let dayTimerSeconds: Int
             let currentPhase: String
             let dayIndex: Int
             let isGameOver: Bool
@@ -53,8 +49,6 @@ final class SessionService {
                 case status
                 case maxPlayers = "max_players"
                 case botCount = "bot_count"
-                case nightTimerSeconds = "night_timer_seconds"
-                case dayTimerSeconds = "day_timer_seconds"
                 case currentPhase = "current_phase"
                 case dayIndex = "day_index"
                 case isGameOver = "is_game_over"
@@ -70,8 +64,6 @@ final class SessionService {
             status: "waiting",
             maxPlayers: maxPlayers,
             botCount: botCount,
-            nightTimerSeconds: nightTimerSeconds,
-            dayTimerSeconds: dayTimerSeconds,
             currentPhase: "lobby",
             dayIndex: 0,
             isGameOver: false,
@@ -583,47 +575,6 @@ final class SessionService {
         return actions
     }
 
-    // MARK: - Phase Timers
-
-    /// Create a phase timer
-    func createPhaseTimer(_ timer: PhaseTimer) async throws {
-        try await supabase
-            .from("phase_timers")
-            .upsert(timer)
-            .execute()
-    }
-
-    /// Get active timer for a session
-    func getActiveTimer(sessionId: UUID) async throws -> PhaseTimer? {
-        let timers: [PhaseTimer] = try await supabase
-            .from("phase_timers")
-            .select()
-            .eq("session_id", value: sessionId.uuidString)
-            .eq("is_expired", value: false)
-            .order("started_at", ascending: false)
-            .limit(1)
-            .execute()
-            .value
-
-        return timers.first
-    }
-
-    /// Mark timer as expired
-    func expireTimer(timerId: UUID) async throws {
-        struct UpdateData: Encodable {
-            let isExpired: Bool
-
-            enum CodingKeys: String, CodingKey {
-                case isExpired = "is_expired"
-            }
-        }
-
-        try await supabase
-            .from("phase_timers")
-            .update(UpdateData(isExpired: true))
-            .eq("id", value: timerId.uuidString)
-            .execute()
-    }
 }
 
 // MARK: - Helper Structs

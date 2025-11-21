@@ -4,7 +4,7 @@ import Foundation
 struct GameSession: Codable, Identifiable, Sendable {
     let id: UUID
     let roomCode: String
-    let hostUserId: UUID
+    var hostUserId: UUID // Mutable to allow host transfer
     var status: SessionStatus
     let createdAt: Date
     var startedAt: Date?
@@ -13,8 +13,6 @@ struct GameSession: Codable, Identifiable, Sendable {
     // Game settings
     var maxPlayers: Int
     var botCount: Int
-    var nightTimerSeconds: Int
-    var dayTimerSeconds: Int
 
     // Current game state
     var currentPhase: String // lobby, role_reveal, night, morning, death_reveal, voting, game_over
@@ -40,8 +38,6 @@ struct GameSession: Codable, Identifiable, Sendable {
         case completedAt = "completed_at"
         case maxPlayers = "max_players"
         case botCount = "bot_count"
-        case nightTimerSeconds = "night_timer_seconds"
-        case dayTimerSeconds = "day_timer_seconds"
         case currentPhase = "current_phase"
         case currentPhaseData = "current_phase_data"
         case dayIndex = "day_index"

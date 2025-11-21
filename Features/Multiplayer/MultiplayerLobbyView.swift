@@ -8,6 +8,7 @@ struct MultiplayerLobbyView: View {
     @State private var showingLeaveConfirmation = false
     @State private var isStarting = false
     @State private var hasLeftSession = false
+    @State private var startGameError: String?
 
     var body: some View {
         ZStack {
@@ -59,22 +60,11 @@ struct MultiplayerLobbyView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
-                    leaveGame()
+                    showingLeaveConfirmation = true
                 } label: {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(Design.Colors.brandGold)
-                }
-            }
-        }
-        .onDisappear {
-            // Automatically leave the session when the view is dismissed
-            if !hasLeftSession {
-                Task {
-                    try? await multiplayerStore.leaveSession()
-                    await MainActor.run {
-                        hasLeftSession = true
-                    }
                 }
             }
         }
@@ -89,185 +79,257 @@ struct MultiplayerLobbyView: View {
     }
     
     private var lobbyContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Room Code Display
-                if let session = multiplayerStore.currentSession {
-                    VStack(spacing: 12) {
-                        Text("Room Code")
-                            .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Colors.textSecondary)
-
-                        Text(session.roomCode)
-                                .font(.system(size: 48, weight: .bold, design: .monospaced))
-                                .foregroundStyle(Design.Colors.brandGold)
-                                .tracking(8)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 16)
-                                .background(Design.Colors.surface1)
-                                .cornerRadius(Design.Radii.large)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Design.Radii.large)
-                                        .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
-                                )
-
-                            Text("Share this code with friends to join")
-                                .font(Design.Typography.footnote)
+        ZStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Room Code Display
+                    if let session = multiplayerStore.currentSession {
+                        VStack(spacing: 12) {
+                            Text("Room Code")
+                                .font(Design.Typography.caption)
                                 .foregroundStyle(Design.Colors.textSecondary)
+
+                            Text(session.roomCode)
+                                    .font(.system(size: 48, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(Design.Colors.brandGold)
+                                    .tracking(8)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 16)
+                                    .background(Design.Colors.surface1)
+                                    .cornerRadius(Design.Radii.large)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Design.Radii.large)
+                                            .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
+                                    )
+
+                                Text("Share this code with friends to join")
+                                    .font(Design.Typography.footnote)
+                                    .foregroundStyle(Design.Colors.textSecondary)
+                            }
+                            .padding(.top, 20)
+                            .padding(.horizontal, 20)
                         }
-                        .padding(.top, 20)
-                        .padding(.horizontal, 20)
-                    }
 
-                    // Game Status
-                    HStack(spacing: 16) {
-                            StatusBadge(
-                                icon: "person.3.fill",
-                                label: "\(multiplayerStore.visiblePlayers.count)",
-                                color: Design.Colors.brandGold
-                            )
-
-                            StatusBadge(
-                                icon: "cpu",
-                                label: "\(multiplayerStore.visiblePlayers.filter { $0.isBot }.count)",
-                                color: Design.Colors.textSecondary
-                            )
-
-                            if multiplayerStore.isHost {
+                        // Game Status
+                        HStack(spacing: 16) {
                                 StatusBadge(
-                                    icon: "crown.fill",
-                                    label: "Host",
+                                    icon: "person.3.fill",
+                                    label: "\(multiplayerStore.visiblePlayers.filter { !$0.isBot }.count)",
                                     color: Design.Colors.brandGold
                                 )
-                            }
-                        }
-                    .padding(.horizontal, 20)
 
-                    // Players List
-                    if let session = multiplayerStore.currentSession {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Players (\(multiplayerStore.visiblePlayers.count)/\(session.maxPlayers))")
-                                .font(Design.Typography.body)
-                                .foregroundStyle(Design.Colors.textPrimary)
-                                .padding(.horizontal, 20)
+                                StatusBadge(
+                                    icon: "cpu",
+                                    label: "\(multiplayerStore.visiblePlayers.filter { $0.isBot }.count)",
+                                    color: Design.Colors.textSecondary
+                                )
 
-                            VStack(spacing: 12) {
-                                ForEach(multiplayerStore.visiblePlayers) { playerInfo in
-                                    PlayerRow(
-                                        playerInfo: playerInfo,
-                                        isMe: playerInfo.id == multiplayerStore.myPlayer?.id,
-                                        isHost: playerInfo.id == multiplayerStore.allPlayers.first?.id,
-                                        onRemove: (multiplayerStore.isHost && playerInfo.id != multiplayerStore.myPlayer?.id) ? {
-                                            removePlayer(playerInfo)
-                                        } : nil
+                                if multiplayerStore.isHost {
+                                    StatusBadge(
+                                        icon: "crown.fill",
+                                        label: "Host",
+                                        color: Design.Colors.brandGold
                                     )
                                 }
                             }
-                            .padding(.horizontal, 20)
+                        .padding(.horizontal, 20)
+
+                        // Players List
+                        if let session = multiplayerStore.currentSession {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Players (\(multiplayerStore.visiblePlayers.count)/\(session.maxPlayers))")
+                                    .font(Design.Typography.body)
+                                    .foregroundStyle(Design.Colors.textPrimary)
+                                    .padding(.horizontal, 20)
+
+                                VStack(spacing: 12) {
+                                    ForEach(multiplayerStore.visiblePlayers) { playerInfo in
+                                        PlayerRow(
+                                            playerInfo: playerInfo,
+                                            isMe: playerInfo.id == multiplayerStore.myPlayer?.id,
+                                            isHost: playerInfo.id == multiplayerStore.allPlayers.first?.id,
+                                            onRemove: (multiplayerStore.isHost && playerInfo.id != multiplayerStore.myPlayer?.id) ? {
+                                                removePlayer(playerInfo)
+                                            } : nil
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                            }
+                        }
+
+                        // Spacer to account for sticky buttons
+                        Color.clear.frame(height: calculateButtonHeight())
+                    }
+                .padding(.bottom, 20)
+            }
+
+            // Sticky Buttons at Bottom
+            VStack {
+                Spacer()
+
+                VStack(spacing: 12) {
+                    // Ready Status (non-host players only)
+                    if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
+                        Button {
+                            Task {
+                                try? await multiplayerStore.toggleReady()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: myPlayer.isReady ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 20))
+
+                                Text(myPlayer.isReady ? "Ready" : "Not Ready")
+                                    .font(Design.Typography.body)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                myPlayer.isReady
+                                    ? Design.Colors.successGreen.opacity(0.2)
+                                    : Design.Colors.surface1
+                            )
+                            .foregroundColor(
+                                myPlayer.isReady
+                                    ? Design.Colors.successGreen
+                                    : Design.Colors.textPrimary
+                            )
+                            .cornerRadius(Design.Radii.medium)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Design.Radii.medium)
+                                    .stroke(
+                                        myPlayer.isReady
+                                            ? Design.Colors.successGreen
+                                            : Design.Colors.stroke.opacity(0.3),
+                                        lineWidth: 1
+                                    )
+                            )
                         }
                     }
 
-                    // Ready Status (if not host)
-                        if !multiplayerStore.isHost, let myPlayer = multiplayerStore.myPlayer {
+                    // Start Game Button (host only)
+                    if multiplayerStore.isHost {
+                        VStack(spacing: 8) {
                             Button {
-                                Task {
-                                    try? await multiplayerStore.toggleReady()
-                                }
+                                startGame()
                             } label: {
                                 HStack {
-                                    Image(systemName: myPlayer.isReady ? "checkmark.circle.fill" : "circle")
-                                        .font(.system(size: 20))
-
-                                    Text(myPlayer.isReady ? "Ready" : "Not Ready")
-                                        .font(Design.Typography.body)
+                                    if isStarting {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Text("Start Game")
+                                            .font(Design.Typography.body)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                                 .background(
-                                    myPlayer.isReady
-                                        ? Design.Colors.successGreen.opacity(0.2)
-                                        : Design.Colors.surface1
+                                    canStart
+                                        ? Design.Colors.brandGold
+                                        : Design.Colors.textSecondary.opacity(0.3)
                                 )
-                                .foregroundColor(
-                                    myPlayer.isReady
-                                        ? Design.Colors.successGreen
-                                        : Design.Colors.textPrimary
-                                )
+                                .foregroundColor(Design.Colors.surface0)
                                 .cornerRadius(Design.Radii.medium)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                        .stroke(
-                                            myPlayer.isReady
-                                                ? Design.Colors.successGreen
-                                                : Design.Colors.stroke.opacity(0.3),
-                                            lineWidth: 1
-                                        )
-                                )
                             }
-                            .padding(.horizontal, 20)
-                        }
+                            .disabled(!canStart || isStarting)
 
-                        // Start Game Button (host only)
-                        if multiplayerStore.isHost {
-                            VStack(spacing: 12) {
-                                Button {
-                                    startGame()
-                                } label: {
-                                    HStack {
-                                        if isStarting {
-                                            ProgressView()
-                                                .tint(.white)
-                                        } else {
-                                            Text("Start Game")
-                                                .font(Design.Typography.body)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(
-                                        canStart
-                                            ? Design.Colors.brandGold
-                                            : Design.Colors.textSecondary.opacity(0.3)
-                                    )
-                                    .foregroundColor(Design.Colors.surface0)
-                                    .cornerRadius(Design.Radii.medium)
-                                }
-                                .disabled(!canStart || isStarting)
+                            // Validation messages
+                            VStack(spacing: 8) {
+                                let playerCount = multiplayerStore.visiblePlayers.count
+                                let humanPlayers = multiplayerStore.visiblePlayers.filter { !$0.isBot }
+                                let nonHostHumans = humanPlayers.filter { $0.id != multiplayerStore.myPlayer?.id }
+                                let notReadyCount = nonHostHumans.filter { !$0.isReady }.count
 
-                                if !canStart {
+                                if playerCount < 4 || playerCount > 19 {
                                     Text("Need 4-19 total players to start")
                                         .font(Design.Typography.footnote)
                                         .foregroundStyle(Design.Colors.dangerRed)
+                                } else if notReadyCount > 0 {
+                                    Text("\(notReadyCount) player\(notReadyCount == 1 ? "" : "s") not ready")
+                                        .font(Design.Typography.footnote)
+                                        .foregroundStyle(Design.Colors.dangerRed)
+                                }
+
+                                if let error = startGameError {
+                                    Text(error)
+                                        .font(Design.Typography.footnote)
+                                        .foregroundStyle(Design.Colors.dangerRed)
+                                        .padding(.top, 4)
                                 }
                             }
-                            .padding(.horizontal, 20)
                         }
+                    }
 
-                        // Leave Button
-                        Button {
-                            showingLeaveConfirmation = true
-                        } label: {
-                            Text("Leave & Quit")
-                                .font(Design.Typography.body)
-                                .foregroundStyle(Design.Colors.dangerRed)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                        }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    // Leave Button
+                    Button {
+                        showingLeaveConfirmation = true
+                    } label: {
+                        Text("Leave & Quit")
+                            .font(Design.Typography.body)
+                            .foregroundStyle(Design.Colors.dangerRed)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+                .background(
+                    VStack(spacing: 0) {
+                        LinearGradient(
+                            colors: [
+                                Design.Colors.surface0.opacity(0),
+                                Design.Colors.surface0.opacity(0.95),
+                                Design.Colors.surface0
+                            ],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                        .frame(height: 40)
+
+                        Design.Colors.surface0
+                    }
+                )
             }
         }
     }
 
+    private func calculateButtonHeight() -> CGFloat {
+        var height: CGFloat = 20 // Base padding
+
+        // Ready button height (shown for non-host players only)
+        if !multiplayerStore.isHost {
+            height += 60 // Button with padding
+        }
+
+        // Start button height (host only)
+        if multiplayerStore.isHost {
+            height += 120 // Button + validation messages
+        }
+
+        // Leave button
+        height += 56 // Leave button height
+
+        return height
+    }
+
     private var canStart: Bool {
         let playerCount = multiplayerStore.visiblePlayers.count
-        return playerCount >= 4 && playerCount <= 19
+        let humanPlayers = multiplayerStore.visiblePlayers.filter { !$0.isBot }
+        let nonHostHumans = humanPlayers.filter { $0.id != multiplayerStore.myPlayer?.id }
+        let allNonHostHumansReady = nonHostHumans.allSatisfy { $0.isReady }
+
+        return playerCount >= 4 && playerCount <= 19 && allNonHostHumansReady
     }
 
     private func startGame() {
         print("🔘 [MultiplayerLobbyView] Start Game button tapped")
         print("🔘 [MultiplayerLobbyView] isHost: \(multiplayerStore.isHost)")
-        
+
+        // Clear any previous errors
+        startGameError = nil
+
         guard multiplayerStore.isHost else {
             print("❌ [MultiplayerLobbyView] Not host, returning early")
             return
@@ -284,14 +346,21 @@ struct MultiplayerLobbyView: View {
                 // Game has started - navigation will be handled by phase updates
                 await MainActor.run {
                     isStarting = false
+                    startGameError = nil
                     print("🔘 [MultiplayerLobbyView] isStarting = false")
+                }
+            } catch SessionError.invalidPhase {
+                print("❌ [MultiplayerLobbyView] Failed to start game: Not all players ready")
+                await MainActor.run {
+                    isStarting = false
+                    startGameError = "All players must be ready before starting"
                 }
             } catch {
                 print("❌ [MultiplayerLobbyView] Failed to start game: \(error)")
                 print("❌ [MultiplayerLobbyView] Error description: \(error.localizedDescription)")
                 await MainActor.run {
                     isStarting = false
-                    // Show error
+                    startGameError = "Failed to start game: \(error.localizedDescription)"
                     print("❌ [MultiplayerLobbyView] isStarting = false (error path)")
                 }
             }

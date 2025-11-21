@@ -26,15 +26,11 @@ final class MultiplayerGameStore: ObservableObject {
     @Published var myNumber: Int?
     @Published var mafiaTeammates: [PublicPlayerInfo] = [] // Only populated if I'm mafia
 
-    // Current phase timer
-    @Published var activeTimer: PhaseTimer?
-    
     // Phase progression state
     @Published var isPhaseReadyToAdvance: Bool = false
 
     // Heartbeat timer
     private var heartbeatTimer: Timer?
-    private var timerUpdateTimer: Timer?
     private var playerRefreshTimer: Timer?
     private var pendingAutoAdvanceTask: Task<Void, Never>?
     private var processedBotNightIndices: Set<Int> = []
@@ -53,9 +49,7 @@ final class MultiplayerGameStore: ObservableObject {
     /// Create a new multiplayer session
     func createSession(
         playerName: String,
-        botCount: Int = 0,
-        nightTimerSeconds: Int = 60,
-        dayTimerSeconds: Int = 180
+        botCount: Int = 0
     ) async throws {
         guard let userId = authStore?.currentUserId else {
             throw SessionError.notHost
@@ -69,9 +63,7 @@ final class MultiplayerGameStore: ObservableObject {
             let session = try await sessionService.createSession(
                 hostUserId: userId,
                 maxPlayers: 19,
-                botCount: botCount,
-                nightTimerSeconds: nightTimerSeconds,
-                dayTimerSeconds: dayTimerSeconds
+                botCount: botCount
             )
 
             // Add host as first player
@@ -185,7 +177,6 @@ final class MultiplayerGameStore: ObservableObject {
         myRole = nil
         myNumber = nil
         mafiaTeammates = []
-        activeTimer = nil
     }
 
     /// Remove a player from the session (Host only)
@@ -278,13 +269,6 @@ final class MultiplayerGameStore: ObservableObject {
         let previousPhase = currentSession?.currentPhase
         let previousPhaseData = currentSession?.currentPhaseData
         currentSession = session
-
-        // Update timer if phase changed
-        if session.currentPhase != previousPhase {
-            Task {
-                try? await refreshActiveTimer()
-            }
-        }
 
         if session.currentPhaseData != previousPhaseData {
             scheduleAutoAdvance(for: session.currentPhaseData)
@@ -499,12 +483,14 @@ final class MultiplayerGameStore: ObservableObject {
         print("🎮 [MultiplayerGameStore] Human players: \(humanPlayers.count)")
         print("🎮 [MultiplayerGameStore] Bot players: \(totalPlayers - humanPlayers.count)")
 
-        // Check readiness: bots are always ready, humans must be explicitly ready
-        let readyHumans = humanPlayers.filter { $0.isReady }
-        
-        // All humans must be ready, bots are always considered ready
-        guard readyHumans.count == humanPlayers.count else {
-            print("❌ [MultiplayerGameStore] Cannot start: Not all human players are ready (\(readyHumans.count)/\(humanPlayers.count))")
+        // Check readiness: bots are always ready, non-host humans must be explicitly ready
+        // Host is excluded from readiness check since they can't mark themselves ready in the UI
+        let nonHostHumans = humanPlayers.filter { $0.id != myPlayer?.id }
+        let readyNonHostHumans = nonHostHumans.filter { $0.isReady }
+
+        // All non-host humans must be ready, bots and host are always considered ready
+        guard readyNonHostHumans.count == nonHostHumans.count else {
+            print("❌ [MultiplayerGameStore] Cannot start: Not all non-host human players are ready (\(readyNonHostHumans.count)/\(nonHostHumans.count))")
             throw SessionError.invalidPhase
         }
         
@@ -671,34 +657,6 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
-    // MARK: - Timer Management
-
-    private func refreshActiveTimer() async throws {
-        guard let sessionId = currentSession?.id else { return }
-
-        let timer = try await sessionService.getActiveTimer(sessionId: sessionId)
-        guard sessionId == currentSession?.id else { return }
-
-        activeTimer = timer
-
-        // Start auto-refresh timer
-        startTimerAutoRefresh()
-    }
-
-    private func startTimerAutoRefresh() {
-        timerUpdateTimer?.invalidate()
-        timerUpdateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.objectWillChange.send() // Trigger UI refresh
-            }
-        }
-    }
-
-    private func stopTimerAutoRefresh() {
-        timerUpdateTimer?.invalidate()
-        timerUpdateTimer = nil
-    }
-
     // MARK: - Heartbeat
 
     private func startHeartbeat() {
@@ -764,6 +722,9 @@ final class MultiplayerGameStore: ObservableObject {
 
         switch phaseData {
         case .night(let nightIndex, _):
+            // Reset all players' ready status at the start of night phase
+            await resetAllPlayersReady()
+
             if !processedBotNightIndices.contains(nightIndex) {
                 processedBotNightIndices.insert(nightIndex)
                 do {
@@ -774,6 +735,9 @@ final class MultiplayerGameStore: ObservableObject {
             }
             await evaluatePhaseProgression(trigger: "enter_night")
         case .voting(let dayIndex):
+            // Reset all players' ready status at the start of voting phase
+            await resetAllPlayersReady()
+
             if !processedBotVotingDays.contains(dayIndex) {
                 processedBotVotingDays.insert(dayIndex)
                 do {
@@ -785,6 +749,19 @@ final class MultiplayerGameStore: ObservableObject {
             await evaluatePhaseProgression(trigger: "enter_voting")
         default:
             break
+        }
+    }
+
+    private func resetAllPlayersReady() async {
+        guard let sessionId = currentSession?.id else { return }
+
+        // Reset isReady for all human players
+        for player in allPlayers where !player.isBot {
+            do {
+                try await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
+            } catch {
+                print("❌ Failed to reset ready status for player \(player.playerName): \(error)")
+            }
         }
     }
 
@@ -838,19 +815,14 @@ final class MultiplayerGameStore: ObservableObject {
             phaseIndex: nightIndex
         )
 
-        func didEveryoneAct(requiredPlayers: [SessionPlayer], actions: [GameAction], roleName: String) -> Bool {
-            guard !requiredPlayers.isEmpty else { return true }
-            let actors = Set(actions.map { $0.actorPlayerId })
-            let ready = actors.count >= requiredPlayers.count
-            return ready
-        }
+        // Check if all alive, non-host human players have marked themselves as ready
+        // (Host doesn't need to mark ready since they control phase advancement)
+        let alivePlayers = allPlayers.filter { $0.isAlive }
+        let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
+        let aliveNonHostHumans = aliveHumanPlayers.filter { $0.userId != session.hostUserId }
+        let readyNonHostHumans = aliveNonHostHumans.filter { $0.isReady }
+        let allReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
 
-        let mafiaReady = didEveryoneAct(requiredPlayers: aliveMafia, actions: mafiaActions, roleName: "Mafia")
-        let doctorReady = didEveryoneAct(requiredPlayers: aliveDoctors, actions: doctorActions, roleName: "Doctor")
-        let inspectorReady = didEveryoneAct(requiredPlayers: aliveInspectors, actions: inspectorActions, roleName: "Inspector")
-        
-        let allReady = mafiaReady && doctorReady && inspectorReady
-        
         await MainActor.run {
             self.isPhaseReadyToAdvance = allReady
         }
@@ -868,11 +840,6 @@ final class MultiplayerGameStore: ObservableObject {
         let mafiaActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .mafiaTarget,
-            phaseIndex: nightIndex
-        )
-        let inspectorActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .inspectorCheck,
             phaseIndex: nightIndex
         )
         let doctorActions = try await sessionService.getActionsForPhase(
@@ -943,15 +910,14 @@ final class MultiplayerGameStore: ObservableObject {
         guard let session = currentSession else { return }
 
         let alivePlayers = allPlayers.filter { $0.isAlive }
-        let votes = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .vote,
-            phaseIndex: dayIndex
-        )
 
-        let uniqueVoters = Set(votes.map { $0.actorPlayerId })
-        let ready = uniqueVoters.count >= alivePlayers.count
-        
+        // Check if all alive, non-host human players have marked themselves as ready
+        // (Host doesn't need to mark ready since they control phase advancement)
+        let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
+        let aliveNonHostHumans = aliveHumanPlayers.filter { $0.userId != session.hostUserId }
+        let readyNonHostHumans = aliveNonHostHumans.filter { $0.isReady }
+        let ready = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+
         await MainActor.run {
             self.isPhaseReadyToAdvance = ready
         }
@@ -1360,8 +1326,6 @@ final class MultiplayerGameStore: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             self?.heartbeatTimer?.invalidate()
             self?.heartbeatTimer = nil
-            self?.timerUpdateTimer?.invalidate()
-            self?.timerUpdateTimer = nil
             self?.playerRefreshTimer?.invalidate()
             self?.playerRefreshTimer = nil
             self?.pendingAutoAdvanceTask?.cancel()

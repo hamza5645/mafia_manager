@@ -10,8 +10,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Query guide**: [`docs/ASKING_CLAUDE_EFFECTIVELY.md`](docs/ASKING_CLAUDE_EFFECTIVELY.md) — How to ask me for focused help without blowing the token budget.
 
-**Codex delegation**: [`docs/CODEX_DELEGATION.md`](docs/CODEX_DELEGATION.md) — When and how Claude Code should delegate tasks to Codex Agent CLI to save tokens.
-
 ## Build & Test Commands
 
 ### Running on Simulator
@@ -43,18 +41,29 @@ rm -rf DerivedData
 
 ## Codebase Overview
 
-**Tech stack**: SwiftUI + MVVM, iOS 16+, no third-party dependencies, local JSON + optional Supabase.
+**Tech stack**: SwiftUI + MVVM, iOS 26+, no third-party dependencies, local JSON + optional Supabase.
+
+**Two game modes**:
+1. **Solo mode** (original): Pass-and-play on single device, all state in GameStore
+2. **Multiplayer mode** (new): Multi-device via Supabase Realtime, state in SessionService
 
 **Feature-based structure**:
-- `Core/Models/` — Codable data models (Player, Role, GameState, NightAction, etc.)
-- `Core/Store/` — **GameStore** (game logic, mutations) and **AuthStore** (auth state)
-- `Core/Services/` — Persistence (JSON), Supabase Auth/Database, SeededRandom
+- `Core/Models/` — Codable data models
+  - Solo: `Player`, `Role`, `GameState`, `NightAction`, `DayAction`
+  - Multiplayer: `GameSession`, `SessionPlayer`, `GameAction`, `PhaseTimer`
+- `Core/Store/` — **GameStore** (solo game logic) and **AuthStore** (auth state)
+- `Core/Services/` — Persistence (JSON), Supabase Auth/Database/Realtime, SeededRandom
+  - Multiplayer: `SessionService`, `RealtimeService`
 - `Core/Components/` — Reusable UI building blocks (PrivacyBlurView, CTAButtonStyle, Chips)
 - `Core/UI/` — Design tokens and theme configuration
-- `Features/` — Screen-specific views (Setup, Assignments, Night, Day, Morning, GameOver, Auth, Stats, Settings)
+- `Features/` — Screen-specific views
+  - Solo: `Setup`, `Assignments`, `Night`, `Day`, `Morning`, `GameOver`
+  - Multiplayer: `GameModeSelection`, `CreateGame`, `JoinGame`, `MultiplayerLobby`, `MultiplayerNight`, `MultiplayerVoting`
+  - Shared: `Auth`, `Stats`, `Settings`
 
 ## Critical Patterns
 
+### Solo Mode (GameStore)
 **Single source of truth**: All game state in GameStore (@MainActor, @Published). Views never mutate directly—always call GameStore methods.
 
 **Night resolution is TWO-PHASE**:
@@ -67,6 +76,18 @@ This allows the UI to ask "Was target saved?" before committing the death.
 
 **Persistence**: Automatic JSON save to Application Support after every GameStore mutation via Persistence service.
 
+### Multiplayer Mode (SessionService + RealtimeService)
+**Realtime sync**: Host controls phase transitions, all clients subscribe to `game_sessions` table changes via Supabase Realtime.
+
+**State management**:
+- `SessionService` (@MainActor) manages multiplayer state and session mutations
+- `RealtimeService` (@MainActor) handles Realtime subscriptions and broadcasts
+- Session state stored in Supabase: `game_sessions`, `session_players`, `game_actions`, `phase_timers`
+
+**Host authority**: Only host can advance phases, kick players, start game. Clients submit actions via `game_actions` table.
+
+**Heartbeat system**: Players send periodic heartbeats to track online status. Missing heartbeats = offline.
+
 **Win conditions**:
 - Citizens win: No alive Mafia (checked after night resolution)
 - Mafia win: Alive Mafia >= Alive Non-Mafia (checked at day start and after day removals)
@@ -78,11 +99,22 @@ This allows the UI to ask "Was target saved?" before committing the death.
 
 ## Key Files
 
-- [Core/Store/GameStore.swift](Core/Store/GameStore.swift) — All game mutations and phase transitions
-- [Core/Store/AuthStore.swift](Core/Store/AuthStore.swift) — Supabase auth state
-- [Core/Models/GameState.swift](Core/Models/GameState.swift) — Root state model
+### Solo Mode
+- [Core/Store/GameStore.swift](Core/Store/GameStore.swift) — All solo game mutations and phase transitions
+- [Core/Models/GameState.swift](Core/Models/GameState.swift) — Root state model for solo
 - [Core/Models/NightAction.swift](Core/Models/NightAction.swift) — Night phase outcomes
+
+### Multiplayer Mode
+- [Core/Services/Multiplayer/SessionService.swift](Core/Services/Multiplayer/SessionService.swift) — Multiplayer session management
+- [Core/Services/Multiplayer/RealtimeService.swift](Core/Services/Multiplayer/RealtimeService.swift) — Supabase Realtime subscriptions
+- [Core/Models/Multiplayer/GameSession.swift](Core/Models/Multiplayer/GameSession.swift) — Multiplayer session model
+- [Core/Models/Multiplayer/SessionPlayer.swift](Core/Models/Multiplayer/SessionPlayer.swift) — Player in multiplayer session
+- [Core/Models/Multiplayer/GameAction.swift](Core/Models/Multiplayer/GameAction.swift) — Night/day actions in multiplayer
+
+### Shared
+- [Core/Store/AuthStore.swift](Core/Store/AuthStore.swift) — Supabase auth state
 - [supabase/setup.sql](supabase/setup.sql) — Database schema (profiles, player_stats, custom_roles_configs)
+- [supabase/multiplayer_schema.sql](supabase/multiplayer_schema.sql) — Multiplayer tables (game_sessions, session_players, game_actions, phase_timers)
 
 ## Testing
 
@@ -94,13 +126,17 @@ Unit tests live in `mafia_managerTests/GameStoreTests.swift`. Tests cover:
 
 Run with `Cmd+U` in Xcode or via xcodebuild test command above.
 
-## Supabase Setup (Optional)
+## Supabase Setup
 
-1. Run `supabase/setup.sql` in your SQL Editor to create tables
-2. Disable email confirmation: Settings → Auth Providers → Email → Email Confirmations (OFF)
-3. Update `Core/Services/SupabaseConfig.swift` with your project URL + anon key
+### Required for Multiplayer
+1. Run `supabase/setup.sql` in your SQL Editor to create base tables
+2. Run `supabase/multiplayer_schema.sql` to create multiplayer tables
+3. Disable email confirmation: Settings → Auth Providers → Email → Email Confirmations (OFF)
+4. Update `Core/Services/SupabaseConfig.swift` with your project URL + anon key
+5. Enable Realtime for tables: `game_sessions`, `session_players`, `game_actions`, `phase_timers`
 
-App works fully offline if you skip authentication (no cloud sync, but all game features work).
+### Solo Mode Only
+Solo mode works fully offline without Supabase. Authentication is optional (only needed for cloud stats sync).
 
 ## Development Notes
 
@@ -132,43 +168,59 @@ App works fully offline if you skip authentication (no cloud sync, but all game 
    - Rollback steps (if applicable)
    - Known gotchas for next session
 
-8. **Respect the two-phase night pattern** — Any changes to night resolution must preserve the `endNight()` → `resolveNightOutcome()` flow. Don't fold them into one method.
+8. **Respect the two-phase night pattern (Solo)** — Any changes to solo night resolution must preserve the `endNight()` → `resolveNightOutcome()` flow. Don't fold them into one method.
 
-9. **Autonomously delegate tasks to Codex Agent** — Claude Code should proactively delegate tasks to Codex Agent (GPT-5.1 with high reasoning) to save tokens and leverage its capabilities. Codex is very capable and can handle complex tasks. Delegate using `./scripts/codex_analyze.sh "task" [files...]` and apply the recommendations. See delegation criteria below.
+9. **Understand mode separation** — Solo and Multiplayer are separate code paths:
+   - Solo: GameStore + local JSON persistence
+   - Multiplayer: SessionService + Supabase Realtime
+   - Don't mix patterns or share state between modes
 
-## Autonomous Codex Delegation
+10. **Test multiplayer with multiple devices/tabs** — Realtime subscriptions only work with actual Supabase connections. Use multiple simulator instances or browser tabs for Supabase Dashboard to verify sync.
 
-Claude Code has access to Codex Agent (GPT-5.1 with high reasoning) and should **autonomously delegate** tasks without asking. Use `./scripts/codex_analyze.sh` to get analysis and recommendations, then apply the changes.
+11. **Delegate to Codex MCP aggressively** — Claude Code has access to Codex Agent (GPT-5.1 with high reasoning) via MCP. **Delegate as many tasks as possible to Codex** using the `mcp__codex-cli__codex` tool for:
+    - Complex debugging and root cause analysis
+    - Refactoring suggestions across multiple files
+    - Implementation planning for new features
+    - Code review and optimization suggestions
+    - Test case generation
+    - Architecture analysis and design decisions
+    - Bug investigation and triage
+    - Performance optimization strategies
+    - Any task requiring deep reasoning or multi-file analysis
 
-### When to Delegate (Do This Proactively)
+    **When to delegate**: Proactively use Codex before making changes, not just when stuck. Codex excels at analysis and recommendations; Claude Code excels at applying those recommendations using its tools.
 
-**Always Consider Delegating:**
-- Complex debugging tasks (Codex has high reasoning capabilities)
-- Refactoring across multiple files
-- Code analysis and optimization suggestions
-- Bug hunting and root cause analysis
-- Implementation planning for new features
-- Test case generation
-- Code review and security analysis
-- Performance optimization suggestions
-- When token budget is >50% used and task is suitable
+12. **Always use ios-simulator-test-orchestrator for simulator interactions** — For ANY interaction with the iOS Simulator (testing UI, verifying fixes, running flows, taking screenshots, etc.), use the Task tool with `subagent_type='ios-simulator-test-orchestrator'`. This specialized agent handles:
+    - Building and launching the app
+    - UI automation (tapping, swiping, typing)
+    - Screenshot capture and verification
+    - Full test scenario execution
+    - Console log monitoring
+    - Multi-step user flows
 
-**Keep in Claude Code:**
-- Final file modifications (Codex provides recommendations, Claude applies them)
-- Direct user interaction and questions
-- Tasks requiring real-time project state (e.g., current git status, file checks)
-- Very simple one-liner changes (faster to do directly)
+    **Never** manually use MCP simulator tools or bash commands for simulator testing. The orchestrator provides better automation, error handling, and reporting.
 
-### Delegation Pattern
+## Multiplayer Architecture
 
-```bash
-# 1. Delegate to Codex for analysis
-CODEX_OUTPUT=$(./scripts/codex_analyze.sh "Analyze GameStore night resolution and suggest improvements" Core/Store/GameStore.swift)
+**Host-client model**: One player is host (creates session), others are clients (join via room code).
 
-# 2. Review Codex's recommendations
-# 3. Apply the suggested changes using Claude Code's tools
-```
+**Room codes**: 6-character uppercase alphanumeric, collision-safe via DB unique constraint.
 
-**Example workflow:**
-- User: "Fix the multiplayer sync issues"
-- Claude Code: [Autonomously delegates to Codex] → Gets analysis → Applies recommended fixes → Reports to user
+**Phase flow** (host controls):
+1. `lobby` → Host configures settings, players join, mark ready
+2. `role_reveal` → Sequential reveals, players see their role
+3. `night` → Role-specific actions submitted to `game_actions` table
+4. `morning` → Host resolves night outcomes, displays results
+5. `death_reveal` → Show who died
+6. `voting` → Players vote to eliminate
+7. Repeat 3-6 until `game_over`
+
+**Action submission**: Players submit actions via `SessionService.submitAction()` → inserts into `game_actions` → host reads all actions before advancing phase.
+
+**Realtime sync**: `RealtimeService.subscribeToSession()` listens to:
+- `game_sessions` changes → session state updates
+- `session_players` changes → player list updates
+- `game_actions` changes → action submissions
+- `phase_timers` changes → timer expirations
+
+**Bot support**: Bots have `is_bot=true`, `user_id=null`. Host controls bot actions locally, writes them as `game_actions`.
