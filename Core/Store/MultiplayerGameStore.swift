@@ -267,9 +267,10 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func handleSessionUpdate(_ session: GameSession) {
-        let previousPhase = currentSession?.currentPhase
         let previousPhaseData = currentSession?.currentPhaseData
         currentSession = session
+
+        updateHostStatus(using: session)
 
         if session.currentPhaseData != previousPhaseData {
             scheduleAutoAdvance(for: session.currentPhaseData)
@@ -279,6 +280,17 @@ final class MultiplayerGameStore: ObservableObject {
                 }
             }
         }
+    }
+
+    private func updateHostStatus(using session: GameSession) {
+        guard let userId = authStore?.currentUserId else { return }
+        let newIsHost = (session.hostUserId == userId)
+        if newIsHost != isHost {
+            let statusMessage = newIsHost ? "Promoted" : "Demoted"
+            print("👑 [MultiplayerGameStore] Host status changed: \(statusMessage)")
+            isHost = newIsHost
+        }
+
     }
 
     private func handlePlayerUpdate(_ player: SessionPlayer) {
@@ -996,9 +1008,10 @@ final class MultiplayerGameStore: ObservableObject {
         let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
 
         var resultingDeaths: [UUID] = []
+        var hostEliminated = false
         if let targetId = mafiaTargetId, !targetWasSaved {
             resultingDeaths = [targetId]
-            try await applyEliminations(resultingDeaths, reason: "Eliminated at night")
+            hostEliminated = try await applyEliminations(resultingDeaths, reason: "Eliminated at night")
         }
 
         let nightRecord = NightActionRecord(
@@ -1041,6 +1054,8 @@ final class MultiplayerGameStore: ObservableObject {
             isGameOver: winnerCheck.isGameOver ? true : nil,
             winner: winnerCheck.winner
         )
+
+        await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
     }
 
     private func checkVotingPhaseReadiness(dayIndex: Int) async throws {
@@ -1094,9 +1109,10 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         var removedPlayerIds: [UUID] = []
+        var hostEliminated = false
         if let eliminated = eliminatedPlayerId {
             removedPlayerIds = [eliminated]
-            try await applyEliminations(removedPlayerIds, reason: "Voted out")
+            hostEliminated = try await applyEliminations(removedPlayerIds, reason: "Voted out")
         }
 
         let dayRecord = DayActionRecord(
@@ -1138,6 +1154,8 @@ final class MultiplayerGameStore: ObservableObject {
             isGameOver: winnerCheck.isGameOver ? true : nil,
             winner: winnerCheck.winner
         )
+
+        await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
     }
 
     private func determineMajorityTarget(from actions: [GameAction]) -> UUID? {
@@ -1155,8 +1173,11 @@ final class MultiplayerGameStore: ObservableObject {
         return leaders.count == 1 ? leaders.first?.key : nil
     }
 
-    private func applyEliminations(_ playerIds: [UUID], reason: String) async throws {
-        guard !playerIds.isEmpty else { return }
+    @discardableResult
+    private func applyEliminations(_ playerIds: [UUID], reason: String) async throws -> Bool {
+        guard !playerIds.isEmpty else { return false }
+
+        var hostEliminated = false
 
         for playerId in playerIds {
             guard let index = allPlayers.firstIndex(where: { $0.playerId == playerId }) else { continue }
@@ -1168,6 +1189,11 @@ final class MultiplayerGameStore: ObservableObject {
             allPlayers[index] = updatedPlayer
             eliminatedPlayerIds.insert(updatedPlayer.playerId)
 
+            if let hostUserId = currentSession?.hostUserId,
+               updatedPlayer.userId == hostUserId {
+                hostEliminated = true
+            }
+
             try await sessionService.updatePlayerLifeStatus(
                 recordId: updatedPlayer.id,
                 isAlive: false,
@@ -1176,6 +1202,37 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         updateVisiblePlayers()
+        return hostEliminated
+    }
+
+    private func transferHostIfNeeded(hostEliminated: Bool, session: GameSession) async {
+        guard hostEliminated else { return }
+
+        guard let newHostUserId = determineNextHostUserId(excluding: session.hostUserId) else {
+            print("⚠️ [MultiplayerGameStore] No eligible player to inherit host role for session \(session.id)")
+            return
+        }
+
+        do {
+            try await sessionService.updateSessionHost(sessionId: session.id, newHostUserId: newHostUserId)
+            try? await refreshSession()
+        } catch {
+            print("❌ [MultiplayerGameStore] Failed to transfer host after elimination: \(error)")
+        }
+    }
+
+    private func determineNextHostUserId(excluding currentHostId: UUID) -> UUID? {
+        let eligiblePlayers = allPlayers
+            .filter { $0.isAlive && !$0.isBot }
+            .sorted { $0.joinedAt < $1.joinedAt }
+
+        for player in eligiblePlayers {
+            if let userId = player.userId, userId != currentHostId {
+                return userId
+            }
+        }
+
+        return nil
     }
 
     private func evaluateWinners(startOfDay: Bool) -> (winner: Role?, isGameOver: Bool) {

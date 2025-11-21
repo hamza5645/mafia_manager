@@ -207,6 +207,21 @@ final class SessionService {
             .execute()
     }
 
+    /// Transfer host privileges to another authenticated user (host only)
+    func updateSessionHost(sessionId: UUID, newHostUserId: UUID) async throws {
+        let params: [String: AnyJSON] = [
+            "p_session_id": .string(sessionId.uuidString),
+            "p_new_host_user_id": .string(newHostUserId.uuidString)
+        ]
+
+        struct TransferResponse: Decodable { let success: Bool? }
+
+        let _: TransferResponse = try await supabase
+            .rpc("transfer_session_host", params: params)
+            .execute()
+            .value
+    }
+
     /// Update session phase
     func updateSessionPhase(
         sessionId: UUID,

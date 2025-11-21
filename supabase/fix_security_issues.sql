@@ -25,8 +25,57 @@ FROM public.session_players sp;
 -- Grant access to the view
 GRANT SELECT ON public.game_session_players TO authenticated, anon;
 
+-- 2. HOST TRANSFER RPC (Allows current host to delegate safely)
+CREATE OR REPLACE FUNCTION public.transfer_session_host(
+    p_session_id UUID,
+    p_new_host_user_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_current_host UUID;
+BEGIN
+    SELECT host_user_id INTO v_current_host
+    FROM public.game_sessions
+    WHERE id = p_session_id
+    FOR UPDATE;
 
--- 2. SECURE GAME ACTIONS RLS (Prevents Action/Result Leakage)
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Session not found';
+    END IF;
+
+    IF v_current_host <> auth.uid() THEN
+        RAISE EXCEPTION 'Only the current host can transfer admin duties';
+    END IF;
+
+    IF p_new_host_user_id IS NULL THEN
+        RAISE EXCEPTION 'New host must be a valid authenticated user';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.session_players
+        WHERE session_id = p_session_id
+          AND user_id = p_new_host_user_id
+          AND is_alive
+    ) THEN
+        RAISE EXCEPTION 'New host must be an alive human participant in this session';
+    END IF;
+
+    UPDATE public.game_sessions
+    SET host_user_id = p_new_host_user_id
+    WHERE id = p_session_id;
+
+    RETURN true;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.transfer_session_host(UUID, UUID) TO authenticated;
+
+-- 3. SECURE GAME ACTIONS RLS (Prevents Action/Result Leakage)
 DROP POLICY IF EXISTS "Players can view actions in their session" ON public.game_actions;
 
 CREATE POLICY "Players can view actions in their session"
