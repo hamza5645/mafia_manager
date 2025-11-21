@@ -74,9 +74,9 @@ struct MultiplayerVotingView: View {
                                 isSelected: selectedTargetId == player.playerId
                             ) {
                                 selectedTargetId = player.playerId
-                                // Auto-submit for host
+                                // For host: submit vote silently without showing confirmation
                                 if multiplayerStore.isHost && !hasSubmitted {
-                                    submitVote()
+                                    submitVote(showConfirmation: false)
                                 }
                             }
                         }
@@ -219,7 +219,7 @@ struct MultiplayerVotingView: View {
         }
     }
 
-    private func submitVote() {
+    private func submitVote(showConfirmation: Bool = true) {
         isSubmitting = true
 
         Task {
@@ -235,7 +235,10 @@ struct MultiplayerVotingView: View {
                 }
 
                 await MainActor.run {
-                    hasSubmitted = true
+                    // Only show confirmation screen if requested (non-host players)
+                    if showConfirmation {
+                        hasSubmitted = true
+                    }
                     isSubmitting = false
                 }
             } catch {

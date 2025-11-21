@@ -95,6 +95,7 @@ final class MultiplayerGameStore: ObservableObject {
             myPlayer = player
             isHost = true
             isInSession = true
+            wasKicked = false // Reset kick status when creating new session
 
             // Subscribe to real-time updates
             try await subscribeToSession(sessionId: session.id)
@@ -137,6 +138,7 @@ final class MultiplayerGameStore: ObservableObject {
             myPlayer = player
             isHost = (session.hostUserId == userId)
             isInSession = true
+            wasKicked = false // Reset kick status when joining session
 
             // Subscribe to real-time updates
             try await subscribeToSession(sessionId: session.id)
@@ -395,13 +397,28 @@ final class MultiplayerGameStore: ObservableObject {
         let players = try await sessionService.getSessionPlayers(sessionId: sessionId)
         guard sessionId == currentSession?.id else { return } // Session changed; drop stale data.
 
+        // Check if current player was removed (kicked)
+        let wasInSession = myPlayer != nil
+        let currentUserId = authStore?.currentUserId
+
         allPlayers = players
 
         // Find my player
-        if let userId = authStore?.currentUserId {
-            myPlayer = allPlayers.first(where: { $0.userId == userId })
-            myRole = myPlayer?.role
-            myNumber = myPlayer?.playerNumber
+        if let userId = currentUserId {
+            let foundPlayer = allPlayers.first(where: { $0.userId == userId })
+            myPlayer = foundPlayer
+            myRole = foundPlayer?.role
+            myNumber = foundPlayer?.playerNumber
+
+            // If player was in session but is no longer found, they were kicked
+            if wasInSession && foundPlayer == nil {
+                print("⚠️ [MultiplayerGameStore] Current user not found in refreshed players - was kicked")
+                myPlayer = nil
+                myRole = nil
+                myNumber = nil
+                isInSession = false
+                wasKicked = true
+            }
         }
 
         // Never resurrect eliminated players even if a stale update arrives
@@ -998,7 +1015,7 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
         guard let session = currentSession else { return }
-        
+
         // Re-fetch actions to ensure we have latest state
         let mafiaActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
@@ -1008,6 +1025,11 @@ final class MultiplayerGameStore: ObservableObject {
         let doctorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .doctorProtect,
+            phaseIndex: nightIndex
+        )
+        let inspectorActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .inspectorCheck,
             phaseIndex: nightIndex
         )
 
@@ -1023,13 +1045,33 @@ final class MultiplayerGameStore: ObservableObject {
             hostEliminated = try await applyEliminations(resultingDeaths, reason: "Eliminated at night")
         }
 
+        // Collect role-specific player numbers (host has access to all roles)
+        let mafiaPlayerNumbers = allPlayers
+            .filter { $0.role == .mafia }
+            .compactMap { $0.playerNumber }
+            .sorted()
+        let doctorPlayerNumbers = allPlayers
+            .filter { $0.role == .doctor }
+            .compactMap { $0.playerNumber }
+            .sorted()
+        let inspectorPlayerNumbers = allPlayers
+            .filter { $0.role == .inspector }
+            .compactMap { $0.playerNumber }
+            .sorted()
+
+        // Inspector checked ID can be public (but result stays private)
+        let inspectorCheckedId = inspectorActions.first?.targetPlayerId
+
         let nightRecord = NightActionRecord(
             nightIndex: nightIndex,
             mafiaTargetId: mafiaTargetId,
-            inspectorCheckedId: nil, // Sanitize: Private action
-            inspectorResult: nil, // Sanitize: Private result
+            inspectorCheckedId: inspectorCheckedId, // Public: Who was checked
+            inspectorResult: nil, // Private: Result stays hidden
             doctorProtectedId: doctorProtectedId,
             resultingDeaths: resultingDeaths,
+            mafiaPlayerNumbers: mafiaPlayerNumbers,
+            doctorPlayerNumbers: doctorPlayerNumbers,
+            inspectorPlayerNumbers: inspectorPlayerNumbers,
             timestamp: Date()
         )
 
@@ -1494,7 +1536,7 @@ final class MultiplayerGameStore: ObservableObject {
                 inspectorResultRole: nil,
                 doctorProtectedPlayerID: record.doctorProtectedId,
                 resultingDeaths: record.resultingDeaths,
-                mafiaNumbers: [],
+                mafiaNumbers: record.mafiaPlayerNumbers,
                 isResolved: true,
                 aliveMafiaIDs: nil,
                 mafiaPhaseCompleted: true,

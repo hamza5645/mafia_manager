@@ -524,8 +524,7 @@ struct MultiplayerMorningView: View {
 
     // Helper functions matching local game format
     private func mafiaSummary(for record: NightActionRecord) -> String {
-        let mafiaPlayers = multiplayerStore.allPlayers.filter { $0.role == .mafia }
-        let numbers = mafiaPlayers.compactMap { $0.playerNumber }.sorted()
+        let numbers = record.mafiaPlayerNumbers.sorted()
         let mafiaLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
         if let targetNumber = playerNumber(for: record.mafiaTargetId) {
@@ -535,8 +534,7 @@ struct MultiplayerMorningView: View {
     }
 
     private func policeSummary(for record: NightActionRecord) -> String {
-        let inspectorPlayers = multiplayerStore.allPlayers.filter { $0.role == .inspector }
-        let numbers = inspectorPlayers.compactMap { $0.playerNumber }.sorted()
+        let numbers = record.inspectorPlayerNumbers.sorted()
         let policeLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
         if let inspectedNumber = playerNumber(for: record.inspectorCheckedId) {
@@ -546,8 +544,7 @@ struct MultiplayerMorningView: View {
     }
 
     private func doctorSummary(for record: NightActionRecord) -> String {
-        let doctorPlayers = multiplayerStore.allPlayers.filter { $0.role == .doctor }
-        let numbers = doctorPlayers.compactMap { $0.playerNumber }.sorted()
+        let numbers = record.doctorPlayerNumbers.sorted()
         let doctorLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
         if let protectedNumber = playerNumber(for: record.doctorProtectedId) {
@@ -681,6 +678,30 @@ struct MultiplayerDeathRevealView: View {
         return record.resultingDeaths.compactMap { playerLookup[$0] }
     }
 
+    // Helper to determine role based on player number from night record
+    private func roleFor(player: PublicPlayerInfo) -> Role {
+        guard let record = nightRecord, let playerNum = player.playerNumber else {
+            return .citizen
+        }
+
+        // Try to get role from session player first (if RLS allows)
+        if let sessionPlayer = multiplayerStore.allPlayers.first(where: { $0.playerId == player.playerId }),
+           let role = sessionPlayer.role {
+            return role
+        }
+
+        // Otherwise, infer from role-specific number arrays in night record
+        if record.mafiaPlayerNumbers.contains(playerNum) {
+            return .mafia
+        } else if record.doctorPlayerNumbers.contains(playerNum) {
+            return .doctor
+        } else if record.inspectorPlayerNumbers.contains(playerNum) {
+            return .inspector
+        } else {
+            return .citizen
+        }
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -725,9 +746,21 @@ struct MultiplayerDeathRevealView: View {
                                             .foregroundStyle(Design.Colors.textSecondary)
                                     }
                                 }
-                                Text("Removed during the night")
-                                    .font(Design.Typography.caption)
-                                    .foregroundStyle(Design.Colors.textSecondary)
+                                // Show role of eliminated player
+                                let playerRole = roleFor(player: player)
+                                HStack(spacing: 6) {
+                                    Text("Was a")
+                                        .font(Design.Typography.caption)
+                                        .foregroundStyle(Design.Colors.textSecondary)
+                                    HStack(spacing: 4) {
+                                        Image(systemName: playerRole.symbolName)
+                                            .font(.system(size: 12))
+                                        Text(playerRole.displayName.uppercased())
+                                            .font(Design.Typography.caption)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundStyle(playerRole.accentColor)
+                                }
                             }
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)

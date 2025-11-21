@@ -155,6 +155,9 @@ struct NightActionRecord: Codable, Sendable {
     let inspectorResult: String?
     let doctorProtectedId: UUID?
     let resultingDeaths: [UUID]
+    let mafiaPlayerNumbers: [Int]
+    let doctorPlayerNumbers: [Int]
+    let inspectorPlayerNumbers: [Int]
     let timestamp: Date
 
     enum CodingKeys: String, CodingKey {
@@ -164,7 +167,66 @@ struct NightActionRecord: Codable, Sendable {
         case inspectorResult = "inspector_result"
         case doctorProtectedId = "doctor_protected_id"
         case resultingDeaths = "resulting_deaths"
+        case mafiaPlayerNumbers = "mafia_player_numbers"
+        case doctorPlayerNumbers = "doctor_player_numbers"
+        case inspectorPlayerNumbers = "inspector_player_numbers"
         case timestamp
+    }
+
+    // Convenience initializer
+    init(
+        nightIndex: Int,
+        mafiaTargetId: UUID?,
+        inspectorCheckedId: UUID?,
+        inspectorResult: String?,
+        doctorProtectedId: UUID?,
+        resultingDeaths: [UUID],
+        mafiaPlayerNumbers: [Int] = [],
+        doctorPlayerNumbers: [Int] = [],
+        inspectorPlayerNumbers: [Int] = [],
+        timestamp: Date
+    ) {
+        self.nightIndex = nightIndex
+        self.mafiaTargetId = mafiaTargetId
+        self.inspectorCheckedId = inspectorCheckedId
+        self.inspectorResult = inspectorResult
+        self.doctorProtectedId = doctorProtectedId
+        self.resultingDeaths = resultingDeaths
+        self.mafiaPlayerNumbers = mafiaPlayerNumbers
+        self.doctorPlayerNumbers = doctorPlayerNumbers
+        self.inspectorPlayerNumbers = inspectorPlayerNumbers
+        self.timestamp = timestamp
+    }
+
+    // Custom decoder to handle old records without role-specific numbers
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        nightIndex = try container.decode(Int.self, forKey: .nightIndex)
+        mafiaTargetId = try container.decodeIfPresent(UUID.self, forKey: .mafiaTargetId)
+        inspectorCheckedId = try container.decodeIfPresent(UUID.self, forKey: .inspectorCheckedId)
+        inspectorResult = try container.decodeIfPresent(String.self, forKey: .inspectorResult)
+        doctorProtectedId = try container.decodeIfPresent(UUID.self, forKey: .doctorProtectedId)
+        resultingDeaths = try container.decode([UUID].self, forKey: .resultingDeaths)
+        // Default to empty arrays for backwards compatibility
+        mafiaPlayerNumbers = (try? container.decode([Int].self, forKey: .mafiaPlayerNumbers)) ?? []
+        doctorPlayerNumbers = (try? container.decode([Int].self, forKey: .doctorPlayerNumbers)) ?? []
+        inspectorPlayerNumbers = (try? container.decode([Int].self, forKey: .inspectorPlayerNumbers)) ?? []
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+    }
+
+    // Standard encoder
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(nightIndex, forKey: .nightIndex)
+        try container.encodeIfPresent(mafiaTargetId, forKey: .mafiaTargetId)
+        try container.encodeIfPresent(inspectorCheckedId, forKey: .inspectorCheckedId)
+        try container.encodeIfPresent(inspectorResult, forKey: .inspectorResult)
+        try container.encodeIfPresent(doctorProtectedId, forKey: .doctorProtectedId)
+        try container.encode(resultingDeaths, forKey: .resultingDeaths)
+        try container.encode(mafiaPlayerNumbers, forKey: .mafiaPlayerNumbers)
+        try container.encode(doctorPlayerNumbers, forKey: .doctorPlayerNumbers)
+        try container.encode(inspectorPlayerNumbers, forKey: .inspectorPlayerNumbers)
+        try container.encode(timestamp, forKey: .timestamp)
     }
 }
 
