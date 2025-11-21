@@ -36,6 +36,7 @@ final class MultiplayerGameStore: ObservableObject {
     private var processedBotNightIndices: Set<Int> = []
     private var processedBotVotingDays: Set<Int> = []
     private var isResolvingPhase = false
+    private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
     // Auth store reference
     private weak var authStore: AuthStore?
@@ -285,10 +286,24 @@ final class MultiplayerGameStore: ObservableObject {
         
         if let index = allPlayers.firstIndex(where: { $0.id == player.id }) {
             print("🔄 [MultiplayerGameStore] Updating existing player at index \(index)")
-            allPlayers[index] = player
+            var updated = player
+            if !updated.isAlive {
+                eliminatedPlayerIds.insert(updated.playerId)
+            }
+            if eliminatedPlayerIds.contains(player.playerId) {
+                updated.isAlive = false
+            }
+            allPlayers[index] = updated
         } else {
             print("➕ [MultiplayerGameStore] Adding new player to list (current count: \(allPlayers.count))")
-            allPlayers.append(player)
+            var updated = player
+            if !updated.isAlive {
+                eliminatedPlayerIds.insert(updated.playerId)
+            }
+            if eliminatedPlayerIds.contains(player.playerId) {
+                updated.isAlive = false
+            }
+            allPlayers.append(updated)
         }
 
         // Update my player if it's me
@@ -301,10 +316,14 @@ final class MultiplayerGameStore: ObservableObject {
         print("👥 [MultiplayerGameStore] Total players after update: \(allPlayers.count)")
         updateVisiblePlayers()
         print("👁️ [MultiplayerGameStore] Visible players count: \(visiblePlayers.count)")
-        
+
         if isHost {
+            print("🔔 [MultiplayerGameStore] Player update - Host detected, triggering phase evaluations")
             Task {
                 try? await self.advanceFromRoleRevealIfReady(forceRefresh: false)
+                // Also check readiness for night/voting phases
+                print("🔄 [MultiplayerGameStore] Calling evaluatePhaseProgression from player_update")
+                await self.evaluatePhaseProgression(trigger: "player_update")
             }
         }
     }
@@ -368,6 +387,17 @@ final class MultiplayerGameStore: ObservableObject {
             myNumber = myPlayer?.playerNumber
         }
 
+        // Never resurrect eliminated players even if a stale update arrives
+        for index in allPlayers.indices {
+            if !allPlayers[index].isAlive {
+                eliminatedPlayerIds.insert(allPlayers[index].playerId)
+            }
+
+            if eliminatedPlayerIds.contains(allPlayers[index].playerId) {
+                allPlayers[index].isAlive = false
+            }
+        }
+
         updateVisiblePlayers()
     }
 
@@ -394,6 +424,13 @@ final class MultiplayerGameStore: ObservableObject {
 
         // Update optimistically
         myPlayer?.isReady = newReadyStatus
+    }
+
+    /// Explicitly set ready state (used for auto-ready flows like citizens)
+    func setReadyStatus(_ isReady: Bool) async throws {
+        guard let playerId = myPlayer?.id else { return }
+        try await sessionService.updatePlayerReady(playerId: playerId, isReady: isReady)
+        myPlayer?.isReady = isReady
     }
     
     /// Mark that player has seen their role
@@ -518,6 +555,11 @@ final class MultiplayerGameStore: ObservableObject {
         // Update session status and phase
         try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress)
         print("✅ [MultiplayerGameStore] Session status updated")
+
+        // Reset readiness before role reveal so hosts can't advance until everyone confirms
+        print("🎮 [MultiplayerGameStore] Resetting ready flags for role reveal...")
+        await resetAllPlayersReady()
+        print("✅ [MultiplayerGameStore] Ready flags reset for role reveal")
         
         print("🎮 [MultiplayerGameStore] Updating phase to role_reveal...")
         try await sessionService.updateSessionPhase(
@@ -753,16 +795,32 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func resetAllPlayersReady() async {
-        guard let sessionId = currentSession?.id else { return }
+        guard currentSession != nil else { return }
+
+        // Keep local state in sync so UI immediately reflects the locked state
+        var updatedPlayers = allPlayers
 
         // Reset isReady for all human players
-        for player in allPlayers where !player.isBot {
+        for index in updatedPlayers.indices where !updatedPlayers[index].isBot {
+            let player = updatedPlayers[index]
             do {
                 try await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
+                updatedPlayers[index].isReady = false
             } catch {
                 print("❌ Failed to reset ready status for player \(player.playerName): \(error)")
             }
         }
+
+        allPlayers = updatedPlayers
+
+        if let myId = myPlayer?.id,
+           let updatedMe = updatedPlayers.first(where: { $0.id == myId }) {
+            myPlayer = updatedMe
+            myRole = updatedMe.role
+            myNumber = updatedMe.playerNumber
+        }
+        
+        updateVisiblePlayers()
     }
 
     private func evaluatePhaseProgression(trigger: String) async {
@@ -774,6 +832,12 @@ final class MultiplayerGameStore: ObservableObject {
 
         do {
             try await refreshPlayers()
+        } catch {
+            // Don't block readiness evaluation on transient network issues
+            print("⚠️ [MultiplayerGameStore] refreshPlayers() failed during \(trigger): \(error)")
+        }
+
+        do {
             switch phaseData {
             case .night(let nightIndex, _):
                 try await checkNightPhaseReadiness(nightIndex: nightIndex)
@@ -788,43 +852,121 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func checkNightPhaseReadiness(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
-              activeNightIndex == nightIndex else {
+        print("🔍 [MultiplayerGameStore] checkNightPhaseReadiness called for night \(nightIndex)")
+        guard isHost else {
+            print("❌ [MultiplayerGameStore] Not host, skipping readiness check")
             return
         }
-        guard let session = currentSession else { return }
+        guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
+              activeNightIndex == nightIndex else {
+            print("❌ [MultiplayerGameStore] Phase mismatch or not in night phase")
+            return
+        }
+        guard let session = currentSession else {
+            print("❌ [MultiplayerGameStore] No current session")
+            return
+        }
 
         let aliveMafia = allPlayers.filter { $0.isAlive && $0.role == .mafia }
         let aliveDoctors = allPlayers.filter { $0.isAlive && $0.role == .doctor }
         let aliveInspectors = allPlayers.filter { $0.isAlive && $0.role == .inspector }
 
-        let mafiaActions = try await sessionService.getActionsForPhase(
+        let mafiaActions = await loadActionsSafely(
             sessionId: session.id,
             actionType: .mafiaTarget,
             phaseIndex: nightIndex
         )
-        let inspectorActions = try await sessionService.getActionsForPhase(
+        let inspectorActions = await loadActionsSafely(
             sessionId: session.id,
             actionType: .inspectorCheck,
             phaseIndex: nightIndex
         )
-        let doctorActions = try await sessionService.getActionsForPhase(
+        let doctorActions = await loadActionsSafely(
             sessionId: session.id,
             actionType: .doctorProtect,
             phaseIndex: nightIndex
         )
+
+        print("📊 [MultiplayerGameStore] Night Actions - Mafia: \(mafiaActions.count), Doctor: \(doctorActions.count), Inspector: \(inspectorActions.count)")
 
         // Check if all alive, non-host human players have marked themselves as ready
         // (Host doesn't need to mark ready since they control phase advancement)
         let alivePlayers = allPlayers.filter { $0.isAlive }
         let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
         let aliveNonHostHumans = aliveHumanPlayers.filter { $0.userId != session.hostUserId }
-        let readyNonHostHumans = aliveNonHostHumans.filter { $0.isReady }
+
+        // Track who has already submitted an action so we don't block on missing ready flags
+        let mafiaActors = Set(mafiaActions.map { $0.actorPlayerId })
+        let doctorActors = Set(doctorActions.map { $0.actorPlayerId })
+        let inspectorActors = Set(inspectorActions.map { $0.actorPlayerId })
+
+        let readyNonHostHumans = aliveNonHostHumans.filter { player in
+            let role = player.role
+            let passive = (role == .citizen)
+
+            let hasAction: Bool = {
+                switch role {
+                case .mafia:
+                    return mafiaActors.contains(player.playerId)
+                case .doctor:
+                    return doctorActors.contains(player.playerId)
+                case .inspector:
+                    return inspectorActors.contains(player.playerId)
+                default:
+                    return false
+                }
+            }()
+
+            return passive || player.isReady || hasAction
+        }
+
         let allReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
 
+        print("👥 [MultiplayerGameStore] Total alive: \(alivePlayers.count), Alive humans: \(aliveHumanPlayers.count)")
+        print("👥 [MultiplayerGameStore] Non-host humans: \(aliveNonHostHumans.count), Ready: \(readyNonHostHumans.count)")
+        print("✅ [MultiplayerGameStore] All ready? \(allReady)")
+
+        // Log individual player states
+        for player in aliveNonHostHumans {
+            let role = player.role?.displayName ?? "?"
+            let hasAction: Bool
+            switch player.role {
+            case .mafia:
+                hasAction = mafiaActors.contains(player.playerId)
+            case .doctor:
+                hasAction = doctorActors.contains(player.playerId)
+            case .inspector:
+                hasAction = inspectorActors.contains(player.playerId)
+            default:
+                hasAction = false
+            }
+
+            let passive = player.role == .citizen
+            let effectiveReady = passive || player.isReady || hasAction
+            print("   👤 \(player.playerName) - Ready flag: \(player.isReady), Action: \(hasAction), Passive: \(passive), Effective: \(effectiveReady), Role: \(role)")
+        }
+
         await MainActor.run {
+            print("🎯 [MultiplayerGameStore] Setting isPhaseReadyToAdvance = \(allReady)")
             self.isPhaseReadyToAdvance = allReady
+        }
+    }
+
+    /// Resilient action fetch that won't block readiness checks if Supabase temporarily fails
+    private func loadActionsSafely(
+        sessionId: UUID,
+        actionType: ActionType,
+        phaseIndex: Int
+    ) async -> [GameAction] {
+        do {
+            return try await sessionService.getActionsForPhase(
+                sessionId: sessionId,
+                actionType: actionType,
+                phaseIndex: phaseIndex
+            )
+        } catch {
+            print("⚠️ [MultiplayerGameStore] Failed to load actions for \(actionType.rawValue) @ phase \(phaseIndex): \(error)")
+            return []
         }
     }
     
@@ -1024,6 +1166,7 @@ final class MultiplayerGameStore: ObservableObject {
             updatedPlayer.isAlive = false
             updatedPlayer.removalNote = reason
             allPlayers[index] = updatedPlayer
+            eliminatedPlayerIds.insert(updatedPlayer.playerId)
 
             try await sessionService.updatePlayerLifeStatus(
                 recordId: updatedPlayer.id,
