@@ -62,7 +62,7 @@ struct MultiplayerLobbyView: View {
                 Button {
                     showingLeaveConfirmation = true
                 } label: {
-                    Image(systemName: "chevron.down")
+                    Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(Design.Colors.brandGold)
                 }
@@ -75,6 +75,12 @@ struct MultiplayerLobbyView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to leave this game?")
+        }
+        .onChange(of: multiplayerStore.wasKicked) { _, wasKicked in
+            if wasKicked {
+                // Auto-dismiss when kicked from session
+                dismiss()
+            }
         }
     }
     
@@ -275,22 +281,7 @@ struct MultiplayerLobbyView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 20)
-                .background(
-                    VStack(spacing: 0) {
-                        LinearGradient(
-                            colors: [
-                                Design.Colors.surface0.opacity(0),
-                                Design.Colors.surface0.opacity(0.95),
-                                Design.Colors.surface0
-                            ],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
-                        .frame(height: 40)
-
-                        Design.Colors.surface0
-                    }
-                )
+                .background(Design.Colors.surface0)
             }
         }
     }
@@ -526,6 +517,61 @@ struct MultiplayerMorningView: View {
         return playerLookup[id]?.playerName
     }
 
+    private func playerNumber(for id: UUID?) -> Int? {
+        guard let id else { return nil }
+        return playerLookup[id]?.playerNumber
+    }
+
+    // Helper functions matching local game format
+    private func mafiaSummary(for record: NightActionRecord) -> String {
+        let mafiaPlayers = multiplayerStore.allPlayers.filter { $0.role == .mafia }
+        let numbers = mafiaPlayers.compactMap { $0.playerNumber }.sorted()
+        let mafiaLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
+
+        if let targetNumber = playerNumber(for: record.mafiaTargetId) {
+            return "\(mafiaLabel) → #\(targetNumber)"
+        }
+        return mafiaLabel
+    }
+
+    private func policeSummary(for record: NightActionRecord) -> String {
+        let inspectorPlayers = multiplayerStore.allPlayers.filter { $0.role == .inspector }
+        let numbers = inspectorPlayers.compactMap { $0.playerNumber }.sorted()
+        let policeLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
+
+        if let inspectedNumber = playerNumber(for: record.inspectorCheckedId) {
+            return "\(policeLabel) → #\(inspectedNumber)"
+        }
+        return policeLabel
+    }
+
+    private func doctorSummary(for record: NightActionRecord) -> String {
+        let doctorPlayers = multiplayerStore.allPlayers.filter { $0.role == .doctor }
+        let numbers = doctorPlayers.compactMap { $0.playerNumber }.sorted()
+        let doctorLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
+
+        if let protectedNumber = playerNumber(for: record.doctorProtectedId) {
+            return "\(doctorLabel) → #\(protectedNumber)"
+        }
+        return doctorLabel
+    }
+
+    private func killedSummary(for record: NightActionRecord) -> String {
+        let deathNumbers = record.resultingDeaths.compactMap { playerNumber(for: $0) }.sorted()
+
+        if !deathNumbers.isEmpty {
+            return deathNumbers.map { "#\($0)" }.joined(separator: ", ")
+        }
+
+        // No deaths - check if doctor saved someone
+        if let targetNumber = playerNumber(for: record.mafiaTargetId),
+           record.doctorProtectedId == record.mafiaTargetId {
+            return "None (Doctor saved #\(targetNumber))"
+        }
+
+        return "None"
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -583,55 +629,37 @@ struct MultiplayerMorningView: View {
 
     @ViewBuilder
     private func summaryView(for record: NightActionRecord) -> some View {
-        VStack(spacing: 16) {
-            if eliminatedPlayers.isEmpty {
-                Label("No one was eliminated last night", systemImage: "sun.max.fill")
-                    .font(Design.Typography.body)
-                    .foregroundStyle(Design.Colors.successGreen)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Design.Colors.surface1)
-                    .cornerRadius(Design.Radii.medium)
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Eliminated Players")
-                        .font(Design.Typography.body)
+        VStack(alignment: .leading, spacing: 16) {
+            // Night summary with role actions
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "moon.stars.fill")
+                        .foregroundStyle(Design.Colors.brandGold)
+                    Text("Night \(nightIndex) Summary")
+                        .font(Design.Typography.headline)
                         .foregroundStyle(Design.Colors.textPrimary)
-
-                    ForEach(eliminatedPlayers) { player in
-                        HStack {
-                            Image(systemName: "person.fill.xmark")
-                                .foregroundStyle(Design.Colors.dangerRed)
-                            Text(player.playerName)
-                                .font(Design.Typography.body)
-                                .foregroundStyle(Design.Colors.textPrimary)
-                            Spacer()
-                            if let number = player.playerNumber {
-                                Text("#\(number)")
-                                    .font(Design.Typography.caption)
-                                    .foregroundStyle(Design.Colors.textSecondary)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Design.Colors.surface1)
-                .cornerRadius(Design.Radii.medium)
-            }
 
-            if let protectedName = playerName(for: record.doctorProtectedId), record.resultingDeaths.isEmpty {
-                Label("Doctor protected \(protectedName)", systemImage: "shield.checkerboard")
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.successGreen)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if let targetName = playerName(for: record.mafiaTargetId) {
-                Text("Mafia targeted \(targetName)")
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                summaryRow(title: "Mafia", value: mafiaSummary(for: record))
+                summaryRow(title: "Killed", value: killedSummary(for: record))
+                summaryRow(title: "Police", value: policeSummary(for: record))
+                summaryRow(title: "Doctor", value: doctorSummary(for: record))
             }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Design.Colors.surface1)
+            .cornerRadius(Design.Radii.medium)
+        }
+    }
+
+    private func summaryRow(title: String, value: String) -> some View {
+        HStack {
+            Text("\(title):")
+                .fontWeight(.semibold)
+                .foregroundStyle(Design.Colors.textPrimary)
+            Spacer()
+            Text(value)
+                .foregroundStyle(Design.Colors.textSecondary)
         }
     }
 }

@@ -29,6 +29,9 @@ final class MultiplayerGameStore: ObservableObject {
     // Phase progression state
     @Published var isPhaseReadyToAdvance: Bool = false
 
+    // Kick detection
+    @Published var wasKicked: Bool = false
+
     // Heartbeat timer
     private var heartbeatTimer: Timer?
     private var playerRefreshTimer: Timer?
@@ -344,16 +347,18 @@ final class MultiplayerGameStore: ObservableObject {
     private func handlePlayerRemoval(playerId: UUID) {
         print("🗑️ [MultiplayerGameStore] Player removed: \(playerId)")
         allPlayers.removeAll(where: { $0.id == playerId })
-        
-        // If it was me, clear my player state
+
+        // If it was me, clear my player state and trigger auto-dismiss
         if playerId == myPlayer?.id {
+            print("⚠️ [MultiplayerGameStore] Current user was kicked from session")
             myPlayer = nil
             myRole = nil
             myNumber = nil
+            wasKicked = true  // Signal to UI that we were removed
         }
-        
+
         updateVisiblePlayers()
-        
+
         // Refresh players from server to ensure consistency
         Task {
             try? await refreshPlayers()
@@ -630,14 +635,15 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Game Actions
 
     /// Submit a night action
+    /// Returns the investigation result for inspector checks, nil otherwise
     func submitNightAction(
         actionType: ActionType,
         nightIndex: Int,
         targetPlayerId: UUID?
-    ) async throws {
+    ) async throws -> String? {
         guard let session = currentSession,
               let myPlayerId = myPlayer?.playerId else {
-            return
+            return nil
         }
 
         let action: GameAction
@@ -668,11 +674,11 @@ final class MultiplayerGameStore: ObservableObject {
             )
         case .vote:
             // Voting handled separately
-            return
+            return nil
         }
 
-        try await sessionService.submitAction(action)
-        
+        let response = try await sessionService.submitAction(action)
+
         // If I'm the host, immediately check if this action completes the phase
         // This avoids relying solely on the real-time event which might be delayed
         if isHost {
@@ -683,6 +689,9 @@ final class MultiplayerGameStore: ObservableObject {
                 await self.evaluatePhaseProgression(trigger: "host_submission")
             }
         }
+
+        // Return investigation result for inspector checks
+        return actionType == .inspectorCheck ? response.result : nil
     }
 
     /// Submit a vote
@@ -1069,11 +1078,23 @@ final class MultiplayerGameStore: ObservableObject {
         let alivePlayers = allPlayers.filter { $0.isAlive }
 
         // Check if all alive, non-host human players have marked themselves as ready
-        // (Host doesn't need to mark ready since they control phase advancement)
         let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
         let aliveNonHostHumans = aliveHumanPlayers.filter { $0.userId != session.hostUserId }
         let readyNonHostHumans = aliveNonHostHumans.filter { $0.isReady }
-        let ready = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+        let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+
+        // Check if host has voted
+        let voteActions = await loadActionsSafely(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex
+        )
+        let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
+        let hostVote = voteActions.first { $0.actorPlayerId == hostPlayer?.playerId }
+        let hostHasVoted = hostVote != nil
+
+        // Ready when all non-host players are ready AND host has voted
+        let ready = nonHostReady && hostHasVoted
 
         await MainActor.run {
             self.isPhaseReadyToAdvance = ready

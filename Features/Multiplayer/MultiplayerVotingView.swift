@@ -74,6 +74,10 @@ struct MultiplayerVotingView: View {
                                 isSelected: selectedTargetId == player.playerId
                             ) {
                                 selectedTargetId = player.playerId
+                                // Auto-submit for host
+                                if multiplayerStore.isHost && !hasSubmitted {
+                                    submitVote()
+                                }
                             }
                         }
                     }
@@ -82,8 +86,8 @@ struct MultiplayerVotingView: View {
 
                 Spacer()
 
-                // Submit Vote Button
-                if !hasSubmitted {
+                // Submit Vote Button (only for non-host players)
+                if !hasSubmitted && !multiplayerStore.isHost {
                     Button {
                         submitVote()
                     } label: {

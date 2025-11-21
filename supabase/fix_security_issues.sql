@@ -147,12 +147,11 @@ BEGIN
         FROM public.session_players
         WHERE session_id = p_session_id AND player_id = p_target_player_id;
 
-        IF v_target_role = 'mafia' THEN
-            v_result := 'mafia';
-        ELSIF v_target_role = 'inspector' THEN
-             v_result := 'blocked';
+        -- Return the actual role name instead of just "mafia"/"not_mafia"
+        IF v_target_role = 'inspector' THEN
+            v_result := 'blocked';
         ELSE
-            v_result := 'not_mafia';
+            v_result := v_target_role;
         END IF;
 
         v_action_data := jsonb_build_object('inspectorResult', v_result);

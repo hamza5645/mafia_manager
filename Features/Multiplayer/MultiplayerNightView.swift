@@ -6,6 +6,7 @@ struct MultiplayerNightView: View {
     @State private var hasSubmitted = false
     @State private var isSubmitting = false
     @State private var autoReadyApplied = false
+    @State private var inspectorResult: String? // Stores the investigation result
 
     var nightIndex: Int {
         // Extract from current session phase data
@@ -166,14 +167,19 @@ struct MultiplayerNightView: View {
                 players: alivePlayers
             )
         case .inspector:
-            targetSelectionView(
-                title: "Investigate a Player",
-                subtitle: "Discover their role",
-                players: alivePlayers.filter { player in
-                    // Can't investigate other inspectors (if visible)
-                    true // Privacy filter handles this
-                }
-            )
+            if let result = inspectorResult {
+                // Show investigation result
+                inspectorResultView(role: result)
+            } else {
+                targetSelectionView(
+                    title: "Investigate a Player",
+                    subtitle: "Discover their role",
+                    players: alivePlayers.filter { player in
+                        // Can't investigate other inspectors (if visible)
+                        true // Privacy filter handles this
+                    }
+                )
+            }
         case .citizen:
             citizenView
         }
@@ -255,6 +261,74 @@ struct MultiplayerNightView: View {
         }
     }
 
+    private func inspectorResultView(role: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(Design.Colors.successGreen)
+
+            Text("Investigation Complete")
+                .font(Design.Typography.title2)
+                .foregroundStyle(Design.Colors.textPrimary)
+
+            // Show the actual role with appropriate color
+            VStack(spacing: 8) {
+                Text("Target's Role:")
+                    .font(Design.Typography.body)
+                    .foregroundStyle(Design.Colors.textSecondary)
+
+                Text(roleDisplayName(for: role))
+                    .font(Design.Typography.title1)
+                    .fontWeight(.bold)
+                    .foregroundStyle(roleColor(for: role))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(roleColor(for: role).opacity(0.1))
+                    .cornerRadius(Design.Radii.medium)
+            }
+
+            Text("Wait for other players to finish...")
+                .font(Design.Typography.footnote)
+                .foregroundStyle(Design.Colors.textSecondary)
+                .padding(.top, 8)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func roleDisplayName(for roleString: String) -> String {
+        switch roleString.lowercased() {
+        case "mafia":
+            return "Mafia"
+        case "doctor":
+            return "Doctor"
+        case "inspector":
+            return "Inspector"
+        case "citizen":
+            return "Citizen"
+        case "blocked":
+            return "Blocked"
+        default:
+            return roleString.capitalized
+        }
+    }
+
+    private func roleColor(for roleString: String) -> Color {
+        switch roleString.lowercased() {
+        case "mafia":
+            return Design.Colors.dangerRed
+        case "doctor":
+            return Design.Colors.successGreen
+        case "inspector":
+            return Design.Colors.actionBlue
+        case "citizen":
+            return Design.Colors.brandGold
+        case "blocked":
+            return Design.Colors.textSecondary
+        default:
+            return Design.Colors.textSecondary
+        }
+    }
+
     @ViewBuilder
     private func targetSelectionView(
         title: String,
@@ -330,7 +404,7 @@ struct MultiplayerNightView: View {
                 case .citizen: .vote // Won't be reached
                 }
 
-                try await multiplayerStore.submitNightAction(
+                let result = try await multiplayerStore.submitNightAction(
                     actionType: actionType,
                     nightIndex: nightIndex,
                     targetPlayerId: selectedTargetId
@@ -340,6 +414,10 @@ struct MultiplayerNightView: View {
                 try await multiplayerStore.setReadyStatus(true)
 
                 await MainActor.run {
+                    // Store inspector result if available
+                    if role == .inspector, let result = result {
+                        inspectorResult = result
+                    }
                     hasSubmitted = true
                     isSubmitting = false
                 }
