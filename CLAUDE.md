@@ -17,18 +17,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Full build, sign, and launch (iPhone 17 Pro)
 ./scripts/run_ios_sim.sh
 
-# Or build without auto-launch
+# Or build without auto-launch (uses default ~/Library/Developer/Xcode/DerivedData)
 xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager \
   -configuration Debug -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
-  -derivedDataPath DerivedData build
+  build
 ```
 
 ### Running Tests
 ```bash
-# Run all unit tests
+# Run all unit tests (uses default DerivedData outside the repo)
 xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager test \
-  -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
-  -derivedDataPath DerivedData
+  -destination "platform=iOS Simulator,name=iPhone 17 Pro"
 
 # Or via Xcode UI: Cmd+U
 ```
@@ -36,7 +35,9 @@ xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager test \
 ### Cleaning
 ```bash
 xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager clean
-rm -rf DerivedData
+# Leave DerivedData at its default location (~/Library/Developer/Xcode/DerivedData)
+# to avoid ballooning the repo directory. Use `rm -rf ~/Library/Developer/Xcode/DerivedData/mafia_manager-*`
+# if you need a full reset.
 ```
 
 ## Codebase Overview
@@ -198,7 +199,14 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
     - Console log monitoring
     - Multi-step user flows
 
-    **Never** manually use MCP simulator tools or bash commands for simulator testing. The orchestrator provides better automation, error handling, and reporting.
+    **Important**: When prompting the orchestrator, explicitly instruct it to use the `ios-simulator-skill` for all simulator interactions:
+    ```
+    "Use the ios-simulator-skill for all iOS simulator interactions. Test the [scenario]..."
+    ```
+
+    The skill provides 21 production-ready scripts for semantic UI navigation, accessibility testing, and simulator lifecycle management. It uses accessibility-driven navigation (find by text/type/ID) instead of brittle pixel coordinates.
+
+    **Never** manually use MCP simulator tools or bash commands for simulator testing. The orchestrator + skill provides better automation, error handling, and reporting.
 
 ## Multiplayer Architecture
 
@@ -224,3 +232,12 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
 - `phase_timers` changes → timer expirations
 
 **Bot support**: Bots have `is_bot=true`, `user_id=null`. Host controls bot actions locally, writes them as `game_actions`.
+
+## Known Fixes & Gotchas
+
+### Host with Active Roles (Mafia/Doctor/Inspector)
+**Issue**: In multiplayer mode, if the host is assigned an active role (Mafia, Doctor, or Inspector), they must be able to submit their night actions just like any other player.
+
+**Solution** (fixed in MultiplayerNightView.swift:61): The "Submit Action" button must be shown to ALL players with active roles, not just non-host players. The host needs to submit their action before they can finish the night phase.
+
+**Critical check**: When modifying night phase UI, never add `!multiplayerStore.isHost` conditions that would prevent the host from submitting role-specific actions. The host is both a player AND a phase controller.

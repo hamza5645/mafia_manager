@@ -57,8 +57,8 @@ struct MultiplayerNightView: View {
 
                 Spacer()
 
-                // Submit Button (non-host players with actions only)
-                if !multiplayerStore.isHost && myRole != nil && myRole != .citizen && !hasSubmitted {
+                // Submit Button (all players with active roles)
+                if myRole != nil && myRole != .citizen && !hasSubmitted {
                     Button {
                         submitAction()
                     } label: {
@@ -83,9 +83,9 @@ struct MultiplayerNightView: View {
                     }
                     .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
-                } else if !multiplayerStore.isHost && (hasSubmitted || myRole == .citizen) {
-                    // Ready indicator for non-host players
+                    .padding(.bottom, multiplayerStore.isHost ? 8 : 40)
+                } else if hasSubmitted || myRole == .citizen {
+                    // Ready indicator for all players
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 48))
@@ -95,11 +95,13 @@ struct MultiplayerNightView: View {
                             .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textPrimary)
 
-                        Text("Waiting for other players...")
-                            .font(Design.Typography.body)
-                            .foregroundStyle(Design.Colors.textSecondary)
+                        if !multiplayerStore.isHost {
+                            Text("Waiting for other players...")
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                        }
                     }
-                    .padding(.bottom, 40)
+                    .padding(.bottom, multiplayerStore.isHost ? 8 : 40)
                 }
                 
                 // Host Controls
