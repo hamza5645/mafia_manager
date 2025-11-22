@@ -189,7 +189,32 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
     - Performance optimization strategies
     - Any task requiring deep reasoning or multi-file analysis
 
-    **When to delegate**: Proactively use Codex before making changes, not just when stuck. Codex excels at analysis and recommendations; Claude Code excels at applying those recommendations using its tools.
+    **When to delegate**: Proactively use Codex **BEFORE** making changes, not just when stuck. Codex excels at analysis and recommendations; Claude Code excels at applying those recommendations using its tools.
+
+    **CODEX-FIRST WORKFLOW PATTERN** (Required for complex tasks):
+
+    ❌ **WRONG Approach** (Manual-first):
+    ```
+    1. Claude manually reviews git diff
+    2. Claude manually fixes build errors
+    3. Claude manually writes reports
+    ```
+
+    ✅ **CORRECT Approach** (Codex-first):
+    ```
+    1. Codex: Analyze impact → "Review git diff, identify breaking changes"
+    2. Codex: Root cause analysis → "Analyze build errors, recommend fixes"
+    3. Claude: Execute fixes → Use Edit/Write tools to apply recommendations
+    4. ios-simulator: Test → Verify fixes work in simulator
+    5. Codex: Final review → "Review test results, provide merge recommendation"
+    ```
+
+    **Real Example from Session:**
+    - Task: Verify refactor didn't break anything
+    - Should have: Codex analyze diff → Codex identify risks → Claude fix → Test → Codex review
+    - Actually did: Claude manually analyzed everything (missed opportunity for deeper insights)
+
+    **Key Principle**: If you're about to analyze, reason deeply, or make architectural decisions → **STOP and delegate to Codex first**. Let GPT-5.1 do the thinking, then execute the plan with precision tools.
 
 12. **Always use ios-simulator-test-orchestrator for simulator interactions** — For ANY interaction with the iOS Simulator (testing UI, verifying fixes, running flows, taking screenshots, etc.), use the Task tool with `subagent_type='ios-simulator-test-orchestrator'`. This specialized agent handles:
     - Building and launching the app
@@ -207,6 +232,25 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
     The skill provides 21 production-ready scripts for semantic UI navigation, accessibility testing, and simulator lifecycle management. It uses accessibility-driven navigation (find by text/type/ID) instead of brittle pixel coordinates.
 
     **Never** manually use MCP simulator tools or bash commands for simulator testing. The orchestrator + skill provides better automation, error handling, and reporting.
+
+## Codex Decision Triggers (Quick Reference)
+
+**ASK YOURSELF**: Does this task involve...
+- ❓ Analyzing changes across multiple files → **USE CODEX**
+- ❓ Identifying breaking changes or risks → **USE CODEX**
+- ❓ Root cause analysis of build errors → **USE CODEX**
+- ❓ Architecture review or design decisions → **USE CODEX**
+- ❓ Planning implementation steps → **USE CODEX**
+- ❓ Code quality or optimization review → **USE CODEX**
+- ❓ Debugging complex async/state issues → **USE CODEX**
+- ❓ Writing comprehensive reports → **USE CODEX**
+
+**Codex is your thinking partner. Use it BEFORE executing with tools.**
+
+Typical task delegation:
+- **Codex** (GPT-5.1): Analysis, reasoning, recommendations, architecture review
+- **Claude Code** (you): File operations (Read, Edit, Write), builds, applying fixes
+- **ios-simulator-test-orchestrator**: UI testing, verification, screenshots
 
 ## Multiplayer Architecture
 
