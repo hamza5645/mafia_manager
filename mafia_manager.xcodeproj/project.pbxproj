@@ -28,7 +28,6 @@
 		2F3DBB802E68EF3A002C5B31 /* NightAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB582E68EF3A002C5B31 /* NightAction.swift */; };
 		2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5A2E68EF3A002C5B31 /* Role.swift */; };
 		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
-		2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */; };
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
 		2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* Vision.md */; };
 		2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */; };
@@ -59,7 +58,6 @@
 		851EFB2472651BC23AF3F12D /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */; };
 		8638D2DEBAEB0BB360F4EFFD /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */; };
 		8887C32EEDDA4E8EBE2A3A75 /* InputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */; };
-		8A04DDFECC96FBF6B34013C4 /* PhaseTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E07EA6A0C4484CDB26712D /* PhaseTimer.swift */; };
 		8EC3587C2C8FF2AA68055283 /* SessionPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE756B643538C66E089F8E6C /* SessionPlayer.swift */; };
 		8F7BF14C95BEF8711634945D /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */; };
 		9226823934ABE5B71B14CD7E /* CustomRoleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */; };
@@ -105,7 +103,6 @@
 		2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStore.swift; sourceTree = "<group>"; };
 		2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentsView.swift; sourceTree = "<group>"; };
-		2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayManagementView.swift; sourceTree = "<group>"; };
 		2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverView.swift; sourceTree = "<group>"; };
 		2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorningSummaryView.swift; sourceTree = "<group>"; };
 		2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightPhaseView.swift; sourceTree = "<group>"; };
@@ -162,7 +159,6 @@
 		E8E9FFD598221E37F715D320 /* GameSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
 		F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InputValidator.swift; path = Core/Services/InputValidator.swift; sourceTree = SOURCE_ROOT; };
 		F7D2DD545CD373564E027525 /* RealtimeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RealtimeService.swift; sourceTree = "<group>"; };
-		F7E07EA6A0C4484CDB26712D /* PhaseTimer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhaseTimer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -277,14 +273,6 @@
 			path = Assignments;
 			sourceTree = "<group>";
 		};
-		2F3DBB652E68EF3A002C5B31 /* Day */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB642E68EF3A002C5B31 /* DayManagementView.swift */,
-			);
-			path = Day;
-			sourceTree = "<group>";
-		};
 		2F3DBB672E68EF3A002C5B31 /* GameOver */ = {
 			isa = PBXGroup;
 			children = (
@@ -328,7 +316,6 @@
 				2FD6A3C42EBB358900D43510 /* Settings */,
 				2FD6A3C72EBB358900D43510 /* Stats */,
 				2F3DBB632E68EF3A002C5B31 /* Assignments */,
-				2F3DBB652E68EF3A002C5B31 /* Day */,
 				2F3DBB672E68EF3A002C5B31 /* GameOver */,
 				2F3DBB692E68EF3A002C5B31 /* Morning */,
 				2F3DBB6B2E68EF3A002C5B31 /* Night */,
@@ -442,7 +429,6 @@
 			children = (
 				5B566F2D0BA02374F0EA21AD /* GameAction.swift */,
 				E8E9FFD598221E37F715D320 /* GameSession.swift */,
-				F7E07EA6A0C4484CDB26712D /* PhaseTimer.swift */,
 				BE756B643538C66E089F8E6C /* SessionPlayer.swift */,
 			);
 			path = Multiplayer;
@@ -559,7 +545,6 @@
 				2F3DBB802E68EF3A002C5B31 /* NightAction.swift in Sources */,
 				2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */,
 				2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */,
-				2F3DBB832E68EF3A002C5B31 /* DayManagementView.swift in Sources */,
 				2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
 				A1E0F8FE2F4A4D0E00A5E3F1 /* NightOutcomeView.swift in Sources */,
 				AA0000032E69000000000003 /* DesignSystem.swift in Sources */,
@@ -594,7 +579,6 @@
 				BF85DACFD73C4FDF56699A90 /* BotVotingRevealView.swift in Sources */,
 				7E14C60FAC9686FE2E4AE201 /* GameAction.swift in Sources */,
 				972231365E4CC6A25C12E521 /* GameSession.swift in Sources */,
-				8A04DDFECC96FBF6B34013C4 /* PhaseTimer.swift in Sources */,
 				8EC3587C2C8FF2AA68055283 /* SessionPlayer.swift in Sources */,
 				45C4C5117873053DCE1B2DAC /* RealtimeService.swift in Sources */,
 				AD435D79A2E82D29DBD0476B /* SessionService.swift in Sources */,
