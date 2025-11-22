@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import Combine
 
 @MainActor
 final class MultiplayerGameStore: ObservableObject {
@@ -1307,9 +1306,7 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         if mafiaCount >= nonMafiaCount {
-            if startOfDay || !startOfDay {
-                return (winner: .mafia, isGameOver: true)
-            }
+            return (winner: .mafia, isGameOver: true)
         }
 
         return (winner: nil, isGameOver: false)

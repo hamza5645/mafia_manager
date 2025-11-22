@@ -1,6 +1,5 @@
 import Foundation
 import Supabase
-import PostgREST
 
 @MainActor
 final class DatabaseService {
