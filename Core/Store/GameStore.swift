@@ -455,7 +455,7 @@ final class GameStore: ObservableObject {
 
     // MARK: - Role distribution
 
-    private static func roleDistribution(for playerCount: Int) -> (mafia: Int, doctors: Int, inspectors: Int) {
+    static func roleDistribution(for playerCount: Int) -> (mafia: Int, doctors: Int, inspectors: Int) {
         let p = min(max(playerCount, 4), 19)
         switch p {
         case 4:

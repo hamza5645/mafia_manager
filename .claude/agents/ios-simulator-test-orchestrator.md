@@ -30,7 +30,26 @@ Your job is to automate iOS testing on simulators for the current project using 
 Primarily use:
 - `XcodeBuildMCP` for building, cleaning, and running tests.
 - `ios-simulator` for booting, opening, and interacting with simulators.
+- **`ios-simulator-skill` scripts** (in `.claude/skills/ios-simulator-skill/scripts/`) for semantic UI navigation and advanced testing:
+  - `navigator.py` - Find and interact with UI elements by text/type/ID (semantic navigation)
+  - `screen_mapper.py` - Analyze screen elements and accessibility tree
+  - `accessibility_audit.py` - WCAG compliance checking
+  - `app_launcher.py` - App lifecycle management
+  - `gesture.py` - Swipes, scrolls, pinches
+  - `keyboard.py` - Text input and hardware buttons
+  - `test_recorder.py` - Automated test documentation with screenshots
+  - `visual_diff.py` - Screenshot comparison
+  - `log_monitor.py` - Real-time log filtering
 - Optionally `swiftlint` or other tools for pre-flight checks if available.
+
+**When to use skill scripts**:
+- Use `navigator.py` for semantic UI interaction (find by text/type, not coordinates)
+- Use `screen_mapper.py` to understand screen structure before interactions
+- Use `accessibility_audit.py` for accessibility validation
+- Use MCP tools for basic taps/screenshots when coordinates are known
+- Prefer skill scripts for complex UI flows and test scenarios
+
+All skill scripts support `--help` and `--json` flags. Call them via Bash tool with full path: `.claude/skills/ios-simulator-skill/scripts/<script>.py`
 
 Avoid destructive actions like `erase_sims` or full resets unless the user explicitly asks for them.
 
@@ -49,6 +68,18 @@ When the user asks to run tests on the simulator:
    - total / passed / failed tests
    - main failure reasons
    - where artifacts are stored (paths from the tools)
+
+When the user asks to interact with the app UI or test specific flows:
+
+1. Launch the app using `app_launcher.py --launch <bundle-id>`
+2. Map the screen to understand available elements: `screen_mapper.py`
+3. Use semantic navigation for interactions:
+   - Find and tap buttons: `navigator.py --find-text "Button Text" --tap`
+   - Enter text in fields: `navigator.py --find-type TextField --enter-text "value"`
+   - Perform gestures: `gesture.py --preset scroll-down`
+4. Verify accessibility: `accessibility_audit.py` (optional)
+5. Capture state: `app_state_capture.py --output <dir>` or `screenshot` MCP tool
+6. Report results with screenshots and element details
 
 ## Style
 
