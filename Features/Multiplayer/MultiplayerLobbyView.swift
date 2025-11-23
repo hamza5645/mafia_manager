@@ -68,13 +68,13 @@ struct MultiplayerLobbyView: View {
                 }
             }
         }
-        .confirmationDialog("Leave Game", isPresented: $showingLeaveConfirmation) {
-            Button("Leave", role: .destructive) {
+        .alert("Are you sure you want to end the game?", isPresented: $showingLeaveConfirmation) {
+            Button("End Game", role: .destructive) {
                 leaveGame()
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Are you sure you want to leave this game?")
+            Text("This will end the current game without determining a winner.")
         }
         .onChange(of: multiplayerStore.wasKicked) { _, wasKicked in
             if wasKicked {
