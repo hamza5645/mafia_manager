@@ -41,11 +41,25 @@ final class MultiplayerGameStore: ObservableObject {
     private var isResolvingPhase = false
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
+    // Reconnect state (for pure Realtime recovery)
+    private var currentSessionId: UUID?
+    @Published var isRealtimeConnected: Bool = false
+    @Published var isRealtimeReconnecting: Bool = false
+
     // Auth store reference
     private weak var authStore: AuthStore?
 
     func setAuthStore(_ authStore: AuthStore) {
         self.authStore = authStore
+    }
+
+    init() {
+        // Observe RealtimeService connection state changes
+        _ = realtimeService.$isReconnecting
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isReconnecting in
+                self?.isRealtimeReconnecting = isReconnecting
+            }
     }
 
     // MARK: - Session Lifecycle
@@ -248,27 +262,35 @@ final class MultiplayerGameStore: ObservableObject {
 
     private func subscribeToSession(sessionId: UUID) async throws {
         print("🔔 [MultiplayerGameStore] Subscribing to session: \(sessionId)")
+
+        // Store sessionId for reconnects
+        currentSessionId = sessionId
+
         try await realtimeService.subscribeToSession(
             sessionId: sessionId,
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     print("📨 [MultiplayerGameStore] Session update received")
+                    self?.isRealtimeConnected = true
                     self?.handleSessionUpdate(session)
                 }
             },
             onPlayerUpdate: { [weak self] player in
                 Task { @MainActor in
                     print("📨 [MultiplayerGameStore] Player update received via callback")
+                    self?.isRealtimeConnected = true
                     self?.handlePlayerUpdate(player)
                 }
             },
             onActionUpdate: { [weak self] action in
                 Task { @MainActor in
+                    self?.isRealtimeConnected = true
                     self?.handleActionUpdate(action)
                 }
             }
         )
         print("✅ [MultiplayerGameStore] Successfully subscribed to session updates")
+        isRealtimeConnected = true
     }
 
     private func handleSessionUpdate(_ session: GameSession) {
@@ -754,41 +776,54 @@ final class MultiplayerGameStore: ObservableObject {
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
     }
-    
+
+    // MARK: - Snapshot Resync (Pure Realtime Recovery)
+
+    /// Perform a one-time snapshot resync after Realtime reconnect
+    /// This fetches the latest session and player state to heal missed events
+    private func performSnapshotResync() async {
+        print("📸 [MultiplayerGameStore] Performing snapshot resync after reconnect")
+        do {
+            try await refreshSession()
+            try await refreshPlayers()
+            print("✅ [MultiplayerGameStore] Snapshot resync complete")
+        } catch {
+            print("❌ [MultiplayerGameStore] Snapshot resync failed: \(error)")
+        }
+    }
+
     // MARK: - Player Refresh Timer
     
-    /// Start periodic refresh of players list (fallback for missed real-time events)
+    /// Start adaptive fallback polling (only for host, only when Realtime disconnected)
+    /// This is a safety net for the host to detect stale state if Realtime fails
     private func startPlayerRefreshTimer() {
         stopPlayerRefreshTimer()
-        
-        // Refresh every 3 seconds as a fallback
-        // Refresh for lobby and role_reveal phases to catch phase transitions
-        playerRefreshTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self, self.isInSession else { return }
-                let currentPhase = self.currentSession?.currentPhase ?? ""
-                // Refresh periodically for ALL players to ensure phase synchronization
-                // This is critical for clients who might miss the real-time phase change event
-                // We only skip if we're not in a session at all
-                let shouldRefresh = true
 
-                if shouldRefresh {
-                    print("🔄 [MultiplayerGameStore] Periodic refresh triggered (phase: \(currentPhase))")
+        // Only host polls as a fallback, interval is 30 seconds (not 3)
+        // This prevents unnecessary DB load during normal Realtime operation
+        playerRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                guard self.isInSession && self.isHost else { return }
+
+                // Only poll if Realtime appears disconnected
+                if !self.isRealtimeConnected {
+                    let currentPhase = self.currentSession?.currentPhase ?? ""
+                    print("⚠️ [MultiplayerGameStore] Realtime disconnected - performing fallback refresh (phase: \(currentPhase))")
+
                     try? await self.refreshSession()
                     try? await self.refreshPlayers()
-                    
-                    if self.isHost {
-                        if currentPhase == "role_reveal" {
-                            try? await self.advanceFromRoleRevealIfReady(forceRefresh: false)
-                        } else if currentPhase == "night" || currentPhase == "voting" {
-                            await self.evaluatePhaseProgression(trigger: "periodic_check")
-                        }
+
+                    if currentPhase == "role_reveal" {
+                        try? await self.advanceFromRoleRevealIfReady(forceRefresh: false)
+                    } else if currentPhase == "night" || currentPhase == "voting" {
+                        await self.evaluatePhaseProgression(trigger: "fallback_check")
                     }
                 }
             }
         }
     }
-    
+
     private func stopPlayerRefreshTimer() {
         playerRefreshTimer?.invalidate()
         playerRefreshTimer = nil

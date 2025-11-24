@@ -109,8 +109,9 @@ struct MultiplayerRoleRevealView: View {
                     }
                 }
 
-                // Confirm Button (non-admin players only)
-                if !multiplayerStore.isHost {
+                // Confirm Button (all human players must confirm, including host)
+                // Host must mark as seen before they can start the night phase
+                if !hasSeen {
                     Button {
                         markAsSeen()
                     } label: {
@@ -119,28 +120,27 @@ struct MultiplayerRoleRevealView: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text(hasSeen ? "Waiting for others..." : "I've Seen My Role")
+                                Text("I've Seen My Role")
                                     .font(Design.Typography.body)
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(hasSeen ? Design.Colors.textSecondary.opacity(0.3) : Design.Colors.brandGold)
+                        .background(Design.Colors.brandGold)
                         .foregroundColor(Design.Colors.surface0)
                         .cornerRadius(Design.Radii.medium)
                     }
-                    .disabled(hasSeen || isProcessing)
+                    .disabled(isProcessing)
                     .padding(.horizontal, 20)
-                }
-
-                if multiplayerStore.isHost {
+                } else if multiplayerStore.isHost {
+                    // Host sees "Start Night" button after confirming their role
                     Button {
                         forceStartNight()
                     } label: {
                         HStack {
                             Text("Start Night")
                                 .fontWeight(.bold)
-                            
+
                             if isEveryoneReady {
                                 Image(systemName: "arrow.right.circle.fill")
                             } else {
@@ -156,9 +156,23 @@ struct MultiplayerRoleRevealView: View {
                         )
                     }
                     .disabled(!isEveryoneReady)
+                    .padding(.horizontal, 20)
                     .padding(.bottom, 40)
                 } else {
-                    Spacer().frame(height: 40)
+                    // Non-host players see "Waiting for others..." after confirming
+                    VStack(spacing: 12) {
+                        HStack {
+                            ProgressView()
+                                .tint(Design.Colors.brandGold)
+                            Text("Waiting for others...")
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
                 }
             }
         }
@@ -186,15 +200,12 @@ struct MultiplayerRoleRevealView: View {
     }
     
     private var isEveryoneReady: Bool {
-        // Bots are always ready, host doesn't need to mark ready
-        // Only check non-host human players
-        guard let session = multiplayerStore.currentSession else { return false }
+        // All human players (including host) must mark ready before phase can advance.
+        // Bots are always ready. Host must confirm their role just like other players.
+        // (See CLAUDE.md "Host with Active Roles" pattern for night phase - same applies to role reveal)
         let humanPlayers = multiplayerStore.allPlayers.filter { !$0.isBot }
-        let nonHostHumans = humanPlayers.filter { $0.userId != session.hostUserId }
-        let readyNonHostHumans = nonHostHumans.filter { $0.isReady }
-        // If no non-host humans (only host + bots), ready to advance
-        // Otherwise, all non-host humans must be ready
-        return nonHostHumans.isEmpty || readyNonHostHumans.count == nonHostHumans.count
+        let readyHumans = humanPlayers.filter { $0.isReady }
+        return readyHumans.count == humanPlayers.count
     }
 
     private func forceStartNight() {

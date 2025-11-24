@@ -8,9 +8,21 @@ final class RealtimeService: ObservableObject {
     private let supabase = SupabaseService.shared.client
     private var channels: [String: RealtimeChannelV2] = [:]
 
+    // CRITICAL: Store subscription tokens to prevent deallocation
+    // Without this, callbacks are garbage collected immediately and never fire
+    private var subscriptionTokens: [String: [RealtimeSubscription]] = [:]
+
     // Published state for connection status
     @Published var isConnected: Bool = false
+    @Published var isReconnecting: Bool = false
     @Published var connectionError: String?
+    @Published var lastConnectTime: Date?
+    @Published var reconnectAttempts: Int = 0
+
+    // Reconnect state
+    private var reconnectTask: Task<Void, Never>?
+    private var lastEventTime: [String: Date] = [:]
+    private var eventMonitoringTimer: Timer?
     
     // Custom decoder for Supabase dates
     private let decoder: JSONDecoder = {
@@ -54,8 +66,11 @@ final class RealtimeService: ObservableObject {
         // Create new channel
         let channel = supabase.realtimeV2.channel(channelName)
 
+        // Array to store subscription tokens (prevents garbage collection)
+        var tokens: [RealtimeSubscription] = []
+
         // Subscribe to game_sessions table changes
-        await channel
+        let sessionToken = await channel
             .onPostgresChange(
                 AnyAction.self,
                 schema: "public",
@@ -95,9 +110,10 @@ final class RealtimeService: ObservableObject {
                     }
                 }
             }
+        tokens.append(sessionToken)
 
         // Subscribe to session_players table changes
-        await channel
+        let playerToken = await channel
             .onPostgresChange(
                 AnyAction.self,
                 schema: "public",
@@ -136,9 +152,10 @@ final class RealtimeService: ObservableObject {
                     }
                 }
             }
+        tokens.append(playerToken)
 
         // Subscribe to game_actions table changes
-        await channel
+        let actionToken = await channel
             .onPostgresChange(
                 AnyAction.self,
                 schema: "public",
@@ -166,13 +183,33 @@ final class RealtimeService: ObservableObject {
                     }
                 }
             }
+        tokens.append(actionToken)
+
+        // CRITICAL: Allow Supabase's filter registrations (scheduled via Task { @MainActor … })
+        // to run before we join the channel; otherwise no postgres filters are sent to server.
+        // Without this yield, subscribeWithError() joins immediately with zero filters configured.
+        await Task.yield()
 
         // Subscribe to the channel
-        try await channel.subscribeWithError()
+        do {
+            try await channel.subscribeWithError()
 
-        // Store channel reference
-        channels[channelName] = channel
-        isConnected = true
+            // Store channel reference AND subscription tokens
+            channels[channelName] = channel
+            subscriptionTokens[channelName] = tokens
+            isConnected = true
+            lastConnectTime = Date()
+            connectionError = nil
+            reconnectAttempts = 0
+            isReconnecting = false
+
+            print("✅ [RealtimeService] Connected to channel: \(channelName) with \(tokens.count) subscriptions")
+        } catch {
+            print("❌ [RealtimeService] Failed to subscribe to channel \(channelName): \(error)")
+            connectionError = error.localizedDescription
+            isConnected = false
+            throw error
+        }
     }
 
     /// Subscribe to presence (player online/offline status)
@@ -193,8 +230,11 @@ final class RealtimeService: ObservableObject {
         let presenceState = PresenceState(playerId: myPlayerId, lastSeen: Date())
         try await channel.track(presenceState)
 
+        // Array to store subscription tokens (prevents garbage collection)
+        var tokens: [RealtimeSubscription] = []
+
         // Listen to presence changes
-        await channel.onPresenceChange { payload in
+        let presenceToken = await channel.onPresenceChange { payload in
             Task { @MainActor in
                 // Convert presence payload to dictionary
                 var presenceMap: [UUID: PresenceState] = [:]
@@ -216,16 +256,44 @@ final class RealtimeService: ObservableObject {
                 onPresenceSync(presenceMap)
             }
         }
+        tokens.append(presenceToken)
+
+        // CRITICAL: Allow Supabase's presence registration (scheduled via Task { @MainActor … })
+        // to run before we join the channel.
+        await Task.yield()
 
         // Subscribe
-        try await channel.subscribeWithError()
+        do {
+            try await channel.subscribeWithError()
 
-        // Store channel reference
-        channels[channelName] = channel
+            // Store channel reference AND subscription tokens
+            channels[channelName] = channel
+            subscriptionTokens[channelName] = tokens
+            isConnected = true
+            lastConnectTime = Date()
+            connectionError = nil
+            reconnectAttempts = 0
+            isReconnecting = false
+
+            print("✅ [RealtimeService] Connected to presence channel: \(channelName) with \(tokens.count) subscriptions")
+        } catch {
+            print("❌ [RealtimeService] Failed to subscribe to presence channel \(channelName): \(error)")
+            connectionError = error.localizedDescription
+            isConnected = false
+            throw error
+        }
     }
 
     /// Unsubscribe from a channel
     func unsubscribe(channelName: String) async {
+        // Cancel all subscription tokens for this channel
+        if let tokens = subscriptionTokens[channelName] {
+            print("🔴 [RealtimeService] Cancelling \(tokens.count) subscription(s) for channel: \(channelName)")
+            tokens.forEach { $0.cancel() }
+            subscriptionTokens.removeValue(forKey: channelName)
+        }
+
+        // Remove the channel
         if let channel = channels[channelName] {
             await supabase.realtimeV2.removeChannel(channel)
             channels.removeValue(forKey: channelName)
@@ -234,6 +302,14 @@ final class RealtimeService: ObservableObject {
 
     /// Unsubscribe from all channels
     func unsubscribeAll() async {
+        // Cancel all subscription tokens
+        for (channelName, tokens) in subscriptionTokens {
+            print("🔴 [RealtimeService] Cancelling \(tokens.count) subscription(s) for channel: \(channelName)")
+            tokens.forEach { $0.cancel() }
+        }
+        subscriptionTokens.removeAll()
+
+        // Remove all channels
         for (_, channel) in channels {
             await supabase.realtimeV2.removeChannel(channel)
         }
@@ -254,6 +330,97 @@ final class RealtimeService: ObservableObject {
         }
 
         try await channel.broadcast(event: event, message: payload)
+    }
+
+    // MARK: - Connection Monitoring
+
+    /// Trigger a snapshot resync when reconnecting
+    func triggerSnapshotResync(callback: @escaping () async -> Void) {
+        Task {
+            print("🔄 [RealtimeService] Triggering snapshot resync after reconnect")
+            await callback()
+        }
+    }
+
+    /// Attempt to resubscribe with exponential backoff
+    /// - Parameters:
+    ///   - sessionId: The session ID to resubscribe to
+    ///   - onSessionUpdate: Callback for session updates
+    ///   - onPlayerUpdate: Callback for player updates
+    ///   - onActionUpdate: Callback for action updates
+    ///   - onReconnected: Called when successfully reconnected
+    func attemptResubscribe(
+        sessionId: UUID,
+        onSessionUpdate: @escaping (GameSession) -> Void,
+        onPlayerUpdate: @escaping (SessionPlayer) -> Void,
+        onActionUpdate: @escaping (GameAction) -> Void,
+        onReconnected: @escaping () async -> Void
+    ) {
+        // Cancel any pending reconnect task
+        reconnectTask?.cancel()
+
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s (max 30s)
+        let baseDelay: Double = 1.0
+        let maxDelay: Double = 30.0
+        let delay = min(baseDelay * pow(2.0, Double(reconnectAttempts)), maxDelay)
+
+        reconnectTask = Task {
+            isReconnecting = true
+            print("⏳ [RealtimeService] Attempting reconnect in \(delay)s (attempt \(reconnectAttempts + 1)/10)")
+
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+            guard !Task.isCancelled else {
+                print("🛑 [RealtimeService] Reconnect attempt cancelled")
+                return
+            }
+
+            do {
+                try await subscribeToSession(
+                    sessionId: sessionId,
+                    onSessionUpdate: onSessionUpdate,
+                    onPlayerUpdate: onPlayerUpdate,
+                    onActionUpdate: onActionUpdate
+                )
+
+                // Successfully reconnected
+                print("✅ [RealtimeService] Reconnected successfully after \(reconnectAttempts + 1) attempts")
+                isReconnecting = false
+
+                // Trigger snapshot resync
+                await onReconnected()
+            } catch {
+                reconnectAttempts += 1
+
+                // Give up after 10 attempts
+                if reconnectAttempts >= 10 {
+                    print("❌ [RealtimeService] Max reconnect attempts reached. Giving up.")
+                    isReconnecting = false
+                    connectionError = "Failed to reconnect after 10 attempts"
+                    return
+                }
+
+                // Retry
+                print("🔄 [RealtimeService] Reconnect attempt \(reconnectAttempts) failed, will retry")
+                attemptResubscribe(
+                    sessionId: sessionId,
+                    onSessionUpdate: onSessionUpdate,
+                    onPlayerUpdate: onPlayerUpdate,
+                    onActionUpdate: onActionUpdate,
+                    onReconnected: onReconnected
+                )
+            }
+        }
+    }
+
+    /// Schedule cleanup of reconnect resources on the main thread
+    func scheduleCleanup() {
+        Task { @MainActor [weak self] in
+            self?.reconnectTask?.cancel()
+            self?.reconnectTask = nil
+            self?.eventMonitoringTimer?.invalidate()
+            self?.eventMonitoringTimer = nil
+        }
     }
 }
 
