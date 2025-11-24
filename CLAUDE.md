@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+**Mafia Manager** is an iOS game assistant for the party game Mafia. The app supports two modes:
+- **Solo mode**: Pass-and-play on single device with optional AI bots (fully offline)
+- **Multiplayer mode**: Multi-device gameplay via Supabase Realtime with room codes
+
+**Tech Stack**: SwiftUI + MVVM, iOS 16+, zero dependencies (native Swift/SwiftUI only)
+**Key Architecture Pattern**: GameStore as single source of truth, phase-based routing (no NavigationLinks), two-phase night resolution
+**Game Features**: 4-19 players, 4 roles (Mafia, Police/Inspector, Doctor, Citizen), voting elimination, win conditions
+
 ## Documentation Index
 
 **Start here**: [`docs/CLAUDE_PRIMER.md`](docs/CLAUDE_PRIMER.md) — Project overview, how to build/run, critical architecture summary (2 min read).
@@ -40,9 +50,23 @@ xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager clean
 # if you need a full reset.
 ```
 
+## Architecture at a Glance
+
+**Single Source of Truth**: `GameStore` (@MainActor, @Published) manages all solo game state. Views call GameStore methods—never mutate directly.
+
+**Phase-Based Routing**: Navigation driven entirely by `GamePhase` enum in `RootView`. No NavigationLinks in phase views. GameStore methods transition phases.
+
+**Two-Phase Night Resolution**:
+1. `endNight(mafiaTargetID, inspectorCheckedID, doctorProtectedID)` — Records actions, no deaths applied
+2. `resolveNightOutcome(targetWasSaved: Bool)` — Applies death (or save), checks win conditions
+
+**Persistence**: Automatic JSON save to Application Support after every mutation, debounced at 300ms.
+
+**Multiplayer**: SessionService handles session CRUD, RealtimeService subscribes to Supabase Realtime tables (game_sessions, session_players, game_actions, phase_timers). Host controls phases; clients submit actions.
+
 ## Codebase Overview
 
-**Tech stack**: SwiftUI + MVVM, iOS 26+, no third-party dependencies, local JSON + optional Supabase.
+**Tech stack**: SwiftUI + MVVM, iOS 16+, no third-party dependencies, local JSON + optional Supabase.
 
 **Two game modes**:
 1. **Solo mode** (original): Pass-and-play on single device, all state in GameStore
@@ -98,24 +122,38 @@ This allows the UI to ask "Was target saved?" before committing the death.
 - Inspector cannot inspect other Inspectors
 - Doctor can protect anyone (including self)
 
-## Key Files
+## Project Structure (Quick Reference)
 
-### Solo Mode
-- [Core/Store/GameStore.swift](Core/Store/GameStore.swift) — All solo game mutations and phase transitions
-- [Core/Models/GameState.swift](Core/Models/GameState.swift) — Root state model for solo
-- [Core/Models/NightAction.swift](Core/Models/NightAction.swift) — Night phase outcomes
+```
+Core/               — Business logic (Models, Stores, Services)
+Features/           — UI screens (phase views + auth/stats/settings)
+mafia_managerApp.swift          — App entry point & root view setup
+mafia_managerTests/             — Unit tests
+supabase/           — Database schema (setup.sql, multiplayer_schema.sql)
+docs/               — Architecture guides & documentation
+scripts/            — Build automation (run_ios_sim.sh)
+```
 
-### Multiplayer Mode
-- [Core/Services/Multiplayer/SessionService.swift](Core/Services/Multiplayer/SessionService.swift) — Multiplayer session management
-- [Core/Services/Multiplayer/RealtimeService.swift](Core/Services/Multiplayer/RealtimeService.swift) — Supabase Realtime subscriptions
-- [Core/Models/Multiplayer/GameSession.swift](Core/Models/Multiplayer/GameSession.swift) — Multiplayer session model
-- [Core/Models/Multiplayer/SessionPlayer.swift](Core/Models/Multiplayer/SessionPlayer.swift) — Player in multiplayer session
-- [Core/Models/Multiplayer/GameAction.swift](Core/Models/Multiplayer/GameAction.swift) — Night/day actions in multiplayer
+## Key Files (What's Important & Why)
 
-### Shared
-- [Core/Store/AuthStore.swift](Core/Store/AuthStore.swift) — Supabase auth state
-- [supabase/setup.sql](supabase/setup.sql) — Database schema (profiles, player_stats, custom_roles_configs)
-- [supabase/multiplayer_schema.sql](supabase/multiplayer_schema.sql) — Multiplayer tables (game_sessions, session_players, game_actions, phase_timers)
+### Solo Mode Core
+- [Core/Store/GameStore.swift](Core/Store/GameStore.swift) — **Central state manager**. All game mutations (setupPlayers, assignRoles, endNight, voting) flow through here. Views are subscribers, never direct mutators.
+- [mafia_managerApp.swift](mafia_managerApp.swift) — **Root view with phase-based routing**. Switches on `gameStore.state.currentPhase` to display appropriate UI. No NavigationLinks—phases transition via GameStore methods.
+- [Core/Models/GameState.swift](Core/Models/GameState.swift) — **Root state model for solo mode** (players, currentPhase, nightHistory, dayHistory, gameResult). Fully Codable.
+- [Core/Models/NightAction.swift](Core/Models/NightAction.swift) — **Night phase outcomes** (mafiaTargetID, inspectorCheckedID, doctorProtectedID, deaths). Used by two-phase resolution.
+- [Features/Night/NightWakeUpView.swift](Features/Night/NightWakeUpView.swift) — **Implements two-phase resolution pattern**. Calls endNight(), then asks Doctor if save succeeded, then resolveNightOutcome(). Critical reference for night logic.
+
+### Multiplayer Mode Core
+- [Core/Services/Multiplayer/SessionService.swift](Core/Services/Multiplayer/SessionService.swift) — **Session CRUD & mutations**. Create sessions, join, submit actions. Writes to Supabase tables.
+- [Core/Services/Multiplayer/RealtimeService.swift](Core/Services/Multiplayer/RealtimeService.swift) — **Realtime subscriptions manager**. Listens to game_sessions, session_players, game_actions, phase_timers. Broadcasts changes to MultiplayerGameStore.
+- [Core/Models/Multiplayer/GameSession.swift](Core/Models/Multiplayer/GameSession.swift) — **Session metadata** (roomCode, host, phase, winner). Synced via Realtime.
+- [Core/Models/Multiplayer/GameAction.swift](Core/Models/Multiplayer/GameAction.swift) — **Night/day actions** submitted by players (Mafia target, Police investigation, Doctor protection, vote). Synced to Supabase.
+
+### Shared Services
+- [Core/Store/AuthStore.swift](Core/Store/AuthStore.swift) — **Authentication state** (user, token, isAuthenticated). Manages Supabase Auth sessions & keychain.
+- [Core/Services/Persistence.swift](Core/Services/Persistence.swift) — **JSON persistence** with debouncing (300ms). Atomic writes to Application Support. Error callbacks for UI.
+- [supabase/setup.sql](supabase/setup.sql) — **Base tables**: profiles, player_stats, custom_roles_configs. Run this first.
+- [supabase/multiplayer_schema.sql](supabase/multiplayer_schema.sql) — **Multiplayer tables**: game_sessions, session_players, game_actions, phase_timers. Requires RLS policies.
 
 ## Testing
 
@@ -126,6 +164,78 @@ Unit tests live in `mafia_managerTests/GameStoreTests.swift`. Tests cover:
 - Win conditions (Mafia victory, Citizen victory)
 
 Run with `Cmd+U` in Xcode or via xcodebuild test command above.
+
+## Common Development Tasks
+
+### Adding a New Phase to Solo Mode
+1. Add case to `GamePhase` enum in `Core/Models/GamePhase.swift`
+2. Create view in `Features/[PhaseName]/[PhaseName]View.swift`
+3. Add switch case in `mafia_managerApp.swift`'s `phaseBasedView` to display the view
+4. Add phase transition method in `GameStore` (e.g., `func advanceToNextPhase()`)
+5. Call that method from your new view's button actions
+
+**Example**: To add a "Confession" phase between Morning and Day:
+```swift
+// GamePhase.swift
+case confession
+
+// ConfessionView.swift (new file)
+var body: some View {
+    Button("Continue to Voting") {
+        gameStore.startVoting()  // New method in GameStore
+    }
+}
+
+// GameStore.swift
+func startVoting() {
+    state.currentPhase = .votingIndividual(currentPlayerIndex: 0)
+}
+```
+
+### Modifying Night Resolution (CRITICAL Pattern)
+**Always preserve the two-phase pattern**—never fold `endNight()` and `resolveNightOutcome()` into one method.
+
+**To record a new night action**:
+1. Add property to `NightAction` struct (e.g., `tutorProtectedID: Int?`)
+2. In `GameStore.endNight()`, record the action: `nightAction.tutorProtectedID = tutorID`
+3. In `NightWakeUpView`, ask the necessary question (if needed)
+4. In `GameStore.resolveNightOutcome()`, apply the effect (e.g., prevent death)
+
+**Example**: Adding Tutor role protection
+```swift
+// NightAction.swift
+struct NightAction {
+    var tutorProtectedID: Int?
+}
+
+// GameStore.swift
+func endNight(mafiaTargetID: Int, ..., tutorProtectedID: Int?) {
+    nightAction.tutorProtectedID = tutorProtectedID
+}
+
+func resolveNightOutcome(targetWasSaved: Bool) {
+    if nightAction.tutorProtectedID == targetID {
+        // Apply tutor protection
+    }
+}
+```
+
+### Adding Tests for Game Logic
+Add test cases to `mafia_managerTests/GameStoreTests.swift`:
+
+```swift
+func testTutorProtection() {
+    gameStore.setupPlayers(["Alice", "Bob", "Carol"])
+    gameStore.assignNumbersAndRoles()
+    // Carol is Tutor, protecting Bob
+    gameStore.endNight(mafiaTargetID: 1, ..., tutorProtectedID: 1)
+    let saved = true  // Bob's protection succeeded
+    gameStore.resolveNightOutcome(targetWasSaved: saved)
+    XCTAssertTrue(gameStore.state.players[1].isAlive)
+}
+```
+
+Run tests: `xcodebuild test -destination "platform=iOS Simulator,name=iPhone 17 Pro"`
 
 ## Supabase Setup
 
@@ -138,6 +248,35 @@ Run with `Cmd+U` in Xcode or via xcodebuild test command above.
 
 ### Solo Mode Only
 Solo mode works fully offline without Supabase. Authentication is optional (only needed for cloud stats sync).
+
+## Debugging Multiplayer
+
+**Realtime subscriptions not syncing?**
+- Verify Realtime is enabled for tables: `game_sessions`, `session_players`, `game_actions`, `phase_timers` (Supabase dashboard → Realtime)
+- Check `SupabaseConfig.swift` has correct project URL and anon key
+- Test with 2+ simulator instances or browser tabs (single instance won't show sync)
+- Enable Logger statements in `RealtimeService.subscribeToSession()` to track subscription status
+
+**Host can't advance phase?**
+- Verify `isHost = true` in `session_players` table for this user
+- Check all required actions are in `game_actions` table (phase may require all players to act first)
+- Ensure only one user is host in the session
+
+**Phase transitions stuck or lagging?**
+- Check if `RealtimeService` is actually subscribed (not just `SessionService`)
+- Verify network connectivity—Realtime requires active WebSocket connection
+- Check Supabase logs for subscription errors
+- Try resetting Realtime: close and rejoin the session
+
+**Players can't see each other's actions?**
+- Verify `game_actions` table has `select` RLS policy allowing all authenticated users to read
+- Check players are using same `session_id`
+- Confirm both are authenticated (not in anonymous mode)
+
+**Room code collision or invalid?**
+- Room codes generated via RPC function—check `generate_room_code()` exists in Supabase
+- Verify RLS policy on `game_sessions` allows creation
+- Test in Supabase SQL editor: `SELECT * FROM game_sessions WHERE room_code = 'ABC123'`
 
 ## Development Notes
 
@@ -178,7 +317,7 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
 
 10. **Test multiplayer with multiple devices/tabs** — Realtime subscriptions only work with actual Supabase connections. Use multiple simulator instances or browser tabs for Supabase Dashboard to verify sync.
 
-11. **Delegate to Codex MCP aggressively** — Claude Code has access to Codex Agent (GPT-5.1 with high reasoning) via MCP. **Delegate as many tasks as possible to Codex** using the `mcp__codex-cli__codex` tool for:
+11. **Delegate to Codex MCP aggressively** — Claude Code has access to Codex Agent (GPT-5.1 with high reasoning) via the Task tool with `subagent_type='codex-delegator'`. **Delegate as many tasks as possible to Codex** for:
     - Complex debugging and root cause analysis
     - Refactoring suggestions across multiple files
     - Implementation planning for new features
@@ -188,6 +327,8 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
     - Bug investigation and triage
     - Performance optimization strategies
     - Any task requiring deep reasoning or multi-file analysis
+
+    **How to delegate**: Use the Task tool with `subagent_type='codex-delegator'` in your prompt. This is the preferred method over direct MCP calls and provides better integration with the agent workflow.
 
     **When to delegate**: Proactively use Codex **BEFORE** making changes, not just when stuck. Codex excels at analysis and recommendations; Claude Code excels at applying those recommendations using its tools.
 
