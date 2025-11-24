@@ -141,7 +141,7 @@ struct SettingsView: View {
                         SettingsRow(
                             icon: "info.circle.fill",
                             title: "Version",
-                            subtitle: "Version 4",
+                            subtitle: "Version 5",
                             color: .gray
                         )
                     }
