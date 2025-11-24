@@ -7,7 +7,6 @@ struct MultiplayerNightView: View {
     @State private var isSubmitting = false
     @State private var autoReadyApplied = false
     @State private var inspectorResult: String? // Stores the investigation result
-    @State private var showNightResults = false // Two-phase resolution: show intermediate results
     @State private var isRecording = false // Phase 1 in progress
 
     var nightIndex: Int {
@@ -148,9 +147,6 @@ struct MultiplayerNightView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        .sheet(isPresented: $showNightResults) {
-            nightResultsSheet
-        }
         .task {
             await autoReadyIfPassive()
         }
@@ -173,34 +169,22 @@ struct MultiplayerNightView: View {
                 // Call the new two-phase method: Phase 1
                 try await multiplayerStore.recordNightActions(nightIndex: nightIndex)
 
-                await MainActor.run {
-                    isRecording = false
-                    showNightResults = true
-                }
-            } catch {
-                await MainActor.run {
-                    isRecording = false
-                    print("Failed to record night actions: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
+                // Auto-determine if target was saved
+                let targetWasSaved = determineIfTargetWasSaved()
 
-    /// Phase 2: Resolve night outcome after host reviews results
-    private func resolveNightOutcome(targetWasSaved: Bool) {
-        Task {
-            do {
+                // Phase 2: Immediately resolve outcome without showing results sheet
                 try await multiplayerStore.resolveNightOutcome(
                     nightIndex: nightIndex,
                     targetWasSaved: targetWasSaved
                 )
 
                 await MainActor.run {
-                    showNightResults = false
+                    isRecording = false
                 }
             } catch {
                 await MainActor.run {
-                    print("Failed to resolve night outcome: \(error.localizedDescription)")
+                    isRecording = false
+                    print("Failed to complete night phase: \(error.localizedDescription)")
                 }
             }
         }
@@ -495,186 +479,6 @@ struct MultiplayerNightView: View {
             hasSubmitted = true
             autoReadyApplied = true
         }
-    }
-
-    // MARK: - Night Results Sheet (Two-Phase Pattern)
-
-    @ViewBuilder
-    private var nightResultsSheet: some View {
-        ZStack {
-            Design.Colors.surface0.ignoresSafeArea()
-
-            VStack(spacing: 32) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "moon.stars.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(Design.Colors.brandGold)
-
-                    Text("Night \(nightIndex) Complete")
-                        .font(Design.Typography.title1)
-                        .foregroundStyle(Design.Colors.textPrimary)
-
-                    Text("Review the night's events before continuing")
-                        .font(Design.Typography.body)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 40)
-
-                Spacer()
-
-                // Night actions summary
-                if let session = multiplayerStore.currentSession,
-                   let nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) {
-                    nightActionsSummary(nightRecord: nightRecord)
-                } else {
-                    Text("Loading night results...")
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
-
-                Spacer()
-
-                // Continue button
-                Button {
-                    // Determine if target was saved by comparing actions
-                    let targetWasSaved = determineIfTargetWasSaved()
-                    resolveNightOutcome(targetWasSaved: targetWasSaved)
-                } label: {
-                    HStack {
-                        Text("Continue to Morning")
-                            .fontWeight(.bold)
-                        Image(systemName: "arrow.right.circle.fill")
-                    }
-                    .font(Design.Typography.body)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Design.Colors.brandGold)
-                    .foregroundColor(Design.Colors.surface0)
-                    .cornerRadius(Design.Radii.medium)
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func nightActionsSummary(nightRecord: NightActionRecord) -> some View {
-        VStack(spacing: 20) {
-            // Mafia target
-            if let mafiaTargetId = nightRecord.mafiaTargetId,
-               let target = multiplayerStore.visiblePlayers.first(where: { $0.playerId == mafiaTargetId }) {
-                actionSummaryCard(
-                    icon: "person.fill.xmark",
-                    iconColor: Design.Colors.dangerRed,
-                    title: "Mafia Target",
-                    playerName: target.playerName,
-                    playerNumber: target.playerNumber
-                )
-            }
-
-            // Doctor protection
-            if let doctorProtectedId = nightRecord.doctorProtectedId,
-               let protected = multiplayerStore.visiblePlayers.first(where: { $0.playerId == doctorProtectedId }) {
-                actionSummaryCard(
-                    icon: "cross.circle.fill",
-                    iconColor: Design.Colors.successGreen,
-                    title: "Doctor Protection",
-                    playerName: protected.playerName,
-                    playerNumber: protected.playerNumber
-                )
-            }
-
-            // Inspector check
-            if let inspectorCheckedId = nightRecord.inspectorCheckedId,
-               let checked = multiplayerStore.visiblePlayers.first(where: { $0.playerId == inspectorCheckedId }) {
-                actionSummaryCard(
-                    icon: "magnifyingglass.circle.fill",
-                    iconColor: Design.Colors.actionBlue,
-                    title: "Inspector Investigation",
-                    playerName: checked.playerName,
-                    playerNumber: checked.playerNumber
-                )
-            }
-
-            // Save outcome indicator
-            if let mafiaTargetId = nightRecord.mafiaTargetId,
-               let doctorProtectedId = nightRecord.doctorProtectedId {
-                Divider()
-                    .background(Design.Colors.stroke)
-                    .padding(.horizontal, 20)
-
-                if mafiaTargetId == doctorProtectedId {
-                    HStack(spacing: 12) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(Design.Colors.successGreen)
-
-                        Text("Target was saved!")
-                            .font(Design.Typography.title3)
-                            .foregroundStyle(Design.Colors.successGreen)
-                    }
-                } else {
-                    HStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(Design.Colors.dangerRed)
-
-                        Text("Target was eliminated")
-                            .font(Design.Typography.title3)
-                            .foregroundStyle(Design.Colors.dangerRed)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 20)
-    }
-
-    @ViewBuilder
-    private func actionSummaryCard(
-        icon: String,
-        iconColor: Color,
-        title: String,
-        playerName: String,
-        playerNumber: Int?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .foregroundStyle(iconColor)
-                Text(title)
-                    .font(Design.Typography.footnote)
-                    .foregroundStyle(Design.Colors.textSecondary)
-            }
-
-            HStack(spacing: 12) {
-                if let number = playerNumber {
-                    ZStack {
-                        Circle()
-                            .fill(iconColor.opacity(0.2))
-                            .frame(width: 40, height: 40)
-
-                        Text("#\(number)")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(iconColor)
-                    }
-                }
-
-                Text(playerName)
-                    .font(Design.Typography.title3)
-                    .foregroundStyle(Design.Colors.textPrimary)
-
-                Spacer()
-            }
-        }
-        .padding(16)
-        .background(iconColor.opacity(0.1))
-        .cornerRadius(Design.Radii.medium)
-        .overlay(
-            RoundedRectangle(cornerRadius: Design.Radii.medium)
-                .stroke(iconColor.opacity(0.3), lineWidth: 1)
-        )
     }
 
     private func determineIfTargetWasSaved() -> Bool {
