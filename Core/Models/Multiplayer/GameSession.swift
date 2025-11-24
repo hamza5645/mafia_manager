@@ -26,6 +26,9 @@ struct GameSession: Codable, Identifiable, Sendable {
     var nightHistory: [NightActionRecord]
     var dayHistory: [DayActionRecord]
 
+    // Round ID for action isolation (prevents action replay across rounds)
+    var currentRoundId: UUID?
+
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -46,6 +49,7 @@ struct GameSession: Codable, Identifiable, Sendable {
         case assignedNumbers = "assigned_numbers"
         case nightHistory = "night_history"
         case dayHistory = "day_history"
+        case currentRoundId = "current_round_id"
         case updatedAt = "updated_at"
     }
 }
@@ -150,11 +154,12 @@ struct PlayerNumberAssignment: Codable, Sendable {
 // Night action record (snapshot)
 struct NightActionRecord: Codable, Sendable {
     let nightIndex: Int
+    var isResolved: Bool // Guards against duplicate resolution
     let mafiaTargetId: UUID?
     let inspectorCheckedId: UUID?
     let inspectorResult: String?
     let doctorProtectedId: UUID?
-    let resultingDeaths: [UUID]
+    var resultingDeaths: [UUID] // Mutable to allow Phase 2 to set final deaths
     let mafiaPlayerNumbers: [Int]
     let doctorPlayerNumbers: [Int]
     let inspectorPlayerNumbers: [Int]
@@ -162,6 +167,7 @@ struct NightActionRecord: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case nightIndex = "night_index"
+        case isResolved = "is_resolved"
         case mafiaTargetId = "mafia_target_id"
         case inspectorCheckedId = "inspector_checked_id"
         case inspectorResult = "inspector_result"
@@ -176,6 +182,7 @@ struct NightActionRecord: Codable, Sendable {
     // Convenience initializer
     init(
         nightIndex: Int,
+        isResolved: Bool = false,
         mafiaTargetId: UUID?,
         inspectorCheckedId: UUID?,
         inspectorResult: String?,
@@ -187,6 +194,7 @@ struct NightActionRecord: Codable, Sendable {
         timestamp: Date
     ) {
         self.nightIndex = nightIndex
+        self.isResolved = isResolved
         self.mafiaTargetId = mafiaTargetId
         self.inspectorCheckedId = inspectorCheckedId
         self.inspectorResult = inspectorResult
@@ -198,10 +206,12 @@ struct NightActionRecord: Codable, Sendable {
         self.timestamp = timestamp
     }
 
-    // Custom decoder to handle old records without role-specific numbers
+    // Custom decoder to handle old records without role-specific numbers and isResolved
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         nightIndex = try container.decode(Int.self, forKey: .nightIndex)
+        // Default to false for backwards compatibility with old records
+        isResolved = (try? container.decode(Bool.self, forKey: .isResolved)) ?? false
         mafiaTargetId = try container.decodeIfPresent(UUID.self, forKey: .mafiaTargetId)
         inspectorCheckedId = try container.decodeIfPresent(UUID.self, forKey: .inspectorCheckedId)
         inspectorResult = try container.decodeIfPresent(String.self, forKey: .inspectorResult)
@@ -218,6 +228,7 @@ struct NightActionRecord: Codable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(nightIndex, forKey: .nightIndex)
+        try container.encode(isResolved, forKey: .isResolved)
         try container.encodeIfPresent(mafiaTargetId, forKey: .mafiaTargetId)
         try container.encodeIfPresent(inspectorCheckedId, forKey: .inspectorCheckedId)
         try container.encodeIfPresent(inspectorResult, forKey: .inspectorResult)

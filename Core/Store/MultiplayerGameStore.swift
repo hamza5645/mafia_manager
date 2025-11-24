@@ -394,6 +394,40 @@ final class MultiplayerGameStore: ObservableObject {
         // This can trigger UI updates for action confirmation
         print("Action received: \(action.actionType.rawValue) for phase \(action.phaseIndex)")
 
+        // ✅ CRITICAL FIX: Only process actions for the CURRENT active phase
+        // This prevents stale actions from previous phases (Realtime replays) from triggering duplicate resolution
+        guard let session = currentSession else { return }
+
+        switch session.currentPhaseData {
+        case .night(let activeNightIndex, _):
+            // Only process night actions for the current night
+            guard action.actionType == .mafiaTarget || action.actionType == .doctorProtect || action.actionType == .inspectorCheck else {
+                print("⚠️ Ignoring non-night action '\(action.actionType.rawValue)' during night phase")
+                return
+            }
+            guard action.phaseIndex == activeNightIndex else {
+                print("⚠️ Ignoring stale night action from phase \(action.phaseIndex), current is \(activeNightIndex)")
+                return
+            }
+
+        case .voting(let activeDayIndex):
+            // Only process vote actions for the current day
+            guard action.actionType == .vote else {
+                print("⚠️ Ignoring non-vote action '\(action.actionType.rawValue)' during voting phase")
+                return
+            }
+            guard action.phaseIndex == activeDayIndex else {
+                print("⚠️ Ignoring stale vote action from phase \(action.phaseIndex), current is \(activeDayIndex)")
+                return
+            }
+
+        default:
+            // Ignore actions outside night/voting phases (lobby, role_reveal, morning, etc.)
+            print("⚠️ Ignoring action during non-action phase: \(session.currentPhase)")
+            return
+        }
+
+        // If we made it here, the action is for the current active phase
         if isHost {
             Task {
                 await self.evaluatePhaseProgression(trigger: "action_update")
@@ -685,12 +719,16 @@ final class MultiplayerGameStore: ObservableObject {
             return nil
         }
 
+        // Use current round ID from session, or generate a new one if missing
+        let roundId = session.currentRoundId ?? UUID()
+
         let action: GameAction
 
         switch actionType {
         case .mafiaTarget:
             action = .mafiaAction(
                 sessionId: session.id,
+                roundId: roundId,
                 nightIndex: nightIndex,
                 actorPlayerId: myPlayerId,
                 targetPlayerId: targetPlayerId
@@ -699,6 +737,7 @@ final class MultiplayerGameStore: ObservableObject {
             // No local logic - handled by server RPC
             action = .inspectorAction(
                 sessionId: session.id,
+                roundId: roundId,
                 nightIndex: nightIndex,
                 actorPlayerId: myPlayerId,
                 targetPlayerId: targetPlayerId,
@@ -707,6 +746,7 @@ final class MultiplayerGameStore: ObservableObject {
         case .doctorProtect:
             action = .doctorAction(
                 sessionId: session.id,
+                roundId: roundId,
                 nightIndex: nightIndex,
                 actorPlayerId: myPlayerId,
                 targetPlayerId: targetPlayerId
@@ -740,8 +780,12 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
+        // Use current round ID from session, or generate a new one if missing
+        let roundId = session.currentRoundId ?? UUID()
+
         let action = GameAction.voteAction(
             sessionId: session.id,
+            roundId: roundId,
             dayIndex: dayIndex,
             actorPlayerId: myPlayerId,
             targetPlayerId: targetPlayerId
@@ -940,6 +984,16 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
+        // ✅ CRITICAL FIX: Check if this night is already resolved (prevents duplicate resolution)
+        if let nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }),
+           nightRecord.isResolved {
+            print("✅ [MultiplayerGameStore] Night \(nightIndex) already resolved, skipping readiness check")
+            await MainActor.run {
+                self.isPhaseReadyToAdvance = false
+            }
+            return
+        }
+
         let aliveMafia = allPlayers.filter { $0.isAlive && $0.role == .mafia }
         let aliveDoctors = allPlayers.filter { $0.isAlive && $0.role == .doctor }
         let aliveInspectors = allPlayers.filter { $0.isAlive && $0.role == .inspector }
@@ -1053,13 +1107,15 @@ final class MultiplayerGameStore: ObservableObject {
     private func loadActionsSafely(
         sessionId: UUID,
         actionType: ActionType,
-        phaseIndex: Int
+        phaseIndex: Int,
+        roundId: UUID? = nil
     ) async -> [GameAction] {
         do {
             return try await sessionService.getActionsForPhase(
                 sessionId: sessionId,
                 actionType: actionType,
-                phaseIndex: phaseIndex
+                phaseIndex: phaseIndex,
+                roundId: roundId
             )
         } catch {
             print("⚠️ [MultiplayerGameStore] Failed to load actions for \(actionType.rawValue) @ phase \(phaseIndex): \(error)")
@@ -1067,6 +1123,178 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
     
+    // MARK: - Two-Phase Night Resolution Pattern
+
+    /// Phase 1: Record night actions without applying deaths (guards against duplicate resolution)
+    func recordNightActions(nightIndex: Int) async throws {
+        guard isHost else { return }
+        guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
+              activeNightIndex == nightIndex else {
+            return
+        }
+        guard let session = currentSession else { return }
+
+        // Check if this night is already recorded
+        if let existingRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) {
+            if existingRecord.isResolved {
+                print("⚠️ Night \(nightIndex) already resolved, skipping recordNightActions")
+                return
+            }
+            // If recorded but not resolved, continue to phase 2
+            print("ℹ️ Night \(nightIndex) already recorded, ready for resolution")
+            return
+        }
+
+        // Re-fetch actions to ensure we have latest state (filtered by round_id to prevent action replay)
+        let mafiaActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .mafiaTarget,
+            phaseIndex: nightIndex,
+            roundId: session.currentRoundId
+        )
+        let doctorActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .doctorProtect,
+            phaseIndex: nightIndex,
+            roundId: session.currentRoundId
+        )
+        let inspectorActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .inspectorCheck,
+            phaseIndex: nightIndex,
+            roundId: session.currentRoundId
+        )
+
+        let mafiaTargetId = determineMajorityTarget(from: mafiaActions)
+        let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
+        let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
+        let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
+
+        // Collect role-specific player numbers (host has access to all roles)
+        let mafiaPlayerNumbers = allPlayers
+            .filter { $0.role == .mafia }
+            .compactMap { $0.playerNumber }
+            .sorted()
+        let doctorPlayerNumbers = allPlayers
+            .filter { $0.role == .doctor }
+            .compactMap { $0.playerNumber }
+            .sorted()
+        let inspectorPlayerNumbers = allPlayers
+            .filter { $0.role == .inspector }
+            .compactMap { $0.playerNumber }
+            .sorted()
+
+        // Inspector checked ID can be public (but result stays private)
+        let inspectorCheckedId = inspectorActions.first?.targetPlayerId
+
+        // Phase 1: Record actions WITHOUT applying deaths (isResolved=false, resultingDeaths=[])
+        let nightRecord = NightActionRecord(
+            nightIndex: nightIndex,
+            isResolved: false,  // NOT resolved yet - Phase 2 will set this to true
+            mafiaTargetId: mafiaTargetId,
+            inspectorCheckedId: inspectorCheckedId,
+            inspectorResult: nil,
+            doctorProtectedId: doctorProtectedId,
+            resultingDeaths: [],  // Empty - deaths not applied yet
+            mafiaPlayerNumbers: mafiaPlayerNumbers,
+            doctorPlayerNumbers: doctorPlayerNumbers,
+            inspectorPlayerNumbers: inspectorPlayerNumbers,
+            timestamp: Date()
+        )
+
+        var updatedHistory = session.nightHistory.filter { $0.nightIndex != nightIndex }
+        updatedHistory.append(nightRecord)
+        updatedHistory.sort { $0.nightIndex < $1.nightIndex }
+        currentSession?.nightHistory = updatedHistory
+
+        // Update ONLY night_history, don't touch players or phase
+        try await sessionService.updateSessionState(
+            sessionId: session.id,
+            nightHistory: updatedHistory
+        )
+
+        print("✅ Night \(nightIndex) actions recorded, ready for resolution")
+    }
+
+    /// Phase 2: Apply night outcomes atomically (with duplicate resolution guard)
+    func resolveNightOutcome(nightIndex: Int, targetWasSaved: Bool) async throws {
+        guard isHost else { return }
+        guard let session = currentSession else { return }
+        guard var nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
+            print("⚠️ Cannot resolve night \(nightIndex): no record found. Call recordNightActions first.")
+            return
+        }
+
+        // CRITICAL: Guard against duplicate resolution
+        if nightRecord.isResolved {
+            print("⚠️ Night \(nightIndex) already resolved, preventing duplicate resolution")
+            return
+        }
+
+        var resultingDeaths: [UUID] = []
+        if let targetId = nightRecord.mafiaTargetId, !targetWasSaved {
+            resultingDeaths = [targetId]
+        }
+
+        // Update the record with final results
+        nightRecord.resultingDeaths = resultingDeaths
+        nightRecord.isResolved = true  // Mark as resolved
+
+        // Update local history
+        var updatedHistory = session.nightHistory.filter { $0.nightIndex != nightIndex }
+        updatedHistory.append(nightRecord)
+        updatedHistory.sort { $0.nightIndex < $1.nightIndex }
+        currentSession?.nightHistory = updatedHistory
+
+        // Check win conditions AFTER death but BEFORE phase transition
+        let winnerCheck = evaluateWinners(startOfDay: true)
+        let nextPhaseName: String
+        let nextPhaseData: PhaseData
+
+        if winnerCheck.isGameOver {
+            nextPhaseName = "game_over"
+            nextPhaseData = .gameOver(winner: winnerCheck.winner?.rawValue)
+        } else {
+            nextPhaseName = "morning"
+            nextPhaseData = .morning(nightIndex: nightIndex)
+        }
+
+        // Reset readiness flag
+        await MainActor.run {
+            self.isPhaseReadyToAdvance = false
+        }
+
+        // ATOMIC OPERATION: Apply deaths + update history + advance phase in single transaction
+        let success = try await sessionService.resolveNightAtomic(
+            sessionId: session.id,
+            nightRecord: nightRecord,
+            eliminatedPlayerIds: resultingDeaths,
+            nextPhase: nextPhaseName,
+            nextPhaseData: nextPhaseData,
+            isGameOver: winnerCheck.isGameOver ? true : nil,
+            winner: winnerCheck.winner
+        )
+
+        if success {
+            // Update local player state to match DB
+            for playerId in resultingDeaths {
+                if let index = allPlayers.firstIndex(where: { $0.playerId == playerId }) {
+                    allPlayers[index].isAlive = false
+                }
+            }
+
+            let hostEliminated = resultingDeaths.contains(where: { playerId in
+                allPlayers.first(where: { $0.playerId == playerId })?.userId == session.hostUserId
+            })
+
+            await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
+            print("✅ Night \(nightIndex) resolved atomically")
+        } else {
+            print("❌ Failed to resolve night \(nightIndex) atomically")
+        }
+    }
+
+    /// Legacy single-phase resolution (DEPRECATED - kept for backwards compatibility, will be removed)
     private func resolveNightPhase(nightIndex: Int) async throws {
         guard isHost else { return }
         guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
@@ -1075,21 +1303,24 @@ final class MultiplayerGameStore: ObservableObject {
         }
         guard let session = currentSession else { return }
 
-        // Re-fetch actions to ensure we have latest state
+        // Re-fetch actions to ensure we have latest state (filtered by round_id to prevent action replay)
         let mafiaActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .mafiaTarget,
-            phaseIndex: nightIndex
+            phaseIndex: nightIndex,
+            roundId: session.currentRoundId
         )
         let doctorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .doctorProtect,
-            phaseIndex: nightIndex
+            phaseIndex: nightIndex,
+            roundId: session.currentRoundId
         )
         let inspectorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .inspectorCheck,
-            phaseIndex: nightIndex
+            phaseIndex: nightIndex,
+            roundId: session.currentRoundId
         )
 
         let mafiaTargetId = determineMajorityTarget(from: mafiaActions)
@@ -1213,7 +1444,8 @@ final class MultiplayerGameStore: ObservableObject {
         let votes = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .vote,
-            phaseIndex: dayIndex
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
         )
 
         var voteCounts: [UUID: Int] = [:]
@@ -1533,12 +1765,16 @@ final class MultiplayerGameStore: ObservableObject {
     ) async throws {
         guard let session = currentSession else { return }
 
+        // Use current round ID from session, or generate a new one if missing
+        let roundId = session.currentRoundId ?? UUID()
+
         let action: GameAction
 
         switch actionType {
         case .mafiaTarget:
             action = .mafiaAction(
                 sessionId: session.id,
+                roundId: roundId,
                 nightIndex: nightIndex,
                 actorPlayerId: botPlayerId,
                 targetPlayerId: targetPlayerId
@@ -1547,6 +1783,7 @@ final class MultiplayerGameStore: ObservableObject {
             // No local logic - handled by server RPC
             action = .inspectorAction(
                 sessionId: session.id,
+                roundId: roundId,
                 nightIndex: nightIndex,
                 actorPlayerId: botPlayerId,
                 targetPlayerId: targetPlayerId,
@@ -1555,6 +1792,7 @@ final class MultiplayerGameStore: ObservableObject {
         case .doctorProtect:
             action = .doctorAction(
                 sessionId: session.id,
+                roundId: roundId,
                 nightIndex: nightIndex,
                 actorPlayerId: botPlayerId,
                 targetPlayerId: targetPlayerId
@@ -1573,8 +1811,12 @@ final class MultiplayerGameStore: ObservableObject {
     ) async throws {
         guard let session = currentSession else { return }
 
+        // Use current round ID from session, or generate a new one if missing
+        let roundId = session.currentRoundId ?? UUID()
+
         let action = GameAction.voteAction(
             sessionId: session.id,
+            roundId: roundId,
             dayIndex: dayIndex,
             actorPlayerId: botPlayerId,
             targetPlayerId: targetPlayerId

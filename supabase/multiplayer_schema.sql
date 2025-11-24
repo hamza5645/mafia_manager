@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
     night_history JSONB DEFAULT '[]'::jsonb,
     day_history JSONB DEFAULT '[]'::jsonb,
 
+    -- Round ID for action isolation (prevents action replay across rounds)
+    current_round_id UUID DEFAULT gen_random_uuid(),
+
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
@@ -66,6 +69,7 @@ CREATE TABLE IF NOT EXISTS public.session_players (
 CREATE TABLE IF NOT EXISTS public.game_actions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES public.game_sessions(id) ON DELETE CASCADE,
+    round_id UUID NOT NULL, -- Links to game_sessions.current_round_id for action isolation
     action_type TEXT NOT NULL, -- mafia_target, inspector_check, doctor_protect, vote
     phase_index INT NOT NULL, -- night_index or day_index
     actor_player_id UUID NOT NULL, -- Who performed the action
@@ -73,8 +77,8 @@ CREATE TABLE IF NOT EXISTS public.game_actions (
     action_data JSONB, -- Additional data (e.g., inspector result)
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
 
-    -- Ensure one action per player per phase
-    UNIQUE(session_id, action_type, phase_index, actor_player_id)
+    -- Ensure one action per player per round+phase
+    UNIQUE(session_id, round_id, action_type, phase_index, actor_player_id)
 );
 
 -- =====================================================
@@ -91,6 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_session_players_online ON public.session_players(
 
 CREATE INDEX IF NOT EXISTS idx_game_actions_session ON public.game_actions(session_id);
 CREATE INDEX IF NOT EXISTS idx_game_actions_phase ON public.game_actions(session_id, phase_index, action_type);
+CREATE INDEX IF NOT EXISTS idx_game_actions_round ON public.game_actions(session_id, round_id, phase_index);
 
 -- =====================================================
 -- 3. ENABLE ROW LEVEL SECURITY
@@ -416,6 +421,123 @@ CREATE TRIGGER update_game_sessions_updated_at
     BEFORE UPDATE ON public.game_sessions
     FOR EACH ROW
     EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Submit game action RPC (handles action insertion with round_id)
+CREATE OR REPLACE FUNCTION public.submit_game_action(
+    p_session_id UUID,
+    p_round_id UUID,
+    p_action_type TEXT,
+    p_phase_index INT,
+    p_actor_player_id UUID,
+    p_target_player_id UUID
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_result TEXT;
+BEGIN
+    -- Insert or update the action
+    INSERT INTO public.game_actions (
+        session_id,
+        round_id,
+        action_type,
+        phase_index,
+        actor_player_id,
+        target_player_id
+    ) VALUES (
+        p_session_id,
+        p_round_id,
+        p_action_type,
+        p_phase_index,
+        p_actor_player_id,
+        p_target_player_id
+    )
+    ON CONFLICT (session_id, round_id, action_type, phase_index, actor_player_id)
+    DO UPDATE SET
+        target_player_id = EXCLUDED.target_player_id,
+        created_at = NOW();
+
+    -- For inspector checks, determine the result
+    IF p_action_type = 'inspector_check' AND p_target_player_id IS NOT NULL THEN
+        SELECT role INTO v_result
+        FROM public.session_players
+        WHERE session_id = p_session_id
+          AND player_id = p_target_player_id;
+
+        IF v_result = 'mafia' THEN
+            RETURN json_build_object('success', true, 'result', 'mafia');
+        ELSE
+            RETURN json_build_object('success', true, 'result', 'not_mafia');
+        END IF;
+    END IF;
+
+    RETURN json_build_object('success', true);
+END;
+$$;
+
+-- Atomic night resolution function (prevents race conditions)
+-- Applies player eliminations AND updates night_history in a single transaction
+CREATE OR REPLACE FUNCTION public.resolve_night_atomic(
+    p_session_id UUID,
+    p_night_record JSONB,
+    p_eliminated_player_ids UUID[],
+    p_next_phase TEXT,
+    p_next_phase_data JSONB
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_night_index INT;
+    v_night_history JSONB;
+    v_updated_history JSONB;
+BEGIN
+    -- Extract night_index from the record
+    v_night_index := (p_night_record->>'nightIndex')::INT;
+
+    -- Get current night_history
+    SELECT night_history INTO v_night_history
+    FROM public.game_sessions
+    WHERE id = p_session_id;
+
+    -- Remove any existing record for this night_index (prevent duplicates)
+    v_updated_history := (
+        SELECT jsonb_agg(elem)
+        FROM jsonb_array_elements(v_night_history) elem
+        WHERE (elem->>'nightIndex')::INT != v_night_index
+    );
+
+    -- If all records were removed, initialize empty array
+    IF v_updated_history IS NULL THEN
+        v_updated_history := '[]'::jsonb;
+    END IF;
+
+    -- Append the new night record
+    v_updated_history := v_updated_history || p_night_record;
+
+    -- Update players (set is_alive = false) in one statement
+    UPDATE public.session_players
+    SET is_alive = false,
+        removal_note = 'Eliminated at night ' || v_night_index
+    WHERE session_id = p_session_id
+      AND player_id = ANY(p_eliminated_player_ids);
+
+    -- Update session state (night_history + phase transition) in one statement
+    UPDATE public.game_sessions
+    SET night_history = v_updated_history,
+        current_phase = p_next_phase,
+        current_phase_data = p_next_phase_data,
+        updated_at = NOW()
+    WHERE id = p_session_id;
+
+    RETURN TRUE;
+END;
+$$;
 
 -- =====================================================
 -- 8. REALTIME CONFIGURATION

@@ -418,6 +418,57 @@ Typical task delegation:
 
 **Bot support**: Bots have `is_bot=true`, `user_id=null`. Host controls bot actions locally, writes them as `game_actions`.
 
+### Two-Phase Night Resolution (Critical Pattern)
+
+Multiplayer night resolution follows a strict two-phase pattern to prevent state corruption, action replay, and race conditions:
+
+**Phase 1: Record Actions** (`recordNightActions()`)
+- Fetches all night actions filtered by `session.currentRoundId` (prevents action replay)
+- Records actions in `nightHistory` with `isResolved=false` and `resultingDeaths=[]`
+- Does NOT mutate player state (no deaths applied)
+- Guarded by `isResolved` flag to prevent duplicate recording
+
+**Phase 2: Resolve Outcome** (`resolveNightOutcome(targetWasSaved:)`)
+- Checks `isResolved` guard to prevent duplicate resolution
+- Applies deaths via atomic RPC `resolve_night_atomic()` which updates:
+  - `session_players.is_alive = false` for eliminated players
+  - `nightHistory` with `isResolved=true` and final `resultingDeaths`
+  - `current_phase` and `current_phase_data` to advance game
+- All mutations happen in single database transaction (prevents race conditions)
+
+**UI Flow** (MultiplayerNightView):
+1. Host clicks "Finish Night Phase" → calls `recordNightActions()`
+2. Sheet displays night results: who mafia targeted, who doctor protected, save outcome
+3. Host clicks "Continue to Morning" → calls `resolveNightOutcome()` with auto-determined save status
+4. Phase advances to morning
+
+**Round Isolation** (`current_round_id`):
+- New UUID generated for each night phase transition (in `updateSessionPhase()`)
+- All actions submitted with `round_id` matching current round
+- Action queries filtered by `round_id` to prevent old actions from being re-applied
+- Prevents action replay bug where Night 2 actions could affect Night 1 outcomes
+
+**Atomic Database Operations**:
+- `resolve_night_atomic()` RPC function ensures player eliminations and history updates happen in single transaction
+- No window for race conditions between Realtime events
+- Idempotent: safe to call multiple times (guards check `isResolved`)
+
+**Realtime Filtering**:
+- `handleActionUpdate()` filters actions by active `phase_index` to prevent stale events
+- Only processes actions matching current night/day phase
+- Prevents Realtime replays from triggering duplicate resolution
+
+**Why Two-Phase?**
+- Solo mode asks Doctor "Was target saved?" before committing death
+- Multiplayer auto-determines save by comparing `mafiaTargetId == doctorProtectedId`
+- Separation allows host to review outcomes before finalizing
+- Matches established solo mode UX pattern
+
+**Critical: Never Merge Phases**
+- Always call `recordNightActions()` before `resolveNightOutcome()`
+- Never fold into single method—breaks duplicate resolution guards
+- UI must show intermediate results sheet between phases
+
 ## Known Fixes & Gotchas
 
 ### Host with Active Roles (Mafia/Doctor/Inspector)

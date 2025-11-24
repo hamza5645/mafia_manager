@@ -4,6 +4,7 @@ import Foundation
 struct GameAction: Codable, Identifiable, Sendable {
     let id: UUID
     let sessionId: UUID
+    let roundId: UUID // Links to game_sessions.current_round_id for action isolation
     let actionType: ActionType
     let phaseIndex: Int // night_index or day_index
     let actorPlayerId: UUID // Who performed the action
@@ -14,6 +15,7 @@ struct GameAction: Codable, Identifiable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id
         case sessionId = "session_id"
+        case roundId = "round_id"
         case actionType = "action_type"
         case phaseIndex = "phase_index"
         case actorPlayerId = "actor_player_id"
@@ -47,6 +49,7 @@ struct ActionData: Codable, Sendable {
 extension GameAction {
     static func mafiaAction(
         sessionId: UUID,
+        roundId: UUID,
         nightIndex: Int,
         actorPlayerId: UUID,
         targetPlayerId: UUID?
@@ -54,6 +57,7 @@ extension GameAction {
         GameAction(
             id: UUID(),
             sessionId: sessionId,
+            roundId: roundId,
             actionType: .mafiaTarget,
             phaseIndex: nightIndex,
             actorPlayerId: actorPlayerId,
@@ -65,6 +69,7 @@ extension GameAction {
 
     static func inspectorAction(
         sessionId: UUID,
+        roundId: UUID,
         nightIndex: Int,
         actorPlayerId: UUID,
         targetPlayerId: UUID?,
@@ -78,6 +83,7 @@ extension GameAction {
         return GameAction(
             id: UUID(),
             sessionId: sessionId,
+            roundId: roundId,
             actionType: .inspectorCheck,
             phaseIndex: nightIndex,
             actorPlayerId: actorPlayerId,
@@ -89,6 +95,7 @@ extension GameAction {
 
     static func doctorAction(
         sessionId: UUID,
+        roundId: UUID,
         nightIndex: Int,
         actorPlayerId: UUID,
         targetPlayerId: UUID?
@@ -96,6 +103,7 @@ extension GameAction {
         GameAction(
             id: UUID(),
             sessionId: sessionId,
+            roundId: roundId,
             actionType: .doctorProtect,
             phaseIndex: nightIndex,
             actorPlayerId: actorPlayerId,
@@ -107,6 +115,7 @@ extension GameAction {
 
     static func voteAction(
         sessionId: UUID,
+        roundId: UUID,
         dayIndex: Int,
         actorPlayerId: UUID,
         targetPlayerId: UUID?
@@ -114,6 +123,7 @@ extension GameAction {
         GameAction(
             id: UUID(),
             sessionId: sessionId,
+            roundId: roundId,
             actionType: .vote,
             phaseIndex: dayIndex,
             actorPlayerId: actorPlayerId,
@@ -127,6 +137,7 @@ extension GameAction {
 // RPC Parameters for submitting actions
 struct ActionParams: Encodable, Sendable {
     let p_session_id: UUID
+    let p_round_id: UUID
     let p_action_type: String
     let p_phase_index: Int
     let p_actor_player_id: UUID

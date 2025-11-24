@@ -231,16 +231,25 @@ final class SessionService {
         struct UpdateData: Encodable {
             let currentPhase: String
             let currentPhaseData: PhaseData?
+            let currentRoundId: String?
 
             enum CodingKeys: String, CodingKey {
                 case currentPhase = "current_phase"
                 case currentPhaseData = "current_phase_data"
+                case currentRoundId = "current_round_id"
             }
         }
 
+        // Initialize round_id when starting night phase (prevents action replay)
+        let newRoundId: UUID? = (currentPhase == "night") ? UUID() : nil
+
         try await supabase
             .from("game_sessions")
-            .update(UpdateData(currentPhase: currentPhase, currentPhaseData: phaseData))
+            .update(UpdateData(
+                currentPhase: currentPhase,
+                currentPhaseData: phaseData,
+                currentRoundId: newRoundId?.uuidString
+            ))
             .eq("id", value: sessionId.uuidString)
             .execute()
     }
@@ -312,6 +321,88 @@ final class SessionService {
             .update(updateData)
             .eq("id", value: sessionId.uuidString)
             .execute()
+    }
+
+    /// Atomically resolve night phase (prevents race conditions)
+    /// Applies player eliminations AND updates night_history + phase transition in a single transaction
+    func resolveNightAtomic(
+        sessionId: UUID,
+        nightRecord: NightActionRecord,
+        eliminatedPlayerIds: [UUID],
+        nextPhase: String,
+        nextPhaseData: PhaseData,
+        isGameOver: Bool? = nil,
+        winner: Role? = nil
+    ) async throws -> Bool {
+        // Encode night record and phase data to JSON using helper
+        func toAnyJSON<T: Encodable>(_ value: T) throws -> AnyJSON {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(value)
+            let jsonObject = try JSONSerialization.jsonObject(with: data)
+
+            if let dict = jsonObject as? [String: Any] {
+                return .object(dict.compactMapValues { value in
+                    if let string = value as? String { return .string(string) }
+                    if let number = value as? Int { return .integer(number) }
+                    if let number = value as? Double { return .double(number) }
+                    if let bool = value as? Bool { return bool ? .integer(1) : .integer(0) }
+                    if let array = value as? [Any] {
+                        return .array(array.compactMap { element in
+                            if let string = element as? String { return .string(string) }
+                            return nil
+                        })
+                    }
+                    return nil
+                })
+            }
+            return .null
+        }
+
+        let params: [String: AnyJSON] = [
+            "p_session_id": .string(sessionId.uuidString),
+            "p_night_record": try toAnyJSON(nightRecord),
+            "p_eliminated_player_ids": .array(eliminatedPlayerIds.map { .string($0.uuidString) }),
+            "p_next_phase": .string(nextPhase),
+            "p_next_phase_data": try toAnyJSON(nextPhaseData)
+        ]
+
+        do {
+            let result: Bool = try await supabase
+                .rpc("resolve_night_atomic", params: params)
+                .single()
+                .execute()
+                .value
+
+            // If RPC succeeded, update is_game_over and winner if needed
+            if result && (isGameOver != nil || winner != nil) {
+                struct GameOverUpdate: Encodable {
+                    let isGameOver: Bool?
+                    let winner: String?
+
+                    enum CodingKeys: String, CodingKey {
+                        case isGameOver = "is_game_over"
+                        case winner
+                    }
+                }
+
+                let gameOverData = GameOverUpdate(
+                    isGameOver: isGameOver,
+                    winner: winner?.rawValue
+                )
+
+                try await supabase
+                    .from("game_sessions")
+                    .update(gameOverData)
+                    .eq("id", value: sessionId.uuidString)
+                    .execute()
+            }
+
+            return result
+        } catch {
+            print("❌ resolveNightAtomic RPC failed: \(error)")
+            return false
+        }
     }
 
     // MARK: - Player Management
@@ -543,6 +634,7 @@ final class SessionService {
     func submitAction(_ action: GameAction) async throws -> ActionResponse {
         let params: [String: AnyJSON] = [
             "p_session_id": .string(action.sessionId.uuidString),
+            "p_round_id": .string(action.roundId.uuidString),  // Include round_id for action isolation
             "p_action_type": .string(action.actionType.rawValue),
             "p_phase_index": .integer(action.phaseIndex),
             "p_actor_player_id": .string(action.actorPlayerId.uuidString),
@@ -554,7 +646,7 @@ final class SessionService {
             .rpc("submit_game_action", params: params)
             .execute()
             .value
-            
+
         return response
     }
 
@@ -562,14 +654,22 @@ final class SessionService {
     func getActionsForPhase(
         sessionId: UUID,
         actionType: ActionType,
-        phaseIndex: Int
+        phaseIndex: Int,
+        roundId: UUID? = nil  // Optional: filter by round_id to prevent action replay
     ) async throws -> [GameAction] {
-        let actions: [GameAction] = try await supabase
+        var query = supabase
             .from("game_actions")
             .select()
             .eq("session_id", value: sessionId.uuidString)
             .eq("action_type", value: actionType.rawValue)
             .eq("phase_index", value: phaseIndex)
+
+        // If round_id provided, filter by it (prevents old actions from being re-applied)
+        if let roundId = roundId {
+            query = query.eq("round_id", value: roundId.uuidString)
+        }
+
+        let actions: [GameAction] = try await query
             .order("created_at")
             .execute()
             .value
