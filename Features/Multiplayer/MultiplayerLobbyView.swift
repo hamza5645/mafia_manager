@@ -67,10 +67,6 @@ struct MultiplayerLobbyView: View {
                         .foregroundColor(Design.Colors.brandGold)
                 }
             }
-
-            ToolbarItem(placement: .navigationBarTrailing) {
-                connectionStatusIndicator
-            }
         }
         .alert("Are you sure you want to end the game?", isPresented: $showingLeaveConfirmation) {
             Button("End Game", role: .destructive) {
@@ -290,47 +286,6 @@ struct MultiplayerLobbyView: View {
         }
     }
 
-    // MARK: - Connection Status Indicator
-
-    private var connectionStatusIndicator: some View {
-        HStack(spacing: 6) {
-            // Indicator dot
-            Circle()
-                .fill(connectionStatusColor)
-                .frame(width: 8, height: 8)
-
-            // Status text
-            if multiplayerStore.isRealtimeReconnecting {
-                Text("Reconnecting...")
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.textSecondary)
-            } else if !multiplayerStore.isRealtimeConnected {
-                Text("Offline")
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.textSecondary)
-            } else {
-                Text("Online")
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.textSecondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Design.Colors.surface2)
-        )
-    }
-
-    private var connectionStatusColor: Color {
-        if !multiplayerStore.isRealtimeConnected {
-            return Color.red.opacity(0.8)
-        } else if multiplayerStore.isRealtimeReconnecting {
-            return Color.yellow.opacity(0.8)
-        } else {
-            return Color.green.opacity(0.8)
-        }
-    }
 
     private func calculateButtonHeight() -> CGFloat {
         var height: CGFloat = 20 // Base padding
