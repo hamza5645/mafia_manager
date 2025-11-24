@@ -973,6 +973,22 @@ final class MultiplayerGameStore: ObservableObject {
         let doctorActors = Set(doctorActions.map { $0.actorPlayerId })
         let inspectorActors = Set(inspectorActions.map { $0.actorPlayerId })
 
+        // Check if the host has an active role and has submitted their action
+        let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
+        let hostHasActiveRole = hostPlayer?.role != nil && hostPlayer?.role != .citizen
+        let hostHasSubmitted = hostPlayer.map { player in
+            switch player.role {
+            case .mafia:
+                return mafiaActors.contains(player.playerId)
+            case .doctor:
+                return doctorActors.contains(player.playerId)
+            case .inspector:
+                return inspectorActors.contains(player.playerId)
+            default:
+                return true // No action needed for citizens
+            }
+        } ?? true
+
         let readyNonHostHumans = aliveNonHostHumans.filter { player in
             let role = player.role
             let passive = (role == .citizen)
@@ -993,10 +1009,18 @@ final class MultiplayerGameStore: ObservableObject {
             return passive || player.isReady || hasAction
         }
 
-        let allReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+        let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+        let allReady = nonHostReady && (!hostHasActiveRole || hostHasSubmitted)
 
         print("👥 [MultiplayerGameStore] Total alive: \(alivePlayers.count), Alive humans: \(aliveHumanPlayers.count)")
         print("👥 [MultiplayerGameStore] Non-host humans: \(aliveNonHostHumans.count), Ready: \(readyNonHostHumans.count)")
+
+        // Log host status
+        if let host = hostPlayer {
+            let hostRole = host.role?.displayName ?? "?"
+            print("🏠 [MultiplayerGameStore] Host: \(host.playerName), Role: \(hostRole), Has active role: \(hostHasActiveRole), Has submitted: \(hostHasSubmitted)")
+        }
+
         print("✅ [MultiplayerGameStore] All ready? \(allReady)")
 
         // Log individual player states

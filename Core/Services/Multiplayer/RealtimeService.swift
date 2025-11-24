@@ -30,20 +30,36 @@ final class RealtimeService: ObservableObject {
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
-            
+
             // Try ISO8601 with fractional seconds first
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let date = formatter.date(from: dateString) {
                 return date
             }
-            
+
             // Try without fractional seconds
             formatter.formatOptions = [.withInternetDateTime]
             if let date = formatter.date(from: dateString) {
                 return date
             }
-            
+
+            // Fallback: Try with fractional seconds but assume UTC if no timezone
+            // Handles format: "2025-11-24T16:33:27.104" (missing Z or +00:00)
+            let fallbackFormatter = DateFormatter()
+            fallbackFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+            fallbackFormatter.timeZone = TimeZone(secondsFromGMT: 0) // Assume UTC
+            fallbackFormatter.locale = Locale(identifier: "en_US_POSIX")
+            if let date = fallbackFormatter.date(from: dateString) {
+                return date
+            }
+
+            // Final fallback: Try without fractional seconds and no timezone
+            fallbackFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            if let date = fallbackFormatter.date(from: dateString) {
+                return date
+            }
+
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string \(dateString)")
         }
         return decoder
