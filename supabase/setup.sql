@@ -15,9 +15,21 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     display_name TEXT NOT NULL,
+    is_anonymous BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
+
+-- Add is_anonymous column if it doesn't exist (for existing installations)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'is_anonymous'
+    ) THEN
+        ALTER TABLE public.profiles ADD COLUMN is_anonymous BOOLEAN DEFAULT false NOT NULL;
+    END IF;
+END $$;
 
 -- Player Stats table: Game statistics for each player
 CREATE TABLE IF NOT EXISTS public.player_stats (
@@ -202,19 +214,32 @@ USING (user_id = auth.uid());
 -- =====================================================
 
 -- Function that automatically creates a profile when a user signs up
+-- Handles both regular users and anonymous users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, display_name, created_at, updated_at)
+  INSERT INTO public.profiles (id, display_name, is_anonymous, created_at, updated_at)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email),
+    COALESCE(
+      NEW.raw_user_meta_data->>'display_name',
+      CASE WHEN NEW.is_anonymous THEN 'Guest' ELSE NEW.email END
+    ),
+    COALESCE(NEW.is_anonymous, false),
     NOW(),
     NOW()
-  );
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    is_anonymous = EXCLUDED.is_anonymous,
+    display_name = CASE
+      WHEN profiles.is_anonymous AND NOT EXCLUDED.is_anonymous
+      THEN COALESCE(NEW.raw_user_meta_data->>'display_name', profiles.display_name)
+      ELSE profiles.display_name
+    END,
+    updated_at = NOW();
   RETURN NEW;
 END;
 $$;
@@ -228,11 +253,115 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_user();
 
 -- =====================================================
+-- 8. ANONYMOUS USER STATS MERGE FUNCTION
+-- =====================================================
+-- This function merges stats from an anonymous user to a permanent account
+-- Used when an anonymous user signs into an existing account
+
+CREATE OR REPLACE FUNCTION public.merge_anonymous_stats(
+    p_anonymous_user_id UUID,
+    p_target_user_id UUID
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_merged_count INT := 0;
+    v_transferred_count INT := 0;
+    v_anon_stat RECORD;
+    v_target_stat player_stats%ROWTYPE;
+BEGIN
+    -- Verify the anonymous user exists and is actually anonymous
+    IF NOT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = p_anonymous_user_id AND is_anonymous = true
+    ) THEN
+        RETURN json_build_object(
+            'success', false,
+            'error', 'Source user is not anonymous or does not exist'
+        );
+    END IF;
+
+    -- Verify target user exists and is not anonymous
+    IF NOT EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = p_target_user_id AND is_anonymous = false
+    ) THEN
+        RETURN json_build_object(
+            'success', false,
+            'error', 'Target user does not exist or is anonymous'
+        );
+    END IF;
+
+    -- Process each stat from anonymous user
+    FOR v_anon_stat IN
+        SELECT * FROM public.player_stats
+        WHERE user_id = p_anonymous_user_id
+    LOOP
+        -- Check if target user has stats for same player_name
+        SELECT * INTO v_target_stat
+        FROM public.player_stats
+        WHERE user_id = p_target_user_id
+          AND player_name = v_anon_stat.player_name;
+
+        IF FOUND THEN
+            -- MERGE: Sum all numeric stats
+            UPDATE public.player_stats
+            SET
+                games_played = games_played + v_anon_stat.games_played,
+                games_won = games_won + v_anon_stat.games_won,
+                games_lost = games_lost + v_anon_stat.games_lost,
+                total_kills = total_kills + v_anon_stat.total_kills,
+                times_mafia = times_mafia + v_anon_stat.times_mafia,
+                times_doctor = times_doctor + v_anon_stat.times_doctor,
+                times_inspector = times_inspector + v_anon_stat.times_inspector,
+                times_citizen = times_citizen + v_anon_stat.times_citizen,
+                updated_at = NOW()
+            WHERE id = v_target_stat.id;
+
+            v_merged_count := v_merged_count + 1;
+
+            -- Delete the anonymous stat (now merged)
+            DELETE FROM public.player_stats WHERE id = v_anon_stat.id;
+        ELSE
+            -- TRANSFER: Move stat to target user (no conflict)
+            UPDATE public.player_stats
+            SET user_id = p_target_user_id, updated_at = NOW()
+            WHERE id = v_anon_stat.id;
+
+            v_transferred_count := v_transferred_count + 1;
+        END IF;
+    END LOOP;
+
+    -- Also transfer other user data (custom_roles_configs, player_groups)
+    UPDATE public.custom_roles_configs
+    SET user_id = p_target_user_id, updated_at = NOW()
+    WHERE user_id = p_anonymous_user_id;
+
+    UPDATE public.player_groups
+    SET user_id = p_target_user_id, updated_at = NOW()
+    WHERE user_id = p_anonymous_user_id;
+
+    -- Delete the anonymous user's profile (orphaned)
+    DELETE FROM public.profiles WHERE id = p_anonymous_user_id;
+
+    RETURN json_build_object(
+        'success', true,
+        'merged_count', v_merged_count,
+        'transferred_count', v_transferred_count
+    );
+END;
+$$;
+
+-- =====================================================
 -- SETUP COMPLETE!
 -- =====================================================
 -- Your database is now ready for the Mafia Manager app.
 --
 -- Next steps:
 -- 1. Disable email confirmation in Authentication → Providers → Email
--- 2. Update Core/Services/SupabaseConfig.swift with your API credentials
--- 3. Build and run the app!
+-- 2. Enable Anonymous Sign-In in Authentication → Providers → Anonymous Sign-In
+-- 3. Update Core/Services/SupabaseConfig.swift with your API credentials
+-- 4. Build and run the app!

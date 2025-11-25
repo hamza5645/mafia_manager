@@ -5,6 +5,7 @@ struct GameModeSelectionView: View {
     @State private var selectedMode: GameMode?
     @State private var showingAuth = false
     @State private var showingSettings = false
+    @State private var showingGuestNameInput = false
 
     enum GameMode: Hashable {
         case local
@@ -61,20 +62,14 @@ struct GameModeSelectionView: View {
                                 icon: "person.3.fill",
                                 accentColor: Design.Colors.brandGold,
                                 isSelected: selectedMode == .online,
-                                isLocked: !authStore.isAuthenticated
+                                isLocked: false  // Guests can play too!
                             ) {
                                 if authStore.isAuthenticated {
                                     selectedMode = .online
                                 } else {
-                                    showingAuth = true
+                                    // Show guest name input for unauthenticated users
+                                    showingGuestNameInput = true
                                 }
-                            }
-
-                            if !authStore.isAuthenticated {
-                                Text("Sign in required for online multiplayer")
-                                    .font(Design.Typography.footnote)
-                                    .foregroundStyle(Design.Colors.textSecondary)
-                                    .padding(.horizontal)
                             }
                         }
                         .padding(.horizontal, 20)
@@ -126,6 +121,17 @@ struct GameModeSelectionView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showingGuestNameInput) {
+                GuestNameInputView(
+                    onSuccess: {
+                        showingGuestNameInput = false
+                        selectedMode = .online
+                    },
+                    onCancel: {
+                        showingGuestNameInput = false
+                    }
+                )
             }
         }
     }

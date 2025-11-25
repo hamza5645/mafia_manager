@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var authStore: AuthStore
     @State private var showingLogin = false
     @State private var showingIntro = false
+    @State private var showingUpgrade = false
 
     var body: some View {
         NavigationStack {
@@ -14,8 +15,8 @@ struct SettingsView: View {
                 List {
                     // Profile/Account Section
                     Section {
-                        if authStore.isAuthenticated {
-                            // Show profile when authenticated
+                        if authStore.isAuthenticated && !authStore.isAnonymous {
+                            // Show profile for authenticated (non-guest) users
                             NavigationLink {
                                 ProfileView()
                                     .environmentObject(authStore)
@@ -42,8 +43,69 @@ struct SettingsView: View {
                                 }
                                 .padding(.vertical, 8)
                             }
+                        } else if authStore.isAnonymous {
+                            // Show guest profile section with upgrade CTA
+                            VStack(spacing: 16) {
+                                HStack(spacing: 16) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Design.Colors.brandGold.opacity(0.2))
+                                            .frame(width: 50, height: 50)
+
+                                        Text(guestDisplayInitial)
+                                            .font(.title3.bold())
+                                            .foregroundColor(Design.Colors.brandGold)
+
+                                        // Guest badge
+                                        Circle()
+                                            .fill(Design.Colors.surface0)
+                                            .frame(width: 18, height: 18)
+                                            .overlay(
+                                                Image(systemName: "person.fill.questionmark")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(Design.Colors.textSecondary)
+                                            )
+                                            .offset(x: 18, y: 18)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Guest Player")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+
+                                        Text("Playing as: \(guestDisplayName)")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                }
+                                .padding(.vertical, 8)
+
+                                // Upgrade CTA button
+                                Button {
+                                    showingUpgrade = true
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "sparkles")
+                                            .font(.system(size: 16, weight: .semibold))
+
+                                        Text("Create Account")
+                                            .font(.subheadline.weight(.semibold))
+
+                                        Spacer()
+
+                                        Text("Keep stats forever")
+                                            .font(.caption)
+                                            .foregroundColor(Design.Colors.surface0.opacity(0.8))
+                                    }
+                                    .foregroundColor(Design.Colors.surface0)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Design.Colors.brandGold)
+                                    .cornerRadius(Design.Radii.small)
+                                }
+                            }
                         } else {
-                            // Show login button when not authenticated
+                            // Show login button when not authenticated at all
                             Button {
                                 showingLogin = true
                             } label: {
@@ -165,7 +227,21 @@ struct SettingsView: View {
                     }
                 )
             }
+            .sheet(isPresented: $showingUpgrade) {
+                SignupView(isUpgrading: true)
+                    .environmentObject(authStore)
+            }
         }
+    }
+
+    // MARK: - Helper Properties
+
+    private var guestDisplayName: String {
+        authStore.guestDisplayName ?? authStore.userProfile?.displayName ?? "Guest"
+    }
+
+    private var guestDisplayInitial: String {
+        String(guestDisplayName.prefix(1).uppercased())
     }
 }
 

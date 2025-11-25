@@ -34,6 +34,31 @@ final class AuthService {
         return response.user
     }
 
+    // MARK: - Anonymous Sign In
+
+    func signInAnonymously() async throws -> Session {
+        let session = try await supabase.auth.signInAnonymously()
+
+        // WORKAROUND: Manually set the session to ensure persistence
+        try await supabase.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+
+        return session
+    }
+
+    // MARK: - Link Identity (Upgrade Anonymous to Permanent)
+
+    func linkEmailIdentity(email: String, password: String, displayName: String) async throws {
+        // Update the anonymous user with email and password
+        // This preserves the user_id (UUID stays the same)
+        try await supabase.auth.update(
+            user: UserAttributes(
+                email: email,
+                password: password,
+                data: ["display_name": .string(displayName)]
+            )
+        )
+    }
+
     // MARK: - Sign In
 
     func signIn(email: String, password: String) async throws -> Session {
@@ -115,6 +140,56 @@ final class AuthService {
             .update(updateData)
             .eq("id", value: userId.uuidString)
             .execute()
+    }
+
+    func updateGuestProfile(userId: UUID, displayName: String, isAnonymous: Bool) async throws {
+        struct UpdateData: Encodable {
+            let displayName: String
+            let isAnonymous: Bool
+            let updatedAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case displayName = "display_name"
+                case isAnonymous = "is_anonymous"
+                case updatedAt = "updated_at"
+            }
+        }
+
+        let updateData = UpdateData(displayName: displayName, isAnonymous: isAnonymous, updatedAt: Date())
+
+        try await supabase
+            .from("profiles")
+            .update(updateData)
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Merge Anonymous Stats
+
+    struct MergeStatsResult: Decodable {
+        let success: Bool
+        let error: String?
+        let mergedCount: Int?
+        let transferredCount: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case success
+            case error
+            case mergedCount = "merged_count"
+            case transferredCount = "transferred_count"
+        }
+    }
+
+    func mergeAnonymousStats(anonymousUserId: UUID, targetUserId: UUID) async throws -> MergeStatsResult {
+        let result: MergeStatsResult = try await supabase
+            .rpc("merge_anonymous_stats", params: [
+                "p_anonymous_user_id": anonymousUserId.uuidString,
+                "p_target_user_id": targetUserId.uuidString
+            ])
+            .execute()
+            .value
+
+        return result
     }
 }
 

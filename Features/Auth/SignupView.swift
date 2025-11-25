@@ -9,6 +9,11 @@ struct SignupView: View {
     @State private var confirmPassword = ""
     @State private var displayName = ""
     @State private var validationError: String?
+    @State private var showingEmailConflict = false
+    @State private var conflictAnonymousUserId: UUID?
+
+    // Upgrade mode: When true, this is upgrading a guest account to permanent
+    var isUpgrading: Bool = false
 
     var body: some View {
         ZStack {
@@ -17,17 +22,34 @@ struct SignupView: View {
 
             ScrollView {
                 VStack(spacing: 32) {
-                    // Title
+                    // Title - different for upgrade vs new signup
                     VStack(spacing: 8) {
-                        Text("Create Account")
+                        Text(isUpgrading ? "Create Account" : "Create Account")
                             .font(.system(size: 36, weight: .bold))
                             .foregroundColor(.white)
 
-                        Text("Join Mafia Manager")
+                        Text(isUpgrading ? "Keep your game progress" : "Join Mafia Manager")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
                     .padding(.top, 40)
+
+                    // Stats preview when upgrading
+                    if isUpgrading {
+                        HStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(Design.Colors.successGreen)
+
+                            Text("Your game stats will be saved to your new account")
+                                .font(.footnote)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Design.Colors.successGreen.opacity(0.15))
+                        .cornerRadius(Design.Radii.small)
+                        .padding(.horizontal, 32)
+                    }
 
                     // Input Fields
                     VStack(spacing: 16) {
@@ -115,17 +137,41 @@ struct SignupView: View {
                     Button {
                         if validateForm() {
                             Task {
-                                let success = await authStore.signUp(
-                                    email: sanitizedEmail,
-                                    password: sanitizedPassword,
-                                    displayName: sanitizedDisplayName
-                                )
-                                if success {
-                                    await MainActor.run {
-                                        dismiss()
+                                if isUpgrading {
+                                    // Upgrade guest account to permanent
+                                    let result = await authStore.linkEmailPassword(
+                                        email: sanitizedEmail,
+                                        password: sanitizedPassword,
+                                        displayName: sanitizedDisplayName
+                                    )
+
+                                    switch result {
+                                    case .success:
+                                        await MainActor.run {
+                                            dismiss()
+                                        }
+                                    case .emailAlreadyExists(let anonymousUserId):
+                                        await MainActor.run {
+                                            conflictAnonymousUserId = anonymousUserId
+                                            showingEmailConflict = true
+                                        }
+                                    case .failure:
+                                        // Error is displayed via authStore.errorMessage
+                                        break
+                                    }
+                                } else {
+                                    // Regular new signup
+                                    let success = await authStore.signUp(
+                                        email: sanitizedEmail,
+                                        password: sanitizedPassword,
+                                        displayName: sanitizedDisplayName
+                                    )
+                                    if success {
+                                        await MainActor.run {
+                                            dismiss()
+                                        }
                                     }
                                 }
-                                // If not success, error will be shown in errorMessage
                             }
                         }
                     } label: {
@@ -175,25 +221,63 @@ struct SignupView: View {
 
                     Spacer()
 
-                    // Back to Login
-                    Button {
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("Already have an account?")
-                                .foregroundColor(.white.opacity(0.7))
-                            Text("Sign In")
-                                .foregroundColor(Design.Colors.brandGold)
-                                .fontWeight(.semibold)
+                    // Back to Login (hide when upgrading since they're already "logged in" as guest)
+                    if !isUpgrading {
+                        Button {
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("Already have an account?")
+                                    .foregroundColor(.white.opacity(0.7))
+                                Text("Sign In")
+                                    .foregroundColor(Design.Colors.brandGold)
+                                    .fontWeight(.semibold)
+                            }
+                            .font(.subheadline)
                         }
-                        .font(.subheadline)
+                        .padding(.bottom, 32)
+                    } else {
+                        // For upgrade mode, show option to sign into existing account
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Cancel")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        .padding(.bottom, 32)
                     }
-                    .padding(.bottom, 32)
                 }
             }
         }
         .onAppear {
             authStore.clearError()
+            // Pre-fill display name from guest profile when upgrading
+            if isUpgrading, let guestName = authStore.guestDisplayName, !guestName.isEmpty {
+                displayName = guestName
+            }
+        }
+        .alert("Email Already Registered", isPresented: $showingEmailConflict) {
+            Button("Sign In & Merge Stats") {
+                // User wants to sign into existing account and merge stats
+                if let anonymousUserId = conflictAnonymousUserId {
+                    Task {
+                        let success = await authStore.mergeIntoExistingAccount(
+                            anonymousUserId: anonymousUserId,
+                            email: sanitizedEmail,
+                            password: sanitizedPassword
+                        )
+                        if success {
+                            await MainActor.run {
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This email is already associated with an account. Would you like to sign in and merge your guest stats?")
         }
     }
 

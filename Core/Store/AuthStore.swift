@@ -16,6 +16,27 @@ final class AuthStore: ObservableObject {
     @Published var accessToken: String?
     @Published var refreshToken: String?
 
+    // Guest/Anonymous user support
+    @Published var isAnonymous = false
+
+    var guestDisplayName: String? {
+        get { UserDefaults.standard.string(forKey: "guest_display_name") }
+        set {
+            if let name = newValue {
+                UserDefaults.standard.set(name, forKey: "guest_display_name")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "guest_display_name")
+            }
+        }
+    }
+
+    // Result type for link operations
+    enum LinkResult {
+        case success
+        case emailAlreadyExists(anonymousUserId: UUID)
+        case failure(String)
+    }
+
     private let authService = AuthService()
     private let databaseService = DatabaseService()
     private let keychain = KeychainHelper.shared
@@ -75,16 +96,17 @@ final class AuthStore: ObservableObject {
     // MARK: - Authentication State
 
     private func checkAuthState() async {
-        do {
-            if let user = await authService.currentUser {
-                currentUserId = user.id
-                isAuthenticated = true
-                await loadUserProfile()
-            } else {
-                isAuthenticated = false
-                currentUserId = nil
-                userProfile = nil
-            }
+        if let user = await authService.currentUser {
+            currentUserId = user.id
+            isAuthenticated = true
+            // Check if user is anonymous
+            isAnonymous = user.isAnonymous
+            await loadUserProfile()
+        } else {
+            isAuthenticated = false
+            currentUserId = nil
+            userProfile = nil
+            isAnonymous = false
         }
     }
 
@@ -98,18 +120,33 @@ final class AuthStore: ObservableObject {
                     if let user = session?.user {
                         self.currentUserId = user.id
                         self.isAuthenticated = true
+                        self.isAnonymous = user.isAnonymous
                         await self.loadUserProfile()
                     }
                 case .signedOut:
                     self.isAuthenticated = false
                     self.currentUserId = nil
                     self.userProfile = nil
+                    self.isAnonymous = false
+                    self.guestDisplayName = nil
                     self.clearTokens()
                 case .userDeleted:
                     self.isAuthenticated = false
                     self.currentUserId = nil
                     self.userProfile = nil
+                    self.isAnonymous = false
+                    self.guestDisplayName = nil
                     self.clearTokens()
+                case .userUpdated:
+                    // User was updated (e.g., anonymous user linked email)
+                    if let user = session?.user {
+                        self.isAnonymous = user.isAnonymous
+                        // If no longer anonymous, clear guest display name
+                        if !user.isAnonymous {
+                            self.guestDisplayName = nil
+                        }
+                        await self.loadUserProfile()
+                    }
                 default:
                     break
                 }
@@ -389,6 +426,192 @@ final class AuthStore: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    // MARK: - Guest/Anonymous Authentication
+
+    /// Sign in as a guest (anonymous) user
+    func signInAsGuest(displayName: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+
+        // Validate display name
+        let validDisplayName: String
+        switch InputValidator.validateDisplayName(displayName) {
+        case .success(let name):
+            validDisplayName = name
+        case .failure(let error):
+            errorMessage = "Invalid display name: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+
+        do {
+            let session = try await authService.signInAnonymously()
+
+            // Store tokens securely
+            saveAccessToken(session.accessToken)
+            saveRefreshToken(session.refreshToken)
+
+            // Store guest display name locally
+            guestDisplayName = validDisplayName
+
+            // Update profile with display name
+            try await authService.updateGuestProfile(
+                userId: session.user.id,
+                displayName: validDisplayName,
+                isAnonymous: true
+            )
+
+            // Update state
+            currentUserId = session.user.id
+            isAuthenticated = true
+            isAnonymous = true
+
+            // Load the profile
+            await loadUserProfile()
+
+            isLoading = false
+            return true
+        } catch {
+            print("Guest sign in error: \(error)")
+            errorMessage = "Could not sign in as guest: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+    }
+
+    /// Link email and password to upgrade anonymous account to permanent
+    func linkEmailPassword(email: String, password: String, displayName: String) async -> LinkResult {
+        guard let anonymousUserId = currentUserId, isAnonymous else {
+            return .failure("Not signed in as guest")
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        // Validate inputs
+        let validEmail: String
+        switch InputValidator.validateEmail(email) {
+        case .success(let e):
+            validEmail = e
+        case .failure(let error):
+            errorMessage = "Invalid email: \(error.localizedDescription)"
+            isLoading = false
+            return .failure(errorMessage ?? "Invalid email")
+        }
+
+        let validPassword: String
+        switch InputValidator.validatePassword(password) {
+        case .success(let p):
+            validPassword = p
+        case .failure(let error):
+            errorMessage = "Invalid password: \(error.localizedDescription)"
+            isLoading = false
+            return .failure(errorMessage ?? "Invalid password")
+        }
+
+        let validDisplayName: String
+        switch InputValidator.validateDisplayName(displayName) {
+        case .success(let n):
+            validDisplayName = n
+        case .failure(let error):
+            errorMessage = "Invalid display name: \(error.localizedDescription)"
+            isLoading = false
+            return .failure(errorMessage ?? "Invalid display name")
+        }
+
+        do {
+            // Link email/password to anonymous account (preserves UUID)
+            try await authService.linkEmailIdentity(
+                email: validEmail,
+                password: validPassword,
+                displayName: validDisplayName
+            )
+
+            // Update profile to mark as non-anonymous
+            try await authService.updateGuestProfile(
+                userId: anonymousUserId,
+                displayName: validDisplayName,
+                isAnonymous: false
+            )
+
+            // Clear guest state
+            isAnonymous = false
+            guestDisplayName = nil
+
+            // Reload profile
+            await loadUserProfile()
+
+            isLoading = false
+            return .success
+        } catch let error as NSError {
+            let message = extractSupabaseMessage(from: error) ?? error.localizedDescription
+            let normalized = message.lowercased()
+
+            // Check if email is already registered
+            if normalized.contains("already registered") || normalized.contains("already been registered") {
+                errorMessage = "This email is already registered. Sign in to merge your stats."
+                isLoading = false
+                return .emailAlreadyExists(anonymousUserId: anonymousUserId)
+            }
+
+            errorMessage = message
+            isLoading = false
+            return .failure(message)
+        } catch {
+            errorMessage = error.localizedDescription
+            isLoading = false
+            return .failure(error.localizedDescription)
+        }
+    }
+
+    /// Merge anonymous user's stats into an existing account
+    func mergeIntoExistingAccount(anonymousUserId: UUID, email: String, password: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Sign into the existing account
+            let session = try await authService.signIn(email: email, password: password)
+            let targetUserId = session.user.id
+
+            // Store tokens
+            saveAccessToken(session.accessToken)
+            saveRefreshToken(session.refreshToken)
+
+            // Call merge RPC to transfer stats
+            let result = try await authService.mergeAnonymousStats(
+                anonymousUserId: anonymousUserId,
+                targetUserId: targetUserId
+            )
+
+            if !result.success {
+                // Merge failed but we're already signed in
+                // Just log the error and continue
+                print("Stats merge warning: \(result.error ?? "Unknown error")")
+            }
+
+            // Update state
+            currentUserId = targetUserId
+            isAuthenticated = true
+            isAnonymous = false
+            guestDisplayName = nil
+
+            // Reload profile
+            await loadUserProfile()
+
+            isLoading = false
+            return true
+        } catch let error as NSError {
+            errorMessage = mapAuthError(error, operation: .signIn)
+            isLoading = false
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            isLoading = false
+            return false
+        }
     }
 
     // MARK: - Helper Methods

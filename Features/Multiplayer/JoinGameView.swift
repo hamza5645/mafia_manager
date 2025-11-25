@@ -134,8 +134,11 @@ struct JoinGameView: View {
                     .environmentObject(authStore)
             }
             .onAppear {
+                // Use profile display name, fall back to guest display name for anonymous users
                 if let displayName = authStore.userProfile?.displayName, !displayName.isEmpty {
                     playerName = displayName
+                } else if let guestName = authStore.guestDisplayName, !guestName.isEmpty {
+                    playerName = guestName
                 }
             }
         }
