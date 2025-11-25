@@ -215,7 +215,14 @@ struct MultiplayerVotingView: View {
 
     private func endVoting() {
         Task {
-            try? await multiplayerStore.completeVotingPhase()
+            do {
+                if let session = multiplayerStore.currentSession,
+                   case .voting(let dayIndex) = session.currentPhaseData {
+                    try await multiplayerStore.showVotingResults(dayIndex: dayIndex)
+                }
+            } catch {
+                print("❌ Failed to show voting results: \(error.localizedDescription)")
+            }
         }
     }
 

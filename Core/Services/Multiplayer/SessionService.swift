@@ -268,6 +268,7 @@ final class SessionService {
         struct UpdateData: Encodable {
             let currentPhase: String?
             let currentPhaseData: PhaseData?
+            let currentRoundId: String?
             let dayIndex: Int?
             let nightHistory: [NightActionRecord]?
             let dayHistory: [DayActionRecord]?
@@ -277,6 +278,7 @@ final class SessionService {
             enum CodingKeys: String, CodingKey {
                 case currentPhase = "current_phase"
                 case currentPhaseData = "current_phase_data"
+                case currentRoundId = "current_round_id"
                 case dayIndex = "day_index"
                 case nightHistory = "night_history"
                 case dayHistory = "day_history"
@@ -288,6 +290,7 @@ final class SessionService {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 try container.encodeIfPresent(currentPhase, forKey: .currentPhase)
                 try container.encodeIfPresent(currentPhaseData, forKey: .currentPhaseData)
+                try container.encodeIfPresent(currentRoundId, forKey: .currentRoundId)
                 try container.encodeIfPresent(dayIndex, forKey: .dayIndex)
                 try container.encodeIfPresent(nightHistory, forKey: .nightHistory)
                 try container.encodeIfPresent(dayHistory, forKey: .dayHistory)
@@ -306,9 +309,13 @@ final class SessionService {
 
         guard hasUpdates else { return }
 
+        // Initialize round_id when starting night phase (prevents action replay)
+        let newRoundId: UUID? = (currentPhase == "night") ? UUID() : nil
+
         let updateData = UpdateData(
             currentPhase: currentPhase,
             currentPhaseData: phaseData,
+            currentRoundId: newRoundId?.uuidString,
             dayIndex: dayIndex,
             nightHistory: nightHistory,
             dayHistory: dayHistory,
@@ -409,7 +416,10 @@ final class SessionService {
 
     /// Get all players in a session
     func getSessionPlayers(sessionId: UUID) async throws -> [SessionPlayer] {
-        // Use the secure view that masks roles
+        // Use the secure view that properly handles role visibility:
+        // - Host sees all roles (via get_visible_role function)
+        // - Players see their own role
+        // - Mafia see other mafia roles
         let players: [SessionPlayer] = try await supabase
             .from("game_session_players")
             .select()

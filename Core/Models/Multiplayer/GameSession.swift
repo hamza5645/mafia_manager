@@ -69,6 +69,7 @@ enum PhaseData: Codable, Sendable, Equatable {
     case morning(nightIndex: Int)
     case deathReveal(nightIndex: Int)
     case voting(dayIndex: Int)
+    case votingResults(dayIndex: Int, voteCounts: [UUID: Int], eliminatedPlayerId: UUID?)
     case gameOver(winner: String?)
 
     private enum CodingKeys: String, CodingKey {
@@ -78,6 +79,8 @@ enum PhaseData: Codable, Sendable, Equatable {
         case dayIndex
         case activeRole
         case winner
+        case voteCounts
+        case eliminatedPlayerId
     }
 
     init(from decoder: Decoder) throws {
@@ -103,6 +106,11 @@ enum PhaseData: Codable, Sendable, Equatable {
         case "voting":
             let dayIndex = try container.decode(Int.self, forKey: .dayIndex)
             self = .voting(dayIndex: dayIndex)
+        case "votingResults":
+            let dayIndex = try container.decode(Int.self, forKey: .dayIndex)
+            let voteCounts = try container.decode([UUID: Int].self, forKey: .voteCounts)
+            let eliminatedPlayerId = try container.decodeIfPresent(UUID.self, forKey: .eliminatedPlayerId)
+            self = .votingResults(dayIndex: dayIndex, voteCounts: voteCounts, eliminatedPlayerId: eliminatedPlayerId)
         case "gameOver":
             let winner = try container.decodeIfPresent(String.self, forKey: .winner)
             self = .gameOver(winner: winner)
@@ -133,6 +141,11 @@ enum PhaseData: Codable, Sendable, Equatable {
         case .voting(let dayIndex):
             try container.encode("voting", forKey: .type)
             try container.encode(dayIndex, forKey: .dayIndex)
+        case .votingResults(let dayIndex, let voteCounts, let eliminatedPlayerId):
+            try container.encode("votingResults", forKey: .type)
+            try container.encode(dayIndex, forKey: .dayIndex)
+            try container.encode(voteCounts, forKey: .voteCounts)
+            try container.encodeIfPresent(eliminatedPlayerId, forKey: .eliminatedPlayerId)
         case .gameOver(let winner):
             try container.encode("gameOver", forKey: .type)
             try container.encodeIfPresent(winner, forKey: .winner)

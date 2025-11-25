@@ -250,14 +250,6 @@ final class MultiplayerGameStore: ObservableObject {
         try await resolveNightPhase(nightIndex: nightIndex)
     }
     
-    /// Manually complete the voting phase (Host only)
-    func completeVotingPhase() async throws {
-        guard isHost, 
-              case .voting(let dayIndex) = currentSession?.currentPhaseData else { return }
-              
-        try await resolveVotingPhase(dayIndex: dayIndex)
-    }
-
     // MARK: - Real-time Subscriptions
 
     private func subscribeToSession(sessionId: UUID) async throws {
@@ -1170,7 +1162,15 @@ final class MultiplayerGameStore: ObservableObject {
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
         let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
 
+        print("🔍 [recordNightActions] Fetched actions - Mafia: \(mafiaActions.count), Doctor: \(doctorActions.count), Inspector: \(inspectorActions.count)")
+        print("🔍 [recordNightActions] Doctor actions: \(doctorActions.map { "actor:\($0.actorPlayerId), target:\($0.targetPlayerId?.uuidString ?? "nil")" })")
+
         // Collect role-specific player numbers (host has access to all roles)
+        print("🔍 [recordNightActions] All players with roles:")
+        for player in allPlayers {
+            print("  - \(player.playerName) (#\(player.playerNumber ?? 0)): role=\(player.role?.rawValue ?? "nil"), isBot=\(player.isBot)")
+        }
+
         let mafiaPlayerNumbers = allPlayers
             .filter { $0.role == .mafia }
             .compactMap { $0.playerNumber }
@@ -1183,6 +1183,9 @@ final class MultiplayerGameStore: ObservableObject {
             .filter { $0.role == .inspector }
             .compactMap { $0.playerNumber }
             .sorted()
+
+        print("🔍 [recordNightActions] Role numbers - Mafia: \(mafiaPlayerNumbers), Doctor: \(doctorPlayerNumbers), Inspector: \(inspectorPlayerNumbers)")
+        print("🔍 [recordNightActions] Doctor protected ID: \(doctorProtectedId?.uuidString ?? "nil")")
 
         // Inspector checked ID can be public (but result stays private)
         let inspectorCheckedId = inspectorActions.first?.targetPlayerId
@@ -1432,7 +1435,137 @@ final class MultiplayerGameStore: ObservableObject {
             self.isPhaseReadyToAdvance = ready
         }
     }
-    
+
+    func showVotingResults(dayIndex: Int) async throws {
+        guard isHost else { return }
+        guard case .voting(let activeDayIndex) = currentSession?.currentPhaseData,
+              activeDayIndex == dayIndex else {
+            return
+        }
+        guard let session = currentSession else { return }
+
+        // Fetch all votes for this day
+        let votes = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
+        )
+
+        // Seed vote counts with all alive players (0 votes)
+        var voteCounts: [UUID: Int] = [:]
+        for player in visiblePlayers where player.isAlive {
+            voteCounts[player.playerId] = 0
+        }
+
+        // Tally actual votes
+        for action in votes {
+            guard let targetId = action.targetPlayerId else { continue }
+            voteCounts[targetId, default: 0] += 1
+        }
+
+        // Determine elimination (but DON'T apply yet)
+        var eliminatedPlayerId: UUID?
+        if let maxVotes = voteCounts.values.max(), maxVotes > 0 {
+            let leaders = voteCounts.filter { $0.value == maxVotes }
+            if leaders.count == 1 {
+                eliminatedPlayerId = leaders.first?.key
+            }
+        }
+
+        // Transition to voting results phase
+        let nextPhaseData: PhaseData = .votingResults(
+            dayIndex: dayIndex,
+            voteCounts: voteCounts,
+            eliminatedPlayerId: eliminatedPlayerId
+        )
+
+        try await sessionService.updateSessionState(
+            sessionId: session.id,
+            currentPhase: "voting_results",
+            phaseData: nextPhaseData,
+            dayIndex: session.dayIndex,
+            dayHistory: session.dayHistory,
+            isGameOver: nil,
+            winner: nil
+        )
+    }
+
+    func applyVotingResult(dayIndex: Int) async throws {
+        guard isHost else { return }
+        guard case .votingResults(let activeDayIndex, let voteCounts, let eliminatedPlayerId) = currentSession?.currentPhaseData,
+              activeDayIndex == dayIndex else {
+            return
+        }
+        guard let session = currentSession else { return }
+
+        // Validate vote data exists
+        guard !voteCounts.isEmpty else {
+            print("⚠️ No vote data available for voting results phase")
+            return
+        }
+
+        // Apply eliminations
+        var removedPlayerIds: [UUID] = []
+        var hostEliminated = false
+        if let eliminated = eliminatedPlayerId {
+            removedPlayerIds = [eliminated]
+            hostEliminated = try await applyEliminations(removedPlayerIds, reason: "Voted out")
+        }
+
+        // Create day record
+        let dayRecord = DayActionRecord(
+            dayIndex: dayIndex,
+            removedPlayerIds: removedPlayerIds,
+            timestamp: Date()
+        )
+
+        var updatedDayHistory = session.dayHistory.filter { $0.dayIndex != dayIndex }
+        updatedDayHistory.append(dayRecord)
+        updatedDayHistory.sort { $0.dayIndex < $1.dayIndex }
+        currentSession?.dayHistory = updatedDayHistory
+
+        // Check win conditions
+        let newDayIndex = dayIndex + 1
+        let winnerCheck = evaluateWinners(startOfDay: false)
+        let nextPhaseName: String
+        let nextPhaseData: PhaseData
+
+        if winnerCheck.isGameOver {
+            nextPhaseName = "game_over"
+            nextPhaseData = .gameOver(winner: winnerCheck.winner?.rawValue)
+        } else {
+            let nextNightIndex = dayIndex + 1
+            nextPhaseName = "night"
+            nextPhaseData = .night(nightIndex: nextNightIndex, activeRole: nil)
+        }
+
+        // Reset readiness flag
+        await MainActor.run {
+            self.isPhaseReadyToAdvance = false
+        }
+
+        // Update session - phase and history changes
+        try await sessionService.updateSessionState(
+            sessionId: session.id,
+            currentPhase: nextPhaseName,
+            phaseData: nextPhaseData,
+            dayIndex: newDayIndex,
+            dayHistory: updatedDayHistory,
+            isGameOver: winnerCheck.isGameOver ? true : nil,
+            winner: winnerCheck.winner
+        )
+
+        // CRITICAL: Small delay to let Realtime propagate the new roundId before processing bot actions
+        // Without this, bot actions might use stale/nil roundId and generate individual UUIDs
+        if nextPhaseName == "night" {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+            print("⏱️ [MultiplayerGameStore] Waited for Realtime roundId sync before bot actions")
+        }
+
+        await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
+    }
+
     private func resolveVotingPhase(dayIndex: Int) async throws {
         guard isHost else { return }
         guard case .voting(let activeDayIndex) = currentSession?.currentPhaseData,
@@ -1524,7 +1657,8 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         let leaders = counts.filter { $0.value == maxVotes }
-        return leaders.count == 1 ? leaders.first?.key : nil
+        // If tie, pick randomly among tied targets (instead of returning nil)
+        return leaders.randomElement()?.key
     }
 
     @discardableResult
@@ -1674,12 +1808,20 @@ final class MultiplayerGameStore: ObservableObject {
         let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
         guard !aliveBots.isEmpty else { return }
 
+        print("🤖 [processBotActions] Processing \(aliveBots.count) alive bots for night \(nightIndex)")
+        for bot in aliveBots {
+            print("  - \(bot.playerName) (#\(bot.playerNumber ?? 0)): role=\(bot.role?.rawValue ?? "nil")")
+        }
+
         let alivePlayersList = allPlayers.filter { $0.isAlive }
         let localAlivePlayers = alivePlayersList.map { makeLocalPlayer(from: $0) }
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
 
         for bot in aliveBots {
-            guard let botRole = bot.role else { continue }
+            guard let botRole = bot.role else {
+                print("⚠️ [processBotActions] Bot \(bot.playerName) has nil role, skipping")
+                continue
+            }
 
             let botAsPlayer = makeLocalPlayer(from: bot)
 
@@ -1718,12 +1860,19 @@ final class MultiplayerGameStore: ObservableObject {
             }
 
             if actionType != .vote {
-                try await submitBotAction(
-                    botPlayerId: bot.playerId,
-                    actionType: actionType,
-                    nightIndex: nightIndex,
-                    targetPlayerId: targetId
-                )
+                print("📤 [processBotActions] Submitting \(botRole.rawValue) action for \(bot.playerName) -> target: \(targetId?.uuidString ?? "nil")")
+                do {
+                    try await submitBotAction(
+                        botPlayerId: bot.playerId,
+                        actionType: actionType,
+                        nightIndex: nightIndex,
+                        targetPlayerId: targetId
+                    )
+                    print("✅ [processBotActions] Successfully submitted action for \(bot.playerName)")
+                } catch {
+                    print("❌ [processBotActions] Failed to submit action for \(bot.playerName): \(error)")
+                    // Continue processing other bots even if one fails
+                }
             }
         }
     }
@@ -1768,6 +1917,12 @@ final class MultiplayerGameStore: ObservableObject {
         // Use current round ID from session, or generate a new one if missing
         let roundId = session.currentRoundId ?? UUID()
 
+        if session.currentRoundId == nil {
+            print("⚠️ [MultiplayerGameStore] Bot action: currentRoundId is nil! Generated new UUID: \(roundId)")
+        } else {
+            print("✅ [MultiplayerGameStore] Bot action using roundId: \(roundId)")
+        }
+
         let action: GameAction
 
         switch actionType {
@@ -1801,7 +1956,16 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
-        try await sessionService.submitAction(action)
+        do {
+            try await sessionService.submitAction(action)
+        } catch let error as DecodingError {
+            // Response parsing failed, but action was likely submitted successfully
+            print("⚠️ [submitBotAction] Response decoding failed (action likely submitted): \(error)")
+            // Don't throw - allow bot processing to continue
+        } catch {
+            // Re-throw other errors (network, auth, etc.)
+            throw error
+        }
     }
 
     private func submitBotVote(
@@ -1822,7 +1986,16 @@ final class MultiplayerGameStore: ObservableObject {
             targetPlayerId: targetPlayerId
         )
 
-        try await sessionService.submitAction(action)
+        do {
+            try await sessionService.submitAction(action)
+        } catch let error as DecodingError {
+            // Response parsing failed, but action was likely submitted successfully
+            print("⚠️ [submitBotVote] Response decoding failed (action likely submitted): \(error)")
+            // Don't throw - allow bot processing to continue
+        } catch {
+            // Re-throw other errors (network, auth, etc.)
+            throw error
+        }
     }
 
     private func convertNightHistoryToLocalModel(_ history: [NightActionRecord]) -> [NightAction] {

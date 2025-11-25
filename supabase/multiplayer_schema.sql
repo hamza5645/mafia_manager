@@ -540,6 +540,38 @@ END;
 $$;
 
 -- =====================================================
+-- 7b. SECURE VIEWS FOR ROLE VISIBILITY
+-- =====================================================
+
+-- View that applies role visibility rules using get_visible_role function
+-- CRITICAL: Always use this view (not session_players directly) when fetching players
+-- to ensure proper role privacy:
+-- - Host sees all roles
+-- - Players see their own role
+-- - Mafia see other mafia roles
+-- - Everyone else sees null for other players' roles
+CREATE OR REPLACE VIEW public.game_session_players AS
+SELECT
+    id,
+    session_id,
+    user_id,
+    player_id,
+    player_name,
+    player_number,
+    get_visible_role(session_id, player_id, auth.uid()) AS role,
+    is_bot,
+    is_alive,
+    is_online,
+    is_ready,
+    last_heartbeat,
+    joined_at,
+    removal_note
+FROM session_players sp;
+
+-- Grant access to the view
+GRANT SELECT ON public.game_session_players TO authenticated;
+
+-- =====================================================
 -- 8. REALTIME CONFIGURATION
 -- =====================================================
 

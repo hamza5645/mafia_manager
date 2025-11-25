@@ -56,6 +56,7 @@
 		7E14C60FAC9686FE2E4AE201 /* GameAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B566F2D0BA02374F0EA21AD /* GameAction.swift */; };
 		7F663480AC89982C964BBEC8 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895520245FFCE2891105A416 /* ProfileView.swift */; };
 		851EFB2472651BC23AF3F12D /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */; };
+		2f6f5287f79217 /* MultiplayerVotingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */; };
 		8638D2DEBAEB0BB360F4EFFD /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */; };
 		8887C32EEDDA4E8EBE2A3A75 /* InputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */; };
 		8EC3587C2C8FF2AA68055283 /* SessionPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE756B643538C66E089F8E6C /* SessionPlayer.swift */; };
@@ -125,6 +126,7 @@
 		2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3630833E19A1FEC52C82BB7A /* JoinGameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JoinGameView.swift; sourceTree = "<group>"; };
 		3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingView.swift; sourceTree = "<group>"; };
+		ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingResultsView.swift; sourceTree = "<group>"; };
 		4499CE3EB8728265E3984899 /* PlayerGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerGroup.swift; path = Core/Models/PlayerGroup.swift; sourceTree = "<group>"; };
 		582569330F61BF4D7DC63263 /* AuthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthStore.swift; path = Core/Store/AuthStore.swift; sourceTree = SOURCE_ROOT; };
 		5B566F2D0BA02374F0EA21AD /* GameAction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameAction.swift; sourceTree = "<group>"; };
@@ -394,6 +396,7 @@
 				AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */,
 				8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */,
 				3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */,
+				ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */,
 				BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */,
 			);
 			path = Multiplayer;
@@ -590,6 +593,7 @@
 				4F4E46B0C916E8916D77F815 /* MultiplayerMenuView.swift in Sources */,
 				69F628B35751454DDC5EABEC /* MultiplayerNightView.swift in Sources */,
 				851EFB2472651BC23AF3F12D /* MultiplayerVotingView.swift in Sources */,
+				2f6f5287f79217 /* MultiplayerVotingResultsView.swift in Sources */,
 				67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

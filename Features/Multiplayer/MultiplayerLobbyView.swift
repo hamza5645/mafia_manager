@@ -40,7 +40,11 @@ struct MultiplayerLobbyView: View {
                     case .voting:
                         MultiplayerVotingView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
-                        
+
+                    case .votingResults:
+                        MultiplayerVotingResultsView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+
                     case .gameOver:
                         GameOverView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
