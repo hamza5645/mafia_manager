@@ -253,8 +253,6 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Real-time Subscriptions
 
     private func subscribeToSession(sessionId: UUID) async throws {
-        print("🔔 [MultiplayerGameStore] Subscribing to session: \(sessionId)")
-
         // Store sessionId for reconnects
         currentSessionId = sessionId
 
@@ -262,14 +260,12 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: sessionId,
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
-                    print("📨 [MultiplayerGameStore] Session update received")
                     self?.isRealtimeConnected = true
                     self?.handleSessionUpdate(session)
                 }
             },
             onPlayerUpdate: { [weak self] player in
                 Task { @MainActor in
-                    print("📨 [MultiplayerGameStore] Player update received via callback")
                     self?.isRealtimeConnected = true
                     self?.handlePlayerUpdate(player)
                 }
@@ -281,7 +277,6 @@ final class MultiplayerGameStore: ObservableObject {
                 }
             }
         )
-        print("✅ [MultiplayerGameStore] Successfully subscribed to session updates")
         isRealtimeConnected = true
     }
 
@@ -305,18 +300,13 @@ final class MultiplayerGameStore: ObservableObject {
         guard let userId = authStore?.currentUserId else { return }
         let newIsHost = (session.hostUserId == userId)
         if newIsHost != isHost {
-            let statusMessage = newIsHost ? "Promoted" : "Demoted"
-            print("👑 [MultiplayerGameStore] Host status changed: \(statusMessage)")
             isHost = newIsHost
         }
 
     }
 
     private func handlePlayerUpdate(_ player: SessionPlayer) {
-        print("📥 [MultiplayerGameStore] handlePlayerUpdate called for player: \(player.playerName) (ID: \(player.id))")
-        
         if let index = allPlayers.firstIndex(where: { $0.id == player.id }) {
-            print("🔄 [MultiplayerGameStore] Updating existing player at index \(index)")
             var updated = player
             if !updated.isAlive {
                 eliminatedPlayerIds.insert(updated.playerId)
@@ -326,7 +316,6 @@ final class MultiplayerGameStore: ObservableObject {
             }
             allPlayers[index] = updated
         } else {
-            print("➕ [MultiplayerGameStore] Adding new player to list (current count: \(allPlayers.count))")
             var updated = player
             if !updated.isAlive {
                 eliminatedPlayerIds.insert(updated.playerId)
@@ -344,16 +333,12 @@ final class MultiplayerGameStore: ObservableObject {
             myNumber = player.playerNumber
         }
 
-        print("👥 [MultiplayerGameStore] Total players after update: \(allPlayers.count)")
         updateVisiblePlayers()
-        print("👁️ [MultiplayerGameStore] Visible players count: \(visiblePlayers.count)")
 
         if isHost {
-            print("🔔 [MultiplayerGameStore] Player update - Host detected, triggering phase evaluations")
             Task {
                 try? await self.advanceFromRoleRevealIfReady(forceRefresh: false)
                 // Also check readiness for night/voting phases
-                print("🔄 [MultiplayerGameStore] Calling evaluatePhaseProgression from player_update")
                 await self.evaluatePhaseProgression(trigger: "player_update")
             }
         }
@@ -361,12 +346,10 @@ final class MultiplayerGameStore: ObservableObject {
     
     /// Handle player removal (called when a player leaves)
     private func handlePlayerRemoval(playerId: UUID) {
-        print("🗑️ [MultiplayerGameStore] Player removed: \(playerId)")
         allPlayers.removeAll(where: { $0.id == playerId })
 
         // If it was me, clear my player state and trigger auto-dismiss
         if playerId == myPlayer?.id {
-            print("⚠️ [MultiplayerGameStore] Current user was kicked from session")
             myPlayer = nil
             myRole = nil
             myNumber = nil
@@ -384,7 +367,6 @@ final class MultiplayerGameStore: ObservableObject {
     private func handleActionUpdate(_ action: GameAction) {
         // Handle action updates (e.g., voting progress, night actions)
         // This can trigger UI updates for action confirmation
-        print("Action received: \(action.actionType.rawValue) for phase \(action.phaseIndex)")
 
         // ✅ CRITICAL FIX: Only process actions for the CURRENT active phase
         // This prevents stale actions from previous phases (Realtime replays) from triggering duplicate resolution
@@ -394,28 +376,23 @@ final class MultiplayerGameStore: ObservableObject {
         case .night(let activeNightIndex, _):
             // Only process night actions for the current night
             guard action.actionType == .mafiaTarget || action.actionType == .doctorProtect || action.actionType == .inspectorCheck else {
-                print("⚠️ Ignoring non-night action '\(action.actionType.rawValue)' during night phase")
                 return
             }
             guard action.phaseIndex == activeNightIndex else {
-                print("⚠️ Ignoring stale night action from phase \(action.phaseIndex), current is \(activeNightIndex)")
                 return
             }
 
         case .voting(let activeDayIndex):
             // Only process vote actions for the current day
             guard action.actionType == .vote else {
-                print("⚠️ Ignoring non-vote action '\(action.actionType.rawValue)' during voting phase")
                 return
             }
             guard action.phaseIndex == activeDayIndex else {
-                print("⚠️ Ignoring stale vote action from phase \(action.phaseIndex), current is \(activeDayIndex)")
                 return
             }
 
         default:
             // Ignore actions outside night/voting phases (lobby, role_reveal, morning, etc.)
-            print("⚠️ Ignoring action during non-action phase: \(session.currentPhase)")
             return
         }
 
@@ -518,15 +495,13 @@ final class MultiplayerGameStore: ObservableObject {
     /// Mark that player has seen their role
     func markRoleAsSeen() async throws {
         guard let playerId = myPlayer?.id else { return }
-        
-        print("🎭 [MultiplayerGameStore] Player marking role as seen")
-        
+
         // Mark player as having seen their role by setting ready status
         try await sessionService.updatePlayerReady(playerId: playerId, isReady: true)
-        
+
         // Update optimistically
         myPlayer?.isReady = true
-        
+
         // If host and all players have seen their roles, advance to night phase
         if isHost {
             try await advanceFromRoleRevealIfReady(forceRefresh: true)
@@ -554,12 +529,9 @@ final class MultiplayerGameStore: ObservableObject {
         if !forceStart {
             // All humans must have confirmed their role, bots are always considered ready
             guard readyHumans.count == humanPlayers.count else {
-                print("⏳ [MultiplayerGameStore] Waiting for all human players to confirm roles (\(readyHumans.count)/\(humanPlayers.count))")
                 return
             }
         }
-        
-        print("✅ [MultiplayerGameStore] All players ready (or forced) — advancing to night phase")
         guard let session = currentSession else { return }
         
         // 1. Update phase first so clients transition to Night view immediately
@@ -585,22 +557,13 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Start the game (host only)
     func startGame() async throws {
-        print("🎮 [MultiplayerGameStore] startGame() called")
-        print("🎮 [MultiplayerGameStore] isHost: \(isHost)")
-        print("🎮 [MultiplayerGameStore] currentSession: \(currentSession?.id.uuidString ?? "nil")")
-        
         guard isHost, let session = currentSession else {
-            print("❌ [MultiplayerGameStore] Not host or no session")
             throw SessionError.notHost
         }
 
         // Ensure we have enough players
         let humanPlayers = allPlayers.filter { !$0.isBot }
         let totalPlayers = allPlayers.count
-        
-        print("🎮 [MultiplayerGameStore] Total players: \(totalPlayers)")
-        print("🎮 [MultiplayerGameStore] Human players: \(humanPlayers.count)")
-        print("🎮 [MultiplayerGameStore] Bot players: \(totalPlayers - humanPlayers.count)")
 
         // Check readiness: bots are always ready, non-host humans must be explicitly ready
         // Host is excluded from readiness check since they can't mark themselves ready in the UI
@@ -609,53 +572,38 @@ final class MultiplayerGameStore: ObservableObject {
 
         // All non-host humans must be ready, bots and host are always considered ready
         guard readyNonHostHumans.count == nonHostHumans.count else {
-            print("❌ [MultiplayerGameStore] Cannot start: Not all non-host human players are ready (\(readyNonHostHumans.count)/\(nonHostHumans.count))")
-            throw SessionError.invalidPhase
-        }
-        
-        guard totalPlayers >= 4, totalPlayers <= 19 else {
-            print("❌ [MultiplayerGameStore] Invalid player count: \(totalPlayers)")
             throw SessionError.invalidPhase
         }
 
-        print("🎮 [MultiplayerGameStore] Assigning roles and numbers...")
+        guard totalPlayers >= 4, totalPlayers <= 19 else {
+            throw SessionError.invalidPhase
+        }
+
         // Assign roles and numbers
         let playerNames = allPlayers.map { $0.playerName }
         let assignments = assignRolesAndNumbers(playerNames: playerNames)
-        
-        print("🎮 [MultiplayerGameStore] Assignments created: \(assignments.count)")
 
-        print("🎮 [MultiplayerGameStore] Updating database with role assignments...")
         // Update database with assignments
         try await sessionService.assignRolesAndNumbers(
             sessionId: session.id,
             assignments: assignments
         )
-        print("✅ [MultiplayerGameStore] Roles assigned in database")
 
-        print("🎮 [MultiplayerGameStore] Updating session status to inProgress...")
         // Update session status and phase
         try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress)
-        print("✅ [MultiplayerGameStore] Session status updated")
 
         // Reset readiness before role reveal so hosts can't advance until everyone confirms
-        print("🎮 [MultiplayerGameStore] Resetting ready flags for role reveal...")
         await resetAllPlayersReady()
-        print("✅ [MultiplayerGameStore] Ready flags reset for role reveal")
-        
-        print("🎮 [MultiplayerGameStore] Updating phase to role_reveal...")
+
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "role_reveal",
             phaseData: .roleReveal(currentPlayerIndex: 0)
         )
-        print("✅ [MultiplayerGameStore] Phase updated to role_reveal")
 
-        print("🎮 [MultiplayerGameStore] Refreshing local player state...")
         // Refresh local state
         try await refreshSession()
         try await refreshPlayers()
-        print("✅ [MultiplayerGameStore] Game started successfully!")
     }
 
     private func assignRolesAndNumbers(playerNames: [String]) -> [(playerId: UUID, role: Role, number: Int)] {
@@ -753,7 +701,6 @@ final class MultiplayerGameStore: ObservableObject {
         // If I'm the host, immediately check if this action completes the phase
         // This avoids relying solely on the real-time event which might be delayed
         if isHost {
-            print("👑 [MultiplayerGameStore] Host submitted action - evaluating phase progression")
             Task {
                 // Small delay to ensure DB consistency
                 try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
@@ -787,7 +734,6 @@ final class MultiplayerGameStore: ObservableObject {
         
         // If I'm the host, immediately check if this action completes the phase
         if isHost {
-            print("👑 [MultiplayerGameStore] Host submitted vote - evaluating phase progression")
             Task {
                 try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
                 await self.evaluatePhaseProgression(trigger: "host_vote")
@@ -818,11 +764,9 @@ final class MultiplayerGameStore: ObservableObject {
     /// Perform a one-time snapshot resync after Realtime reconnect
     /// This fetches the latest session and player state to heal missed events
     private func performSnapshotResync() async {
-        print("📸 [MultiplayerGameStore] Performing snapshot resync after reconnect")
         do {
             try await refreshSession()
             try await refreshPlayers()
-            print("✅ [MultiplayerGameStore] Snapshot resync complete")
         } catch {
             print("❌ [MultiplayerGameStore] Snapshot resync failed: \(error)")
         }
@@ -845,7 +789,6 @@ final class MultiplayerGameStore: ObservableObject {
                 // Only poll if Realtime appears disconnected
                 if !self.isRealtimeConnected {
                     let currentPhase = self.currentSession?.currentPhase ?? ""
-                    print("⚠️ [MultiplayerGameStore] Realtime disconnected - performing fallback refresh (phase: \(currentPhase))")
 
                     try? await self.refreshSession()
                     try? await self.refreshPlayers()
@@ -961,25 +904,20 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func checkNightPhaseReadiness(nightIndex: Int) async throws {
-        print("🔍 [MultiplayerGameStore] checkNightPhaseReadiness called for night \(nightIndex)")
         guard isHost else {
-            print("❌ [MultiplayerGameStore] Not host, skipping readiness check")
             return
         }
         guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
               activeNightIndex == nightIndex else {
-            print("❌ [MultiplayerGameStore] Phase mismatch or not in night phase")
             return
         }
         guard let session = currentSession else {
-            print("❌ [MultiplayerGameStore] No current session")
             return
         }
 
         // ✅ CRITICAL FIX: Check if this night is already resolved (prevents duplicate resolution)
         if let nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }),
            nightRecord.isResolved {
-            print("✅ [MultiplayerGameStore] Night \(nightIndex) already resolved, skipping readiness check")
             await MainActor.run {
                 self.isPhaseReadyToAdvance = false
             }
@@ -1005,8 +943,6 @@ final class MultiplayerGameStore: ObservableObject {
             actionType: .doctorProtect,
             phaseIndex: nightIndex
         )
-
-        print("📊 [MultiplayerGameStore] Night Actions - Mafia: \(mafiaActions.count), Doctor: \(doctorActions.count), Inspector: \(inspectorActions.count)")
 
         // Check if all alive, non-host human players have marked themselves as ready
         // (Host doesn't need to mark ready since they control phase advancement)
@@ -1058,39 +994,7 @@ final class MultiplayerGameStore: ObservableObject {
         let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
         let allReady = nonHostReady && (!hostHasActiveRole || hostHasSubmitted)
 
-        print("👥 [MultiplayerGameStore] Total alive: \(alivePlayers.count), Alive humans: \(aliveHumanPlayers.count)")
-        print("👥 [MultiplayerGameStore] Non-host humans: \(aliveNonHostHumans.count), Ready: \(readyNonHostHumans.count)")
-
-        // Log host status
-        if let host = hostPlayer {
-            let hostRole = host.role?.displayName ?? "?"
-            print("🏠 [MultiplayerGameStore] Host: \(host.playerName), Role: \(hostRole), Has active role: \(hostHasActiveRole), Has submitted: \(hostHasSubmitted)")
-        }
-
-        print("✅ [MultiplayerGameStore] All ready? \(allReady)")
-
-        // Log individual player states
-        for player in aliveNonHostHumans {
-            let role = player.role?.displayName ?? "?"
-            let hasAction: Bool
-            switch player.role {
-            case .mafia:
-                hasAction = mafiaActors.contains(player.playerId)
-            case .doctor:
-                hasAction = doctorActors.contains(player.playerId)
-            case .inspector:
-                hasAction = inspectorActors.contains(player.playerId)
-            default:
-                hasAction = false
-            }
-
-            let passive = player.role == .citizen
-            let effectiveReady = passive || player.isReady || hasAction
-            print("   👤 \(player.playerName) - Ready flag: \(player.isReady), Action: \(hasAction), Passive: \(passive), Effective: \(effectiveReady), Role: \(role)")
-        }
-
         await MainActor.run {
-            print("🎯 [MultiplayerGameStore] Setting isPhaseReadyToAdvance = \(allReady)")
             self.isPhaseReadyToAdvance = allReady
         }
     }
@@ -1129,11 +1033,9 @@ final class MultiplayerGameStore: ObservableObject {
         // Check if this night is already recorded
         if let existingRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) {
             if existingRecord.isResolved {
-                print("⚠️ Night \(nightIndex) already resolved, skipping recordNightActions")
                 return
             }
             // If recorded but not resolved, continue to phase 2
-            print("ℹ️ Night \(nightIndex) already recorded, ready for resolution")
             return
         }
 
@@ -1162,15 +1064,7 @@ final class MultiplayerGameStore: ObservableObject {
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
         let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
 
-        print("🔍 [recordNightActions] Fetched actions - Mafia: \(mafiaActions.count), Doctor: \(doctorActions.count), Inspector: \(inspectorActions.count)")
-        print("🔍 [recordNightActions] Doctor actions: \(doctorActions.map { "actor:\($0.actorPlayerId), target:\($0.targetPlayerId?.uuidString ?? "nil")" })")
-
         // Collect role-specific player numbers (host has access to all roles)
-        print("🔍 [recordNightActions] All players with roles:")
-        for player in allPlayers {
-            print("  - \(player.playerName) (#\(player.playerNumber ?? 0)): role=\(player.role?.rawValue ?? "nil"), isBot=\(player.isBot)")
-        }
-
         let mafiaPlayerNumbers = allPlayers
             .filter { $0.role == .mafia }
             .compactMap { $0.playerNumber }
@@ -1183,9 +1077,6 @@ final class MultiplayerGameStore: ObservableObject {
             .filter { $0.role == .inspector }
             .compactMap { $0.playerNumber }
             .sorted()
-
-        print("🔍 [recordNightActions] Role numbers - Mafia: \(mafiaPlayerNumbers), Doctor: \(doctorPlayerNumbers), Inspector: \(inspectorPlayerNumbers)")
-        print("🔍 [recordNightActions] Doctor protected ID: \(doctorProtectedId?.uuidString ?? "nil")")
 
         // Inspector checked ID can be public (but result stays private)
         let inspectorCheckedId = inspectorActions.first?.targetPlayerId
@@ -1215,8 +1106,6 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             nightHistory: updatedHistory
         )
-
-        print("✅ Night \(nightIndex) actions recorded, ready for resolution")
     }
 
     /// Phase 2: Apply night outcomes atomically (with duplicate resolution guard)
@@ -1224,13 +1113,11 @@ final class MultiplayerGameStore: ObservableObject {
         guard isHost else { return }
         guard let session = currentSession else { return }
         guard var nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
-            print("⚠️ Cannot resolve night \(nightIndex): no record found. Call recordNightActions first.")
             return
         }
 
         // CRITICAL: Guard against duplicate resolution
         if nightRecord.isResolved {
-            print("⚠️ Night \(nightIndex) already resolved, preventing duplicate resolution")
             return
         }
 
@@ -1291,7 +1178,6 @@ final class MultiplayerGameStore: ObservableObject {
             })
 
             await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
-            print("✅ Night \(nightIndex) resolved atomically")
         } else {
             print("❌ Failed to resolve night \(nightIndex) atomically")
         }
@@ -1560,7 +1446,6 @@ final class MultiplayerGameStore: ObservableObject {
         // Without this, bot actions might use stale/nil roundId and generate individual UUIDs
         if nextPhaseName == "night" {
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-            print("⏱️ [MultiplayerGameStore] Waited for Realtime roundId sync before bot actions")
         }
 
         await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
@@ -1808,18 +1693,12 @@ final class MultiplayerGameStore: ObservableObject {
         let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
         guard !aliveBots.isEmpty else { return }
 
-        print("🤖 [processBotActions] Processing \(aliveBots.count) alive bots for night \(nightIndex)")
-        for bot in aliveBots {
-            print("  - \(bot.playerName) (#\(bot.playerNumber ?? 0)): role=\(bot.role?.rawValue ?? "nil")")
-        }
-
         let alivePlayersList = allPlayers.filter { $0.isAlive }
         let localAlivePlayers = alivePlayersList.map { makeLocalPlayer(from: $0) }
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
 
         for bot in aliveBots {
             guard let botRole = bot.role else {
-                print("⚠️ [processBotActions] Bot \(bot.playerName) has nil role, skipping")
                 continue
             }
 
@@ -1860,7 +1739,6 @@ final class MultiplayerGameStore: ObservableObject {
             }
 
             if actionType != .vote {
-                print("📤 [processBotActions] Submitting \(botRole.rawValue) action for \(bot.playerName) -> target: \(targetId?.uuidString ?? "nil")")
                 do {
                     try await submitBotAction(
                         botPlayerId: bot.playerId,
@@ -1868,7 +1746,6 @@ final class MultiplayerGameStore: ObservableObject {
                         nightIndex: nightIndex,
                         targetPlayerId: targetId
                     )
-                    print("✅ [processBotActions] Successfully submitted action for \(bot.playerName)")
                 } catch {
                     print("❌ [processBotActions] Failed to submit action for \(bot.playerName): \(error)")
                     // Continue processing other bots even if one fails
@@ -1917,12 +1794,6 @@ final class MultiplayerGameStore: ObservableObject {
         // Use current round ID from session, or generate a new one if missing
         let roundId = session.currentRoundId ?? UUID()
 
-        if session.currentRoundId == nil {
-            print("⚠️ [MultiplayerGameStore] Bot action: currentRoundId is nil! Generated new UUID: \(roundId)")
-        } else {
-            print("✅ [MultiplayerGameStore] Bot action using roundId: \(roundId)")
-        }
-
         let action: GameAction
 
         switch actionType {
@@ -1960,7 +1831,6 @@ final class MultiplayerGameStore: ObservableObject {
             try await sessionService.submitAction(action)
         } catch let error as DecodingError {
             // Response parsing failed, but action was likely submitted successfully
-            print("⚠️ [submitBotAction] Response decoding failed (action likely submitted): \(error)")
             // Don't throw - allow bot processing to continue
         } catch {
             // Re-throw other errors (network, auth, etc.)

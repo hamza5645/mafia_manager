@@ -91,21 +91,13 @@ final class SessionService {
         // CRITICAL: Verify auth session is valid before attempting to join
         // The RLS policy checks auth.uid() = user_id, so we need a valid JWT session
         guard let currentSession = try? await supabase.auth.session else {
-            print("❌ [SessionService] No Supabase auth session found")
             throw SessionError.notAuthenticated
         }
 
-        print("✅ [SessionService] Auth session found - User ID: \(currentSession.user.id)")
-        print("📝 [SessionService] Requested user ID: \(userId)")
-        print("🔑 [SessionService] Access token present: \(!currentSession.accessToken.isEmpty)")
-
         // Verify the session's user ID matches the requested userId
         guard currentSession.user.id == userId else {
-            print("❌ [SessionService] User ID mismatch! Session: \(currentSession.user.id), Requested: \(userId)")
             throw SessionError.sessionMismatch
         }
-
-        print("✅ [SessionService] User ID verified, proceeding to join session")
 
         // Find session by room code
         let sessions: [GameSession] = try await supabase
@@ -460,14 +452,6 @@ final class SessionService {
             }
         }
 
-        // Debug: Check current auth session before insert
-        if let authSession = try? await supabase.auth.session {
-            print("🔐 [addPlayer] Auth session exists - User: \(authSession.user.id)")
-            print("🔐 [addPlayer] Inserting player with userId: \(userId?.uuidString ?? "nil (bot)")")
-        } else {
-            print("❌ [addPlayer] WARNING: No auth session found!")
-        }
-
         let playerId = UUID()
 
         let createData = CreatePlayerData(
@@ -481,20 +465,13 @@ final class SessionService {
             isReady: isBot // Bots are always ready
         )
 
-        print("📤 [addPlayer] Attempting insert with data: session=\(sessionId), user=\(userId?.uuidString ?? "nil"), name=\(playerName)")
-
         do {
             // CRITICAL: Verify session is still valid right before insert
             // This ensures the JWT token is fresh and included in the request
-            guard let authSession = try? await supabase.auth.session else {
-                print("❌ [addPlayer] Auth session lost right before insert!")
+            guard let _authSession = try? await supabase.auth.session else {
                 throw SessionError.notAuthenticated
             }
-            
-            print("🔐 [addPlayer] Auth token verified before insert")
-            let expiryDate = Date(timeIntervalSince1970: authSession.expiresAt)
-            print("🔐 [addPlayer] Token expires at: \(expiryDate)")
-            
+
             let players: [SessionPlayer] = try await supabase
                 .from("session_players")
                 .insert(createData)
@@ -506,11 +483,8 @@ final class SessionService {
                 throw SessionError.playerNotCreated
             }
 
-            print("✅ [addPlayer] Player created successfully: \(player.id)")
             return player
         } catch {
-            print("❌ [addPlayer] Insert failed with error: \(error)")
-            print("❌ [addPlayer] Error details: \(error.localizedDescription)")
             throw error
         }
     }
