@@ -675,6 +675,87 @@ CREATE TRIGGER on_player_leave_transfer_host
     EXECUTE FUNCTION public.transfer_host_on_leave();
 
 -- =====================================================
+-- 10. REMATCH / PLAY AGAIN SUPPORT
+-- =====================================================
+
+-- Add rematch_deadline column to game_sessions
+ALTER TABLE public.game_sessions
+ADD COLUMN IF NOT EXISTS rematch_deadline TIMESTAMPTZ;
+
+-- Atomic RPC: Execute Rematch
+-- Handles: host transfer, removes non-confirmed players, resets session to lobby
+CREATE OR REPLACE FUNCTION public.execute_rematch(p_session_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_confirmed_count INT;
+    v_new_host_user_id UUID;
+BEGIN
+    -- Count confirmed human players (is_ready = true, is_bot = false)
+    SELECT COUNT(*) INTO v_confirmed_count
+    FROM public.session_players
+    WHERE session_id = p_session_id
+    AND is_bot = false
+    AND is_ready = true;
+
+    -- Check minimum threshold (4 players for Mafia)
+    IF v_confirmed_count < 4 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Not enough players', 'confirmedCount', v_confirmed_count);
+    END IF;
+
+    -- Delete non-confirmed human players
+    DELETE FROM public.session_players
+    WHERE session_id = p_session_id
+    AND is_bot = false
+    AND is_ready = false;
+
+    -- Select new host from confirmed players (oldest by joined_at)
+    SELECT sp.user_id INTO v_new_host_user_id
+    FROM public.session_players sp
+    WHERE sp.session_id = p_session_id
+    AND sp.is_bot = false
+    AND sp.is_ready = true
+    AND sp.user_id IS NOT NULL
+    ORDER BY sp.joined_at ASC
+    LIMIT 1;
+
+    IF v_new_host_user_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'No valid host found');
+    END IF;
+
+    -- Reset session to lobby with new host
+    UPDATE public.game_sessions
+    SET
+        host_user_id = v_new_host_user_id,
+        status = 'waiting',
+        current_phase = 'lobby',
+        current_phase_data = jsonb_build_object('type', 'lobby'),
+        current_round_id = NULL,
+        day_index = 0,
+        night_history = '[]'::jsonb,
+        day_history = '[]'::jsonb,
+        is_game_over = false,
+        winner = NULL,
+        rematch_deadline = NULL,
+        updated_at = NOW()
+    WHERE id = p_session_id;
+
+    -- Reset remaining players (clear roles, numbers, mark alive, reset ready)
+    UPDATE public.session_players
+    SET is_alive = true, is_ready = false, role = NULL, player_number = NULL
+    WHERE session_id = p_session_id;
+
+    -- Clear game actions
+    DELETE FROM public.game_actions WHERE session_id = p_session_id;
+
+    RETURN jsonb_build_object('success', true, 'newHostUserId', v_new_host_user_id, 'confirmedCount', v_confirmed_count);
+END;
+$$;
+
+-- =====================================================
 -- SETUP COMPLETE!
 -- =====================================================
 -- Multiplayer database is now ready!

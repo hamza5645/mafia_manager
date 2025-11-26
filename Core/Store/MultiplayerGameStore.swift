@@ -32,6 +32,11 @@ final class MultiplayerGameStore: ObservableObject {
     // Kick detection
     @Published var wasKicked: Bool = false
 
+    // Rematch state
+    @Published var rematchDeadline: Date?
+    @Published var isInRematchPhase: Bool = false
+    private var rematchTimer: Timer?
+
     // Heartbeat timer
     private var heartbeatTimer: Timer?
     private var playerRefreshTimer: Timer?
@@ -199,9 +204,126 @@ final class MultiplayerGameStore: ObservableObject {
         mafiaTeammates = []
     }
 
-    // MARK: - Play Again (HAMZA-88)
+    // MARK: - Rematch / Play Again
 
-    /// Reset the session for playing again - keeps all players but resets game state
+    /// Confirmed players count (ready during game_over with deadline)
+    var rematchConfirmedCount: Int {
+        guard isInRematchPhase else { return 0 }
+        return allPlayers.filter { !$0.isBot && $0.isReady }.count
+    }
+
+    /// Total human players
+    var totalHumanPlayers: Int {
+        allPlayers.filter { !$0.isBot }.count
+    }
+
+    /// Whether current player has confirmed rematch (only true if rematch phase is active)
+    var hasConfirmedRematch: Bool {
+        guard isInRematchPhase else { return false }
+        return myPlayer?.isReady ?? false
+    }
+
+    /// Any player initiates rematch confirmation
+    func initiateRematch() async throws {
+        guard let sessionId = currentSession?.id,
+              let playerId = myPlayer?.id else { return }
+
+        try await sessionService.startRematchConfirmation(
+            sessionId: sessionId,
+            initiatorPlayerId: playerId
+        )
+
+        // Optimistic update
+        isInRematchPhase = true
+        myPlayer?.isReady = true
+    }
+
+    /// Confirm wanting to rematch (mark ready)
+    func confirmRematch() async throws {
+        guard let playerId = myPlayer?.id else { return }
+        try await sessionService.updatePlayerReady(playerId: playerId, isReady: true)
+    }
+
+    /// Decline rematch (leave session)
+    func declineRematch() async throws {
+        try await leaveSession()
+    }
+
+    /// Timer expired - execute rematch
+    func executeRematch() async throws {
+        guard let sessionId = currentSession?.id else { return }
+
+        let (success, error) = try await sessionService.executeRematch(sessionId: sessionId)
+
+        if success {
+            resetRematchState()
+            try await refreshSession()
+            try await refreshPlayers()
+            updateVisiblePlayers()
+        } else if error != nil {
+            // Handle "Not enough players" - cancel rematch
+            try await sessionService.cancelRematch(sessionId: sessionId)
+            resetRematchState()
+        }
+    }
+
+    private func resetRematchState() {
+        rematchDeadline = nil
+        isInRematchPhase = false
+        stopRematchTimer()
+        myRole = nil
+        myNumber = nil
+        mafiaTeammates = []
+        eliminatedPlayerIds.removeAll()
+    }
+
+    /// Check if all human players confirmed rematch and execute immediately
+    private func checkAndExecuteRematchIfAllReady() {
+        guard isInRematchPhase else { return }
+
+        let humanPlayers = allPlayers.filter { !$0.isBot }
+        guard humanPlayers.count >= 4 else { return } // Need minimum 4 players
+
+        let allConfirmed = humanPlayers.allSatisfy { $0.isReady }
+        guard allConfirmed else { return }
+
+        // All players confirmed - execute rematch immediately
+        // Stop the timer first to prevent duplicate execution
+        stopRematchTimer()
+
+        Task {
+            try? await executeRematch()
+        }
+    }
+
+    private func startRematchTimer() {
+        stopRematchTimer()
+        guard let deadline = rematchDeadline, deadline > Date() else {
+            handleRematchTimeout()
+            return
+        }
+
+        rematchTimer = Timer.scheduledTimer(
+            withTimeInterval: deadline.timeIntervalSinceNow,
+            repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleRematchTimeout() }
+        }
+    }
+
+    private func stopRematchTimer() {
+        rematchTimer?.invalidate()
+        rematchTimer = nil
+    }
+
+    private func handleRematchTimeout() {
+        // Anyone can trigger execution when timer expires
+        Task {
+            try? await executeRematch()
+        }
+    }
+
+    /// Legacy playAgain for host-only reset (not used in rematch flow)
     func playAgain() async throws {
         guard isHost, let sessionId = currentSession?.id else {
             throw SessionError.notHost
@@ -305,12 +427,36 @@ final class MultiplayerGameStore: ObservableObject {
 
     private func handleSessionUpdate(_ session: GameSession) {
         let previousPhaseData = currentSession?.currentPhaseData
+        let previousRematchDeadline = currentSession?.rematchDeadline
         currentSession = session
 
         updateHostStatus(using: session)
 
+        // Handle rematch deadline changes
+        if let deadline = session.rematchDeadline {
+            // Rematch phase active
+            if previousRematchDeadline == nil || previousRematchDeadline != deadline {
+                rematchDeadline = deadline
+                isInRematchPhase = true
+                startRematchTimer()
+            }
+        } else if isInRematchPhase && session.rematchDeadline == nil {
+            // Rematch was cancelled or executed (session reset to lobby)
+            resetRematchState()
+        }
+
         if session.currentPhaseData != previousPhaseData {
             scheduleAutoAdvance(for: session.currentPhaseData)
+
+            // Reset isReady for all players when entering game_over (so rematch starts fresh)
+            if case .gameOver = session.currentPhaseData {
+                if isHost {
+                    Task {
+                        await self.resetAllPlayersReadyForGameOver()
+                    }
+                }
+            }
+
             if isHost {
                 Task {
                     await self.handlePhaseEntry(for: session.currentPhaseData)
@@ -357,6 +503,11 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         updateVisiblePlayers()
+
+        // Check if all players confirmed rematch - execute immediately
+        if isInRematchPhase {
+            checkAndExecuteRematchIfAllReady()
+        }
 
         if isHost {
             Task {
@@ -896,7 +1047,37 @@ final class MultiplayerGameStore: ObservableObject {
             myRole = updatedMe.role
             myNumber = updatedMe.playerNumber
         }
-        
+
+        updateVisiblePlayers()
+    }
+
+    /// Reset isReady for all players when game ends (for clean rematch state)
+    private func resetAllPlayersReadyForGameOver() async {
+        guard currentSession != nil else { return }
+
+        var updatedPlayers = allPlayers
+
+        // Reset isReady for ALL players (human and bot) so rematch starts fresh
+        for index in updatedPlayers.indices {
+            let player = updatedPlayers[index]
+            // Only update if currently ready
+            guard player.isReady else { continue }
+
+            do {
+                try await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
+                updatedPlayers[index].isReady = false
+            } catch {
+                print("❌ Failed to reset ready status for player \(player.playerName): \(error)")
+            }
+        }
+
+        allPlayers = updatedPlayers
+
+        if let myId = myPlayer?.id,
+           let updatedMe = updatedPlayers.first(where: { $0.id == myId }) {
+            myPlayer = updatedMe
+        }
+
         updateVisiblePlayers()
     }
 

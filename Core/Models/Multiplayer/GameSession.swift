@@ -29,6 +29,9 @@ struct GameSession: Codable, Identifiable, Sendable {
     // Round ID for action isolation (prevents action replay across rounds)
     var currentRoundId: UUID?
 
+    // Rematch support
+    var rematchDeadline: Date?
+
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -50,6 +53,7 @@ struct GameSession: Codable, Identifiable, Sendable {
         case nightHistory = "night_history"
         case dayHistory = "day_history"
         case currentRoundId = "current_round_id"
+        case rematchDeadline = "rematch_deadline"
         case updatedAt = "updated_at"
     }
 }

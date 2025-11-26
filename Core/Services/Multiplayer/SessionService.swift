@@ -750,6 +750,71 @@ final class SessionService {
             .execute()
     }
 
+    // MARK: - Rematch Flow
+
+    /// Start rematch confirmation phase (sets deadline, marks initiator as ready)
+    func startRematchConfirmation(sessionId: UUID, initiatorPlayerId: UUID) async throws {
+        let deadline = Date().addingTimeInterval(45) // 45 seconds
+
+        // Update session with deadline
+        struct SessionUpdate: Encodable {
+            let rematchDeadline: Date
+
+            enum CodingKeys: String, CodingKey {
+                case rematchDeadline = "rematch_deadline"
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(SessionUpdate(rematchDeadline: deadline))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+
+        // Mark initiator as ready (confirmed for rematch)
+        try await updatePlayerReady(playerId: initiatorPlayerId, isReady: true)
+    }
+
+    /// Execute rematch via atomic RPC - handles host transfer, removes non-confirmed players
+    func executeRematch(sessionId: UUID) async throws -> (success: Bool, error: String?) {
+        struct RematchResponse: Decodable {
+            let success: Bool
+            let error: String?
+            let newHostUserId: String?
+            let confirmedCount: Int?
+        }
+
+        do {
+            let response: RematchResponse = try await supabase
+                .rpc("execute_rematch", params: ["p_session_id": AnyJSON.string(sessionId.uuidString)])
+                .single()
+                .execute()
+                .value
+
+            return (response.success, response.error)
+        } catch {
+            print("❌ executeRematch RPC failed: \(error)")
+            return (false, error.localizedDescription)
+        }
+    }
+
+    /// Cancel rematch (clear deadline)
+    func cancelRematch(sessionId: UUID) async throws {
+        struct SessionUpdate: Encodable {
+            let rematchDeadline: Date?
+
+            enum CodingKeys: String, CodingKey {
+                case rematchDeadline = "rematch_deadline"
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(SessionUpdate(rematchDeadline: nil))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+
 }
 
 // MARK: - Helper Structs
