@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MultiplayerNightView: View {
     @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
@@ -8,6 +9,7 @@ struct MultiplayerNightView: View {
     @State private var autoReadyApplied = false
     @State private var inspectorResult: String? // Stores the investigation result
     @State private var isRecording = false // Phase 1 in progress
+    @State private var submitError: String? // Error message for failed submissions
 
     var nightIndex: Int {
         // Extract from current session phase data
@@ -21,8 +23,11 @@ struct MultiplayerNightView: View {
         multiplayerStore.myRole
     }
 
+    // HAMZA-94: Sort players by humans first
     var alivePlayers: [PublicPlayerInfo] {
-        multiplayerStore.visiblePlayers.filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+        multiplayerStore.visiblePlayers
+            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+            .sortedHumansFirst()
     }
 
     var body: some View {
@@ -32,7 +37,7 @@ struct MultiplayerNightView: View {
             VStack(spacing: 24) {
                 // Header
                 VStack(spacing: 8) {
-                    Text("Night \(nightIndex)")
+                    Text("Night \(nightIndex + 1)")
                         .font(Design.Typography.title1)
                         .foregroundStyle(Design.Colors.textPrimary)
 
@@ -58,35 +63,48 @@ struct MultiplayerNightView: View {
 
                 Spacer()
 
-                // Submit Button (all players with active roles)
+                // Submit Button (all players with active roles) - HAMZA-95: Improved UI/UX
                 if myRole != nil && myRole != .citizen && !hasSubmitted {
                     Button {
                         submitAction()
                     } label: {
-                        HStack {
+                        HStack(spacing: 10) {
                             if isSubmitting {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(Design.Colors.surface0)
+                                Text("Submitting...")
                             } else {
+                                Image(systemName: "paperplane.fill")
                                 Text("Submit Action")
-                                    .font(Design.Typography.body)
                             }
                         }
+                        .font(Design.Typography.body)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(
-                            selectedTargetId == nil
-                                ? Design.Colors.textSecondary.opacity(0.3)
-                                : roleAccentColor(for: myRole)
+                            isSubmitting
+                                ? roleAccentColor(for: myRole).opacity(0.7)
+                                : (selectedTargetId == nil
+                                    ? Design.Colors.textSecondary.opacity(0.3)
+                                    : roleAccentColor(for: myRole))
                         )
                         .foregroundColor(Design.Colors.surface0)
                         .cornerRadius(Design.Radii.medium)
                     }
                     .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, multiplayerStore.isHost ? 8 : 40)
+
+                    // Show error message if submission failed
+                    if let error = submitError {
+                        Text(error)
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.dangerRed)
+                            .padding(.horizontal, 20)
+                    }
+
+                    Spacer().frame(height: multiplayerStore.isHost ? 8 : 40)
                 } else if hasSubmitted || myRole == .citizen {
-                    // Ready indicator for all players
+                    // Ready indicator for all players - HAMZA-95: Improved with action summary
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 48))
@@ -96,10 +114,28 @@ struct MultiplayerNightView: View {
                             .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textPrimary)
 
+                        // Show action summary for active roles
+                        if myRole != .citizen,
+                           let targetId = selectedTargetId,
+                           let targetPlayer = multiplayerStore.visiblePlayers.first(where: { $0.playerId == targetId }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: actionVerb(for: myRole).icon)
+                                    .foregroundStyle(roleAccentColor(for: myRole))
+                                Text("\(actionVerb(for: myRole).text) \(targetPlayer.playerName)")
+                                    .font(Design.Typography.body)
+                                    .foregroundStyle(Design.Colors.textSecondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(roleAccentColor(for: myRole).opacity(0.1))
+                            .cornerRadius(Design.Radii.small)
+                        }
+
                         if !multiplayerStore.isHost {
                             Text("Waiting for other players...")
-                                .font(Design.Typography.body)
+                                .font(Design.Typography.footnote)
                                 .foregroundStyle(Design.Colors.textSecondary)
+                                .padding(.top, 4)
                         }
                     }
                     .padding(.bottom, multiplayerStore.isHost ? 8 : 40)
@@ -251,11 +287,11 @@ struct MultiplayerNightView: View {
                 }
             }
 
-            // Target selection
+            // Target selection - mafia can target any non-mafia alive player
             targetSelectionView(
                 title: "Choose Target",
                 subtitle: "Coordinate with your team",
-                players: alivePlayers.filter { !$0.isBot || true } // Filter handled by visibility
+                players: alivePlayers // Visibility rules already filter appropriately
             )
         }
     }
@@ -306,9 +342,17 @@ struct MultiplayerNightView: View {
                 .font(Design.Typography.title2)
                 .foregroundStyle(Design.Colors.textPrimary)
 
+            // Show who was investigated
+            if let targetId = selectedTargetId,
+               let targetPlayer = multiplayerStore.visiblePlayers.first(where: { $0.playerId == targetId }) {
+                Text("You investigated \(targetPlayer.playerName)")
+                    .font(Design.Typography.body)
+                    .foregroundStyle(Design.Colors.textSecondary)
+            }
+
             // Show the actual role with appropriate color
             VStack(spacing: 8) {
-                Text("Target's Role:")
+                Text("Their Role:")
                     .font(Design.Typography.body)
                     .foregroundStyle(Design.Colors.textSecondary)
 
@@ -334,6 +378,8 @@ struct MultiplayerNightView: View {
         switch roleString.lowercased() {
         case "mafia":
             return "Mafia"
+        case "not_mafia":
+            return "Not Mafia"
         case "doctor":
             return "Doctor"
         case "inspector":
@@ -351,6 +397,8 @@ struct MultiplayerNightView: View {
         switch roleString.lowercased() {
         case "mafia":
             return Design.Colors.dangerRed
+        case "not_mafia":
+            return Design.Colors.successGreen
         case "doctor":
             return Design.Colors.successGreen
         case "inspector":
@@ -383,13 +431,16 @@ struct MultiplayerNightView: View {
             .padding(.horizontal, 20)
 
             ScrollView {
-                VStack(spacing: 12) {
+                // HAMZA-141: Reduced spacing for better display with many players
+                VStack(spacing: 8) {
                     ForEach(players) { player in
                         TargetPlayerButton(
                             playerInfo: player,
                             isSelected: selectedTargetId == player.playerId,
                             accentColor: roleAccentColor(for: myRole)
                         ) {
+                            // Prevent target changes while submitting
+                            guard !isSubmitting else { return }
                             selectedTargetId = player.playerId
                         }
                     }
@@ -425,10 +476,25 @@ struct MultiplayerNightView: View {
         }
     }
 
+    // HAMZA-95: Action verb for summary display
+    private func actionVerb(for role: Role?) -> (text: String, icon: String) {
+        switch role {
+        case .mafia:
+            return ("Targeting", "target")
+        case .doctor:
+            return ("Protecting", "heart.fill")
+        case .inspector:
+            return ("Investigating", "magnifyingglass")
+        case .citizen, .none:
+            return ("", "person.fill")
+        }
+    }
+
     private func submitAction() {
         guard let role = myRole else { return }
 
         isSubmitting = true
+        submitError = nil // Clear any previous error
 
         Task {
             do {
@@ -455,10 +521,33 @@ struct MultiplayerNightView: View {
                     }
                     hasSubmitted = true
                     isSubmitting = false
+
+                    // HAMZA-95: Haptic feedback on successful submission
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+
+                // HAMZA-145: Host auto-ends night phase after submitting (except inspector who needs to see result first)
+                if multiplayerStore.isHost && role != .inspector {
+                    // Small delay to ensure state updates propagate before checking readiness
+                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+
+                    let canAutoAdvance = await MainActor.run {
+                        multiplayerStore.isPhaseReadyToAdvance && !isRecording
+                    }
+
+                    if canAutoAdvance {
+                        await MainActor.run {
+                            recordNightActionsPhase()
+                        }
+                    } else {
+                        print("⏳ [MultiplayerNightView] Skipping auto-advance; waiting for other players/actions")
+                    }
                 }
             } catch {
                 await MainActor.run {
                     isSubmitting = false
+                    submitError = "Failed to submit action. Tap to retry."
                     print("Failed to submit action: \(error.localizedDescription)")
                 }
             }
@@ -494,6 +583,7 @@ struct MultiplayerNightView: View {
 }
 
 // MARK: - Target Player Button
+// HAMZA-141: Made more compact for better display with many players
 
 struct TargetPlayerButton: View {
     let playerInfo: PublicPlayerInfo
@@ -503,8 +593,8 @@ struct TargetPlayerButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                // Player Icon
+            HStack(spacing: 10) {
+                // Player Icon (HAMZA-136: Numbers are kept secret - show person icon instead)
                 ZStack {
                     Circle()
                         .fill(
@@ -512,24 +602,15 @@ struct TargetPlayerButton: View {
                                 ? accentColor.opacity(0.2)
                                 : Design.Colors.surface2
                         )
-                        .frame(width: 44, height: 44)
+                        .frame(width: 36, height: 36)
 
-                    if let number = playerInfo.playerNumber {
-                        Text("#\(number)")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(
-                                isSelected
-                                    ? accentColor
-                                    : Design.Colors.textPrimary
-                            )
-                    } else {
-                        Image(systemName: "person.fill")
-                            .foregroundStyle(
-                                isSelected
-                                    ? accentColor
-                                    : Design.Colors.textSecondary
-                            )
-                    }
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(
+                            isSelected
+                                ? accentColor
+                                : Design.Colors.textSecondary
+                        )
                 }
 
                 // Player Name
@@ -542,11 +623,11 @@ struct TargetPlayerButton: View {
                 // Selection Indicator
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 24))
+                        .font(.system(size: 20))
                         .foregroundStyle(accentColor)
                 }
             }
-            .padding(16)
+            .padding(12)
             .background(
                 isSelected
                     ? accentColor.opacity(0.1)

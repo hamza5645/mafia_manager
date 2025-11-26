@@ -16,7 +16,7 @@ struct MorningSummaryView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 8) {
                             Image(systemName: "moon.stars.fill").foregroundStyle(Design.Colors.brandGold)
-                            Text("Night \(night.nightIndex) Summary").font(.headline)
+                            Text("Night \(night.nightIndex + 1) Summary").font(.headline)
                         }
                         summaryRow(title: "Mafia", value: mafiaSummary(for: night))
                         summaryRow(title: "Killed", value: killedSummary(for: night))

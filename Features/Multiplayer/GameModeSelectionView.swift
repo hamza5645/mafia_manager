@@ -6,6 +6,7 @@ struct GameModeSelectionView: View {
     @State private var showingAuth = false
     @State private var showingSettings = false
     @State private var showingGuestNameInput = false
+    @State private var autoNavigateOnline = false  // Trigger auto navigation after guest login
 
     enum GameMode: Hashable {
         case local
@@ -97,6 +98,12 @@ struct GameModeSelectionView: View {
                     }
                 }
             }
+            // Hidden link to push Online flow automatically after guest sign-in
+            NavigationLink(
+                destination: MultiplayerMenuView(),
+                isActive: $autoNavigateOnline
+            ) { EmptyView() }
+
             .navigationDestination(for: GameMode.self) { mode in
                 switch mode {
                 case .local:
@@ -127,6 +134,7 @@ struct GameModeSelectionView: View {
                     onSuccess: {
                         showingGuestNameInput = false
                         selectedMode = .online
+                        autoNavigateOnline = true
                     },
                     onCancel: {
                         showingGuestNameInput = false

@@ -674,14 +674,89 @@ final class SessionService {
         return actions
     }
 
+    // MARK: - Play Again (HAMZA-88)
+
+    /// Reset session for playing again - keeps players but resets game state
+    func resetSessionForPlayAgain(sessionId: UUID) async throws {
+        // 1. Reset game_sessions to lobby state
+        struct SessionResetData: Encodable {
+            let currentPhase: String
+            let currentPhaseData: PhaseData?
+            let currentRoundId: String?
+            let dayIndex: Int
+            let nightHistory: [NightActionRecord]
+            let dayHistory: [DayActionRecord]
+            let isGameOver: Bool
+            let winner: String?
+
+            enum CodingKeys: String, CodingKey {
+                case currentPhase = "current_phase"
+                case currentPhaseData = "current_phase_data"
+                case currentRoundId = "current_round_id"
+                case dayIndex = "day_index"
+                case nightHistory = "night_history"
+                case dayHistory = "day_history"
+                case isGameOver = "is_game_over"
+                case winner
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(SessionResetData(
+                currentPhase: "lobby",
+                currentPhaseData: nil,
+                currentRoundId: nil,
+                dayIndex: 0,
+                nightHistory: [],
+                dayHistory: [],
+                isGameOver: false,
+                winner: nil
+            ))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+
+        // 2. Reset all session_players
+        struct PlayerResetData: Encodable {
+            let isAlive: Bool
+            let isReady: Bool
+            let role: String?
+            let playerNumber: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case isAlive = "is_alive"
+                case isReady = "is_ready"
+                case role
+                case playerNumber = "player_number"
+            }
+        }
+
+        try await supabase
+            .from("session_players")
+            .update(PlayerResetData(
+                isAlive: true,
+                isReady: false,
+                role: nil,
+                playerNumber: nil
+            ))
+            .eq("session_id", value: sessionId.uuidString)
+            .execute()
+
+        // 3. Delete all game_actions for this session
+        try await supabase
+            .from("game_actions")
+            .delete()
+            .eq("session_id", value: sessionId.uuidString)
+            .execute()
+    }
+
 }
 
 // MARK: - Helper Structs
 
 struct ActionResponse: Decodable, Sendable {
     let success: Bool
-    let action_id: UUID
-    let result: String?
+    let result: String?  // Inspector result: "mafia" or "not_mafia"
 }
 
 // MARK: - Errors

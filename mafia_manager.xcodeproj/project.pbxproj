@@ -77,6 +77,7 @@
 		C49D034AF71B89B3068D5C9F /* QuickStartSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D56F8B50DF3FF0F13CB9907 /* QuickStartSheet.swift */; };
 		CCA6AB8A5D9C4567B4A97AD0 /* doctor_ecg.wav in Resources */ = {isa = PBXBuildFile; fileRef = 733E894B28BB497697DE0ACD /* doctor_ecg.wav */; };
 		D4523CBB88B33CFDBB8226AE /* MultiplayerGameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */; };
+		D61D69ED1159583204730043 /* MultiplayerGameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */; };
 		D87243F14475380F8BAD8E48 /* GameModeSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */; };
 		E2F914A70BD661E561900644 /* PlayerStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */; };
 		E8844B7EBF4F052A936F6EB9 /* PrivacyBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59F350DCAA6EDFB11650FED /* PrivacyBlurView.swift */; };
@@ -86,6 +87,7 @@
 
 /* Begin PBXFileReference section */
 		0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Features/Night/NightWakeUpView.swift; sourceTree = SOURCE_ROOT; };
+		0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerGameOverView.swift; sourceTree = "<group>"; };
 		0FFCAAB712B0B3CA1DCD9128 /* GuestNameInputView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuestNameInputView.swift; sourceTree = "<group>"; };
 		1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Features/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		14862413A29957F28E086D12 /* VotingSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VotingSession.swift; sourceTree = "<group>"; };
@@ -404,6 +406,7 @@
 				3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */,
 				ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */,
 				BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */,
+				0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */,
 			);
 			path = Multiplayer;
 			sourceTree = "<group>";
@@ -603,6 +606,7 @@
 				67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */,
 				C49D034AF71B89B3068D5C9F /* QuickStartSheet.swift in Sources */,
 				40C3A5D99E1C7068E07DA028 /* GuestNameInputView.swift in Sources */,
+				D61D69ED1159583204730043 /* MultiplayerGameOverView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

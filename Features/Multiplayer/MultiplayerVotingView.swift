@@ -14,8 +14,11 @@ struct MultiplayerVotingView: View {
         return multiplayerStore.currentSession?.dayIndex ?? 0
     }
 
+    // HAMZA-94: Sort players by humans first
     var alivePlayers: [PublicPlayerInfo] {
-        multiplayerStore.visiblePlayers.filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+        multiplayerStore.visiblePlayers
+            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+            .sortedHumansFirst()
     }
 
     var isAlive: Bool {
@@ -66,8 +69,9 @@ struct MultiplayerVotingView: View {
                 .padding(.horizontal, 20)
 
                 // Player Selection
+                // HAMZA-141: Reduced spacing for better display with many players
                 ScrollView {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) {
                         ForEach(alivePlayers) { player in
                             VoteTargetButton(
                                 playerInfo: player,
@@ -75,8 +79,9 @@ struct MultiplayerVotingView: View {
                             ) {
                                 selectedTargetId = player.playerId
                                 // For host: submit vote silently without showing confirmation
+                                // Pass target explicitly to avoid race condition with state update
                                 if multiplayerStore.isHost && !hasSubmitted {
-                                    submitVote(showConfirmation: false)
+                                    submitVote(explicitTarget: player.playerId, showConfirmation: false)
                                 }
                             }
                         }
@@ -91,24 +96,17 @@ struct MultiplayerVotingView: View {
                     Button {
                         submitVote()
                     } label: {
-                        HStack {
-                            if isSubmitting {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Text(selectedTargetId == nil ? "Abstain" : "Submit Vote")
-                                    .font(Design.Typography.body)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            (selectedTargetId == nil && dayIndex > 0) 
-                                ? Design.Colors.textSecondary.opacity(0.3)
-                                : Design.Colors.brandGold
-                        )
-                        .foregroundColor(Design.Colors.surface0)
-                        .cornerRadius(Design.Radii.medium)
+                        Text(selectedTargetId == nil ? "Abstain" : "Submit Vote")
+                            .font(Design.Typography.body)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                (selectedTargetId == nil && dayIndex > 0)
+                                    ? Design.Colors.textSecondary.opacity(0.3)
+                                    : Design.Colors.brandGold
+                            )
+                            .foregroundColor(Design.Colors.surface0)
+                            .cornerRadius(Design.Radii.medium)
                     }
                     .disabled(isSubmitting || (selectedTargetId == nil && dayIndex > 0))
                     .padding(.horizontal, 20)
@@ -226,14 +224,17 @@ struct MultiplayerVotingView: View {
         }
     }
 
-    private func submitVote(showConfirmation: Bool = true) {
+    private func submitVote(explicitTarget: UUID? = nil, showConfirmation: Bool = true) {
         isSubmitting = true
+
+        // Use explicit target if provided (avoids race condition), otherwise use state
+        let targetToSubmit = explicitTarget ?? selectedTargetId
 
         Task {
             do {
                 try await multiplayerStore.submitVote(
                     dayIndex: dayIndex,
-                    targetPlayerId: selectedTargetId
+                    targetPlayerId: targetToSubmit
                 )
 
                 // Auto-mark non-host humans as ready after submitting a vote
@@ -259,6 +260,7 @@ struct MultiplayerVotingView: View {
 }
 
 // MARK: - Vote Target Button
+// HAMZA-141: Made more compact for better display with many players
 
 struct VoteTargetButton: View {
     let playerInfo: PublicPlayerInfo
@@ -267,8 +269,8 @@ struct VoteTargetButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
-                // Player Number Badge
+            HStack(spacing: 12) {
+                // Player Icon (HAMZA-136: Numbers are kept secret)
                 ZStack {
                     Circle()
                         .fill(
@@ -276,54 +278,36 @@ struct VoteTargetButton: View {
                                 ? Design.Colors.brandGold.opacity(0.2)
                                 : Design.Colors.surface2
                         )
-                        .frame(width: 52, height: 52)
+                        .frame(width: 40, height: 40)
 
-                    if let number = playerInfo.playerNumber {
-                        Text("#\(number)")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(
-                                isSelected
-                                    ? Design.Colors.brandGold
-                                    : Design.Colors.textPrimary
-                            )
-                    } else {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(
-                                isSelected
-                                    ? Design.Colors.brandGold
-                                    : Design.Colors.textSecondary
-                            )
-                    }
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(
+                            isSelected
+                                ? Design.Colors.brandGold
+                                : Design.Colors.textSecondary
+                        )
                 }
 
-                // Player Info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(playerInfo.playerName)
-                        .font(Design.Typography.body)
-                        .foregroundStyle(Design.Colors.textPrimary)
-
-                    if playerInfo.isBot {
-                        Text("Bot Player")
-                            .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Colors.textSecondary)
-                    }
-                }
+                // Player Name
+                Text(playerInfo.playerName)
+                    .font(Design.Typography.body)
+                    .foregroundStyle(Design.Colors.textPrimary)
 
                 Spacer()
 
                 // Selection Indicator
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: 22))
                         .foregroundStyle(Design.Colors.brandGold)
                 } else {
                     Image(systemName: "circle")
-                        .font(.system(size: 28))
+                        .font(.system(size: 22))
                         .foregroundStyle(Design.Colors.textSecondary.opacity(0.3))
                 }
             }
-            .padding(20)
+            .padding(14)
             .background(
                 isSelected
                     ? Design.Colors.brandGold.opacity(0.1)
@@ -341,8 +325,8 @@ struct VoteTargetButton: View {
             )
             .shadow(
                 color: isSelected ? Design.Colors.brandGold.opacity(0.3) : .clear,
-                radius: 8,
-                y: 4
+                radius: 6,
+                y: 3
             )
         }
         .buttonStyle(PlainButtonStyle())

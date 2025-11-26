@@ -73,3 +73,28 @@ struct MyPlayerInfo: Sendable {
         self.isHost = isHost
     }
 }
+
+// MARK: - HAMZA-94: Sort players by humans first
+extension Array where Element == SessionPlayer {
+    /// Returns players sorted with humans first, then bots. Within each group, sorted alphabetically.
+    func sortedHumansFirst() -> [SessionPlayer] {
+        self.sorted { player1, player2 in
+            if player1.isBot != player2.isBot {
+                return !player1.isBot // Humans first
+            }
+            return player1.playerName.localizedCaseInsensitiveCompare(player2.playerName) == .orderedAscending
+        }
+    }
+}
+
+extension Array where Element == PublicPlayerInfo {
+    /// Returns players sorted with humans first, then bots. Within each group, sorted alphabetically.
+    func sortedHumansFirst() -> [PublicPlayerInfo] {
+        self.sorted { player1, player2 in
+            if player1.isBot != player2.isBot {
+                return !player1.isBot // Humans first
+            }
+            return player1.playerName.localizedCaseInsensitiveCompare(player2.playerName) == .orderedAscending
+        }
+    }
+}

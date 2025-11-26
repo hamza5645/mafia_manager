@@ -46,7 +46,7 @@ struct MultiplayerLobbyView: View {
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
 
                     case .gameOver:
-                        GameOverView()
+                        MultiplayerGameOverView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                         
                     default:
@@ -152,8 +152,9 @@ struct MultiplayerLobbyView: View {
                                     .foregroundStyle(Design.Colors.textPrimary)
                                     .padding(.horizontal, 20)
 
+                                // HAMZA-94: Sort players by humans first
                                 VStack(spacing: 12) {
-                                    ForEach(multiplayerStore.visiblePlayers) { playerInfo in
+                                    ForEach(multiplayerStore.visiblePlayers.sortedHumansFirst()) { playerInfo in
                                         PlayerRow(
                                             playerInfo: playerInfo,
                                             isMe: playerInfo.id == multiplayerStore.myPlayer?.id,
@@ -637,7 +638,7 @@ struct MultiplayerMorningView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "moon.stars.fill")
                         .foregroundStyle(Design.Colors.brandGold)
-                    Text("Night \(nightIndex) Summary")
+                    Text("Night \(nightIndex + 1) Summary")
                         .font(Design.Typography.headline)
                         .foregroundStyle(Design.Colors.textPrimary)
                 }

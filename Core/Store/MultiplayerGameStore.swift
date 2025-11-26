@@ -199,6 +199,29 @@ final class MultiplayerGameStore: ObservableObject {
         mafiaTeammates = []
     }
 
+    // MARK: - Play Again (HAMZA-88)
+
+    /// Reset the session for playing again - keeps all players but resets game state
+    func playAgain() async throws {
+        guard isHost, let sessionId = currentSession?.id else {
+            throw SessionError.notHost
+        }
+
+        // Reset session via service
+        try await sessionService.resetSessionForPlayAgain(sessionId: sessionId)
+
+        // Clear local game state (but keep session connection)
+        myRole = nil
+        myNumber = nil
+        mafiaTeammates = []
+        isPhaseReadyToAdvance = false
+
+        // Refresh session and players to get updated state
+        try await refreshSession()
+        try await refreshPlayers()
+        updateVisiblePlayers()
+    }
+
     /// Remove a player from the session (Host only)
     func removePlayer(withId playerId: UUID) async throws {
         guard isHost, let sessionId = currentSession?.id else { return }
@@ -820,11 +843,12 @@ final class MultiplayerGameStore: ObservableObject {
             await resetAllPlayersReady()
 
             if !processedBotNightIndices.contains(nightIndex) {
-                processedBotNightIndices.insert(nightIndex)
                 do {
                     try await processBotActions(nightIndex: nightIndex)
+                    processedBotNightIndices.insert(nightIndex) // Only mark after successful completion
                 } catch {
                     print("❌ [MultiplayerGameStore] Failed to process bot night actions: \(error)")
+                    // Don't mark as processed so we can retry on next phase entry
                 }
             }
             await evaluatePhaseProgression(trigger: "enter_night")
@@ -833,11 +857,12 @@ final class MultiplayerGameStore: ObservableObject {
             await resetAllPlayersReady()
 
             if !processedBotVotingDays.contains(dayIndex) {
-                processedBotVotingDays.insert(dayIndex)
                 do {
                     try await processBotVotes(dayIndex: dayIndex)
+                    processedBotVotingDays.insert(dayIndex) // Only mark after successful completion
                 } catch {
                     print("❌ [MultiplayerGameStore] Failed to process bot votes: \(error)")
+                    // Don't mark as processed so we can retry on next phase entry
                 }
             }
             await evaluatePhaseProgression(trigger: "enter_voting")
@@ -1111,8 +1136,13 @@ final class MultiplayerGameStore: ObservableObject {
     /// Phase 2: Apply night outcomes atomically (with duplicate resolution guard)
     func resolveNightOutcome(nightIndex: Int, targetWasSaved: Bool) async throws {
         guard isHost else { return }
-        guard let session = currentSession else { return }
+        guard let session = currentSession else {
+            print("ERROR: [resolveNightOutcome] No current session - cannot resolve night \(nightIndex)")
+            return
+        }
         guard var nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
+            print("ERROR: [resolveNightOutcome] Night record missing for nightIndex \(nightIndex) in session \(session.id)")
+            print("ERROR: [resolveNightOutcome] Current nightHistory: \(session.nightHistory.map { "night \($0.nightIndex), resolved: \($0.isResolved)" })")
             return
         }
 
@@ -1304,18 +1334,19 @@ final class MultiplayerGameStore: ObservableObject {
         let readyNonHostHumans = aliveNonHostHumans.filter { $0.isReady }
         let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
 
-        // Check if host has voted
+        // Check if host has voted (only required if host is alive)
         let voteActions = await loadActionsSafely(
             sessionId: session.id,
             actionType: .vote,
             phaseIndex: dayIndex
         )
         let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
+        let hostIsAlive = hostPlayer?.isAlive ?? false
         let hostVote = voteActions.first { $0.actorPlayerId == hostPlayer?.playerId }
         let hostHasVoted = hostVote != nil
 
-        // Ready when all non-host players are ready AND host has voted
-        let ready = nonHostReady && hostHasVoted
+        // Ready when all non-host players are ready AND (host has voted OR host is dead)
+        let ready = nonHostReady && (!hostIsAlive || hostHasVoted)
 
         await MainActor.run {
             self.isPhaseReadyToAdvance = ready
@@ -1542,8 +1573,11 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         let leaders = counts.filter { $0.value == maxVotes }
-        // If tie, pick randomly among tied targets (instead of returning nil)
-        return leaders.randomElement()?.key
+        // If tie (more than one leader), no one is eliminated
+        guard leaders.count == 1 else {
+            return nil
+        }
+        return leaders.first?.key
     }
 
     @discardableResult
@@ -1609,8 +1643,16 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func evaluateWinners(startOfDay: Bool) -> (winner: Role?, isGameOver: Bool) {
-        let mafiaCount = allPlayers.filter { $0.isAlive && $0.role == .mafia }.count
-        let nonMafiaCount = allPlayers.filter { $0.isAlive && $0.role != .mafia }.count
+        let alivePlayers = allPlayers.filter { $0.isAlive }
+        let mafiaCount = alivePlayers.filter { $0.role == .mafia }.count
+        let nonMafiaCount = alivePlayers.filter { $0.role != .mafia }.count
+
+        // HAMZA-90: End game when all humans die (only bots remain)
+        let aliveHumans = alivePlayers.filter { !$0.isBot }
+        if aliveHumans.isEmpty && !alivePlayers.isEmpty {
+            print("🎮 [evaluateWinners] All humans dead - Mafia wins by default")
+            return (winner: .mafia, isGameOver: true)
+        }
 
         if mafiaCount == 0 {
             return (winner: .citizen, isGameOver: true)
@@ -1755,6 +1797,7 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Process bot votes during the day phase
+    /// HAMZA-149: Bots must always vote after day 0 (first day allows abstaining)
     func processBotVotes(dayIndex: Int) async throws {
         guard isHost else { return }
         guard let session = currentSession else { return }
@@ -1766,20 +1809,43 @@ final class MultiplayerGameStore: ObservableObject {
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
         let dayHistory = convertDayHistoryToLocalModel(session.dayHistory)
 
+        // Get valid vote targets (alive players excluding current bot)
+        let validTargetIds = alivePlayers.filter { $0.alive }.map { $0.id }
+
+        var failedBots: [String] = []
+
         for bot in aliveBots {
             let botPlayer = makeLocalPlayer(from: bot)
-            let targetId = botService.chooseVotingTarget(
+            var targetId = botService.chooseVotingTarget(
                 botPlayer: botPlayer,
                 alivePlayers: alivePlayers,
                 nightHistory: nightHistory,
                 dayHistory: dayHistory
             )
 
-            try await submitBotVote(
-                botPlayerId: bot.playerId,
-                dayIndex: dayIndex,
-                targetPlayerId: targetId
-            )
+            // HAMZA-149: After day 0, bots must always vote (no abstaining)
+            // If chooseVotingTarget returned nil but there are valid targets, pick one
+            if targetId == nil && dayIndex > 0 {
+                let validTargets = validTargetIds.filter { $0 != bot.playerId }
+                targetId = validTargets.randomElement()
+            }
+
+            do {
+                try await submitBotVote(
+                    botPlayerId: bot.playerId,
+                    dayIndex: dayIndex,
+                    targetPlayerId: targetId
+                )
+            } catch {
+                // Log but continue with other bots
+                print("⚠️ [processBotVotes] Bot \(bot.playerName) failed to vote: \(error)")
+                failedBots.append(bot.playerName)
+            }
+        }
+
+        // Throw only if ALL bots failed (so we can retry)
+        if failedBots.count == aliveBots.count {
+            throw NSError(domain: "BotVoting", code: -1, userInfo: [NSLocalizedDescriptionKey: "All bot votes failed"])
         }
     }
 
@@ -1927,14 +1993,15 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Cleanup
 
     deinit {
-        // Schedule cleanup on main thread since this is a @MainActor class
-        DispatchQueue.main.async { [weak self] in
-            self?.heartbeatTimer?.invalidate()
-            self?.heartbeatTimer = nil
-            self?.playerRefreshTimer?.invalidate()
-            self?.playerRefreshTimer = nil
-            self?.pendingAutoAdvanceTask?.cancel()
-            self?.pendingAutoAdvanceTask = nil
-        }
+        // Capture timer references directly before self is deallocated
+        // Timer.invalidate() is thread-safe, so we can call it synchronously
+        let heartbeat = heartbeatTimer
+        let playerRefresh = playerRefreshTimer
+        let autoAdvance = pendingAutoAdvanceTask
+
+        // Invalidate timers and cancel tasks synchronously
+        heartbeat?.invalidate()
+        playerRefresh?.invalidate()
+        autoAdvance?.cancel()
     }
 }

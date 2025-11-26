@@ -76,6 +76,7 @@ struct MultiplayerRoleRevealView: View {
                                 .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.textSecondary)
 
+                            // HAMZA-136: Numbers are kept secret - show names only
                             VStack(spacing: 8) {
                                 ForEach(multiplayerStore.mafiaTeammates) { teammate in
                                     HStack {
@@ -83,10 +84,6 @@ struct MultiplayerRoleRevealView: View {
                                             .font(.system(size: 14))
                                         Text(teammate.playerName)
                                             .font(Design.Typography.body)
-                                        if let number = teammate.playerNumber {
-                                            Text("(#\(number))")
-                                                .font(Design.Typography.caption)
-                                        }
                                     }
                                     .foregroundStyle(Design.Colors.dangerRed)
                                     .padding(.horizontal, 16)
