@@ -11,6 +11,7 @@ struct MultiplayerGameOverView: View {
     // Error handling state
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isLeaving = false
 
     private var winner: Role? {
         multiplayerStore.currentSession?.winner
@@ -282,26 +283,37 @@ struct MultiplayerGameOverView: View {
             Button {
                 Task {
                     do {
-                        if isInRematch {
-                            try await multiplayerStore.declineRematch()
-                        } else {
-                            try await multiplayerStore.leaveSession()
-                        }
+                        guard !isLeaving else { return }
+                        isLeaving = true
+
+                        if isInRematch { try await multiplayerStore.declineRematch() }
+                        else { try await multiplayerStore.leaveSession() }
+
+                        await MainActor.run { dismiss() }
                     } catch {
                         errorMessage = error.localizedDescription
                         showError = true
                     }
+                    await MainActor.run {
+                        isLeaving = false
+                    }
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                    Text(isInRematch ? "Leave" : "Return to Menu")
-                        .font(Design.Typography.headline)
+                    if isLeaving {
+                        ProgressView()
+                            .tint(Design.Colors.textPrimary)
+                    } else {
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text(isInRematch ? "Leave" : "Return to Menu")
+                            .font(Design.Typography.headline)
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(CTAButtonStyle(kind: .secondary))
+            .disabled(isLeaving)
         }
         .onAppear { startCountdownIfNeeded() }
         .onChange(of: multiplayerStore.rematchDeadline) { _ in startCountdownIfNeeded() }
