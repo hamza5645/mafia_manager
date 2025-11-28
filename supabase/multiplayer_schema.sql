@@ -694,14 +694,13 @@ DECLARE
     v_confirmed_count INT;
     v_new_host_user_id UUID;
 BEGIN
-    -- Count confirmed human players (is_ready = true, is_bot = false)
+    -- Count all ready players (confirmed humans + bots who are auto-ready)
     SELECT COUNT(*) INTO v_confirmed_count
     FROM public.session_players
     WHERE session_id = p_session_id
-    AND is_bot = false
     AND is_ready = true;
 
-    -- Check minimum threshold (4 players for Mafia)
+    -- Check minimum threshold (4 total players for Mafia - includes bots)
     IF v_confirmed_count < 4 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Not enough players', 'confirmedCount', v_confirmed_count);
     END IF;
@@ -752,6 +751,31 @@ BEGIN
     DELETE FROM public.game_actions WHERE session_id = p_session_id;
 
     RETURN jsonb_build_object('success', true, 'newHostUserId', v_new_host_user_id, 'confirmedCount', v_confirmed_count);
+END;
+$$;
+
+-- =====================================================
+-- 11. PLAYER REMOVAL RPC (BYPASSES RLS)
+-- =====================================================
+
+-- Remove a player by their session_players ID (works for both authenticated and unauthenticated users)
+-- Uses SECURITY DEFINER to bypass RLS policies
+CREATE OR REPLACE FUNCTION public.remove_player_by_id(p_player_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Delete the player record
+    DELETE FROM public.session_players
+    WHERE id = p_player_id;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Player not found');
+    END IF;
+
+    RETURN jsonb_build_object('success', true);
 END;
 $$;
 

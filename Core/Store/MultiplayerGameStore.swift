@@ -181,16 +181,16 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Leave the current session
     func leaveSession() async throws {
-        guard let sessionId = currentSession?.id,
-              let userId = authStore?.currentUserId else {
-            return
+        guard let playerId = myPlayer?.id else {
+            throw SessionError.playerNotFound
         }
 
         stopHeartbeat()
         stopPlayerRefreshTimer()
         await realtimeService.unsubscribeAll()
 
-        try await sessionService.leaveSession(sessionId: sessionId, userId: userId)
+        // Remove player directly by their session player ID (works for both authenticated and unauthenticated users)
+        try await sessionService.removePlayer(playerId: playerId)
 
         // Clear local state
         currentSession = nil
@@ -225,8 +225,12 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Any player initiates rematch confirmation
     func initiateRematch() async throws {
-        guard let sessionId = currentSession?.id,
-              let playerId = myPlayer?.id else { return }
+        guard let sessionId = currentSession?.id else {
+            throw SessionError.noActiveSession
+        }
+        guard let playerId = myPlayer?.id else {
+            throw SessionError.playerNotFound
+        }
 
         try await sessionService.startRematchConfirmation(
             sessionId: sessionId,
@@ -240,7 +244,9 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Confirm wanting to rematch (mark ready)
     func confirmRematch() async throws {
-        guard let playerId = myPlayer?.id else { return }
+        guard let playerId = myPlayer?.id else {
+            throw SessionError.playerNotFound
+        }
         try await sessionService.updatePlayerReady(playerId: playerId, isReady: true)
     }
 
@@ -281,9 +287,11 @@ final class MultiplayerGameStore: ObservableObject {
     private func checkAndExecuteRematchIfAllReady() {
         guard isInRematchPhase else { return }
 
-        let humanPlayers = allPlayers.filter { !$0.isBot }
-        guard humanPlayers.count >= 4 else { return } // Need minimum 4 players
+        // Need minimum 4 total players (humans + bots)
+        guard allPlayers.count >= 4 else { return }
 
+        // All human players must confirm (bots are auto-ready)
+        let humanPlayers = allPlayers.filter { !$0.isBot }
         let allConfirmed = humanPlayers.allSatisfy { $0.isReady }
         guard allConfirmed else { return }
 

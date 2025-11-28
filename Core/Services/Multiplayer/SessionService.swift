@@ -153,13 +153,48 @@ final class SessionService {
         try await removePlayer(playerId: player.id)
     }
     
-    /// Remove a player by ID
+    /// Remove a player by ID (uses RPC to bypass RLS for unauthenticated users)
     func removePlayer(playerId: UUID) async throws {
-        try await supabase
-            .from("session_players")
-            .delete()
-            .eq("id", value: playerId.uuidString)
-            .execute()
+        var lastError: Error?
+
+        // Preferred path: delete via table (works for host/players under RLS)
+        do {
+            let deleted: [SessionPlayer] = try await supabase
+                .from("session_players")
+                .delete()
+                .eq("id", value: playerId.uuidString)
+                .select()
+                .execute()
+                .value
+
+            guard !deleted.isEmpty else {
+                throw SessionError.playerNotFound
+            }
+
+            return
+        } catch {
+            lastError = error
+            print("⚠️ removePlayer direct delete failed, falling back to RPC: \(error)")
+        }
+
+        // Fallback: legacy RPC for environments missing updated policies
+        do {
+            struct RemoveResponse: Decodable {
+                let success: Bool
+                let error: String?
+            }
+
+            let response: RemoveResponse = try await supabase
+                .rpc("remove_player_by_id", params: ["p_player_id": AnyJSON.string(playerId.uuidString)])
+                .execute()
+                .value
+
+            if !response.success {
+                throw SessionError.playerNotFound
+            }
+        } catch {
+            throw lastError ?? error
+        }
     }
 
     /// Get session by ID
@@ -752,7 +787,7 @@ final class SessionService {
 
     // MARK: - Rematch Flow
 
-    /// Start rematch confirmation phase (sets deadline, marks initiator as ready)
+    /// Start rematch confirmation phase (sets deadline, marks initiator and all bots as ready)
     func startRematchConfirmation(sessionId: UUID, initiatorPlayerId: UUID) async throws {
         let deadline = Date().addingTimeInterval(45) // 45 seconds
 
@@ -773,6 +808,13 @@ final class SessionService {
 
         // Mark initiator as ready (confirmed for rematch)
         try await updatePlayerReady(playerId: initiatorPlayerId, isReady: true)
+
+        // Auto-mark all bots as ready (they can't decline)
+        let players = try await getSessionPlayers(sessionId: sessionId)
+        let bots = players.filter { $0.isBot }
+        for bot in bots {
+            try await updatePlayerReady(playerId: bot.id, isReady: true)
+        }
     }
 
     /// Execute rematch via atomic RPC - handles host transfer, removes non-confirmed players
@@ -794,8 +836,141 @@ final class SessionService {
             return (response.success, response.error)
         } catch {
             print("❌ executeRematch RPC failed: \(error)")
-            return (false, error.localizedDescription)
+            // Fallback for environments where the RPC isn't deployed yet
+            do {
+                return try await executeRematchClientSide(sessionId: sessionId)
+            } catch {
+                print("❌ executeRematch client-side fallback failed: \(error)")
+                return (false, error.localizedDescription)
+            }
         }
+    }
+
+    /// Rematch fallback that mirrors the server RPC for setups missing the SQL function
+    private func executeRematchClientSide(sessionId: UUID) async throws -> (Bool, String?) {
+        // Non-hosts cannot perform the updates directly due to RLS
+        if
+            let authSession = try? await supabase.auth.session,
+            let session = try? await getSession(sessionId: sessionId),
+            session.hostUserId != authSession.user.id
+        {
+            return (false, "Only the host can start a rematch right now")
+        }
+
+        // Fetch players to determine readiness and host candidate
+        let players: [SessionPlayer] = try await supabase
+            .from("session_players")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .order("joined_at")
+            .execute()
+            .value
+
+        let readyPlayers = players.filter { $0.isReady }
+        guard readyPlayers.count >= 4 else {
+            return (false, "Not enough players")
+        }
+
+        // Remove non-confirmed humans
+        _ = try await supabase
+            .from("session_players")
+            .delete()
+            .eq("session_id", value: sessionId.uuidString)
+            .eq("is_bot", value: false)
+            .eq("is_ready", value: false)
+            .select()
+            .execute()
+
+        // Oldest confirmed human becomes host
+        let readyHumans = readyPlayers
+            .filter { !$0.isBot && $0.userId != nil }
+            .sorted { $0.joinedAt < $1.joinedAt }
+
+        guard let newHostUserId = readyHumans.first?.userId else {
+            return (false, "No valid host found")
+        }
+
+        struct SessionReset: Encodable {
+            let hostUserId: String
+            let status: String
+            let currentPhase: String
+            let currentPhaseData: PhaseData?
+            let currentRoundId: String?
+            let dayIndex: Int
+            let nightHistory: [NightActionRecord]
+            let dayHistory: [DayActionRecord]
+            let isGameOver: Bool
+            let winner: String?
+            let rematchDeadline: Date?
+            let updatedAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case hostUserId = "host_user_id"
+                case status
+                case currentPhase = "current_phase"
+                case currentPhaseData = "current_phase_data"
+                case currentRoundId = "current_round_id"
+                case dayIndex = "day_index"
+                case nightHistory = "night_history"
+                case dayHistory = "day_history"
+                case isGameOver = "is_game_over"
+                case winner
+                case rematchDeadline = "rematch_deadline"
+                case updatedAt = "updated_at"
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(SessionReset(
+                hostUserId: newHostUserId.uuidString,
+                status: SessionStatus.waiting.rawValue,
+                currentPhase: "lobby",
+                currentPhaseData: .lobby,
+                currentRoundId: nil,
+                dayIndex: 0,
+                nightHistory: [],
+                dayHistory: [],
+                isGameOver: false,
+                winner: nil,
+                rematchDeadline: nil,
+                updatedAt: Date()
+            ))
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+
+        struct PlayerReset: Encodable {
+            let isAlive: Bool
+            let isReady: Bool
+            let role: String?
+            let playerNumber: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case isAlive = "is_alive"
+                case isReady = "is_ready"
+                case role
+                case playerNumber = "player_number"
+            }
+        }
+
+        try await supabase
+            .from("session_players")
+            .update(PlayerReset(
+                isAlive: true,
+                isReady: false,
+                role: nil,
+                playerNumber: nil
+            ))
+            .eq("session_id", value: sessionId.uuidString)
+            .execute()
+
+        try await supabase
+            .from("game_actions")
+            .delete()
+            .eq("session_id", value: sessionId.uuidString)
+            .execute()
+
+        return (true, nil)
     }
 
     /// Cancel rematch (clear deadline)
@@ -836,6 +1011,8 @@ enum SessionError: LocalizedError {
     case invalidPhase
     case notAuthenticated
     case sessionMismatch
+    case noActiveSession
+    case playerNotFound
 
     var errorDescription: String? {
         switch self {
@@ -857,6 +1034,10 @@ enum SessionError: LocalizedError {
             return "Please sign in to join a multiplayer game"
         case .sessionMismatch:
             return "Authentication error. Please sign out and sign in again"
+        case .noActiveSession:
+            return "No active game session"
+        case .playerNotFound:
+            return "Player not found in session"
         }
     }
 }

@@ -8,6 +8,10 @@ struct MultiplayerGameOverView: View {
     @State private var remainingSeconds: Int = 45
     @State private var countdownTimer: Timer?
 
+    // Error handling state
+    @State private var showError = false
+    @State private var errorMessage = ""
+
     private var winner: Role? {
         multiplayerStore.currentSession?.winner
     }
@@ -39,6 +43,11 @@ struct MultiplayerGameOverView: View {
         }
         .navigationTitle("Game Over")
         .navigationBarBackButtonHidden(true)
+        .alert("Error", isPresented: $showError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
     }
 
     private func playerRow(player: SessionPlayer) -> some View {
@@ -243,14 +252,19 @@ struct MultiplayerGameOverView: View {
             // Play Again / Confirm button - ALL PLAYERS can see
             Button {
                 Task {
-                    if !isInRematch {
-                        // Start rematch confirmation
-                        try? await multiplayerStore.initiateRematch()
-                    } else if !hasConfirmed {
-                        // Confirm rematch
-                        try? await multiplayerStore.confirmRematch()
+                    do {
+                        if !isInRematch {
+                            // Start rematch confirmation
+                            try await multiplayerStore.initiateRematch()
+                        } else if !hasConfirmed {
+                            // Confirm rematch
+                            try await multiplayerStore.confirmRematch()
+                        }
+                        // If already confirmed, button is disabled
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        showError = true
                     }
-                    // If already confirmed, button is disabled
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -267,10 +281,15 @@ struct MultiplayerGameOverView: View {
             // Leave / Return to Menu
             Button {
                 Task {
-                    if isInRematch {
-                        try? await multiplayerStore.declineRematch()
-                    } else {
-                        try? await multiplayerStore.leaveSession()
+                    do {
+                        if isInRematch {
+                            try await multiplayerStore.declineRematch()
+                        } else {
+                            try await multiplayerStore.leaveSession()
+                        }
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        showError = true
                     }
                 }
             } label: {
