@@ -436,7 +436,7 @@ struct PlayerRow: View {
                     }
                 }
 
-                if !playerInfo.isBot && !playerInfo.isReady {
+                if !playerInfo.isBot && !playerInfo.isReady && !isHost {
                     Text("Not ready")
                         .font(Design.Typography.caption)
                         .foregroundStyle(Design.Colors.textSecondary)
@@ -445,8 +445,8 @@ struct PlayerRow: View {
 
             Spacer()
 
-            // Ready Checkmark
-            if !playerInfo.isBot && playerInfo.isReady {
+            // Ready Checkmark (host is always ready since they control game start)
+            if !playerInfo.isBot && (playerInfo.isReady || isHost) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(Design.Colors.successGreen)
