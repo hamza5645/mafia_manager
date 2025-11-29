@@ -633,7 +633,7 @@ struct MultiplayerMorningView: View {
     @ViewBuilder
     private func summaryView(for record: NightActionRecord) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Night summary with role actions
+            // Night summary with role actions and full player numbers
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "moon.stars.fill")

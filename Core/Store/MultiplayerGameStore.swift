@@ -1278,18 +1278,23 @@ final class MultiplayerGameStore: ObservableObject {
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
         let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
 
-        // Collect role-specific player numbers (host has access to all roles)
-        let mafiaPlayerNumbers = allPlayers
-            .filter { $0.role == .mafia }
-            .compactMap { $0.playerNumber }
+        // Build lookup from visiblePlayers (same source that works for target resolution)
+        let playerNumberLookup = Dictionary(uniqueKeysWithValues:
+            visiblePlayers.map { ($0.playerId, $0.playerNumber) }
+        )
+
+        // Get player numbers from who submitted each action type
+        let mafiaPlayerNumbers = mafiaActions
+            .compactMap { playerNumberLookup[$0.actorPlayerId] }
+            .compactMap { $0 }
             .sorted()
-        let doctorPlayerNumbers = allPlayers
-            .filter { $0.role == .doctor }
-            .compactMap { $0.playerNumber }
+        let doctorPlayerNumbers = doctorActions
+            .compactMap { playerNumberLookup[$0.actorPlayerId] }
+            .compactMap { $0 }
             .sorted()
-        let inspectorPlayerNumbers = allPlayers
-            .filter { $0.role == .inspector }
-            .compactMap { $0.playerNumber }
+        let inspectorPlayerNumbers = inspectorActions
+            .compactMap { playerNumberLookup[$0.actorPlayerId] }
+            .compactMap { $0 }
             .sorted()
 
         // Inspector checked ID can be public (but result stays private)
@@ -1443,18 +1448,23 @@ final class MultiplayerGameStore: ObservableObject {
             hostEliminated = try await applyEliminations(resultingDeaths, reason: "Eliminated at night")
         }
 
-        // Collect role-specific player numbers (host has access to all roles)
-        let mafiaPlayerNumbers = allPlayers
-            .filter { $0.role == .mafia }
-            .compactMap { $0.playerNumber }
+        // Build lookup from visiblePlayers (same source that works for target resolution)
+        let playerNumberLookup = Dictionary(uniqueKeysWithValues:
+            visiblePlayers.map { ($0.playerId, $0.playerNumber) }
+        )
+
+        // Get player numbers from who submitted each action type
+        let mafiaPlayerNumbers = mafiaActions
+            .compactMap { playerNumberLookup[$0.actorPlayerId] }
+            .compactMap { $0 }
             .sorted()
-        let doctorPlayerNumbers = allPlayers
-            .filter { $0.role == .doctor }
-            .compactMap { $0.playerNumber }
+        let doctorPlayerNumbers = doctorActions
+            .compactMap { playerNumberLookup[$0.actorPlayerId] }
+            .compactMap { $0 }
             .sorted()
-        let inspectorPlayerNumbers = allPlayers
-            .filter { $0.role == .inspector }
-            .compactMap { $0.playerNumber }
+        let inspectorPlayerNumbers = inspectorActions
+            .compactMap { playerNumberLookup[$0.actorPlayerId] }
+            .compactMap { $0 }
             .sorted()
 
         // Inspector checked ID can be public (but result stays private)

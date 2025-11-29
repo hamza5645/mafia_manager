@@ -375,22 +375,31 @@ final class SessionService {
             let data = try encoder.encode(value)
             let jsonObject = try JSONSerialization.jsonObject(with: data)
 
-            if let dict = jsonObject as? [String: Any] {
-                return .object(dict.compactMapValues { value in
-                    if let string = value as? String { return .string(string) }
-                    if let number = value as? Int { return .integer(number) }
-                    if let number = value as? Double { return .double(number) }
-                    if let bool = value as? Bool { return bool ? .integer(1) : .integer(0) }
-                    if let array = value as? [Any] {
-                        return .array(array.compactMap { element in
-                            if let string = element as? String { return .string(string) }
-                            return nil
-                        })
+            func convert(_ value: Any) -> AnyJSON? {
+                switch value {
+                case let dict as [String: Any]:
+                    return .object(dict.compactMapValues { convert($0) })
+                case let array as [Any]:
+                    return .array(array.compactMap { convert($0) })
+                case let string as String:
+                    return .string(string)
+                case let number as NSNumber:
+                    if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                        return number.boolValue ? .integer(1) : .integer(0)
                     }
+
+                    let doubleValue = number.doubleValue
+                    if doubleValue.truncatingRemainder(dividingBy: 1) == 0 {
+                        return .integer(number.intValue)
+                    } else {
+                        return .double(doubleValue)
+                    }
+                default:
                     return nil
-                })
+                }
             }
-            return .null
+
+            return convert(jsonObject) ?? .null
         }
 
         let params: [String: AnyJSON] = [
