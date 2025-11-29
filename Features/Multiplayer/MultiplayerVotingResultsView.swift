@@ -133,23 +133,9 @@ struct MultiplayerVotingResultsView: View {
                     .font(Design.Typography.caption)
                     .foregroundStyle(Design.Colors.textSecondary)
 
-                HStack(spacing: 12) {
-                    if let number = player.playerNumber {
-                        Text("#\(number)")
-                            .font(Design.Typography.title2)
-                            .foregroundStyle(Design.Colors.dangerRed)
-                            .frame(width: 60)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Design.Colors.surface2)
-                            )
-                    }
-
-                    Text(player.playerName)
-                        .font(Design.Typography.title3)
-                        .foregroundStyle(Design.Colors.textPrimary)
-                }
+                Text(player.playerName)
+                    .font(Design.Typography.title3)
+                    .foregroundStyle(Design.Colors.textPrimary)
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
@@ -192,19 +178,6 @@ struct MultiplayerVoteCountRow: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Player number
-            if let number = player.playerNumber {
-                Text("#\(number)")
-                    .font(Design.Typography.headline)
-                    .foregroundStyle(isEliminated ? Design.Colors.dangerRed : Design.Colors.textPrimary)
-                    .frame(width: 50)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Design.Colors.surface2)
-                    )
-            }
-
             // Player name
             Text(player.playerName)
                 .font(Design.Typography.body)
