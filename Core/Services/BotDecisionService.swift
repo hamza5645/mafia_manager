@@ -93,6 +93,21 @@ final class BotDecisionService {
         return otherPlayers.randomElement()?.id ?? botPlayer.id
     }
 
+    /// Picks a single coordinated Mafia target so all Mafia bots agree
+    /// Uses the same strategy as `chooseMafiaTarget` but executes once per night for the team
+    func chooseCoordinatedMafiaTarget(
+        mafiaBots: [Player],
+        alivePlayers: [Player],
+        nightHistory: [NightAction]
+    ) -> UUID? {
+        guard let representative = mafiaBots.first else { return nil }
+        return chooseMafiaTarget(
+            botPlayer: representative,
+            alivePlayers: alivePlayers,
+            nightHistory: nightHistory
+        )
+    }
+
     // MARK: - Day Phase Decisions
 
     /// Chooses who to vote out during day phase

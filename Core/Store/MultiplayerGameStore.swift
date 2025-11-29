@@ -58,6 +58,22 @@ final class MultiplayerGameStore: ObservableObject {
         self.authStore = authStore
     }
 
+    /// Clear per-game caches so bots/actions get re-processed for a brand new game
+    private func resetPhaseProcessingState() {
+        processedBotNightIndices.removeAll()
+        processedBotVotingDays.removeAll()
+        isPhaseReadyToAdvance = false
+        isResolvingPhase = false
+    }
+
+    /// Detects when a session has been fully reset to lobby (e.g., after rematch)
+    private func isFreshLobbyState(_ session: GameSession) -> Bool {
+        session.currentPhase == "lobby"
+            && session.dayIndex == 0
+            && session.nightHistory.isEmpty
+            && session.dayHistory.isEmpty
+    }
+
     init() {
         // Observe RealtimeService connection state changes
         _ = realtimeService.$isReconnecting
@@ -77,6 +93,9 @@ final class MultiplayerGameStore: ObservableObject {
         guard let userId = authStore?.currentUserId else {
             throw SessionError.notHost
         }
+
+        resetPhaseProcessingState()
+        eliminatedPlayerIds.removeAll()
 
         isConnecting = true
         connectionError = nil
@@ -142,6 +161,9 @@ final class MultiplayerGameStore: ObservableObject {
             throw SessionError.notHost
         }
 
+        resetPhaseProcessingState()
+        eliminatedPlayerIds.removeAll()
+
         isConnecting = true
         connectionError = nil
 
@@ -184,6 +206,9 @@ final class MultiplayerGameStore: ObservableObject {
         guard let playerId = myPlayer?.id else {
             throw SessionError.playerNotFound
         }
+
+        resetPhaseProcessingState()
+        eliminatedPlayerIds.removeAll()
 
         stopHeartbeat()
         stopPlayerRefreshTimer()
@@ -280,6 +305,7 @@ final class MultiplayerGameStore: ObservableObject {
         myRole = nil
         myNumber = nil
         mafiaTeammates = []
+        resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
     }
 
@@ -336,6 +362,9 @@ final class MultiplayerGameStore: ObservableObject {
         guard isHost, let sessionId = currentSession?.id else {
             throw SessionError.notHost
         }
+
+        resetPhaseProcessingState()
+        eliminatedPlayerIds.removeAll()
 
         // Reset session via service
         try await sessionService.resetSessionForPlayAgain(sessionId: sessionId)
@@ -434,8 +463,15 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func handleSessionUpdate(_ session: GameSession) {
+        let previousSessionId = currentSession?.id
         let previousPhaseData = currentSession?.currentPhaseData
         let previousRematchDeadline = currentSession?.rematchDeadline
+
+        // New session or a full lobby reset (e.g., rematch) -> clear bot/night caches
+        if session.id != previousSessionId || isFreshLobbyState(session) {
+            resetPhaseProcessingState()
+        }
+
         currentSession = session
 
         updateHostStatus(using: session)
@@ -1938,6 +1974,13 @@ final class MultiplayerGameStore: ObservableObject {
         let alivePlayersList = allPlayers.filter { $0.isAlive }
         let localAlivePlayers = alivePlayersList.map { makeLocalPlayer(from: $0) }
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
+        let mafiaBots = aliveBots.filter { $0.role == .mafia }
+        // Compute a single shared Mafia target so bot teammates never split votes
+        let sharedMafiaTarget = botService.chooseCoordinatedMafiaTarget(
+            mafiaBots: mafiaBots.map { makeLocalPlayer(from: $0) },
+            alivePlayers: localAlivePlayers,
+            nightHistory: nightHistory
+        )
 
         for bot in aliveBots {
             guard let botRole = bot.role else {
@@ -1950,7 +1993,7 @@ final class MultiplayerGameStore: ObservableObject {
 
             switch botRole {
             case .mafia:
-                targetId = botService.chooseMafiaTarget(
+                targetId = sharedMafiaTarget ?? botService.chooseMafiaTarget(
                     botPlayer: botAsPlayer,
                     alivePlayers: localAlivePlayers,
                     nightHistory: nightHistory
