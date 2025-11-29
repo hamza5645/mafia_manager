@@ -353,14 +353,14 @@ final class GameStore: ObservableObject {
         let botService = BotDecisionService()
 
         for bot in aliveBots {
-            if let targetID = botService.chooseVotingTarget(
+            // HAMZA-FIX: chooseVotingTarget now returns non-optional UUID (always votes)
+            let targetID = botService.chooseVotingTarget(
                 botPlayer: bot,
                 alivePlayers: alivePlayers,
                 nightHistory: state.nightHistory,
                 dayHistory: state.dayHistory
-            ) {
-                recordVote(from: bot.id, for: targetID)
-            }
+            )
+            recordVote(from: bot.id, for: targetID)
         }
 
         // If there are bots, show their votes first

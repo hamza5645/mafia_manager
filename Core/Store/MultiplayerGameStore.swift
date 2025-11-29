@@ -44,6 +44,7 @@ final class MultiplayerGameStore: ObservableObject {
     private var processedBotNightIndices: Set<Int> = []
     private var processedBotVotingDays: Set<Int> = []
     private var isResolvingPhase = false
+    private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
     // Reconnect state (for pure Realtime recovery)
@@ -930,6 +931,25 @@ final class MultiplayerGameStore: ObservableObject {
         return actionType == .inspectorCheck ? response.result : nil
     }
 
+    /// Ensures we have a valid round ID, refreshing session if needed
+    /// HAMZA-FIX: Prevents orphan votes that don't get counted
+    private func resolvedRoundId() async throws -> UUID {
+        // First check if we already have it
+        if let id = currentSession?.currentRoundId {
+            return id
+        }
+
+        // Refresh session to get latest round ID
+        try await refreshSession()
+
+        if let id = currentSession?.currentRoundId {
+            return id
+        }
+
+        // If still nil, this is an error state - phase hasn't been properly initialized
+        throw SessionError.noActiveSession
+    }
+
     /// Submit a vote
     func submitVote(dayIndex: Int, targetPlayerId: UUID?) async throws {
         guard let session = currentSession,
@@ -937,8 +957,8 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
-        // Use current round ID from session, or generate a new one if missing
-        let roundId = session.currentRoundId ?? UUID()
+        // HAMZA-FIX: Use resolved round ID instead of fallback to prevent orphan votes
+        let roundId = try await resolvedRoundId()
 
         let action = GameAction.voteAction(
             sessionId: session.id,
@@ -1051,19 +1071,48 @@ final class MultiplayerGameStore: ObservableObject {
             // Reset all players' ready status at the start of voting phase
             await resetAllPlayersReady()
 
-            if !processedBotVotingDays.contains(dayIndex) {
+            // HAMZA-FIX: SIMPLIFIED - Always process bot votes if ANY bots are missing valid votes
+            // This is the PRIMARY trigger for bot voting - don't rely on processedBotVotingDays
+            let missingBots = await botsMissingVotes(dayIndex: dayIndex)
+
+            if !missingBots.isEmpty {
+                print("🤖 [handlePhaseEntry] \(missingBots.count) bots missing votes for day \(dayIndex) - processing NOW")
                 do {
                     try await processBotVotes(dayIndex: dayIndex)
-                    processedBotVotingDays.insert(dayIndex) // Only mark after successful completion
+                    processedBotVotingDays.insert(dayIndex)
                 } catch {
-                    print("❌ [MultiplayerGameStore] Failed to process bot votes: \(error)")
-                    // Don't mark as processed so we can retry on next phase entry
+                    print("❌ [handlePhaseEntry] Failed to process bot votes: \(error)")
+                    // Don't mark as processed so we can retry
                 }
+            } else if !processedBotVotingDays.contains(dayIndex) {
+                // No bots missing votes but not yet marked processed - mark it now
+                print("🤖 [handlePhaseEntry] All bots already have votes for day \(dayIndex)")
+                processedBotVotingDays.insert(dayIndex)
             }
+
             await evaluatePhaseProgression(trigger: "enter_voting")
         default:
             break
         }
+    }
+
+    /// Returns alive bots that do not yet have a VALID vote recorded for the given day
+    /// HAMZA-FIX: Now checks for non-nil targetPlayerId - votes without targets don't count
+    private func botsMissingVotes(dayIndex: Int) async -> [SessionPlayer] {
+        guard let session = currentSession else { return [] }
+        let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
+        guard !aliveBots.isEmpty else { return [] }
+
+        let existingVotes = await loadActionsSafely(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
+        )
+
+        // HAMZA-FIX: Only count votes that have a non-nil target as valid
+        let validVotedIds = Set(existingVotes.filter { $0.targetPlayerId != nil }.map { $0.actorPlayerId })
+        return aliveBots.filter { !validVotedIds.contains($0.playerId) }
     }
 
     private func resetAllPlayersReady() async {
@@ -1562,6 +1611,38 @@ final class MultiplayerGameStore: ObservableObject {
         guard let session = currentSession else { return }
 
         let alivePlayers = allPlayers.filter { $0.isAlive }
+        let aliveBotIds = alivePlayers.filter { $0.isBot }.map { $0.playerId }
+
+        // HAMZA-FIX: Fetch current vote actions FIRST to check real state
+        var voteActions = await loadActionsSafely(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
+        )
+
+        // HAMZA-FIX: Count how many alive bots have valid votes (non-nil target)
+        let botVotesWithTargets = voteActions.filter { action in
+            aliveBotIds.contains(action.actorPlayerId) && action.targetPlayerId != nil
+        }
+        let missingBotVoteCount = aliveBotIds.count - botVotesWithTargets.count
+
+        // HAMZA-FIX: CRITICAL - If ANY alive bot is missing a vote, force processBotVotes NOW
+        if missingBotVoteCount > 0 {
+            print("🤖 [checkVotingPhaseReadiness] \(missingBotVoteCount)/\(aliveBotIds.count) bots missing votes - FORCING processBotVotes()")
+            do {
+                try await processBotVotes(dayIndex: dayIndex)
+                // Re-fetch votes after processing
+                voteActions = await loadActionsSafely(
+                    sessionId: session.id,
+                    actionType: .vote,
+                    phaseIndex: dayIndex,
+                    roundId: session.currentRoundId
+                )
+            } catch {
+                print("❌ [checkVotingPhaseReadiness] Force bot voting failed: \(error)")
+            }
+        }
 
         // Check if all alive, non-host human players have marked themselves as ready
         let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
@@ -1570,18 +1651,23 @@ final class MultiplayerGameStore: ObservableObject {
         let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
 
         // Check if host has voted (only required if host is alive)
-        let voteActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .vote,
-            phaseIndex: dayIndex
-        )
         let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
         let hostIsAlive = hostPlayer?.isAlive ?? false
         let hostVote = voteActions.first { $0.actorPlayerId == hostPlayer?.playerId }
         let hostHasVoted = hostVote != nil
 
-        // Ready when all non-host players are ready AND (host has voted OR host is dead)
-        let ready = nonHostReady && (!hostIsAlive || hostHasVoted)
+        // HAMZA-FIX: Re-count bot votes after potential processing
+        let finalBotVotes = voteActions.filter { action in
+            aliveBotIds.contains(action.actorPlayerId) && action.targetPlayerId != nil
+        }
+        let botsReady = finalBotVotes.count == aliveBotIds.count
+
+        // Ready when all non-host players are ready AND (host has voted OR host is dead) AND bots have voted
+        let ready = nonHostReady && (!hostIsAlive || hostHasVoted) && botsReady
+
+        if !botsReady {
+            print("⚠️ [checkVotingPhaseReadiness] STILL not ready: \(finalBotVotes.count)/\(aliveBotIds.count) bot votes")
+        }
 
         await MainActor.run {
             self.isPhaseReadyToAdvance = ready
@@ -1604,16 +1690,35 @@ final class MultiplayerGameStore: ObservableObject {
             roundId: session.currentRoundId
         )
 
+        // DEBUG: Log fetched votes
+        print("📊 [showVotingResults] Fetched \(votes.count) votes for day \(dayIndex), roundId: \(session.currentRoundId?.uuidString ?? "nil")")
+        for vote in votes {
+            let actorName = visiblePlayers.first { $0.playerId == vote.actorPlayerId }?.playerName ?? "Unknown"
+            let targetName = vote.targetPlayerId.flatMap { tid in visiblePlayers.first { $0.playerId == tid }?.playerName } ?? "Abstain"
+            print("   - \(actorName) voted for \(targetName)")
+        }
+
         // Seed vote counts with all alive players (0 votes)
         var voteCounts: [UUID: Int] = [:]
         for player in visiblePlayers where player.isAlive {
             voteCounts[player.playerId] = 0
         }
+        print("📊 [showVotingResults] Seeded \(voteCounts.count) alive players with 0 votes")
 
         // Tally actual votes
         for action in votes {
-            guard let targetId = action.targetPlayerId else { continue }
+            guard let targetId = action.targetPlayerId else {
+                print("   ⚠️ Skipping vote with nil target from actor: \(action.actorPlayerId)")
+                continue
+            }
             voteCounts[targetId, default: 0] += 1
+        }
+
+        // DEBUG: Log final tallies
+        print("📊 [showVotingResults] Final vote tallies:")
+        for (playerId, count) in voteCounts.sorted(by: { $0.value > $1.value }) {
+            let name = visiblePlayers.first { $0.playerId == playerId }?.playerName ?? "Unknown(\(playerId))"
+            print("   - \(name): \(count) votes")
         }
 
         // Determine elimination (but DON'T apply yet)
@@ -1954,11 +2059,17 @@ final class MultiplayerGameStore: ObservableObject {
 
     private func advanceToVoting(afterNightIndex nightIndex: Int) async throws {
         guard let session = currentSession, !session.isGameOver else { return }
+        let dayIndex = session.dayIndex
         try await sessionService.updateSessionState(
             sessionId: session.id,
             currentPhase: "voting",
-            phaseData: .voting(dayIndex: session.dayIndex)
+            phaseData: .voting(dayIndex: dayIndex)
         )
+
+        // HAMZA-FIX: Call handlePhaseEntry synchronously to ensure bot voting triggers immediately
+        // Don't rely on Realtime event which can be delayed or lost
+        print("🗳️ [advanceToVoting] Phase updated, calling handlePhaseEntry directly for day \(dayIndex)")
+        await handlePhaseEntry(for: .voting(dayIndex: dayIndex))
     }
 
     // MARK: - Bot Actions (Host Only)
@@ -2040,10 +2151,18 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Process bot votes during the day phase
-    /// HAMZA-149: Bots must always vote after day 0 (first day allows abstaining)
+    /// HAMZA-149: Bots must always vote every day (no abstaining)
     func processBotVotes(dayIndex: Int) async throws {
         guard isHost else { return }
         guard let session = currentSession else { return }
+
+        // HAMZA-FIX: Recursion guard - prevent multiple concurrent bot voting attempts
+        guard !isProcessingBotVotes else {
+            print("🤖 [processBotVotes] Already processing bot votes, skipping duplicate call")
+            return
+        }
+        isProcessingBotVotes = true
+        defer { isProcessingBotVotes = false }
 
         let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
         guard !aliveBots.isEmpty else { return }
@@ -2052,26 +2171,31 @@ final class MultiplayerGameStore: ObservableObject {
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
         let dayHistory = convertDayHistoryToLocalModel(session.dayHistory)
 
+        // Skip bots that already have VALID votes (non-nil target) - supports retries without double-submitting
+        // HAMZA-FIX: Only count votes with non-nil targets as valid
+        let initialExistingVotes = await loadActionsSafely(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
+        )
+        let botsWithValidVotes = Set(initialExistingVotes.filter { $0.targetPlayerId != nil }.map { $0.actorPlayerId })
+        print("🤖 [processBotVotes] \(botsWithValidVotes.count) bots already have valid votes")
+
         // Get valid vote targets (alive players excluding current bot)
         let validTargetIds = alivePlayers.filter { $0.alive }.map { $0.id }
 
         var failedBots: [String] = []
 
-        for bot in aliveBots {
+        for bot in aliveBots where !botsWithValidVotes.contains(bot.playerId) {
             let botPlayer = makeLocalPlayer(from: bot)
-            var targetId = botService.chooseVotingTarget(
+            // HAMZA-FIX: chooseVotingTarget now returns non-optional UUID (always votes)
+            let targetId = botService.chooseVotingTarget(
                 botPlayer: botPlayer,
                 alivePlayers: alivePlayers,
                 nightHistory: nightHistory,
                 dayHistory: dayHistory
             )
-
-            // HAMZA-149: After day 0, bots must always vote (no abstaining)
-            // If chooseVotingTarget returned nil but there are valid targets, pick one
-            if targetId == nil && dayIndex > 0 {
-                let validTargets = validTargetIds.filter { $0 != bot.playerId }
-                targetId = validTargets.randomElement()
-            }
 
             do {
                 try await submitBotVote(
@@ -2084,6 +2208,59 @@ final class MultiplayerGameStore: ObservableObject {
                 print("⚠️ [processBotVotes] Bot \(bot.playerName) failed to vote: \(error)")
                 failedBots.append(bot.playerName)
             }
+        }
+
+        // Second pass: ensure every bot has a recorded VALID vote (no abstaining allowed)
+        // HAMZA-FIX: Only count votes with non-nil targets
+        let postFirstPassVotes = await loadActionsSafely(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
+        )
+
+        let botsMissingValidVotes = aliveBots.filter { bot in
+            !postFirstPassVotes.contains { $0.actorPlayerId == bot.playerId && $0.targetPlayerId != nil }
+        }
+        print("🤖 [processBotVotes] Second pass: \(botsMissingValidVotes.count) bots still need valid votes")
+
+        for bot in botsMissingValidVotes {
+            let fallbackTargets = validTargetIds.filter { $0 != bot.playerId }
+            // HAMZA-FIX: Always force a target; self-vote as last resort to ensure a ballot exists
+            let fallbackTarget = fallbackTargets.randomElement() ?? validTargetIds.first ?? bot.playerId
+            print("🤖 [processBotVotes] Retry: \(bot.playerName) voting for fallback target")
+
+            do {
+                try await submitBotVote(
+                    botPlayerId: bot.playerId,
+                    dayIndex: dayIndex,
+                    targetPlayerId: fallbackTarget
+                )
+            } catch {
+                print("⚠️ [processBotVotes] Bot \(bot.playerName) retry vote failed: \(error)")
+                failedBots.append(bot.playerName)
+            }
+        }
+
+        // HAMZA-FIX: Always verify all bots have VALID votes (mandatory voting, non-nil targets)
+        let refreshedVotes = await loadActionsSafely(
+            sessionId: session.id,
+            actionType: .vote,
+            phaseIndex: dayIndex,
+            roundId: session.currentRoundId
+        )
+
+        let stillMissingBots = aliveBots.filter { bot in
+            !refreshedVotes.contains { $0.actorPlayerId == bot.playerId && $0.targetPlayerId != nil }
+        }
+
+        if !stillMissingBots.isEmpty {
+            let names = stillMissingBots.map { $0.playerName }.joined(separator: ", ")
+            print("❌ [processBotVotes] STILL missing valid bot votes after retries: \(names)")
+            // Throw to allow re-processing on next phase entry and keep host blocked from advancing
+            throw NSError(domain: "BotVoting", code: -3, userInfo: [NSLocalizedDescriptionKey: "Missing bot votes: \(names)"])
+        } else {
+            print("✅ [processBotVotes] All \(aliveBots.count) bots have valid votes")
         }
 
         // Throw only if ALL bots failed (so we can retry)
@@ -2147,15 +2324,16 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
+    /// HAMZA-FIX: targetPlayerId is now required (non-optional) - bots MUST always vote for someone
     private func submitBotVote(
         botPlayerId: UUID,
         dayIndex: Int,
-        targetPlayerId: UUID?
+        targetPlayerId: UUID
     ) async throws {
         guard let session = currentSession else { return }
 
-        // Use current round ID from session, or generate a new one if missing
-        let roundId = session.currentRoundId ?? UUID()
+        // HAMZA-FIX: Use resolved round ID instead of fallback to prevent orphan votes
+        let roundId = try await resolvedRoundId()
 
         let action = GameAction.voteAction(
             sessionId: session.id,

@@ -112,15 +112,17 @@ final class BotDecisionService {
 
     /// Chooses who to vote out during day phase
     /// Strategy: Mafia votes for non-Mafia, Citizens vote semi-randomly
+    /// HAMZA-FIX: Returns non-optional UUID - bots MUST always vote
     func chooseVotingTarget(
         botPlayer: Player,
         alivePlayers: [Player],
         nightHistory: [NightAction],
         dayHistory: [DayAction]
-    ) -> UUID? {
+    ) -> UUID {
         let validTargets = alivePlayers.filter { $0.alive && $0.id != botPlayer.id }
 
-        guard !validTargets.isEmpty else { return nil }
+        // If no valid targets (only bot left), self-vote as last resort
+        guard !validTargets.isEmpty else { return botPlayer.id }
 
         if botPlayer.role == .mafia {
             // Bot Mafia: Vote for non-Mafia players
@@ -136,10 +138,12 @@ final class BotDecisionService {
                 }
 
                 if !survivors.isEmpty && Double.random(in: 0...1) < 0.6 {
-                    return survivors.randomElement()?.id
+                    // Guaranteed non-nil since survivors is non-empty
+                    return survivors.randomElement()!.id
                 }
 
-                return nonMafiaTargets.randomElement()?.id
+                // Guaranteed non-nil since nonMafiaTargets is non-empty
+                return nonMafiaTargets.randomElement()!.id
             }
         } else {
             // Bot Citizen/Inspector/Doctor: Vote somewhat randomly
@@ -153,16 +157,17 @@ final class BotDecisionService {
                 }
 
                 if untargetedPlayers.count >= 2 && Double.random(in: 0...1) < 0.5 {
-                    return untargetedPlayers.randomElement()?.id
+                    // Guaranteed non-nil since untargetedPlayers has >= 2 elements
+                    return untargetedPlayers.randomElement()!.id
                 }
             }
 
-            // Default: random vote
-            return validTargets.randomElement()?.id
+            // Default: random vote - guaranteed non-nil since validTargets is non-empty
+            return validTargets.randomElement()!.id
         }
 
-        // Fallback
-        return validTargets.randomElement()?.id
+        // Fallback - guaranteed non-nil since validTargets is non-empty (checked at top)
+        return validTargets.randomElement()!.id
     }
 
     // MARK: - Utility

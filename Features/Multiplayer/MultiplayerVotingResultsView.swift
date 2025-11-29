@@ -20,16 +20,37 @@ struct MultiplayerVotingResultsView: View {
     private var sortedVoteCounts: [(player: PublicPlayerInfo, votes: Int)] {
         guard let data = voteData else { return [] }
 
-        return data.voteCounts.compactMap { (playerID, voteCount) -> (PublicPlayerInfo, Int)? in
-            guard let player = playerLookup[playerID] else { return nil }
+        // HAMZA-FIX: Use map instead of compactMap to never silently drop vote entries
+        // If a player is missing from visiblePlayers, create a placeholder
+        return data.voteCounts.map { (playerID, voteCount) -> (PublicPlayerInfo, Int) in
+            let player = playerLookup[playerID] ?? PublicPlayerInfo(
+                id: playerID,
+                playerId: playerID,
+                playerName: "Unknown Player",
+                playerNumber: nil,
+                isBot: false,
+                isAlive: false,
+                isOnline: false,
+                isReady: false
+            )
             return (player, voteCount)
         }
-        .sorted { $0.votes > $1.votes }
+        .sorted(by: { $0.1 > $1.1 })
     }
 
     private var eliminatedPlayer: PublicPlayerInfo? {
         guard let data = voteData, let eliminatedId = data.eliminatedId else { return nil }
-        return playerLookup[eliminatedId]
+        // HAMZA-FIX: Handle missing eliminated player with placeholder
+        return playerLookup[eliminatedId] ?? PublicPlayerInfo(
+            id: eliminatedId,
+            playerId: eliminatedId,
+            playerName: "Eliminated Player",
+            playerNumber: nil,
+            isBot: false,
+            isAlive: false,
+            isOnline: false,
+            isReady: false
+        )
     }
 
     private var nextPhaseButtonLabel: String {

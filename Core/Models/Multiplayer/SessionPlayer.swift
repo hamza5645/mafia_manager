@@ -56,6 +56,28 @@ struct PublicPlayerInfo: Identifiable, Sendable {
         self.isOnline = sessionPlayer.isOnline
         self.isReady = sessionPlayer.isReady
     }
+
+    /// HAMZA-FIX: Memberwise initializer for creating placeholder players
+    /// Used when vote counts reference players not in the current visiblePlayers list
+    init(
+        id: UUID,
+        playerId: UUID,
+        playerName: String,
+        playerNumber: Int?,
+        isBot: Bool,
+        isAlive: Bool,
+        isOnline: Bool,
+        isReady: Bool
+    ) {
+        self.id = id
+        self.playerId = playerId
+        self.playerName = playerName
+        self.playerNumber = playerNumber
+        self.isBot = isBot
+        self.isAlive = isAlive
+        self.isOnline = isOnline
+        self.isReady = isReady
+    }
 }
 
 // My player info (what I can see about myself)

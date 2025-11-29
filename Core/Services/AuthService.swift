@@ -110,16 +110,36 @@ final class AuthService {
     // Note: Profile creation is now handled by a database trigger
     // when a new user signs up. See supabase/alternative_trigger_approach.sql
 
+    /// HAMZA-FIX: Added retry logic to handle Supabase session propagation timing issues
+    /// After login/signup, REST API calls may fail with 406 if the session isn't fully propagated
     func getUserProfile(userId: UUID) async throws -> UserProfile {
-        let response: UserProfile = try await supabase
-            .from("profiles")
-            .select()
-            .eq("id", value: userId.uuidString.lowercased())
-            .single()
-            .execute()
-            .value
+        let maxRetries = 3
+        var lastError: Error?
 
-        return response
+        for attempt in 0..<maxRetries {
+            do {
+                // Small delay before retry to allow session propagation
+                if attempt > 0 {
+                    try await Task.sleep(nanoseconds: UInt64(300_000_000 * attempt)) // 300ms * attempt
+                }
+
+                let response: UserProfile = try await supabase
+                    .from("profiles")
+                    .select()
+                    .eq("id", value: userId.uuidString.lowercased())
+                    .single()
+                    .execute()
+                    .value
+
+                return response
+            } catch {
+                lastError = error
+                // Continue to next retry
+            }
+        }
+
+        // All retries failed, throw the last error
+        throw lastError ?? NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch profile after \(maxRetries) attempts"])
     }
 
     func updateUserProfile(userId: UUID, displayName: String) async throws {
