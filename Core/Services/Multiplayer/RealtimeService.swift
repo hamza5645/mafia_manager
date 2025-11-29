@@ -74,7 +74,7 @@ final class RealtimeService: ObservableObject {
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
         onActionUpdate: @escaping (GameAction) -> Void
     ) async throws {
-        let channelName = "session:\(sessionId.uuidString)"
+        let channelName = "session:\(sessionId.uuidString.lowercased())"
 
         // Remove existing channel if any
         await unsubscribe(channelName: channelName)
@@ -91,7 +91,7 @@ final class RealtimeService: ObservableObject {
                 AnyAction.self,
                 schema: "public",
                 table: "game_sessions",
-                filter: "id=eq.\(sessionId.uuidString)"
+                filter: "id=eq.\(sessionId.uuidString.lowercased())"
             ) { payload in
                 Task { @MainActor in
                     switch payload {
@@ -134,7 +134,7 @@ final class RealtimeService: ObservableObject {
                 AnyAction.self,
                 schema: "public",
                 table: "session_players",
-                filter: "session_id=eq.\(sessionId.uuidString)"
+                filter: "session_id=eq.\(sessionId.uuidString.lowercased())"
             ) { payload in
                 Task { @MainActor in
                     switch payload {
@@ -176,7 +176,7 @@ final class RealtimeService: ObservableObject {
                 AnyAction.self,
                 schema: "public",
                 table: "game_actions",
-                filter: "session_id=eq.\(sessionId.uuidString)"
+                filter: "session_id=eq.\(sessionId.uuidString.lowercased())"
             ) { payload in
                 Task { @MainActor in
                     switch payload {
@@ -234,7 +234,7 @@ final class RealtimeService: ObservableObject {
         myPlayerId: UUID,
         onPresenceSync: @escaping ([UUID: PresenceState]) -> Void
     ) async throws {
-        let channelName = "presence:\(sessionId.uuidString)"
+        let channelName = "presence:\(sessionId.uuidString.lowercased())"
 
         // Remove existing channel if any
         await unsubscribe(channelName: channelName)
@@ -339,7 +339,7 @@ final class RealtimeService: ObservableObject {
         event: String,
         payload: T
     ) async throws {
-        let channelName = "session:\(sessionId.uuidString)"
+        let channelName = "session:\(sessionId.uuidString.lowercased())"
 
         guard let channel = channels[channelName] else {
             throw RealtimeError.channelNotFound

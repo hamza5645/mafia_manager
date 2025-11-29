@@ -1847,7 +1847,8 @@ final class MultiplayerGameStore: ObservableObject {
             return (winner: .citizen, isGameOver: true)
         }
 
-        if mafiaCount >= nonMafiaCount {
+        // Mafia wins only when ALL non-Mafia are dead
+        if nonMafiaCount == 0 {
             return (winner: .mafia, isGameOver: true)
         }
 

@@ -702,14 +702,8 @@ final class GameStore: ObservableObject {
             state.currentPhase = .gameOver
             return
         }
-        if startOfDay && mafiaCount >= nonMafiaCount {
-            state.isGameOver = true
-            state.winner = .mafia
-            state.currentPhase = .gameOver
-            return
-        }
-        // Optional: also end immediately after day if mafia outnumber
-        if !startOfDay && mafiaCount >= nonMafiaCount {
+        // Mafia wins only when ALL non-Mafia are dead
+        if nonMafiaCount == 0 {
             state.isGameOver = true
             state.winner = .mafia
             state.currentPhase = .gameOver

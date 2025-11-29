@@ -80,28 +80,43 @@ struct SettingsView: View {
                                 }
                                 .padding(.vertical, 8)
 
-                                // Upgrade CTA button
-                                Button {
-                                    showingUpgrade = true
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 16, weight: .semibold))
+                                // Account action buttons
+                                HStack(spacing: 12) {
+                                    // Login button
+                                    Button {
+                                        showingLogin = true
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: "person.circle")
+                                                .font(.system(size: 16, weight: .semibold))
 
-                                        Text("Create Account")
-                                            .font(.subheadline.weight(.semibold))
-
-                                        Spacer()
-
-                                        Text("Keep stats forever")
-                                            .font(.caption)
-                                            .foregroundColor(Design.Colors.surface0.opacity(0.8))
+                                            Text("Login")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(Design.Colors.surface2)
+                                        .cornerRadius(Design.Radii.small)
                                     }
-                                    .foregroundColor(Design.Colors.surface0)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(Design.Colors.brandGold)
-                                    .cornerRadius(Design.Radii.small)
+
+                                    // Create Account button
+                                    Button {
+                                        showingUpgrade = true
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: "sparkles")
+                                                .font(.system(size: 16, weight: .semibold))
+
+                                            Text("Sign Up")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                        .foregroundColor(Design.Colors.surface0)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(Design.Colors.brandGold)
+                                        .cornerRadius(Design.Radii.small)
+                                    }
                                 }
                             }
                         } else {

@@ -60,7 +60,7 @@ final class SessionService {
 
         let createData = CreateSessionData(
             roomCode: roomCode,
-            hostUserId: hostUserId.uuidString,
+            hostUserId: hostUserId.uuidString.lowercased(),
             status: "waiting",
             maxPlayers: maxPlayers,
             botCount: botCount,
@@ -140,8 +140,8 @@ final class SessionService {
         let players: [SessionPlayer] = try await supabase
             .from("session_players")
             .select()
-            .eq("session_id", value: sessionId.uuidString)
-            .eq("user_id", value: userId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
+            .eq("user_id", value: userId.uuidString.lowercased())
             .execute()
             .value
 
@@ -162,7 +162,7 @@ final class SessionService {
             let deleted: [SessionPlayer] = try await supabase
                 .from("session_players")
                 .delete()
-                .eq("id", value: playerId.uuidString)
+                .eq("id", value: playerId.uuidString.lowercased())
                 .select()
                 .execute()
                 .value
@@ -185,7 +185,7 @@ final class SessionService {
             }
 
             let response: RemoveResponse = try await supabase
-                .rpc("remove_player_by_id", params: ["p_player_id": AnyJSON.string(playerId.uuidString)])
+                .rpc("remove_player_by_id", params: ["p_player_id": AnyJSON.string(playerId.uuidString.lowercased())])
                 .execute()
                 .value
 
@@ -202,7 +202,7 @@ final class SessionService {
         let sessions: [GameSession] = try await supabase
             .from("game_sessions")
             .select()
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
             .value
 
@@ -230,15 +230,15 @@ final class SessionService {
         try await supabase
             .from("game_sessions")
             .update(UpdateData(status: status.rawValue))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
     }
 
     /// Transfer host privileges to another authenticated user (host only)
     func updateSessionHost(sessionId: UUID, newHostUserId: UUID) async throws {
         let params: [String: AnyJSON] = [
-            "p_session_id": .string(sessionId.uuidString),
-            "p_new_host_user_id": .string(newHostUserId.uuidString)
+            "p_session_id": .string(sessionId.uuidString.lowercased()),
+            "p_new_host_user_id": .string(newHostUserId.uuidString.lowercased())
         ]
 
         struct TransferResponse: Decodable { let success: Bool? }
@@ -275,9 +275,9 @@ final class SessionService {
             .update(UpdateData(
                 currentPhase: currentPhase,
                 currentPhaseData: phaseData,
-                currentRoundId: newRoundId?.uuidString
+                currentRoundId: newRoundId?.uuidString.lowercased()
             ))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
     }
 
@@ -342,7 +342,7 @@ final class SessionService {
         let updateData = UpdateData(
             currentPhase: currentPhase,
             currentPhaseData: phaseData,
-            currentRoundId: newRoundId?.uuidString,
+            currentRoundId: newRoundId?.uuidString.lowercased(),
             dayIndex: dayIndex,
             nightHistory: nightHistory,
             dayHistory: dayHistory,
@@ -353,7 +353,7 @@ final class SessionService {
         try await supabase
             .from("game_sessions")
             .update(updateData)
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
     }
 
@@ -394,9 +394,9 @@ final class SessionService {
         }
 
         let params: [String: AnyJSON] = [
-            "p_session_id": .string(sessionId.uuidString),
+            "p_session_id": .string(sessionId.uuidString.lowercased()),
             "p_night_record": try toAnyJSON(nightRecord),
-            "p_eliminated_player_ids": .array(eliminatedPlayerIds.map { .string($0.uuidString) }),
+            "p_eliminated_player_ids": .array(eliminatedPlayerIds.map { .string($0.uuidString.lowercased()) }),
             "p_next_phase": .string(nextPhase),
             "p_next_phase_data": try toAnyJSON(nextPhaseData)
         ]
@@ -428,7 +428,7 @@ final class SessionService {
                 try await supabase
                     .from("game_sessions")
                     .update(gameOverData)
-                    .eq("id", value: sessionId.uuidString)
+                    .eq("id", value: sessionId.uuidString.lowercased())
                     .execute()
             }
 
@@ -450,7 +450,7 @@ final class SessionService {
         let players: [SessionPlayer] = try await supabase
             .from("game_session_players")
             .select()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .order("joined_at")
             .execute()
             .value
@@ -490,9 +490,9 @@ final class SessionService {
         let playerId = UUID()
 
         let createData = CreatePlayerData(
-            sessionId: sessionId.uuidString,
-            userId: userId?.uuidString,
-            playerId: playerId.uuidString,
+            sessionId: sessionId.uuidString.lowercased(),
+            userId: userId?.uuidString.lowercased(),
+            playerId: playerId.uuidString.lowercased(),
             playerName: playerName,
             isBot: isBot,
             isAlive: true,
@@ -537,7 +537,7 @@ final class SessionService {
         try await supabase
             .from("session_players")
             .update(UpdateData(isReady: isReady))
-            .eq("id", value: playerId.uuidString)
+            .eq("id", value: playerId.uuidString.lowercased())
             .execute()
     }
 
@@ -568,7 +568,7 @@ final class SessionService {
         try await supabase
             .from("session_players")
             .update(updateData)
-            .eq("id", value: recordId.uuidString)
+            .eq("id", value: recordId.uuidString.lowercased())
             .execute()
     }
 
@@ -592,7 +592,7 @@ final class SessionService {
         try await supabase
             .from("session_players")
             .update(updateData)
-            .eq("id", value: playerId.uuidString)
+            .eq("id", value: playerId.uuidString.lowercased())
             .execute()
     }
 
@@ -621,8 +621,8 @@ final class SessionService {
             try await supabase
                 .from("session_players")
                 .update(updateData)
-                .eq("session_id", value: sessionId.uuidString)
-                .eq("player_id", value: assignment.playerId.uuidString)
+                .eq("session_id", value: sessionId.uuidString.lowercased())
+                .eq("player_id", value: assignment.playerId.uuidString.lowercased())
                 .execute()
         }
 
@@ -642,7 +642,7 @@ final class SessionService {
         try await supabase
             .from("game_sessions")
             .update(UpdateSessionData(assignedNumbers: numberAssignments))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
     }
 
@@ -652,12 +652,12 @@ final class SessionService {
     @discardableResult
     func submitAction(_ action: GameAction) async throws -> ActionResponse {
         let params: [String: AnyJSON] = [
-            "p_session_id": .string(action.sessionId.uuidString),
-            "p_round_id": .string(action.roundId.uuidString),  // Include round_id for action isolation
+            "p_session_id": .string(action.sessionId.uuidString.lowercased()),
+            "p_round_id": .string(action.roundId.uuidString.lowercased()),  // Include round_id for action isolation
             "p_action_type": .string(action.actionType.rawValue),
             "p_phase_index": .integer(action.phaseIndex),
-            "p_actor_player_id": .string(action.actorPlayerId.uuidString),
-            "p_target_player_id": action.targetPlayerId.map { .string($0.uuidString) } ?? .null
+            "p_actor_player_id": .string(action.actorPlayerId.uuidString.lowercased()),
+            "p_target_player_id": action.targetPlayerId.map { .string($0.uuidString.lowercased()) } ?? .null
         ]
 
         // Use RPC to handle action submission securely (especially for Inspector logic)
@@ -679,13 +679,13 @@ final class SessionService {
         var query = supabase
             .from("game_actions")
             .select()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .eq("action_type", value: actionType.rawValue)
             .eq("phase_index", value: phaseIndex)
 
         // If round_id provided, filter by it (prevents old actions from being re-applied)
         if let roundId = roundId {
-            query = query.eq("round_id", value: roundId.uuidString)
+            query = query.eq("round_id", value: roundId.uuidString.lowercased())
         }
 
         let actions: [GameAction] = try await query
@@ -701,7 +701,7 @@ final class SessionService {
         let actions: [GameAction] = try await supabase
             .from("game_actions")
             .select()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .order("created_at")
             .execute()
             .value
@@ -748,7 +748,7 @@ final class SessionService {
                 isGameOver: false,
                 winner: nil
             ))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
 
         // 2. Reset all session_players
@@ -774,14 +774,14 @@ final class SessionService {
                 role: nil,
                 playerNumber: nil
             ))
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .execute()
 
         // 3. Delete all game_actions for this session
         try await supabase
             .from("game_actions")
             .delete()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .execute()
     }
 
@@ -803,7 +803,7 @@ final class SessionService {
         try await supabase
             .from("game_sessions")
             .update(SessionUpdate(rematchDeadline: deadline))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
 
         // Mark initiator as ready (confirmed for rematch)
@@ -828,7 +828,7 @@ final class SessionService {
 
         do {
             let response: RematchResponse = try await supabase
-                .rpc("execute_rematch", params: ["p_session_id": AnyJSON.string(sessionId.uuidString)])
+                .rpc("execute_rematch", params: ["p_session_id": AnyJSON.string(sessionId.uuidString.lowercased())])
                 .single()
                 .execute()
                 .value
@@ -861,7 +861,7 @@ final class SessionService {
         let players: [SessionPlayer] = try await supabase
             .from("session_players")
             .select()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .order("joined_at")
             .execute()
             .value
@@ -875,7 +875,7 @@ final class SessionService {
         _ = try await supabase
             .from("session_players")
             .delete()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .eq("is_bot", value: false)
             .eq("is_ready", value: false)
             .select()
@@ -923,7 +923,7 @@ final class SessionService {
         try await supabase
             .from("game_sessions")
             .update(SessionReset(
-                hostUserId: newHostUserId.uuidString,
+                hostUserId: newHostUserId.uuidString.lowercased(),
                 status: SessionStatus.waiting.rawValue,
                 currentPhase: "lobby",
                 currentPhaseData: .lobby,
@@ -936,7 +936,7 @@ final class SessionService {
                 rematchDeadline: nil,
                 updatedAt: Date()
             ))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
 
         struct PlayerReset: Encodable {
@@ -961,13 +961,13 @@ final class SessionService {
                 role: nil,
                 playerNumber: nil
             ))
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .execute()
 
         try await supabase
             .from("game_actions")
             .delete()
-            .eq("session_id", value: sessionId.uuidString)
+            .eq("session_id", value: sessionId.uuidString.lowercased())
             .execute()
 
         return (true, nil)
@@ -986,7 +986,7 @@ final class SessionService {
         try await supabase
             .from("game_sessions")
             .update(SessionUpdate(rematchDeadline: nil))
-            .eq("id", value: sessionId.uuidString)
+            .eq("id", value: sessionId.uuidString.lowercased())
             .execute()
     }
 

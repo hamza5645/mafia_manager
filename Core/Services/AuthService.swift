@@ -114,7 +114,7 @@ final class AuthService {
         let response: UserProfile = try await supabase
             .from("profiles")
             .select()
-            .eq("id", value: userId.uuidString)
+            .eq("id", value: userId.uuidString.lowercased())
             .single()
             .execute()
             .value
@@ -138,7 +138,7 @@ final class AuthService {
         try await supabase
             .from("profiles")
             .update(updateData)
-            .eq("id", value: userId.uuidString)
+            .eq("id", value: userId.uuidString.lowercased())
             .execute()
     }
 
@@ -160,7 +160,7 @@ final class AuthService {
         try await supabase
             .from("profiles")
             .update(updateData)
-            .eq("id", value: userId.uuidString)
+            .eq("id", value: userId.uuidString.lowercased())
             .execute()
     }
 
@@ -183,8 +183,8 @@ final class AuthService {
     func mergeAnonymousStats(anonymousUserId: UUID, targetUserId: UUID) async throws -> MergeStatsResult {
         let result: MergeStatsResult = try await supabase
             .rpc("merge_anonymous_stats", params: [
-                "p_anonymous_user_id": anonymousUserId.uuidString,
-                "p_target_user_id": targetUserId.uuidString
+                "p_anonymous_user_id": anonymousUserId.uuidString.lowercased(),
+                "p_target_user_id": targetUserId.uuidString.lowercased()
             ])
             .execute()
             .value

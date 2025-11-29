@@ -14,7 +14,7 @@ final class DatabaseService {
         let response: [PlayerStats] = try await supabase
             .from("player_stats")
             .select()
-            .eq("user_id", value: userId.uuidString)
+            .eq("user_id", value: userId.uuidString.lowercased())
             .order("player_name")
             .execute()
             .value
@@ -26,7 +26,7 @@ final class DatabaseService {
         let response: [PlayerStats] = try await supabase
             .from("player_stats")
             .select()
-            .eq("user_id", value: userId.uuidString)
+            .eq("user_id", value: userId.uuidString.lowercased())
             .eq("player_name", value: playerName)
             .execute()
             .value
@@ -81,7 +81,7 @@ final class DatabaseService {
         try await supabase
             .from("player_stats")
             .update(updateData)
-            .eq("id", value: stat.id.uuidString)
+            .eq("id", value: stat.id.uuidString.lowercased())
             .execute()
     }
 
@@ -89,7 +89,7 @@ final class DatabaseService {
         try await supabase
             .from("player_stats")
             .delete()
-            .eq("id", value: id.uuidString)
+            .eq("id", value: id.uuidString.lowercased())
             .execute()
     }
 
@@ -147,7 +147,7 @@ final class DatabaseService {
         var request = try supabase
             .from("custom_roles_configs")
             .select()
-            .eq("user_id", value: userId.uuidString)
+            .eq("user_id", value: userId.uuidString.lowercased())
             .order("config_name")
 
         if let token = accessToken {
@@ -166,7 +166,7 @@ final class DatabaseService {
         var request = try supabase
             .from("custom_roles_configs")
             .select()
-            .eq("id", value: id.uuidString)
+            .eq("id", value: id.uuidString.lowercased())
 
         if let token = accessToken {
             request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
@@ -215,7 +215,7 @@ final class DatabaseService {
         var request = try supabase
             .from("custom_roles_configs")
             .update(updateData)
-            .eq("id", value: config.id.uuidString)
+            .eq("id", value: config.id.uuidString.lowercased())
 
         if let token = accessToken {
             request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
@@ -229,7 +229,7 @@ final class DatabaseService {
         var request = try supabase
             .from("custom_roles_configs")
             .delete()
-            .eq("id", value: id.uuidString)
+            .eq("id", value: id.uuidString.lowercased())
 
         if let token = accessToken {
             request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
@@ -245,7 +245,7 @@ final class DatabaseService {
         var request = try supabase
             .from("player_groups")
             .select()
-            .eq("user_id", value: userId.uuidString)
+            .eq("user_id", value: userId.uuidString.lowercased())
             .order("group_name")
 
         if let token = accessToken {
@@ -264,7 +264,7 @@ final class DatabaseService {
         var request = try supabase
             .from("player_groups")
             .select()
-            .eq("id", value: id.uuidString)
+            .eq("id", value: id.uuidString.lowercased())
 
         if let token = accessToken {
             request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
@@ -313,7 +313,7 @@ final class DatabaseService {
         var request = try supabase
             .from("player_groups")
             .update(updateData)
-            .eq("id", value: group.id.uuidString)
+            .eq("id", value: group.id.uuidString.lowercased())
 
         if let token = accessToken {
             request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
@@ -327,7 +327,7 @@ final class DatabaseService {
         var request = try supabase
             .from("player_groups")
             .delete()
-            .eq("id", value: id.uuidString)
+            .eq("id", value: id.uuidString.lowercased())
 
         if let token = accessToken {
             request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
