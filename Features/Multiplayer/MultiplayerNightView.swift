@@ -57,7 +57,6 @@ struct MultiplayerNightView: View {
                 if let role = myRole {
                     roleSpecificView(for: role)
                 } else {
-                    // Spectator/Dead player view
                     spectatorView
                 }
 
@@ -140,7 +139,7 @@ struct MultiplayerNightView: View {
                     }
                     .padding(.bottom, multiplayerStore.isHost ? 8 : 40)
                 }
-                
+
                 // Host Controls
                 if multiplayerStore.isHost {
                     Button {
@@ -258,7 +257,7 @@ struct MultiplayerNightView: View {
 
     private var mafiaView: some View {
         VStack(spacing: 20) {
-            // Show mafia teammates
+            // Show mafia teammates as pill-shaped chips
             if !multiplayerStore.mafiaTeammates.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Your Team")
@@ -266,24 +265,25 @@ struct MultiplayerNightView: View {
                         .foregroundStyle(Design.Colors.textPrimary)
                         .padding(.horizontal, 20)
 
-                    VStack(spacing: 8) {
-                        ForEach(multiplayerStore.mafiaTeammates) { teammate in
-                            HStack {
-                                Image(systemName: "person.fill")
-                                    .foregroundStyle(Design.Colors.dangerRed)
-
-                                Text(teammate.playerName)
-                                    .font(Design.Typography.body)
-                                    .foregroundStyle(Design.Colors.textPrimary)
-
-                                Spacer()
+                    // Horizontal pill layout
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(multiplayerStore.mafiaTeammates) { teammate in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 12))
+                                    Text(teammate.playerName)
+                                        .font(Design.Typography.body)
+                                }
+                                .foregroundStyle(Design.Colors.dangerRed)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(Design.Colors.dangerRed.opacity(0.15))
+                                .cornerRadius(20)
                             }
-                            .padding(12)
-                            .background(Design.Colors.dangerRed.opacity(0.1))
-                            .cornerRadius(Design.Radii.small)
                         }
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal, 20)
                 }
             }
 
@@ -412,6 +412,7 @@ struct MultiplayerNightView: View {
         }
     }
 
+    // HAMZA-142: 3-column grid for player selection
     @ViewBuilder
     private func targetSelectionView(
         title: String,
@@ -419,6 +420,7 @@ struct MultiplayerNightView: View {
         players: [PublicPlayerInfo]
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Header
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(Design.Typography.title3)
@@ -430,18 +432,27 @@ struct MultiplayerNightView: View {
             }
             .padding(.horizontal, 20)
 
+            // 3-column grid
             ScrollView {
-                // HAMZA-141: Reduced spacing for better display with many players
-                VStack(spacing: 8) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
                     ForEach(players) { player in
-                        TargetPlayerButton(
-                            playerInfo: player,
+                        TargetGridCell(
+                            name: player.playerName,
                             isSelected: selectedTargetId == player.playerId,
                             accentColor: roleAccentColor(for: myRole)
                         ) {
-                            // Prevent target changes while submitting
                             guard !isSubmitting else { return }
-                            selectedTargetId = player.playerId
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                                selectedTargetId = player.playerId
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }
                     }
                 }
@@ -582,8 +593,54 @@ struct MultiplayerNightView: View {
     }
 }
 
-// MARK: - Target Player Button
+// MARK: - Target Grid Cell
+// HAMZA-142: Grid cell for player selection with proper text sizes
+
+struct TargetGridCell: View {
+    let name: String
+    let isSelected: Bool
+    let accentColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? accentColor.opacity(0.2) : Design.Colors.surface2)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(isSelected ? accentColor : Design.Colors.textSecondary)
+                }
+
+                // Name
+                Text(name)
+                    .font(Design.Typography.body)
+                    .foregroundStyle(Design.Colors.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Design.Radii.medium)
+                    .fill(isSelected ? accentColor.opacity(0.1) : Design.Colors.surface1)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Design.Radii.medium)
+                    .stroke(isSelected ? accentColor : Design.Colors.stroke.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Legacy Target Player Button (kept for backward compatibility)
 // HAMZA-141: Made more compact for better display with many players
+// Use CompactTargetCell for grid layouts
 
 struct TargetPlayerButton: View {
     let playerInfo: PublicPlayerInfo
