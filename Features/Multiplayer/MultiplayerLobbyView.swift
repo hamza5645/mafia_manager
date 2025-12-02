@@ -159,6 +159,7 @@ struct MultiplayerLobbyView: View {
                                             playerInfo: playerInfo,
                                             isMe: playerInfo.id == multiplayerStore.myPlayer?.id,
                                             isHost: playerInfo.id == multiplayerStore.allPlayers.first?.id,
+                                            isHostOffline: multiplayerStore.isHostOffline, // HAMZA-165
                                             onRemove: (multiplayerStore.isHost && playerInfo.id != multiplayerStore.myPlayer?.id) ? {
                                                 removePlayer(playerInfo)
                                             } : nil
@@ -388,6 +389,7 @@ struct PlayerRow: View {
     let playerInfo: PublicPlayerInfo
     let isMe: Bool
     let isHost: Bool
+    var isHostOffline: Bool = false // HAMZA-165: Whether the host is offline
     var onRemove: (() -> Void)? = nil
 
     var body: some View {
@@ -429,10 +431,24 @@ struct PlayerRow: View {
                             .foregroundStyle(Design.Colors.brandGold)
                     }
 
+                    // HAMZA-165: Host crown with offline indicator
                     if isHost {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Design.Colors.brandGold)
+                        if isHostOffline {
+                            // Offline host: dimmed crown + wifi.slash
+                            HStack(spacing: 4) {
+                                Image(systemName: "crown.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Design.Colors.textSecondary.opacity(0.5))
+                                Image(systemName: "wifi.slash")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Design.Colors.dangerRed)
+                            }
+                        } else {
+                            // Online host: normal gold crown
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Design.Colors.brandGold)
+                        }
                     }
                 }
 

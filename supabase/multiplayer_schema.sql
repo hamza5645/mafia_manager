@@ -675,7 +675,60 @@ CREATE TRIGGER on_player_leave_transfer_host
     EXECUTE FUNCTION public.transfer_host_on_leave();
 
 -- =====================================================
--- 10. REMATCH / PLAY AGAIN SUPPORT
+-- 10. HOST TRANSFER RPC (FOR DISCONNECT - HAMZA-165)
+-- =====================================================
+
+-- RPC to transfer host when current host is disconnected (called from Swift)
+-- Uses row-level lock to prevent race conditions when multiple clients detect offline host
+CREATE OR REPLACE FUNCTION public.transfer_session_host(
+    p_session_id UUID,
+    p_new_host_user_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_current_host_id UUID;
+BEGIN
+    -- Lock session row to prevent race conditions
+    SELECT host_user_id INTO v_current_host_id
+    FROM public.game_sessions
+    WHERE id = p_session_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Session not found');
+    END IF;
+
+    -- Verify new host is valid (alive, human, in session)
+    IF NOT EXISTS (
+        SELECT 1 FROM public.session_players
+        WHERE session_id = p_session_id
+        AND user_id = p_new_host_user_id
+        AND is_bot = false
+        AND is_alive = true
+    ) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid host candidate');
+    END IF;
+
+    -- Transfer host
+    UPDATE public.game_sessions
+    SET host_user_id = p_new_host_user_id,
+        updated_at = NOW()
+    WHERE id = p_session_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'previous_host_id', v_current_host_id,
+        'new_host_id', p_new_host_user_id
+    );
+END;
+$$;
+
+-- =====================================================
+-- 11. REMATCH / PLAY AGAIN SUPPORT
 -- =====================================================
 
 -- Add rematch_deadline column to game_sessions

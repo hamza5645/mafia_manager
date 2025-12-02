@@ -47,6 +47,11 @@ final class MultiplayerGameStore: ObservableObject {
     private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
+    // Host health monitoring (HAMZA-165: Host disconnect detection)
+    private var hostMonitorTimer: Timer?
+    private let hostOfflineThreshold: TimeInterval = 15.0 // 3 missed heartbeats (5s each)
+    @Published var isHostOffline: Bool = false
+
     // Reconnect state (for pure Realtime recovery)
     private var currentSessionId: UUID?
     @Published var isRealtimeConnected: Bool = false
@@ -148,10 +153,11 @@ final class MultiplayerGameStore: ObservableObject {
 
             // Start heartbeat
             startHeartbeat()
+            startHostMonitorTimer() // HAMZA-165: Monitor host's heartbeat (no-op for host)
 
             // Refresh players
             try await refreshPlayers()
-            
+
             // Start periodic player refresh (fallback for missed real-time events)
             startPlayerRefreshTimer()
 
@@ -194,10 +200,11 @@ final class MultiplayerGameStore: ObservableObject {
 
             // Start heartbeat
             startHeartbeat()
+            startHostMonitorTimer() // HAMZA-165: Monitor host's heartbeat
 
             // Refresh players
             try await refreshPlayers()
-            
+
             // Start periodic player refresh (fallback for missed real-time events)
             startPlayerRefreshTimer()
 
@@ -219,6 +226,7 @@ final class MultiplayerGameStore: ObservableObject {
         eliminatedPlayerIds.removeAll()
 
         stopHeartbeat()
+        stopHostMonitorTimer() // HAMZA-165: Stop monitoring host
         stopPlayerRefreshTimer()
         await realtimeService.unsubscribeAll()
 
@@ -564,8 +572,15 @@ final class MultiplayerGameStore: ObservableObject {
         let newIsHost = (session.hostUserId == userId)
         if newIsHost != isHost {
             isHost = newIsHost
+            // HAMZA-165: Toggle host monitoring based on new host status
+            if newIsHost {
+                print("👑 [MultiplayerGameStore] I am now the host - stopping host monitor")
+                stopHostMonitorTimer()
+            } else {
+                print("👤 [MultiplayerGameStore] I am no longer host - starting host monitor")
+                startHostMonitorTimer()
+            }
         }
-
     }
 
     private func handlePlayerUpdate(_ player: SessionPlayer) {
@@ -1093,6 +1108,76 @@ final class MultiplayerGameStore: ObservableObject {
     private func stopPlayerRefreshTimer() {
         playerRefreshTimer?.invalidate()
         playerRefreshTimer = nil
+    }
+
+    // MARK: - Host Offline Detection (HAMZA-165)
+
+    /// Start monitoring host's heartbeat (non-hosts only)
+    private func startHostMonitorTimer() {
+        stopHostMonitorTimer()
+        guard !isHost else { return } // Only non-hosts monitor
+
+        hostMonitorTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.checkHostHeartbeat()
+            }
+        }
+    }
+
+    private func stopHostMonitorTimer() {
+        hostMonitorTimer?.invalidate()
+        hostMonitorTimer = nil
+        isHostOffline = false
+    }
+
+    /// Check if host's heartbeat is stale and attempt transfer if so
+    private func checkHostHeartbeat() async {
+        guard !isHost, isInSession, let session = currentSession else { return }
+
+        // Get fresh player data
+        try? await refreshPlayers()
+
+        // Find host player
+        guard let hostPlayer = allPlayers.first(where: { $0.userId == session.hostUserId }),
+              !hostPlayer.isBot else { return }
+
+        // Check staleness
+        let timeSinceHeartbeat = Date().timeIntervalSince(hostPlayer.lastHeartbeat)
+        let wasOffline = isHostOffline
+        isHostOffline = timeSinceHeartbeat > hostOfflineThreshold
+
+        if isHostOffline && !wasOffline {
+            print("⚠️ [MultiplayerGameStore] Host offline detected (last heartbeat: \(Int(timeSinceHeartbeat))s ago)")
+        }
+
+        if isHostOffline {
+            await attemptHostTransfer(session: session)
+        } else if wasOffline {
+            print("✅ [MultiplayerGameStore] Host heartbeat recovered")
+        }
+    }
+
+    /// Attempt to claim host role when current host is offline
+    private func attemptHostTransfer(session: GameSession) async {
+        // Determine next host (oldest alive human by joinedAt)
+        guard let newHostUserId = determineNextHostUserId(
+            excluding: session.hostUserId,
+            requireRecentHeartbeat: true
+        ) else {
+            print("⚠️ [MultiplayerGameStore] No eligible player to become host")
+            return
+        }
+
+        print("🔄 [MultiplayerGameStore] Initiating host transfer to next eligible player")
+
+        do {
+            try await sessionService.updateSessionHost(sessionId: session.id, newHostUserId: newHostUserId)
+            // Realtime should sync the change to all clients, but also refresh locally in case it was missed
+            try? await refreshSession()
+            print("✅ [MultiplayerGameStore] Host transfer initiated successfully")
+        } catch {
+            print("❌ [MultiplayerGameStore] Failed to transfer host: \(error)")
+        }
     }
 
     // MARK: - Phase Coordination
@@ -2004,7 +2089,10 @@ final class MultiplayerGameStore: ObservableObject {
     private func transferHostIfNeeded(hostEliminated: Bool, session: GameSession) async {
         guard hostEliminated else { return }
 
-        guard let newHostUserId = determineNextHostUserId(excluding: session.hostUserId) else {
+        guard let newHostUserId = determineNextHostUserId(
+            excluding: session.hostUserId,
+            requireRecentHeartbeat: true
+        ) else {
             print("⚠️ [MultiplayerGameStore] No eligible player to inherit host role for session \(session.id)")
             return
         }
@@ -2017,13 +2105,28 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
-    private func determineNextHostUserId(excluding currentHostId: UUID) -> UUID? {
+    private func determineNextHostUserId(
+        excluding currentHostId: UUID,
+        requireRecentHeartbeat: Bool = false
+    ) -> UUID? {
+        let now = Date()
+
         let eligiblePlayers = allPlayers
-            .filter { $0.isAlive && !$0.isBot }
+            .filter { player in
+                guard player.isAlive && !player.isBot else { return false }
+                guard let userId = player.userId, userId != currentHostId else { return false }
+
+                if requireRecentHeartbeat {
+                    let timeSinceHeartbeat = now.timeIntervalSince(player.lastHeartbeat)
+                    return timeSinceHeartbeat <= hostOfflineThreshold
+                }
+
+                return true
+            }
             .sorted { $0.joinedAt < $1.joinedAt }
 
         for player in eligiblePlayers {
-            if let userId = player.userId, userId != currentHostId {
+            if let userId = player.userId {
                 return userId
             }
         }
