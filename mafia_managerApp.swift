@@ -4,6 +4,7 @@ import SwiftUI
 struct mafia_managerApp: App {
     @StateObject private var gameStore = GameStore()
     @StateObject private var authStore = AuthStore()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // Setup the connection between stores
@@ -20,6 +21,11 @@ struct mafia_managerApp: App {
                 .preferredColorScheme(.dark)
                 .onAppear {
                     gameStore.setAuthStore(authStore)
+                }
+                .onChange(of: scenePhase) { newPhase in
+                    if newPhase == .background || newPhase == .inactive {
+                        try? Persistence.shared.saveImmediately(gameStore.state)
+                    }
                 }
         }
     }
@@ -41,6 +47,8 @@ struct RootView: View {
                         hasSeenIntro = true
                     }
                 )
+            } else if gameStore.returnToSoloSetup {
+                SetupView()
             } else if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
                 GameModeSelectionView()
             } else {
@@ -48,6 +56,11 @@ struct RootView: View {
             }
         }
         .id(gameStore.flowID)
+        .transition(.asymmetric(
+            insertion: .move(edge: .trailing),
+            removal: .move(edge: .leading)
+        ))
+        .animation(.easeInOut(duration: 0.3), value: gameStore.flowID)
         .background(Design.Colors.surface0.ignoresSafeArea())
     }
 

@@ -264,16 +264,6 @@ struct SetupView: View {
         }
         .background(Design.Colors.surface0)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NavigationLink {
-                    SettingsView()
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .foregroundColor(Design.Colors.brandGold)
-                }
-            }
-        }
         .onAppear {
             if store.isFreshSetup {
                 // Check if we have previous player info from "Play Again"
@@ -310,22 +300,6 @@ struct SetupView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: Design.Spacing.md) {
-                // Load Last Game (if available) with enhanced styling
-                if store.hasSavedGame {
-                    Button {
-                        store.loadLastGame()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 18, weight: .semibold))
-                            Text("Load Last Game")
-                                .font(Design.Typography.headline)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(CTAButtonStyle(kind: .secondary))
-                }
-
                 // Enhanced grid layout for authenticated users
                 if authStore.isAuthenticated {
                     VStack(spacing: Design.Spacing.sm) {

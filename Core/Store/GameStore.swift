@@ -15,6 +15,8 @@ final class GameStore: ObservableObject {
     @Published var previousBotCount: Int = 0
     // Surface setup validation errors to the UI
     @Published var setupError: String?
+    // Flag to return directly to solo setup (for "Play Again")
+    @Published var returnToSoloSetup: Bool = false
 
     private let databaseService = DatabaseService()
     // BUG FIX: Use weak reference to prevent potential retain cycle
@@ -59,6 +61,7 @@ final class GameStore: ObservableObject {
         setupError = nil
         state = .empty
         isFreshSetup = true
+        returnToSoloSetup = true
         Persistence.shared.reset()
         flowID = UUID()
     }
@@ -72,6 +75,7 @@ final class GameStore: ObservableObject {
 
     func assignNumbersAndRoles(names: [String], numberOfBots: Int = 0, customRoleConfig: CustomRoleConfig? = nil) {
         setupError = nil
+        returnToSoloSetup = false
         // SECURITY FIX: Validate all player names
         var validatedNames: [String] = []
         for name in names {
@@ -189,6 +193,8 @@ final class GameStore: ObservableObject {
 
         state = GameState(players: players, nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil, currentPhase: .roleReveal(currentPlayerIndex: 0))
         isFreshSetup = false
+        // Regenerate flowID to trigger NavigationStack rebuild with transition
+        flowID = UUID()
         save()
     }
 
