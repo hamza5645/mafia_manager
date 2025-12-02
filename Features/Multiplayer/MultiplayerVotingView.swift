@@ -5,6 +5,7 @@ struct MultiplayerVotingView: View {
     @State private var selectedTargetId: UUID?
     @State private var hasSubmitted = false
     @State private var isSubmitting = false
+    @State private var votingError: String?
 
     var dayIndex: Int {
         // Extract from current session phase data
@@ -152,7 +153,15 @@ struct MultiplayerVotingView: View {
                 }
                 .padding(.bottom, 16)
             }
-            
+
+            // Error Display
+            if let error = votingError {
+                Text(error)
+                    .font(Design.Typography.caption)
+                    .foregroundStyle(Design.Colors.dangerRed)
+                    .padding(.horizontal, 20)
+            }
+
             // Host Controls
             if multiplayerStore.isHost {
                 Button {
@@ -212,6 +221,7 @@ struct MultiplayerVotingView: View {
     }
 
     private func endVoting() {
+        votingError = nil
         Task {
             do {
                 if let session = multiplayerStore.currentSession,
@@ -219,6 +229,9 @@ struct MultiplayerVotingView: View {
                     try await multiplayerStore.showVotingResults(dayIndex: dayIndex)
                 }
             } catch {
+                await MainActor.run {
+                    votingError = "Bot voting failed. Please try again."
+                }
                 print("❌ Failed to show voting results: \(error.localizedDescription)")
             }
         }
@@ -226,6 +239,7 @@ struct MultiplayerVotingView: View {
 
     private func submitVote(explicitTarget: UUID? = nil, showConfirmation: Bool = true) {
         isSubmitting = true
+        votingError = nil
 
         // Use explicit target if provided (avoids race condition), otherwise use state
         let targetToSubmit = explicitTarget ?? selectedTargetId
@@ -252,8 +266,9 @@ struct MultiplayerVotingView: View {
             } catch {
                 await MainActor.run {
                     isSubmitting = false
-                    print("Failed to submit vote: \(error.localizedDescription)")
+                    votingError = "Failed to submit vote. Tap to retry."
                 }
+                print("Failed to submit vote: \(error.localizedDescription)")
             }
         }
     }
