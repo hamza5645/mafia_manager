@@ -82,6 +82,13 @@ final class MultiplayerGameStore: ObservableObject {
             .sink { [weak self] isReconnecting in
                 self?.isRealtimeReconnecting = isReconnecting
             }
+
+        // Wire up disconnect recovery - this is called when channel status becomes unsubscribed
+        realtimeService.onDisconnect = { [weak self] sessionId in
+            Task { @MainActor in
+                await self?.handleRealtimeDisconnect(sessionId: sessionId)
+            }
+        }
     }
 
     // MARK: - Session Lifecycle
@@ -461,6 +468,48 @@ final class MultiplayerGameStore: ObservableObject {
             }
         )
         isRealtimeConnected = true
+    }
+
+    // MARK: - Realtime Disconnect Recovery
+
+    /// Handle Realtime disconnection by triggering auto-recovery
+    /// Called when channel status transitions to unsubscribed
+    private func handleRealtimeDisconnect(sessionId: UUID) async {
+        // Only attempt recovery if we're still in a session and the sessionId matches
+        guard isInSession, currentSessionId == sessionId else {
+            print("⚠️ [MultiplayerGameStore] Ignoring disconnect - not in session or sessionId mismatch")
+            return
+        }
+
+        print("🔴 [MultiplayerGameStore] Realtime disconnected - triggering auto-recovery for session: \(sessionId)")
+        isRealtimeConnected = false
+
+        // Use RealtimeService's exponential backoff recovery
+        realtimeService.attemptResubscribe(
+            sessionId: sessionId,
+            onSessionUpdate: { [weak self] session in
+                Task { @MainActor in
+                    self?.isRealtimeConnected = true
+                    self?.handleSessionUpdate(session)
+                }
+            },
+            onPlayerUpdate: { [weak self] player in
+                Task { @MainActor in
+                    self?.isRealtimeConnected = true
+                    self?.handlePlayerUpdate(player)
+                }
+            },
+            onActionUpdate: { [weak self] action in
+                Task { @MainActor in
+                    self?.isRealtimeConnected = true
+                    self?.handleActionUpdate(action)
+                }
+            },
+            onReconnected: { [weak self] in
+                // Perform snapshot resync to heal any missed events during disconnection
+                await self?.performSnapshotResync()
+            }
+        )
     }
 
     private func handleSessionUpdate(_ session: GameSession) {

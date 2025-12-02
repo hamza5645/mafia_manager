@@ -23,6 +23,10 @@ final class RealtimeService: ObservableObject {
     private var reconnectTask: Task<Void, Never>?
     private var lastEventTime: [String: Date] = [:]
     private var eventMonitoringTimer: Timer?
+    private var channelStatusTasks: [String: Task<Void, Never>] = [:]
+
+    // Disconnect callback for triggering recovery from MultiplayerGameStore
+    var onDisconnect: ((UUID) -> Void)?
     
     // Custom decoder for Supabase dates
     private let decoder: JSONDecoder = {
@@ -220,6 +224,9 @@ final class RealtimeService: ObservableObject {
             isReconnecting = false
 
             print("✅ [RealtimeService] Connected to channel: \(channelName) with \(tokens.count) subscriptions")
+
+            // Start monitoring channel status for disconnection detection
+            startChannelStatusMonitoring(channelName: channelName, sessionId: sessionId, channel: channel)
         } catch {
             print("❌ [RealtimeService] Failed to subscribe to channel \(channelName): \(error)")
             connectionError = error.localizedDescription
@@ -302,6 +309,10 @@ final class RealtimeService: ObservableObject {
 
     /// Unsubscribe from a channel
     func unsubscribe(channelName: String) async {
+        // Cancel channel status monitoring task
+        channelStatusTasks[channelName]?.cancel()
+        channelStatusTasks.removeValue(forKey: channelName)
+
         // Cancel all subscription tokens for this channel
         if let tokens = subscriptionTokens[channelName] {
             print("🔴 [RealtimeService] Cancelling \(tokens.count) subscription(s) for channel: \(channelName)")
@@ -318,6 +329,10 @@ final class RealtimeService: ObservableObject {
 
     /// Unsubscribe from all channels
     func unsubscribeAll() async {
+        // Cancel all channel status monitoring tasks
+        channelStatusTasks.values.forEach { $0.cancel() }
+        channelStatusTasks.removeAll()
+
         // Cancel all subscription tokens
         for (channelName, tokens) in subscriptionTokens {
             print("🔴 [RealtimeService] Cancelling \(tokens.count) subscription(s) for channel: \(channelName)")
@@ -436,7 +451,56 @@ final class RealtimeService: ObservableObject {
             self?.reconnectTask = nil
             self?.eventMonitoringTimer?.invalidate()
             self?.eventMonitoringTimer = nil
+            // Cancel all channel status monitoring tasks
+            self?.channelStatusTasks.values.forEach { $0.cancel() }
+            self?.channelStatusTasks.removeAll()
         }
+    }
+
+    // MARK: - Channel Status Monitoring
+
+    /// Start monitoring channel status to detect disconnections
+    /// Uses Supabase channel status async sequence to detect when channel is no longer subscribed
+    private func startChannelStatusMonitoring(channelName: String, sessionId: UUID, channel: RealtimeChannelV2) {
+        // Cancel any existing monitoring task for this channel
+        channelStatusTasks[channelName]?.cancel()
+
+        let monitoringTask = Task { [weak self] in
+            // Monitor using channel.status async sequence
+            for await status in channel.statusChange {
+                guard !Task.isCancelled else { break }
+
+                await MainActor.run {
+                    switch status {
+                    case .subscribed:
+                        print("✅ [RealtimeService] Channel \(channelName) is subscribed")
+                        self?.isConnected = true
+                    case .unsubscribed:
+                        print("⚠️ [RealtimeService] Channel \(channelName) unsubscribed - triggering recovery")
+                        self?.handleDisconnection(sessionId: sessionId, channelName: channelName)
+                    case .subscribing:
+                        print("🔄 [RealtimeService] Channel \(channelName) is subscribing...")
+                    case .unsubscribing:
+                        print("🔄 [RealtimeService] Channel \(channelName) is unsubscribing...")
+                    }
+                }
+            }
+        }
+
+        channelStatusTasks[channelName] = monitoringTask
+    }
+
+    /// Handle disconnection by updating state and notifying MultiplayerGameStore
+    private func handleDisconnection(sessionId: UUID, channelName: String) {
+        // Only trigger recovery if we think we should still be connected
+        guard channels[channelName] != nil else { return }
+
+        print("🔴 [RealtimeService] Disconnection detected for session: \(sessionId)")
+        isConnected = false
+        connectionError = "Connection lost"
+
+        // Notify MultiplayerGameStore to trigger recovery
+        onDisconnect?(sessionId)
     }
 }
 
