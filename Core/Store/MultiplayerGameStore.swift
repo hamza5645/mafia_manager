@@ -1250,32 +1250,28 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func resetAllPlayersReady() async {
-        guard currentSession != nil else { return }
+        guard let session = currentSession else { return }
 
-        // Keep local state in sync so UI immediately reflects the locked state
-        var updatedPlayers = allPlayers
+        do {
+            // Single RPC call instead of N sequential updates
+            try await sessionService.resetAllPlayersReady(sessionId: session.id)
 
-        // Reset isReady for all human players
-        for index in updatedPlayers.indices where !updatedPlayers[index].isBot {
-            let player = updatedPlayers[index]
-            do {
-                try await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
-                updatedPlayers[index].isReady = false
-            } catch {
-                print("❌ Failed to reset ready status for player \(player.playerName): \(error)")
+            // Update local state for immediate UI feedback
+            for index in allPlayers.indices where !allPlayers[index].isBot {
+                allPlayers[index].isReady = false
             }
+
+            if let myId = myPlayer?.id,
+               let updatedMe = allPlayers.first(where: { $0.id == myId }) {
+                myPlayer = updatedMe
+                myRole = updatedMe.role
+                myNumber = updatedMe.playerNumber
+            }
+
+            updateVisiblePlayers()
+        } catch {
+            print("❌ Failed to reset all players ready: \(error)")
         }
-
-        allPlayers = updatedPlayers
-
-        if let myId = myPlayer?.id,
-           let updatedMe = updatedPlayers.first(where: { $0.id == myId }) {
-            myPlayer = updatedMe
-            myRole = updatedMe.role
-            myNumber = updatedMe.playerNumber
-        }
-
-        updateVisiblePlayers()
     }
 
     /// Reset isReady for all players when game ends (for clean rematch state)

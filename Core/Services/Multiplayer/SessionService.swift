@@ -550,6 +550,14 @@ final class SessionService {
             .execute()
     }
 
+    /// Reset ready status for all human players in a session (single batch update)
+    func resetAllPlayersReady(sessionId: UUID) async throws {
+        try await supabase.rpc(
+            "reset_players_ready",
+            params: ["p_session_id": AnyJSON.string(sessionId.uuidString.lowercased())]
+        ).execute()
+    }
+
     /// Update a player's alive status and optional removal note
     func updatePlayerLifeStatus(
         recordId: UUID,

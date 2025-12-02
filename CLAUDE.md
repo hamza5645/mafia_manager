@@ -477,3 +477,4 @@ Multiplayer night resolution follows a strict two-phase pattern to prevent state
 **Solution** (fixed in MultiplayerNightView.swift:61): The "Submit Action" button must be shown to ALL players with active roles, not just non-host players. The host needs to submit their action before they can finish the night phase.
 
 **Critical check**: When modifying night phase UI, never add `!multiplayerStore.isHost` conditions that would prevent the host from submitting role-specific actions. The host is both a player AND a phase controller.
+- don't marke linear issues as done. when you finish mark them as in review
