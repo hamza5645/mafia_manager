@@ -25,11 +25,12 @@ struct SignupView: View {
                     // Title - different for upgrade vs new signup
                     VStack(spacing: 8) {
                         Text(isUpgrading ? "Create Account" : "Create Account")
-                            .font(.system(size: 36, weight: .bold))
+                            .font(Design.Typography.title1)
                             .foregroundColor(.white)
+                            .accessibilityAddTraits(.isHeader)
 
                         Text(isUpgrading ? "Keep your game progress" : "Join Mafia Manager")
-                            .font(.subheadline)
+                            .font(Design.Typography.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
                     .padding(.top, 40)
@@ -38,10 +39,12 @@ struct SignupView: View {
                     if isUpgrading {
                         HStack(spacing: 12) {
                             Image(systemName: "checkmark.circle.fill")
+                                .font(Design.Typography.body)
                                 .foregroundColor(Design.Colors.successGreen)
+                                .accessibilityHidden(true)
 
                             Text("Your game stats will be saved to your new account")
-                                .font(.footnote)
+                                .font(Design.Typography.footnote)
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         .padding(.horizontal, 16)
@@ -120,17 +123,19 @@ struct SignupView: View {
                     // Validation Error
                     if let validationError = validationError {
                         Text(validationError)
-                            .font(.caption)
+                            .font(Design.Typography.caption)
                             .foregroundColor(Design.Colors.dangerRed)
                             .padding(.horizontal, 32)
+                            .accessibilityLabel("Validation error: \(validationError)")
                     }
 
                     // Auth Error
                     if let errorMessage = authStore.errorMessage {
                         Text(errorMessage)
-                            .font(.caption)
+                            .font(Design.Typography.caption)
                             .foregroundColor(Design.Colors.dangerRed)
                             .padding(.horizontal, 32)
+                            .accessibilityLabel("Error: \(errorMessage)")
                     }
 
                     // Sign Up Button
@@ -197,24 +202,32 @@ struct SignupView: View {
                     // Password Requirements
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Password must:")
-                            .font(.caption)
+                            .font(Design.Typography.caption)
                             .foregroundColor(.white.opacity(0.7))
 
                         HStack(spacing: 8) {
                             Image(systemName: sanitizedPassword.count >= 6 ? "checkmark.circle.fill" : "circle")
+                                .font(Design.Typography.caption)
                                 .foregroundColor(sanitizedPassword.count >= 6 ? Design.Colors.successGreen : .white.opacity(0.3))
+                                .accessibilityHidden(true)
                             Text("Be at least 6 characters")
-                                .font(.caption)
+                                .font(Design.Typography.caption)
                                 .foregroundColor(.white.opacity(0.7))
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("At least 6 characters: \(sanitizedPassword.count >= 6 ? "met" : "not met")")
 
                         HStack(spacing: 8) {
                             Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "circle")
+                                .font(Design.Typography.caption)
                                 .foregroundColor(passwordsMatch ? Design.Colors.successGreen : .white.opacity(0.3))
+                                .accessibilityHidden(true)
                             Text("Match confirmation")
-                                .font(.caption)
+                                .font(Design.Typography.caption)
                                 .foregroundColor(.white.opacity(0.7))
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Passwords match: \(passwordsMatch ? "met" : "not met")")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 32)
@@ -233,8 +246,9 @@ struct SignupView: View {
                                     .foregroundColor(Design.Colors.brandGold)
                                     .fontWeight(.semibold)
                             }
-                            .font(.subheadline)
+                            .font(Design.Typography.subheadline)
                         }
+                        .accessibilityLabel("Sign in to existing account")
                         .padding(.bottom, 32)
                     } else {
                         // For upgrade mode, show option to sign into existing account
@@ -242,7 +256,7 @@ struct SignupView: View {
                             dismiss()
                         } label: {
                             Text("Cancel")
-                                .font(.subheadline)
+                                .font(Design.Typography.subheadline)
                                 .foregroundColor(.white.opacity(0.7))
                         }
                         .padding(.bottom, 32)

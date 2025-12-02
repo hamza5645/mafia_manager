@@ -58,15 +58,17 @@ struct EmptyStatsView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 60))
+                .font(Design.Typography.displayEmoji)
                 .foregroundColor(.white.opacity(0.3))
+                .accessibilityHidden(true)
 
             Text("No Stats Yet")
-                .font(.title2.bold())
+                .font(Design.Typography.title2)
+                .fontWeight(.bold)
                 .foregroundColor(.white)
 
             Text("Complete some games to see player statistics here")
-                .font(.subheadline)
+                .font(Design.Typography.subheadline)
                 .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -82,13 +84,14 @@ struct PlayerStatCard: View {
             // Player Name Header
             HStack {
                 Text(stat.playerName)
-                    .font(.title3.bold())
+                    .font(Design.Typography.title3)
+                    .fontWeight(.bold)
                     .foregroundColor(.white)
 
                 Spacer()
 
                 Text("\(stat.gamesPlayed) games")
-                    .font(.caption)
+                    .font(Design.Typography.caption)
                     .foregroundColor(.white.opacity(0.7))
             }
 
@@ -96,11 +99,12 @@ struct PlayerStatCard: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Win Rate")
-                        .font(.caption)
+                        .font(Design.Typography.caption)
                         .foregroundColor(.white.opacity(0.7))
 
                     Text(String(format: "%.1f%%", stat.winRate * 100))
-                        .font(.title2.bold())
+                        .font(Design.Typography.title2)
+                        .fontWeight(.bold)
                         .foregroundColor(Design.Colors.successGreen)
                 }
 
@@ -108,7 +112,7 @@ struct PlayerStatCard: View {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("Record")
-                        .font(.caption)
+                        .font(Design.Typography.caption)
                         .foregroundColor(.white.opacity(0.7))
 
                     HStack(spacing: 4) {
@@ -119,9 +123,12 @@ struct PlayerStatCard: View {
                         Text("\(stat.gamesLost)L")
                             .foregroundColor(Design.Colors.dangerRed)
                     }
-                    .font(.body.bold())
+                    .font(Design.Typography.body)
+                    .fontWeight(.bold)
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(stat.playerName): \(String(format: "%.1f%%", stat.winRate * 100)) win rate, \(stat.gamesWon) wins, \(stat.gamesLost) losses")
 
             Divider()
                 .background(.white.opacity(0.2))
@@ -129,7 +136,7 @@ struct PlayerStatCard: View {
             // Role Distribution
             VStack(alignment: .leading, spacing: 12) {
                 Text("Role Distribution")
-                    .font(.caption)
+                    .font(Design.Typography.caption)
                     .foregroundColor(.white.opacity(0.7))
 
                 HStack(spacing: 12) {
@@ -163,17 +170,21 @@ struct RoleStatBadge: View {
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: role.symbolName)
-                .font(.caption)
+                .font(Design.Typography.caption)
                 .foregroundColor(role.accentColor)
+                .accessibilityHidden(true)
 
             Text("\(count)")
-                .font(.caption2.bold())
+                .font(Design.Typography.caption2)
+                .fontWeight(.bold)
                 .foregroundColor(.white)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(role.accentColor.opacity(0.15))
         .cornerRadius(8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(role.displayName): \(count) times")
     }
 }
 
@@ -186,16 +197,20 @@ struct StatItem: View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.caption2)
+                    .font(Design.Typography.caption2)
+                    .accessibilityHidden(true)
                 Text(label)
-                    .font(.caption2)
+                    .font(Design.Typography.caption2)
             }
             .foregroundColor(.white.opacity(0.7))
 
             Text(value)
-                .font(.body.bold())
+                .font(Design.Typography.body)
+                .fontWeight(.bold)
                 .foregroundColor(.white)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 }

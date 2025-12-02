@@ -22,9 +22,10 @@ struct ProfileView: View {
                             .frame(width: 100, height: 100)
                             .overlay(
                                 Text(authStore.userProfile?.displayName.prefix(1).uppercased() ?? "U")
-                                    .font(.system(size: 40, weight: .bold))
+                                    .font(Design.Typography.largeTitle)
                                     .foregroundColor(Design.Colors.brandGold)
                             )
+                            .accessibilityLabel("Profile avatar")
 
                         // Display Name
                         if isEditingName {
@@ -49,7 +50,8 @@ struct ProfileView: View {
                         } else {
                             HStack {
                                 Text(authStore.userProfile?.displayName ?? "User")
-                                    .font(.title.bold())
+                                    .font(Design.Typography.title1)
+                                    .fontWeight(.bold)
                                     .foregroundColor(.white)
 
                                 Button {
@@ -57,8 +59,10 @@ struct ProfileView: View {
                                     isEditingName = true
                                 } label: {
                                     Image(systemName: "pencil.circle")
+                                        .font(Design.Typography.title2)
                                         .foregroundColor(Design.Colors.brandGold)
                                 }
+                                .accessibilityLabel("Edit display name")
                             }
                         }
                     }
@@ -80,7 +84,10 @@ struct ProfileView: View {
                     } label: {
                         HStack {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(Design.Typography.body)
+                                .accessibilityHidden(true)
                             Text("Sign Out")
+                                .font(Design.Typography.body)
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
@@ -129,17 +136,18 @@ struct ProfileCard: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.title2)
+                .font(Design.Typography.title2)
                 .foregroundColor(Design.Colors.brandGold)
                 .frame(width: 40)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.caption)
+                    .font(Design.Typography.caption)
                     .foregroundColor(.white.opacity(0.7))
 
                 Text(value)
-                    .font(.body)
+                    .font(Design.Typography.body)
                     .foregroundColor(.white)
             }
 
@@ -152,5 +160,7 @@ struct ProfileCard: View {
             RoundedRectangle(cornerRadius: Design.Radii.card)
                 .stroke(Design.Colors.stroke, lineWidth: 1)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }

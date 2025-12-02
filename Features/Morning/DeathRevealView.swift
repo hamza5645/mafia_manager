@@ -71,19 +71,22 @@ struct DeathRevealView: View {
                     .shadow(color: Design.Colors.glowGreen, radius: 20)
 
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 60, weight: .bold))
+                    .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.successGreen)
+                    .accessibilityHidden(true)
             }
 
             VStack(spacing: 12) {
                 Text("No Deaths")
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .font(Design.Typography.largeTitle)
                     .foregroundStyle(Design.Colors.textPrimary)
 
                 Text("Everyone survived the night")
                     .font(Design.Typography.title3)
                     .foregroundColor(Design.Colors.textSecondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("No deaths tonight. Everyone survived.")
 
             Spacer()
 
@@ -127,21 +130,22 @@ struct DeathRevealView: View {
                     .frame(width: 100, height: 100)
 
                 Image(systemName: "moon.zzz.fill")
-                    .font(.system(size: 50, weight: .bold))
+                    .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.dangerRed)
+                    .accessibilityHidden(true)
             }
             .padding(.top, 8)
 
             // Title: Name has Died
             Text("\(player.name) has Died")
-                .font(.system(size: 32, weight: .heavy, design: .rounded))
+                .font(Design.Typography.largeTitle)
                 .foregroundStyle(Design.Colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
 
             // Number
             Text("#\(player.number)")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .font(Design.Typography.title2)
                 .foregroundStyle(Design.Colors.brandGold)
 
             Divider()
@@ -157,16 +161,19 @@ struct DeathRevealView: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: player.role.symbolName)
-                        .font(.system(size: 32, weight: .semibold))
+                        .font(Design.Typography.largeTitle)
                         .foregroundStyle(player.role.accentColor)
+                        .accessibilityHidden(true)
 
                     Text(player.role.displayName.uppercased())
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(Design.Typography.title1)
                         .foregroundStyle(player.role.accentColor)
                 }
             }
             .padding(.bottom, 8)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(player.name) has died. They were player number \(player.number). Their role was \(player.role.displayName).")
         .padding(.vertical, 36)
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity)
@@ -208,9 +215,11 @@ struct DeathRevealView: View {
             }
         } label: {
             Text(store.state.isGameOver ? "View Result" : "Continue to Day \(store.currentDayIndex + 1)")
+                .font(Design.Typography.headline)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(CTAButtonStyle(kind: .primary))
+        .accessibleButton(store.state.isGameOver ? "View game result" : "Continue to Day \(store.currentDayIndex + 1)")
     }
 }
 

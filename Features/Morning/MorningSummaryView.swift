@@ -15,9 +15,13 @@ struct MorningSummaryView: View {
                 if let night = lastNight {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 8) {
-                            Image(systemName: "moon.stars.fill").foregroundStyle(Design.Colors.brandGold)
-                            Text("Night \(night.nightIndex + 1) Summary").font(.headline)
+                            Image(systemName: "moon.stars.fill")
+                                .foregroundStyle(Design.Colors.brandGold)
+                                .accessibilityHidden(true)
+                            Text("Night \(night.nightIndex + 1) Summary")
+                                .font(Design.Typography.headline)
                         }
+                        .accessibilityAddTraits(.isHeader)
                         summaryRow(title: "Mafia", value: mafiaSummary(for: night))
                         summaryRow(title: "Killed", value: killedSummary(for: night))
                         summaryRow(title: "Police", value: policeSummary(for: night))
@@ -67,9 +71,11 @@ struct MorningSummaryView: View {
                     }
                 } label: {
                     Text(store.state.isGameOver ? "View Result" : "Continue")
+                        .font(Design.Typography.headline)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(CTAButtonStyle(kind: .primary))
+                .accessibleButton(store.state.isGameOver ? "View game result" : "Continue to see who died")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -80,12 +86,16 @@ struct MorningSummaryView: View {
     private func summaryRow(title: String, value: String) -> some View {
         HStack {
             Text("\(title):")
+                .font(Design.Typography.body)
                 .fontWeight(.semibold)
                 .foregroundStyle(Design.Colors.textPrimary)
             Spacer()
             Text(value)
+                .font(Design.Typography.body)
                 .foregroundStyle(Design.Colors.textSecondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }
 

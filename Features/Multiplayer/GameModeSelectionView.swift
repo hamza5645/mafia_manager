@@ -7,6 +7,7 @@ struct GameModeSelectionView: View {
     @State private var showingSettings = false
     @State private var showingGuestNameInput = false
     @State private var autoNavigateOnline = false  // Trigger auto navigation after guest login
+    @ScaledMetric(relativeTo: .body) private var gearIconSize: CGFloat = 20
 
     enum GameMode: Hashable {
         case local
@@ -90,6 +91,8 @@ struct GameModeSelectionView: View {
                                     )
                                     .cornerRadius(Design.Radii.medium)
                             }
+                            .accessibilityLabel("Continue to \(selectedMode == .local ? "local game setup" : "online multiplayer")")
+                            .accessibilityHint("Uses the selected game mode")
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                         }
@@ -118,9 +121,11 @@ struct GameModeSelectionView: View {
                         showingSettings = true
                     } label: {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: gearIconSize, weight: .semibold))
                             .foregroundStyle(Design.Colors.brandGold)
                     }
+                    .accessibilityLabel("Open settings")
+                    .accessibilityHint("Adjust preferences and saved data")
                 }
             }
             .sheet(isPresented: $showingAuth) {
@@ -156,6 +161,8 @@ struct GameModeCard: View {
     let isSelected: Bool
     var isLocked: Bool = false
     let action: () -> Void
+    @ScaledMetric(relativeTo: .title2) private var iconSize: CGFloat = 24
+    @ScaledMetric(relativeTo: .callout) private var lockIconSize: CGFloat = 20
 
     var body: some View {
         Button(action: action) {
@@ -168,7 +175,7 @@ struct GameModeCard: View {
                             .frame(width: 56, height: 56)
 
                         Image(systemName: icon)
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(.system(size: iconSize, weight: .semibold))
                             .foregroundStyle(accentColor)
                     }
 
@@ -177,7 +184,7 @@ struct GameModeCard: View {
                     // Lock indicator
                     if isLocked {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: lockIconSize, weight: .semibold))
                             .foregroundStyle(Design.Colors.textSecondary)
                     }
                 }
@@ -221,6 +228,10 @@ struct GameModeCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(subtitle). \(description)")
+        .accessibilityHint(isLocked ? "Sign in required to unlock" : "Double tap to select")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

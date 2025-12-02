@@ -31,6 +31,7 @@ struct VoteResultsView: View {
                 Text("Voting Results")
                     .font(Design.Typography.largeTitle)
                     .foregroundStyle(Design.Colors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                     .padding(.top, 40)
 
                 // Vote tally
@@ -128,6 +129,7 @@ struct VoteCountRow: View {
     let player: Player
     let voteCount: Int
     let isEliminated: Bool
+    @ScaledMetric(relativeTo: .subheadline) private var voteIconSize: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 16) {
@@ -152,7 +154,7 @@ struct VoteCountRow: View {
             // Vote count
             HStack(spacing: 8) {
                 Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 16))
+                    .font(.system(size: voteIconSize, weight: .semibold))
                     .foregroundStyle(isEliminated ? Design.Colors.dangerRed : Design.Colors.textSecondary)
 
                 Text("\(voteCount)")
@@ -173,8 +175,10 @@ struct VoteCountRow: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(isEliminated ? Design.Colors.dangerRed : Color.clear, lineWidth: 2)
-                )
+            )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(player.name) received \(voteCount) vote\(voteCount == 1 ? "" : "s")\(isEliminated ? ", eliminated" : "")")
     }
 }
 

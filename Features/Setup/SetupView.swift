@@ -74,7 +74,7 @@ struct SetupView: View {
                                         .frame(width: 40, height: 40)
 
                                     Text("\(idx + 1)")
-                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .font(Design.Typography.subheadline)
                                         .foregroundStyle(Design.Colors.brandGold)
                                 }
 
@@ -97,6 +97,8 @@ struct SetupView: View {
                                     RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
                                         .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
                                 )
+                                .accessibilityLabel("Player \(idx + 1) name")
+                                .accessibilityHint("Enter player name")
 
                                 if names.count > 1 {
                                     Button {
@@ -106,11 +108,12 @@ struct SetupView: View {
                                         }
                                     } label: {
                                         Image(systemName: "minus.circle.fill")
-                                            .font(.system(size: 24))
+                                            .font(Design.Typography.title2)
                                             .foregroundStyle(Design.Colors.dangerRed.opacity(0.8))
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Remove row")
+                                    .accessibilityLabel("Remove player \(idx + 1)")
+                                    .accessibilityHint("Removes this player from the game")
                                     .disabled(isAddingPlayer)
                                     .opacity(isAddingPlayer ? 0.3 : 1.0)
                                 }
@@ -152,7 +155,7 @@ struct SetupView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 18))
+                                    .font(Design.Typography.body)
                                 Text("Add Player")
                                     .font(Design.Typography.subheadline)
                                     .fontWeight(.semibold)
@@ -168,15 +171,18 @@ struct SetupView: View {
                         }
                         .foregroundStyle(Design.Colors.actionBlue.opacity(names.count >= maxPlayers ? 0.5 : 1))
                         .disabled(names.count >= maxPlayers)
+                        .accessibilityLabel("Add player")
+                        .accessibilityHint("Adds a new player slot")
 
                         Spacer()
 
                         // Cleaner player count indicator
                         HStack(spacing: 8) {
                             Image(systemName: "person.3.fill")
-                                .font(.system(size: 16))
+                                .font(Design.Typography.callout)
+                                .accessibilityHidden(true)
                             Text("\(names.count)\(numberOfBots > 0 ? "+\(numberOfBots)" : "")/\(maxPlayers)")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .font(Design.Typography.subheadline)
                         }
                         .foregroundStyle(allFilled ? Design.Colors.successGreen : Design.Colors.textTertiary)
                         .padding(.horizontal, 16)
@@ -187,6 +193,8 @@ struct SetupView: View {
                             RoundedRectangle(cornerRadius: Design.Radii.medium, style: .continuous)
                                 .stroke(allFilled ? Design.Colors.successGreen.opacity(0.5) : Design.Colors.stroke.opacity(0.3), lineWidth: 1.5)
                         )
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(names.count + numberOfBots) of \(maxPlayers) players")
                     }
                     .padding(.top, 8)
                 }
@@ -197,12 +205,14 @@ struct SetupView: View {
                 VStack(alignment: .center, spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: "cpu.fill")
-                            .font(.system(size: 18))
+                            .font(Design.Typography.body)
                             .foregroundStyle(Design.Colors.brandGold)
+                            .accessibilityHidden(true)
                         Text("Bot Players")
                             .font(Design.Typography.headline)
                             .foregroundStyle(Design.Colors.textPrimary)
                     }
+                    .accessibilityAddTraits(.isHeader)
 
                     Text("Add computer-controlled players to fill out your game")
                         .font(Design.Typography.footnote)
@@ -218,15 +228,17 @@ struct SetupView: View {
                             }
                         } label: {
                             Image(systemName: "minus.circle.fill")
-                                .font(.system(size: 36))
+                                .font(Design.Typography.largeTitle)
                                 .foregroundStyle(numberOfBots > 0 ? Design.Colors.brandGold : Design.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
                         .disabled(numberOfBots == 0)
+                        .accessibilityLabel("Decrease bot count")
+                        .accessibilityHint("Reduces bot players by one")
 
                         VStack(spacing: 4) {
                             Text("\(numberOfBots)")
-                                .font(.system(size: 42, weight: .bold, design: .rounded))
+                                .font(Design.Typography.largeTitle)
                                 .foregroundStyle(Design.Colors.brandGold)
                                 .frame(minWidth: 80)
 
@@ -234,6 +246,8 @@ struct SetupView: View {
                                 .font(Design.Typography.subheadline)
                                 .foregroundStyle(Design.Colors.textSecondary)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(numberOfBots) bot \(numberOfBots == 1 ? "player" : "players")")
 
                         Button {
                             let totalPlayers = validInput.count + numberOfBots
@@ -244,11 +258,13 @@ struct SetupView: View {
                             }
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 36))
+                                .font(Design.Typography.largeTitle)
                                 .foregroundStyle((validInput.count + numberOfBots) < maxPlayers ? Design.Colors.brandGold : Design.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
                         .disabled((validInput.count + numberOfBots) >= maxPlayers)
+                        .accessibilityLabel("Increase bot count")
+                        .accessibilityHint("Adds one bot player")
                     }
                     .padding(.vertical, 12)
                 }
@@ -310,7 +326,7 @@ struct SetupView: View {
                             } label: {
                                 VStack(spacing: 8) {
                                     Image(systemName: "person.3.fill")
-                                        .font(.system(size: 22, weight: .semibold))
+                                        .font(Design.Typography.title2)
                                     Text("Load Group")
                                         .font(Design.Typography.caption)
                                         .fontWeight(.semibold)
@@ -319,13 +335,15 @@ struct SetupView: View {
                                 .padding(.vertical, 14)
                             }
                             .buttonStyle(CompactGridButtonStyle(kind: .secondary))
+                            .accessibilityLabel("Load player group")
+                            .accessibilityHint("Load saved player names")
 
                             Button {
                                 showLoadRoleConfigSheet = true
                             } label: {
                                 VStack(spacing: 8) {
                                     Image(systemName: "person.2.badge.gearshape.fill")
-                                        .font(.system(size: 22, weight: .semibold))
+                                        .font(Design.Typography.title2)
                                     Text(selectedRoleConfig == nil ? "Load Roles" : selectedRoleConfig!.configName)
                                         .font(Design.Typography.caption)
                                         .fontWeight(.semibold)
@@ -335,6 +353,8 @@ struct SetupView: View {
                                 .padding(.vertical, 14)
                             }
                             .buttonStyle(CompactGridButtonStyle(kind: selectedRoleConfig == nil ? .secondary : .accent))
+                            .accessibilityLabel(selectedRoleConfig == nil ? "Load role configuration" : "Role configuration: \(selectedRoleConfig!.configName)")
+                            .accessibilityHint("Load custom role distribution")
                         }
 
                         // Bottom row: Continue button (full width)
@@ -343,7 +363,7 @@ struct SetupView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.right.circle.fill")
-                                    .font(.system(size: 18, weight: .semibold))
+                                    .font(Design.Typography.body)
                                 Text("Continue")
                                     .font(Design.Typography.headline)
                             }
@@ -351,6 +371,8 @@ struct SetupView: View {
                         }
                         .buttonStyle(CTAButtonStyle(kind: .primary))
                         .disabled(!isValid)
+                        .accessibilityLabel("Continue to role assignment")
+                        .accessibilityHint("Starts the game with \(validInput.count + numberOfBots) players")
                     }
                 } else {
                     // Enhanced non-authenticated users layout
@@ -359,7 +381,7 @@ struct SetupView: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(Design.Typography.body)
                             Text("Continue")
                                 .font(Design.Typography.headline)
                         }
@@ -367,6 +389,8 @@ struct SetupView: View {
                     }
                     .buttonStyle(CTAButtonStyle(kind: .primary))
                     .disabled(!isValid)
+                    .accessibilityLabel("Continue to role assignment")
+                    .accessibilityHint("Starts the game with \(validInput.count + numberOfBots) players")
                 }
             }
             .padding(.horizontal, Design.Spacing.lg)
@@ -542,17 +566,20 @@ struct LoadPlayerGroupSheet: View {
                 } else if playerGroups.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "person.3.fill")
-                            .font(.system(size: 60))
+                            .font(Design.Typography.displayEmoji)
                             .foregroundColor(.white.opacity(0.3))
+                            .accessibilityHidden(true)
 
                         Text("No Saved Groups")
-                            .font(.title2.bold())
+                            .font(Design.Typography.title2)
                             .foregroundColor(.white)
 
                         Text("Create player groups in Settings")
-                            .font(.subheadline)
+                            .font(Design.Typography.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("No saved groups. Create player groups in Settings.")
                 } else {
                     ScrollView {
                         VStack(spacing: 12) {
@@ -669,19 +696,22 @@ struct LoadCustomRoleConfigSheet: View {
                             if customRoleConfigs.isEmpty {
                                 VStack(spacing: 16) {
                                     Image(systemName: "person.2.badge.gearshape.fill")
-                                        .font(.system(size: 60))
+                                        .font(Design.Typography.displayEmoji)
                                         .foregroundColor(.white.opacity(0.3))
                                         .padding(.top, 40)
+                                        .accessibilityHidden(true)
 
                                     Text("No Custom Role Configs")
-                                        .font(.title2.bold())
+                                        .font(Design.Typography.title2)
                                         .foregroundColor(.white)
 
                                     Text("Create custom role configurations in Settings")
-                                        .font(.subheadline)
+                                        .font(Design.Typography.subheadline)
                                         .foregroundColor(.white.opacity(0.7))
                                         .multilineTextAlignment(.center)
                                 }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("No custom role configurations. Create custom role configurations in Settings.")
                             } else {
                                 // Custom configs
                                 ForEach(customRoleConfigs) { config in

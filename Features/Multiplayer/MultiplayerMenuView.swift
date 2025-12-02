@@ -5,6 +5,7 @@ struct MultiplayerMenuView: View {
     @EnvironmentObject private var authStore: AuthStore
     @State private var showingCreateGame = false
     @State private var showingJoinGame = false
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
 
     var body: some View {
         ZStack {
@@ -23,6 +24,7 @@ struct MultiplayerMenuView: View {
                                 endPoint: .trailing
                             )
                         )
+                        .accessibilityAddTraits(.isHeader)
 
                     Text("Play with friends online")
                         .font(Design.Typography.body)
@@ -40,7 +42,7 @@ struct MultiplayerMenuView: View {
                     } label: {
                         VStack(spacing: 12) {
                             Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 48))
+                                .font(.system(size: iconSize, weight: .semibold))
                                 .foregroundStyle(Design.Colors.brandGold)
 
                             Text("Create Game")
@@ -60,6 +62,8 @@ struct MultiplayerMenuView: View {
                                 .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 1)
                         )
                     }
+                    .accessibilityLabel("Create online game")
+                    .accessibilityHint("Start a new room and invite friends")
                     .buttonStyle(PlainButtonStyle())
 
                     // Join Game Button
@@ -68,7 +72,7 @@ struct MultiplayerMenuView: View {
                     } label: {
                         VStack(spacing: 12) {
                             Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 48))
+                                .font(.system(size: iconSize, weight: .semibold))
                                 .foregroundStyle(Design.Colors.brandGold)
 
                             Text("Join Game")
@@ -88,6 +92,8 @@ struct MultiplayerMenuView: View {
                                 .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 1)
                         )
                     }
+                    .accessibilityLabel("Join online game")
+                    .accessibilityHint("Enter a room code to join your friends")
                     .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal, 20)

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct PrivacyBlurView: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 50
+
     var body: some View {
         ZStack {
             // Full-screen blur
@@ -25,7 +27,7 @@ struct PrivacyBlurView: View {
                         .frame(width: 100, height: 100)
 
                     Image(systemName: "eye.slash.fill")
-                        .font(.system(size: 50, weight: .bold))
+                        .font(.system(size: iconSize, weight: .bold))
                         .foregroundStyle(Design.Colors.textSecondary)
                 }
 

@@ -16,13 +16,16 @@ struct GameOverView: View {
                     Text("Event Log")
                         .font(Design.Typography.title3)
                         .foregroundStyle(Design.Colors.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
 
                     Text(logText)
-                        .font(.system(size: 15, design: .monospaced))
+                        .font(Design.Typography.footnote)
                         .foregroundStyle(Design.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .cardStyle(padding: 18)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Event log. Contains game history.")
 
                 buttonRow(logText: logText)
 
@@ -127,6 +130,9 @@ struct GameOverView: View {
             }
             .padding(.vertical, 32)
             .padding(.horizontal, 24)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Game over. \(isNoWinner ? "No winner determined." : (isMafiaWin ? "Mafia wins!" : "Citizens win!"))")
+            .accessibilityAddTraits(.isHeader)
 
             // Enhanced confetti overlay
             ConfettiOverlay(winColor: winColor)
@@ -163,13 +169,14 @@ struct GameOverView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: (mafiaWon && !isNoWinner) ? "flame.fill" : "arrow.clockwise")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(Design.Typography.headline)
                     Text("Play Again")
                         .font(Design.Typography.headline)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(CTAButtonStyle(kind: (mafiaWon && !isNoWinner) ? .danger : .primary))
+            .accessibleButton("Play again", hint: "Starts a new game")
 
             ShareButton(text: logText)
                 .buttonStyle(CTAButtonStyle(kind: .secondary))
@@ -187,7 +194,7 @@ private struct ShareButton: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(Design.Typography.headline)
                 Text("Share Event Log")
                     .font(Design.Typography.headline)
             }
@@ -196,6 +203,7 @@ private struct ShareButton: View {
         .sheet(isPresented: $present) {
             ActivityView(activityItems: [text])
         }
+        .accessibleButton("Share event log", hint: "Opens share sheet to share game history")
     }
 }
 

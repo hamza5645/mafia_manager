@@ -24,11 +24,12 @@ struct MultiplayerRoleRevealView: View {
                         Circle()
                             .fill(myRole.accentColor.opacity(0.2))
                             .frame(width: 140, height: 140)
-                        
+
                         Image(systemName: myRole.symbolName)
-                            .font(.system(size: 70))
+                            .font(Design.Typography.displayEmoji)
                             .foregroundStyle(myRole.accentColor)
                     }
+                    .accessibilityHidden(true)
                     
                     // Role Name
                     Text("You are")
@@ -45,9 +46,9 @@ struct MultiplayerRoleRevealView: View {
                         Text("Your Number")
                             .font(Design.Typography.caption)
                             .foregroundStyle(Design.Colors.textSecondary)
-                        
+
                         Text("\(myNumber)")
-                            .font(.system(size: 64, weight: .bold, design: .rounded))
+                            .font(Design.Typography.playerNumber)
                             .foregroundStyle(Design.Colors.brandGold)
                             .padding(.horizontal, 32)
                             .padding(.vertical, 16)
@@ -81,7 +82,8 @@ struct MultiplayerRoleRevealView: View {
                                 ForEach(multiplayerStore.mafiaTeammates) { teammate in
                                     HStack {
                                         Image(systemName: "person.fill")
-                                            .font(.system(size: 14))
+                                            .font(Design.Typography.body)
+                                            .accessibilityHidden(true)
                                         Text(teammate.playerName)
                                             .font(Design.Typography.body)
                                     }

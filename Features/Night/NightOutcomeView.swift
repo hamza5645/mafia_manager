@@ -89,6 +89,8 @@ struct NightOutcomeView: View {
                     Text("Continue to Morning")
                         .frame(maxWidth: .infinity)
                 }
+                .accessibilityLabel("Continue to morning summary")
+                .accessibilityHint("Applies the selected outcome and advances the game")
                 .buttonStyle(CTAButtonStyle(kind: .primary))
                 .disabled(targetedPlayer == nil || selection == nil)
             }
@@ -101,11 +103,15 @@ struct NightOutcomeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Night \(lastNight?.nightIndex ?? store.currentNightIndex)")
-                .font(.system(size: 26, weight: .heavy))
+                .font(.system(.title, design: .rounded))
+                .fontWeight(.heavy)
                 .kerning(1)
+                .accessibilityAddTraits(.isHeader)
             Text("Confirm whether the mafia's target survived.")
                 .foregroundStyle(Design.Colors.textSecondary)
+                .font(Design.Typography.body)
         }
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -113,16 +119,17 @@ struct NightOutcomeView: View {
         if let target = targetedPlayer {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Mafia Target")
-                    .font(.headline)
+                    .font(Design.Typography.headline)
                     .foregroundStyle(Design.Colors.textPrimary)
 
                 HStack(spacing: 12) {
                     Chip(text: "#\(target.number)", style: .outline(Design.Colors.textSecondary))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(target.name)
-                            .font(.title3.bold())
+                            .font(Design.Typography.title3)
+                            .fontWeight(.bold)
                         Text(target.role.displayName)
-                            .font(.subheadline)
+                            .font(Design.Typography.subheadline)
                             .foregroundStyle(target.role.accentColor)
                     }
                     Spacer()
@@ -130,16 +137,18 @@ struct NightOutcomeView: View {
 
                 if target.alive == false {
                     Label("Already removed earlier", systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote)
+                        .font(Design.Typography.footnote)
                         .foregroundStyle(Design.Colors.dangerRed)
                 }
             }
             .cardStyle()
+            .accessiblePlayerCard(name: target.name, number: target.number, role: target.role.displayName, isAlive: target.alive)
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 Text("No mafia target recorded.")
-                    .font(.headline)
+                    .font(Design.Typography.headline)
                 Text("Return to the previous step to pick a target before resolving the night.")
+                    .font(Design.Typography.body)
                     .foregroundStyle(Design.Colors.textSecondary)
             }
             .cardStyle()
@@ -163,7 +172,7 @@ struct NightOutcomeView: View {
     private var outcomePicker: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Outcome")
-                .font(.headline)
+                .font(Design.Typography.headline)
 
             VStack(spacing: 10) {
                 ForEach(OutcomeSelection.allCases, id: \.self) { option in
@@ -180,9 +189,10 @@ struct NightOutcomeView: View {
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(option.title)
-                                    .font(.subheadline.bold())
+                                    .font(Design.Typography.subheadline)
+                                    .fontWeight(.bold)
                                 Text(option.subtitle)
-                                    .font(.footnote)
+                                    .font(Design.Typography.footnote)
                                     .foregroundStyle(Design.Colors.textSecondary)
                             }
                             Spacer()
@@ -204,6 +214,7 @@ struct NightOutcomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .accessibleSelection(option.title, isSelected: selection == option, hint: option.subtitle)
                 }
             }
         }

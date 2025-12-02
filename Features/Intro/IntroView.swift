@@ -6,6 +6,7 @@ struct IntroView: View {
 
     @State private var currentPage = 0
     private let totalPages = 5
+    @ScaledMetric(relativeTo: .body) private var navIconSize: CGFloat = 16
 
     var body: some View {
         GeometryReader { geometry in
@@ -93,7 +94,7 @@ struct IntroView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: navIconSize, weight: .semibold))
                         Text("Back")
                             .font(Design.Typography.headline)
                     }
@@ -116,7 +117,7 @@ struct IntroView: View {
                     Text(currentPage < totalPages - 1 ? "Next" : "Get Started")
                         .font(Design.Typography.headline)
                     Image(systemName: currentPage < totalPages - 1 ? "chevron.right" : "checkmark")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: navIconSize, weight: .semibold))
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -151,6 +152,8 @@ private struct PageIndicator: View {
 // MARK: - Screen 1: Welcome to Mafia
 
 private struct IntroScreen1: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 28) {
@@ -159,7 +162,7 @@ private struct IntroScreen1: View {
                 // Hero
                 VStack(spacing: 18) {
                     Image(systemName: "theatermasks.fill")
-                        .font(.system(size: 60))
+                        .font(.system(size: heroIconSize, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
@@ -226,6 +229,8 @@ private struct IntroScreen1: View {
 // MARK: - Screen 2: Your AI Host
 
 private struct IntroScreen2: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 28) {
@@ -233,7 +238,7 @@ private struct IntroScreen2: View {
 
                 VStack(spacing: 14) {
                     Image(systemName: "wand.and.stars")
-                        .font(.system(size: 60))
+                        .font(.system(size: heroIconSize, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.actionBlue, Design.Colors.actionBlueBright],
@@ -278,6 +283,8 @@ private struct IntroScreen2: View {
 // MARK: - Screen 3: Game Flow Timeline
 
 private struct IntroScreen3: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 28) {
@@ -285,7 +292,7 @@ private struct IntroScreen3: View {
 
                 VStack(spacing: 14) {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 60))
+                        .font(.system(size: heroIconSize, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
@@ -345,6 +352,8 @@ private struct IntroScreen3: View {
 // MARK: - Screen 4: Night Phase Details
 
 private struct IntroScreen4: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 28) {
@@ -352,7 +361,7 @@ private struct IntroScreen4: View {
 
                 VStack(spacing: 14) {
                     Image(systemName: "moon.stars.fill")
-                        .font(.system(size: 60))
+                        .font(.system(size: heroIconSize, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: Design.Colors.policeGradient,
@@ -403,6 +412,8 @@ private struct IntroScreen4: View {
 // MARK: - Screen 5: Tips & Get Started
 
 private struct IntroScreen5: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 60
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 28) {
@@ -410,7 +421,7 @@ private struct IntroScreen5: View {
 
                 VStack(spacing: 14) {
                     Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 60))
+                        .font(.system(size: heroIconSize, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
@@ -470,11 +481,12 @@ private struct InfoCard: View {
     let title: String
     let description: String
     let color: Color
+    @ScaledMetric(relativeTo: .title2) private var iconSize: CGFloat = 28
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(color)
                 .frame(width: 44, height: 44)
 
@@ -498,11 +510,12 @@ private struct InfoCard: View {
 private struct FeatureRow: View {
     let icon: String
     let title: String
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(Design.Colors.brandGold)
                 .frame(width: 24)
 
@@ -517,6 +530,8 @@ private struct RoleRow: View {
     let role: Role
     let action: String
     let order: Int?
+    @ScaledMetric(relativeTo: .title3) private var orderFontSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var initialFontSize: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 12) {
@@ -527,11 +542,11 @@ private struct RoleRow: View {
 
                 if let order = order {
                     Text("\(order)")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(size: orderFontSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else {
                     Text(String(role.displayName.prefix(1)))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: initialFontSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 }
             }
@@ -566,6 +581,7 @@ private struct PhaseCard: View {
     let phase: String
     let description: String
     let color: Color
+    @ScaledMetric(relativeTo: .callout) private var iconSize: CGFloat = 20
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -575,7 +591,7 @@ private struct PhaseCard: View {
                     .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
                     .foregroundStyle(color)
             }
 
@@ -600,11 +616,12 @@ private struct WinRow: View {
     let team: String
     let condition: String
     let color: Color
+    @ScaledMetric(relativeTo: .subheadline) private var iconSize: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 16))
+                .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(color)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -622,11 +639,12 @@ private struct WinRow: View {
 private struct TipRow: View {
     let number: Int
     let tip: String
+    @ScaledMetric(relativeTo: .body) private var numberFontSize: CGFloat = 16
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.system(size: numberFontSize, weight: .bold, design: .rounded))
                 .foregroundStyle(Design.Colors.brandGold)
                 .frame(width: 28, height: 28)
                 .background(
@@ -644,11 +662,12 @@ private struct TipRow: View {
 
 private struct BestPracticeRow: View {
     let text: String
+    @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 12
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "checkmark")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(Design.Colors.successGreen)
                 .frame(width: 16)
 
@@ -665,6 +684,8 @@ private struct TimelinePhase: View {
     let phase: String
     let description: String
     let color: Color
+    @ScaledMetric(relativeTo: .footnote) private var indexFontSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .callout) private var iconSize: CGFloat = 18
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -675,11 +696,11 @@ private struct TimelinePhase: View {
 
                 VStack(spacing: 2) {
                     Text("\(number)")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.system(size: indexFontSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.7))
 
                     Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: iconSize, weight: .semibold))
                         .foregroundStyle(.white)
                 }
             }

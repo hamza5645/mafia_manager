@@ -270,7 +270,9 @@ struct MultiplayerGameOverView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: hasConfirmed ? "checkmark.circle.fill" : ((mafiaWon && !isNoWinner) ? "flame.fill" : "arrow.clockwise"))
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(Design.Typography.callout)
+                        .fontWeight(.semibold)
+                        .accessibilityHidden(true)
                     Text(hasConfirmed ? "Waiting for others..." : "Play Again")
                         .font(Design.Typography.headline)
                 }
@@ -305,7 +307,9 @@ struct MultiplayerGameOverView: View {
                             .tint(Design.Colors.textPrimary)
                     } else {
                         Image(systemName: "house.fill")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(Design.Typography.callout)
+                            .fontWeight(.semibold)
+                            .accessibilityHidden(true)
                         Text(isInRematch ? "Leave" : "Return to Menu")
                             .font(Design.Typography.headline)
                     }

@@ -120,8 +120,9 @@ struct RoleRevealView: View {
                     .shadow(color: Design.Colors.glowGold.opacity(0.5), radius: 20)
 
                 Image(systemName: "hand.point.up.left.fill")
-                    .font(.system(size: 50, weight: .bold))
+                    .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.brandGold)
+                    .accessibilityHidden(true)
             }
 
             VStack(spacing: 12) {
@@ -132,11 +133,12 @@ struct RoleRevealView: View {
                 HStack(spacing: 12) {
                     if player.isBot {
                         Image(systemName: "cpu.fill")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(Design.Typography.largeTitle)
                             .foregroundStyle(Design.Colors.brandGold)
+                            .accessibilityHidden(true)
                     }
                     Text(player.name)
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .font(Design.Typography.largeTitle)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [Design.Colors.brandGold, Design.Colors.brandGold.opacity(0.7)],
@@ -157,7 +159,7 @@ struct RoleRevealView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "eye.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(Design.Typography.title3)
                     Text("I'm Ready - Show My Role")
                         .font(Design.Typography.headline)
                 }
@@ -165,7 +167,10 @@ struct RoleRevealView: View {
             }
             .buttonStyle(CTAButtonStyle(kind: .primary))
             .padding(.top, 16)
+            .accessibleButton("Show my role", hint: "Reveals your secret role assignment")
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Give phone to \(player.name)")
     }
 
     private func roleRevealView(for player: Player, at index: Int) -> some View {
@@ -176,7 +181,7 @@ struct RoleRevealView: View {
             VStack(alignment: .center, spacing: 24) {
                 // Number
                 Text("#\(player.number)")
-                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                    .font(Design.Typography.playerNumber)
                     .foregroundStyle(Design.Colors.brandGold)
                     .shadow(color: Design.Colors.glowGold, radius: 8, y: 0)
 
@@ -188,13 +193,14 @@ struct RoleRevealView: View {
                         .frame(width: 120, height: 120)
 
                     Image(systemName: player.role.symbolName)
-                        .font(.system(size: 60, weight: .bold))
+                        .font(Design.Typography.displayEmoji)
                         .foregroundStyle(palette.iconColor)
+                        .accessibilityHidden(true)
                 }
 
                 // Role name
                 Text(player.role.displayName.uppercased())
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .font(Design.Typography.largeTitle)
                     .foregroundStyle(player.role.accentColor)
                     .shadow(color: palette.glowColor.opacity(0.5), radius: 8)
 
@@ -202,8 +208,9 @@ struct RoleRevealView: View {
                 HStack(spacing: 8) {
                     if player.isBot {
                         Image(systemName: "cpu")
-                            .font(.system(size: 18))
+                            .font(Design.Typography.headline)
                             .foregroundStyle(Design.Colors.textSecondary)
+                            .accessibilityHidden(true)
                     }
                     Text(player.name)
                         .font(Design.Typography.title2)
@@ -268,12 +275,14 @@ struct RoleRevealView: View {
                     Text(index < store.state.players.count - 1 ? "I've Seen It - Pass Phone" : "Done - Start Game")
                         .font(Design.Typography.headline)
                     Image(systemName: index < store.state.players.count - 1 ? "arrow.right.circle.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(Design.Typography.title3)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(CTAButtonStyle(kind: .secondary))
+            .accessibleButton(index < store.state.players.count - 1 ? "I've seen my role, pass phone" : "Done, start game")
         }
+        .accessiblePlayerCard(name: player.name, number: player.number, role: player.role.displayName)
     }
 
     private func roleDescription(for role: Role) -> String {

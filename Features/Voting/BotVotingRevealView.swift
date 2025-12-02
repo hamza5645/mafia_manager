@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BotVotingRevealView: View {
     @EnvironmentObject private var store: GameStore
+    @ScaledMetric(relativeTo: .title2) private var headerIconSize: CGFloat = 28
 
     private var botVotes: [(bot: Player, target: Player)] {
         guard let session = store.state.currentVotingSession else { return [] }
@@ -25,12 +26,13 @@ struct BotVotingRevealView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: "cpu.fill")
-                            .font(.system(size: 28))
+                            .font(.system(size: headerIconSize, weight: .semibold))
                             .foregroundStyle(Design.Colors.brandGold)
 
                         Text("Bot Votes")
                             .font(Design.Typography.title1)
                             .foregroundStyle(Design.Colors.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
                     }
 
                     Text("The bots have cast their votes")
@@ -58,6 +60,8 @@ struct BotVotingRevealView: View {
                     Text("Continue to Voting")
                         .frame(maxWidth: .infinity)
                 }
+                .accessibilityLabel("Continue to human voting")
+                .accessibilityHint("Moves to the voting phase for players")
                 .buttonStyle(CTAButtonStyle(kind: .primary))
                 .padding(.horizontal)
                 .padding(.bottom, 20)
@@ -70,13 +74,15 @@ struct BotVotingRevealView: View {
 struct BotVoteCard: View {
     let bot: Player
     let target: Player
+    @ScaledMetric(relativeTo: .title3) private var playerIconSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .footnote) private var arrowIconSize: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 16) {
             // Bot info
             HStack(spacing: 12) {
                 Image(systemName: "cpu")
-                    .font(.system(size: 18))
+                    .font(.system(size: playerIconSize, weight: .semibold))
                     .foregroundStyle(Design.Colors.brandGold)
 
                 Text(bot.name)
@@ -88,7 +94,7 @@ struct BotVoteCard: View {
 
             // Arrow
             Image(systemName: "arrow.right")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: arrowIconSize, weight: .bold))
                 .foregroundStyle(Design.Colors.textTertiary)
 
             Spacer()
@@ -100,7 +106,7 @@ struct BotVoteCard: View {
                     .foregroundStyle(Design.Colors.textPrimary)
 
                 Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: playerIconSize, weight: .semibold))
                     .foregroundStyle(Design.Colors.dangerRed)
             }
         }
@@ -114,6 +120,8 @@ struct BotVoteCard: View {
                 )
         )
         .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(bot.name) voted for \(target.name)")
     }
 }
 

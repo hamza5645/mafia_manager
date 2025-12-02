@@ -126,8 +126,9 @@ struct MultiplayerVotingView: View {
 
                 VStack(spacing: 16) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 64))
+                        .font(Design.Typography.displayEmoji)
                         .foregroundStyle(Design.Colors.successGreen)
+                        .accessibilityHidden(true)
 
                     Text("Vote Submitted")
                         .font(Design.Typography.title2)
@@ -203,8 +204,9 @@ struct MultiplayerVotingView: View {
             Spacer()
 
             Image(systemName: "eye.slash.fill")
-                .font(.system(size: 64))
+                .font(Design.Typography.displayEmoji)
                 .foregroundStyle(Design.Colors.textSecondary.opacity(0.5))
+                .accessibilityHidden(true)
 
             Text("Spectating")
                 .font(Design.Typography.title2)
@@ -296,13 +298,14 @@ struct VoteTargetButton: View {
                         .frame(width: 40, height: 40)
 
                     Image(systemName: "person.fill")
-                        .font(.system(size: 16))
+                        .font(Design.Typography.subheadline)
                         .foregroundStyle(
                             isSelected
                                 ? Design.Colors.brandGold
                                 : Design.Colors.textSecondary
                         )
                 }
+                .accessibilityHidden(true)
 
                 // Player Name
                 Text(playerInfo.playerName)
@@ -314,12 +317,14 @@ struct VoteTargetButton: View {
                 // Selection Indicator
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 22))
+                        .font(Design.Typography.title2)
                         .foregroundStyle(Design.Colors.brandGold)
+                        .accessibilityHidden(true)
                 } else {
                     Image(systemName: "circle")
-                        .font(.system(size: 22))
+                        .font(Design.Typography.title2)
                         .foregroundStyle(Design.Colors.textSecondary.opacity(0.3))
+                        .accessibilityHidden(true)
                 }
             }
             .padding(14)

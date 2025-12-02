@@ -20,7 +20,9 @@ struct QuickStartSheet: View {
                 Button(action: onGuestSelected) {
                     HStack {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(Design.Typography.callout)
+                            .fontWeight(.semibold)
+                            .accessibilityHidden(true)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Play as Guest")
@@ -35,7 +37,9 @@ struct QuickStartSheet: View {
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(Design.Typography.footnote)
+                            .fontWeight(.semibold)
+                            .accessibilityHidden(true)
                     }
                     .foregroundStyle(Design.Colors.surface0)
                     .padding(.horizontal, 20)
@@ -43,12 +47,15 @@ struct QuickStartSheet: View {
                     .background(Design.Colors.brandGold)
                     .cornerRadius(Design.Radii.medium)
                 }
+                .accessibilityLabel("Play as Guest. Start playing instantly")
 
                 // Sign In / Create Account - Secondary CTA
                 Button(action: onSignInSelected) {
                     HStack {
                         Image(systemName: "person.fill")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(Design.Typography.callout)
+                            .fontWeight(.semibold)
+                            .accessibilityHidden(true)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Sign In / Create Account")
@@ -63,7 +70,9 @@ struct QuickStartSheet: View {
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(Design.Typography.footnote)
+                            .fontWeight(.medium)
+                            .accessibilityHidden(true)
                     }
                     .foregroundStyle(Design.Colors.textPrimary)
                     .padding(.horizontal, 20)
@@ -75,6 +84,7 @@ struct QuickStartSheet: View {
                             .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
                     )
                 }
+                .accessibilityLabel("Sign in or create account. Sync stats across devices")
             }
             .padding(.horizontal, 20)
 

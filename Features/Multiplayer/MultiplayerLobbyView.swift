@@ -67,9 +67,11 @@ struct MultiplayerLobbyView: View {
                     showingLeaveConfirmation = true
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(Design.Typography.subheadline)
+                        .fontWeight(.bold)
                         .foregroundColor(Design.Colors.brandGold)
                 }
+                .accessibilityLabel("Leave game")
             }
         }
         .alert("Are you sure you want to end the game?", isPresented: $showingLeaveConfirmation) {
@@ -100,7 +102,7 @@ struct MultiplayerLobbyView: View {
                                 .foregroundStyle(Design.Colors.textSecondary)
 
                             Text(session.roomCode)
-                                    .font(.system(size: 48, weight: .bold, design: .monospaced))
+                                    .font(Design.Typography.roomCode)
                                     .foregroundStyle(Design.Colors.brandGold)
                                     .tracking(8)
                                     .padding(.horizontal, 24)
@@ -111,6 +113,7 @@ struct MultiplayerLobbyView: View {
                                         RoundedRectangle(cornerRadius: Design.Radii.large)
                                             .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
                                     )
+                                    .accessibilityLabel("Room code: \(session.roomCode.map { String($0) }.joined(separator: " "))")
 
                                 Text("Share this code with friends to join")
                                     .font(Design.Typography.footnote)
@@ -190,7 +193,8 @@ struct MultiplayerLobbyView: View {
                         } label: {
                             HStack {
                                 Image(systemName: myPlayer.isReady ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 20))
+                                    .font(Design.Typography.title3)
+                                    .accessibilityHidden(true)
 
                                 Text(myPlayer.isReady ? "Ready" : "Not Ready")
                                     .font(Design.Typography.body)
@@ -410,13 +414,14 @@ struct PlayerRow: View {
                     .frame(width: 40, height: 40)
 
                 Image(systemName: playerInfo.isBot ? "cpu" : "person.fill")
-                    .font(.system(size: 18))
+                    .font(Design.Typography.callout)
                     .foregroundStyle(
                         playerInfo.isBot
                             ? Design.Colors.textSecondary
                             : Design.Colors.brandGold
                     )
             }
+            .accessibilityHidden(true)
 
             // Player Name
             VStack(alignment: .leading, spacing: 4) {
@@ -437,17 +442,19 @@ struct PlayerRow: View {
                             // Offline host: dimmed crown + wifi.slash
                             HStack(spacing: 4) {
                                 Image(systemName: "crown.fill")
-                                    .font(.system(size: 12))
+                                    .font(Design.Typography.caption2)
                                     .foregroundStyle(Design.Colors.textSecondary.opacity(0.5))
                                 Image(systemName: "wifi.slash")
-                                    .font(.system(size: 10))
+                                    .font(Design.Typography.caption2)
                                     .foregroundStyle(Design.Colors.dangerRed)
                             }
+                            .accessibilityLabel("Host, offline")
                         } else {
                             // Online host: normal gold crown
                             Image(systemName: "crown.fill")
-                                .font(.system(size: 12))
+                                .font(Design.Typography.caption2)
                                 .foregroundStyle(Design.Colors.brandGold)
+                                .accessibilityLabel("Host")
                         }
                     }
                 }
@@ -464,18 +471,20 @@ struct PlayerRow: View {
             // Ready Checkmark (host is always ready since they control game start)
             if !playerInfo.isBot && (playerInfo.isReady || isHost) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20))
+                    .font(Design.Typography.title3)
                     .foregroundStyle(Design.Colors.successGreen)
+                    .accessibilityLabel("Ready")
             }
-            
+
             // Remove Button (Host only)
             if let onRemove = onRemove {
                 Button(action: onRemove) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
+                        .font(Design.Typography.title3)
                         .foregroundStyle(Design.Colors.dangerRed)
                 }
                 .padding(.leading, 8)
+                .accessibilityLabel("Remove player")
             }
         }
         .padding(12)
@@ -494,7 +503,8 @@ struct StatusBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(Design.Typography.body)
+                .accessibilityHidden(true)
             Text(label)
                 .font(Design.Typography.caption)
         }
@@ -503,6 +513,7 @@ struct StatusBadge: View {
         .padding(.vertical, 6)
         .background(color.opacity(0.15))
         .cornerRadius(Design.Radii.small)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -776,7 +787,8 @@ struct MultiplayerDeathRevealView: View {
                                         .foregroundStyle(Design.Colors.textSecondary)
                                     HStack(spacing: 4) {
                                         Image(systemName: playerRole.symbolName)
-                                            .font(.system(size: 12))
+                                            .font(Design.Typography.caption)
+                                            .accessibilityHidden(true)
                                         Text(playerRole.displayName.uppercased())
                                             .font(Design.Typography.caption)
                                             .fontWeight(.semibold)

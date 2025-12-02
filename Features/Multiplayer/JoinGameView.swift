@@ -10,6 +10,7 @@ struct JoinGameView: View {
     @State private var isJoining = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
+    @ScaledMetric(relativeTo: .title) private var roomCodeFontSize: CGFloat = 24
 
     var body: some View {
         NavigationStack {
@@ -23,6 +24,7 @@ struct JoinGameView: View {
                             Text("Join Online Game")
                                 .font(Design.Typography.title1)
                                 .foregroundStyle(Design.Colors.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
 
                             Text("Enter the room code to join")
                                 .font(Design.Typography.body)
@@ -44,6 +46,8 @@ struct JoinGameView: View {
                                     .disableAutocorrection(true)
                                     .padding(.vertical, 14)
                                     .padding(.horizontal, 16)
+                                    .accessibilityLabel("Player name")
+                                    .accessibilityHint("Enter the name shown to other players")
                                     .background(Design.Colors.surface2)
                                     .cornerRadius(Design.Radii.medium)
                                     .overlay(
@@ -59,11 +63,13 @@ struct JoinGameView: View {
                                     .foregroundStyle(Design.Colors.textPrimary)
 
                                 TextField("XXXXXX", text: $roomCode)
-                                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                    .font(.system(size: roomCodeFontSize, weight: .bold, design: .monospaced))
                                     .textInputAutocapitalization(.characters)
                                     .disableAutocorrection(true)
                                     .multilineTextAlignment(.center)
                                     .padding(.vertical, 20)
+                                    .accessibilityLabel("Room code")
+                                    .accessibilityHint("Enter the six character room code from the host")
                                     .background(Design.Colors.surface1)
                                     .cornerRadius(Design.Radii.medium)
                                     .overlay(
@@ -113,6 +119,8 @@ struct JoinGameView: View {
                             .foregroundColor(Design.Colors.surface0)
                             .cornerRadius(Design.Radii.medium)
                         }
+                        .accessibilityLabel("Join room")
+                        .accessibilityHint("Attempts to join the room with your name and code")
                         .disabled(!canJoin || isJoining)
                         .padding(.horizontal, 20)
 
@@ -126,6 +134,7 @@ struct JoinGameView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .accessibilityHint("Close join game and return to the previous screen")
                 }
             }
             .navigationDestination(isPresented: $showingLobby) {

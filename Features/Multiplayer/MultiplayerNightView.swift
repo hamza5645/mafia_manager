@@ -106,8 +106,9 @@ struct MultiplayerNightView: View {
                     // Ready indicator for all players - HAMZA-95: Improved with action summary
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 48))
+                            .font(Design.Typography.displayEmoji)
                             .foregroundStyle(Design.Colors.successGreen)
+                            .accessibilityHidden(true)
 
                         Text(myRole == .citizen ? "Ready to Continue" : "Action Submitted")
                             .font(Design.Typography.title3)
@@ -271,7 +272,8 @@ struct MultiplayerNightView: View {
                             ForEach(multiplayerStore.mafiaTeammates) { teammate in
                                 HStack(spacing: 6) {
                                     Image(systemName: "person.fill")
-                                        .font(.system(size: 12))
+                                        .font(Design.Typography.caption)
+                                        .accessibilityHidden(true)
                                     Text(teammate.playerName)
                                         .font(Design.Typography.body)
                                 }
@@ -299,8 +301,9 @@ struct MultiplayerNightView: View {
     private var citizenView: some View {
         VStack(spacing: 16) {
             Image(systemName: "moon.stars.fill")
-                .font(.system(size: 64))
+                .font(Design.Typography.displayEmoji)
                 .foregroundStyle(Design.Colors.textSecondary.opacity(0.5))
+                .accessibilityHidden(true)
 
             Text("Sleep Tight")
                 .font(Design.Typography.title2)
@@ -317,8 +320,9 @@ struct MultiplayerNightView: View {
     private var spectatorView: some View {
         VStack(spacing: 16) {
             Image(systemName: "eye.slash.fill")
-                .font(.system(size: 64))
+                .font(Design.Typography.displayEmoji)
                 .foregroundStyle(Design.Colors.textSecondary.opacity(0.5))
+                .accessibilityHidden(true)
 
             Text("Waiting...")
                 .font(Design.Typography.title2)
@@ -335,8 +339,9 @@ struct MultiplayerNightView: View {
     private func inspectorResultView(role: String) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 64))
+                .font(Design.Typography.displayEmoji)
                 .foregroundStyle(Design.Colors.successGreen)
+                .accessibilityHidden(true)
 
             Text("Investigation Complete")
                 .font(Design.Typography.title2)
@@ -611,9 +616,10 @@ struct TargetGridCell: View {
                         .fill(isSelected ? accentColor.opacity(0.2) : Design.Colors.surface2)
                         .frame(width: 48, height: 48)
                     Image(systemName: "person.fill")
-                        .font(.system(size: 20))
+                        .font(Design.Typography.title3)
                         .foregroundStyle(isSelected ? accentColor : Design.Colors.textSecondary)
                 }
+                .accessibilityHidden(true)
 
                 // Name
                 Text(name)
@@ -662,13 +668,14 @@ struct TargetPlayerButton: View {
                         .frame(width: 36, height: 36)
 
                     Image(systemName: "person.fill")
-                        .font(.system(size: 14))
+                        .font(Design.Typography.body)
                         .foregroundStyle(
                             isSelected
                                 ? accentColor
                                 : Design.Colors.textSecondary
                         )
                 }
+                .accessibilityHidden(true)
 
                 // Player Name
                 Text(playerInfo.playerName)
@@ -680,8 +687,9 @@ struct TargetPlayerButton: View {
                 // Selection Indicator
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
+                        .font(Design.Typography.title3)
                         .foregroundStyle(accentColor)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(12)

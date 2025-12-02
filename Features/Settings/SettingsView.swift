@@ -62,10 +62,12 @@ struct SettingsView: View {
                                             .frame(width: 18, height: 18)
                                             .overlay(
                                                 Image(systemName: "person.fill.questionmark")
-                                                    .font(.system(size: 10, weight: .bold))
+                                                    .font(Design.Typography.caption2)
+                                                    .fontWeight(.bold)
                                                     .foregroundColor(Design.Colors.textSecondary)
                                             )
                                             .offset(x: 18, y: 18)
+                                            .accessibilityLabel("Guest account")
                                     }
 
                                     VStack(alignment: .leading, spacing: 4) {
@@ -88,10 +90,13 @@ struct SettingsView: View {
                                     } label: {
                                         HStack {
                                             Image(systemName: "person.circle")
-                                                .font(.system(size: 16, weight: .semibold))
+                                                .font(Design.Typography.subheadline)
+                                                .fontWeight(.semibold)
+                                                .accessibilityHidden(true)
 
                                             Text("Login")
-                                                .font(.subheadline.weight(.semibold))
+                                                .font(Design.Typography.subheadline)
+                                                .fontWeight(.semibold)
                                         }
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
@@ -106,10 +111,13 @@ struct SettingsView: View {
                                     } label: {
                                         HStack {
                                             Image(systemName: "sparkles")
-                                                .font(.system(size: 16, weight: .semibold))
+                                                .font(Design.Typography.subheadline)
+                                                .fontWeight(.semibold)
+                                                .accessibilityHidden(true)
 
                                             Text("Sign Up")
-                                                .font(.subheadline.weight(.semibold))
+                                                .font(Design.Typography.subheadline)
+                                                .fontWeight(.semibold)
                                         }
                                         .foregroundColor(Design.Colors.surface0)
                                         .frame(maxWidth: .infinity)
@@ -269,21 +277,25 @@ struct SettingsRow: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(Design.Typography.title3)
                 .foregroundColor(color)
                 .frame(width: 30)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
+                    .font(Design.Typography.body)
                     .foregroundColor(.white)
 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(Design.Typography.caption)
                         .foregroundColor(.white.opacity(0.7))
                 }
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(subtitle != nil ? "\(title), \(subtitle!)" : title)
     }
 }

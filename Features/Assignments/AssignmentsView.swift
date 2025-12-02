@@ -63,13 +63,14 @@ struct AssignmentsView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "moon.stars.fill")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(Design.Typography.headline)
                         Text(store.currentNightIndex == 1 ? "Start Night 1" : "Continue Night \(store.currentNightIndex)")
                             .font(Design.Typography.headline)
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(CTAButtonStyle(kind: .primary))
+                .accessibleButton(store.currentNightIndex == 1 ? "Start Night 1" : "Continue to Night \(store.currentNightIndex)", hint: "Begins the night phase")
             }
             .padding(.horizontal, Design.Spacing.lg)
             .padding(.vertical, Design.Spacing.md)
@@ -109,7 +110,7 @@ private struct PlayerRoleCard: View {
             HStack(alignment: .top) {
                 // Simple, visible player number
                 Text("#\(player.number)")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(Design.Typography.subheadline)
                     .foregroundStyle(Design.Colors.brandGold)
                     .shadow(color: Design.Colors.glowGold, radius: 4, y: 0)
                     .shadow(color: .black.opacity(0.3), radius: 2, y: 2)
@@ -129,8 +130,9 @@ private struct PlayerRoleCard: View {
 
                     // Icon
                     Image(systemName: player.role.symbolName)
-                        .font(.system(size: 26, weight: .bold))
+                        .font(Design.Typography.title2)
                         .foregroundStyle(palette.iconColor)
+                        .accessibilityHidden(true)
                 }
                 .frame(width: 36, height: 36)
 
@@ -144,9 +146,9 @@ private struct PlayerRoleCard: View {
                     if player.isBot {
                         HStack(spacing: 4) {
                             Image(systemName: "cpu")
-                                .font(.system(size: 10))
+                                .font(Design.Typography.caption2)
                             Text("Bot")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(Design.Typography.caption2)
                         }
                         .foregroundStyle(Design.Colors.textSecondary)
                     }
@@ -155,6 +157,7 @@ private struct PlayerRoleCard: View {
                 Spacer()
             }
         }
+        .accessiblePlayerCard(name: player.name, number: player.number, role: player.role.displayName)
         .padding(.vertical, 20)
         .padding(.horizontal, 18)
         .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
@@ -197,7 +200,8 @@ private struct RoleBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: role.symbolName)
-                .font(.system(size: 11, weight: .bold))
+                .font(Design.Typography.caption)
+                .accessibilityHidden(true)
             Text(role.displayName.uppercased())
                 .font(Design.Typography.caption)
                 .fontWeight(.bold)

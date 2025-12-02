@@ -60,16 +60,23 @@ enum Design {
     }
 
     enum Typography {
-        static let largeTitle = Font.system(size: 34, weight: .heavy, design: .rounded)
-        static let title1 = Font.system(size: 28, weight: .bold, design: .rounded)
-        static let title2 = Font.system(size: 22, weight: .bold, design: .rounded)
-        static let title3 = Font.system(size: 20, weight: .semibold, design: .rounded)
-        static let headline = Font.system(size: 17, weight: .semibold, design: .rounded)
-        static let body = Font.system(size: 17, weight: .regular, design: .rounded)
-        static let callout = Font.system(size: 16, weight: .regular, design: .rounded)
-        static let subheadline = Font.system(size: 15, weight: .medium, design: .rounded)
-        static let footnote = Font.system(size: 13, weight: .regular, design: .rounded)
-        static let caption = Font.system(size: 12, weight: .medium, design: .rounded)
+        // Dynamic Type-aware fonts (automatically scale with user's accessibility settings)
+        static let largeTitle = Font.system(.largeTitle, design: .rounded).weight(.heavy)
+        static let title1 = Font.system(.title, design: .rounded).weight(.bold)
+        static let title2 = Font.system(.title2, design: .rounded).weight(.bold)
+        static let title3 = Font.system(.title3, design: .rounded).weight(.semibold)
+        static let headline = Font.system(.headline, design: .rounded)
+        static let body = Font.system(.body, design: .rounded)
+        static let callout = Font.system(.callout, design: .rounded)
+        static let subheadline = Font.system(.subheadline, design: .rounded).weight(.medium)
+        static let footnote = Font.system(.footnote, design: .rounded)
+        static let caption = Font.system(.caption, design: .rounded).weight(.medium)
+        static let caption2 = Font.system(.caption2, design: .rounded)
+
+        // Semantic styles for specialized use cases
+        static let displayEmoji = Font.system(.largeTitle, design: .rounded).weight(.bold)
+        static let roomCode = Font.system(.title, design: .monospaced).weight(.bold)
+        static let playerNumber = Font.system(.largeTitle, design: .rounded).weight(.heavy)
     }
 
     enum Shadows {
@@ -165,13 +172,14 @@ struct CTAButtonStyle: ButtonStyle {
         let configuration: Configuration
         let kind: CTAKind
         @Environment(\.isEnabled) private var isEnabled
+        @ScaledMetric(relativeTo: .headline) private var scaledHeight: CGFloat = 56
 
         var body: some View {
             let colors = palette(for: kind)
             return configuration.label
                 .font(Design.Typography.headline)
                 .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.5))
-                .frame(height: 56)
+                .frame(height: scaledHeight)
                 .frame(maxWidth: .infinity)
                 .background(
                     ZStack {
@@ -250,6 +258,7 @@ struct CompactGridButtonStyle: ButtonStyle {
         let configuration: Configuration
         let kind: GridButtonKind
         @Environment(\.isEnabled) private var isEnabled
+        @ScaledMetric(relativeTo: .subheadline) private var minHeight: CGFloat = 44
 
         var body: some View {
             let colors = palette(for: kind)
@@ -257,6 +266,7 @@ struct CompactGridButtonStyle: ButtonStyle {
                 .font(Design.Typography.subheadline)
                 .foregroundStyle(colors.foreground.opacity(isEnabled ? 1 : 0.45))
                 .frame(maxWidth: .infinity)
+                .frame(minHeight: minHeight)
                 .background(
                     ZStack {
                         RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
@@ -342,13 +352,15 @@ struct PillButtonStyle: ButtonStyle {
         let background: Color
         let foreground: Color
         @Environment(\.isEnabled) private var isEnabled
+        @ScaledMetric(relativeTo: .subheadline) private var hPadding: CGFloat = 20
+        @ScaledMetric(relativeTo: .subheadline) private var vPadding: CGFloat = 12
 
         var body: some View {
             configuration.label
                 .font(Design.Typography.subheadline)
                 .foregroundStyle(foreground.opacity(isEnabled ? 1 : 0.4))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.horizontal, hPadding)
+                .padding(.vertical, vPadding)
                 .background(
                     ZStack {
                         Capsule()
@@ -397,18 +409,23 @@ struct Chip: View {
     var style: Style
     var icon: String?
 
+    @ScaledMetric(relativeTo: .caption) private var iconSpacing: CGFloat = 6
+    @ScaledMetric(relativeTo: .caption) private var hPadding: CGFloat = 12
+    @ScaledMetric(relativeTo: .caption) private var vPadding: CGFloat = 7
+
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: iconSpacing) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Design.Typography.caption)
+                    .accessibilityHidden(true)
             }
             Text(text)
                 .font(Design.Typography.caption)
                 .fontWeight(.semibold)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, hPadding)
+        .padding(.vertical, vPadding)
         .background(
             ZStack {
                 Capsule()
@@ -433,6 +450,8 @@ struct Chip: View {
         )
         .foregroundStyle(foreground)
         .shadow(color: shadowColor, radius: 6, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 
     private var background: Color {
@@ -471,5 +490,48 @@ extension Color {
         let g = Double((hex & 0x00FF00) >> 8) / 255.0
         let b = Double(hex & 0x0000FF) / 255.0
         self = Color(red: r, green: g, blue: b, opacity: alpha)
+    }
+}
+
+// MARK: - Accessibility Modifiers
+
+extension View {
+    /// Adds accessibility label and button trait to a view
+    func accessibleButton(_ label: String, hint: String? = nil) -> some View {
+        self
+            .accessibilityLabel(label)
+            .accessibilityHint(hint ?? "")
+            .accessibilityAddTraits(.isButton)
+    }
+
+    /// Combines child elements and adds a descriptive label for player cards
+    func accessiblePlayerCard(name: String, number: Int, role: String? = nil, isAlive: Bool = true) -> some View {
+        let parts = [
+            "Player \(number)",
+            name,
+            role,
+            isAlive ? nil : "Eliminated"
+        ].compactMap { $0 }
+
+        return self
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(parts.joined(separator: ", "))
+    }
+
+    /// Marks a view as a phase header for VoiceOver navigation
+    func accessiblePhaseHeader(_ phase: String, instruction: String? = nil) -> some View {
+        let label = instruction != nil ? "\(phase). \(instruction!)" : phase
+        return self
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Adds accessibility for selection states (toggle buttons, selectable items)
+    func accessibleSelection(_ label: String, isSelected: Bool, hint: String? = nil) -> some View {
+        self
+            .accessibilityLabel(label)
+            .accessibilityHint(hint ?? (isSelected ? "Double tap to deselect" : "Double tap to select"))
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }

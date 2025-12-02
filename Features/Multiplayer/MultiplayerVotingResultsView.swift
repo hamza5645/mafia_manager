@@ -209,8 +209,9 @@ struct MultiplayerVoteCountRow: View {
             // Vote count
             HStack(spacing: 8) {
                 Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 16))
+                    .font(Design.Typography.subheadline)
                     .foregroundStyle(isEliminated ? Design.Colors.dangerRed : Design.Colors.textSecondary)
+                    .accessibilityHidden(true)
 
                 Text("\(voteCount)")
                     .font(Design.Typography.headline)

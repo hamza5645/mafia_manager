@@ -137,13 +137,14 @@ struct NightWakeUpView: View {
                         .shadow(color: Design.Colors.glowGold.opacity(0.5), radius: 20)
 
                     Image(systemName: "moon.stars.fill")
-                        .font(.system(size: 60, weight: .bold))
+                        .font(Design.Typography.displayEmoji)
                         .foregroundStyle(Design.Colors.brandGold)
+                        .accessibilityHidden(true)
                 }
 
                 VStack(spacing: 16) {
                     Text("Night \(store.currentNightIndex)")
-                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .font(Design.Typography.largeTitle)
                         .foregroundColor(Design.Colors.textPrimary)
 
                     Text("Everyone Close Your Eyes")
@@ -187,13 +188,15 @@ struct NightWakeUpView: View {
                     Text("Everyone Ready - Start Night")
                         .font(Design.Typography.headline)
                     Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(Design.Typography.title3)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(CTAButtonStyle(kind: .primary))
             .padding(.horizontal, Design.Spacing.lg)
+            .accessibleButton("Everyone ready, start night", hint: "Begins the night phase")
         }
+        .accessiblePhaseHeader("Night \(store.currentNightIndex)", instruction: "Everyone close your eyes. Place the phone in the middle.")
     }
 
     // MARK: - Wake Up Screens
@@ -235,7 +238,7 @@ struct NightWakeUpView: View {
                     Text("Continue")
                         .font(Design.Typography.headline)
                     Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(Design.Typography.title3)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -248,6 +251,7 @@ struct NightWakeUpView: View {
                     .opacity(0.98)
                     .ignoresSafeArea()
             )
+            .accessibleButton("Continue to \(role.displayName) action", hint: "Proceed to make your choice")
         }
     }
 
@@ -261,14 +265,15 @@ struct NightWakeUpView: View {
                     .shadow(color: Design.Colors.glowRed, radius: 20)
 
                 Image(systemName: "flame.fill")
-                    .font(.system(size: 60, weight: .bold))
+                    .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.dangerRed)
+                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity)
 
             VStack(spacing: 16) {
                 Text("Mafia, Wake Up")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(Design.Typography.largeTitle)
                     .foregroundStyle(Design.Colors.dangerRed)
                     .frame(maxWidth: .infinity)
 
@@ -286,7 +291,7 @@ struct NightWakeUpView: View {
                                     .frame(width: 40, height: 40)
                                     .overlay(
                                         Text(player.name.prefix(1).uppercased())
-                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .font(Design.Typography.subheadline)
                                             .foregroundColor(Design.Colors.dangerRed)
                                     )
 
@@ -337,14 +342,15 @@ struct NightWakeUpView: View {
                     .shadow(color: Design.Colors.glowBlue, radius: 20)
 
                 Image(systemName: "eye.fill")
-                    .font(.system(size: 60, weight: .bold))
+                    .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.actionBlue)
+                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity)
 
             VStack(spacing: 16) {
                 Text("Police, Wake Up")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(Design.Typography.largeTitle)
                     .foregroundStyle(Design.Colors.actionBlue)
                     .frame(maxWidth: .infinity)
 
@@ -361,7 +367,7 @@ struct NightWakeUpView: View {
                                     .frame(width: 40, height: 40)
                                     .overlay(
                                         Text(player.name.prefix(1).uppercased())
-                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .font(Design.Typography.subheadline)
                                             .foregroundColor(Design.Colors.actionBlue)
                                     )
 
@@ -412,14 +418,15 @@ struct NightWakeUpView: View {
                     .shadow(color: Design.Colors.glowGreen, radius: 20)
 
                 Image(systemName: "cross.case.fill")
-                    .font(.system(size: 60, weight: .bold))
+                    .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.successGreen)
+                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity)
 
             VStack(spacing: 16) {
                 Text("Doctor, Wake Up")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(Design.Typography.largeTitle)
                     .foregroundStyle(Design.Colors.successGreen)
                     .frame(maxWidth: .infinity)
 
@@ -436,7 +443,7 @@ struct NightWakeUpView: View {
                                     .frame(width: 40, height: 40)
                                     .overlay(
                                         Text(player.name.prefix(1).uppercased())
-                                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                                            .font(Design.Typography.subheadline)
                                             .foregroundColor(Design.Colors.successGreen)
                                     )
 
@@ -549,12 +556,13 @@ struct NightWakeUpView: View {
                         .shadow(color: result.isMafia ? Design.Colors.glowRed : Design.Colors.glowGreen, radius: 20)
 
                     Image(systemName: result.role.symbolName)
-                        .font(.system(size: 50, weight: .bold))
+                        .font(Design.Typography.displayEmoji)
                         .foregroundStyle(result.role.accentColor)
+                        .accessibilityHidden(true)
                 }
 
                 Text(result.isMafia ? "This player is MAFIA!" : "This player is INNOCENT")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(Design.Typography.title1)
                     .foregroundColor(result.isMafia ? Design.Colors.dangerRed : Design.Colors.successGreen)
                     .multilineTextAlignment(.center)
 
@@ -590,12 +598,13 @@ struct NightWakeUpView: View {
                     Text(buttonText(for: role))
                         .font(Design.Typography.headline)
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(Design.Typography.title3)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(CTAButtonStyle(kind: .primary))
             .disabled(selectedTargetID == nil && !showResult)
+            .accessibleButton(buttonText(for: role))
         }
         .padding(.horizontal, Design.Spacing.lg)
         .padding(.vertical, Design.Spacing.md)
@@ -1025,21 +1034,24 @@ struct NightWakeUpView: View {
                         .shadow(color: role.accentColor.opacity(0.5), radius: 20)
 
                     Image(systemName: "cpu.fill")
-                        .font(.system(size: 60, weight: .bold))
+                        .font(Design.Typography.displayEmoji)
                         .foregroundStyle(role.accentColor)
+                        .accessibilityHidden(true)
                 }
                 .scaleEffect(showBotActing ? 1.1 : 1.0)
                 .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: showBotActing)
 
                 VStack(spacing: 16) {
                     Text("Bot is Deciding...")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(Design.Typography.largeTitle)
                         .foregroundStyle(role.accentColor)
 
                     Text(role.displayName)
                         .font(Design.Typography.title3)
                         .foregroundColor(Design.Colors.textSecondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Bot is deciding. \(role.displayName) is making their choice.")
 
                 // Progress indicator
                 ProgressView()
@@ -1071,9 +1083,10 @@ private struct PlayerSelectionRow: View {
                         .frame(width: 50, height: 50)
 
                     Text(player.name.prefix(1).uppercased())
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(Design.Typography.title3)
                         .foregroundColor(isSelected ? accent : Design.Colors.textSecondary)
                 }
+                .accessibilityHidden(true)
 
                 // Name
                 Text(player.name)
@@ -1085,8 +1098,9 @@ private struct PlayerSelectionRow: View {
                 // Selection indicator
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(Design.Typography.title2)
                         .foregroundColor(accent)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 20)
@@ -1101,6 +1115,7 @@ private struct PlayerSelectionRow: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibleSelection(player.name, isSelected: isSelected, hint: isSelected ? "Currently selected target" : "Tap to select as target")
     }
 }
 
@@ -1126,8 +1141,9 @@ private struct TransitionBlurView: View {
                         .frame(width: 100, height: 100)
 
                     Image(systemName: "moon.stars.fill")
-                        .font(.system(size: 50, weight: .bold))
+                        .font(Design.Typography.displayEmoji)
                         .foregroundStyle(Design.Colors.brandGold)
+                        .accessibilityHidden(true)
                 }
 
                 VStack(spacing: 12) {
@@ -1141,5 +1157,7 @@ private struct TransitionBlurView: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Everyone go to sleep. Waiting for next role.")
     }
 }

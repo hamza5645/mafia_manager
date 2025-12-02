@@ -19,11 +19,12 @@ struct LoginView: View {
                     // Title
                     VStack(spacing: 8) {
                         Text("Mafia Manager")
-                            .font(.system(size: 40, weight: .bold))
+                            .font(Design.Typography.largeTitle)
                             .foregroundColor(Design.Colors.brandGold)
+                            .accessibilityAddTraits(.isHeader)
 
                         Text("Sign in to continue")
-                            .font(.subheadline)
+                            .font(Design.Typography.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
                     .padding(.top, 60)
@@ -61,9 +62,10 @@ struct LoginView: View {
                     // Error Message
                     if let errorMessage = authStore.errorMessage {
                         Text(errorMessage)
-                            .font(.caption)
+                            .font(Design.Typography.caption)
                             .foregroundColor(Design.Colors.dangerRed)
                             .padding(.horizontal, 32)
+                            .accessibilityLabel("Error: \(errorMessage)")
                     }
 
                     // Sign In Button
@@ -96,9 +98,10 @@ struct LoginView: View {
                         showPasswordReset = true
                     } label: {
                         Text("Forgot Password?")
-                            .font(.subheadline)
+                            .font(Design.Typography.subheadline)
                             .foregroundColor(Design.Colors.brandGold)
                     }
+                    .accessibilityLabel("Forgot password")
 
                     Spacer()
 
@@ -113,8 +116,9 @@ struct LoginView: View {
                                 .foregroundColor(Design.Colors.brandGold)
                                 .fontWeight(.semibold)
                         }
-                        .font(.subheadline)
+                        .font(Design.Typography.subheadline)
                     }
+                    .accessibilityLabel("Create account")
                     .padding(.bottom, 32)
                 }
             }
@@ -151,12 +155,13 @@ struct PasswordResetView: View {
 
             VStack(spacing: 24) {
                 Text("Reset Password")
-                    .font(.title.bold())
+                    .font(Design.Typography.title1)
                     .foregroundColor(.white)
                     .padding(.top, 40)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("Enter your email address and we'll send you a link to reset your password")
-                    .font(.subheadline)
+                    .font(Design.Typography.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -178,14 +183,15 @@ struct PasswordResetView: View {
 
                 if showSuccess {
                     Text("Check your email for a password reset link")
-                        .font(.caption)
+                        .font(Design.Typography.caption)
                         .foregroundColor(Design.Colors.successGreen)
                         .padding(.horizontal, 32)
                 } else if let errorMessage = authStore.errorMessage {
                     Text(errorMessage)
-                        .font(.caption)
+                        .font(Design.Typography.caption)
                         .foregroundColor(Design.Colors.dangerRed)
                         .padding(.horizontal, 32)
+                        .accessibilityLabel("Error: \(errorMessage)")
                 }
 
                 Button {

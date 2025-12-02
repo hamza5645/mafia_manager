@@ -108,15 +108,17 @@ struct EmptyPlayerGroupsView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "person.3.fill")
-                .font(.system(size: 60))
+                .font(Design.Typography.displayEmoji)
                 .foregroundColor(.white.opacity(0.3))
+                .accessibilityHidden(true)
 
             Text("No Saved Groups")
-                .font(.title2.bold())
+                .font(Design.Typography.title2)
+                .fontWeight(.bold)
                 .foregroundColor(.white)
 
             Text("Save groups of player names for quick setup")
-                .font(.subheadline)
+                .font(Design.Typography.subheadline)
                 .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -135,7 +137,8 @@ struct PlayerGroupCard: View {
             // Header
             HStack {
                 Text(group.groupName)
-                    .font(.title3.bold())
+                    .font(Design.Typography.title3)
+                    .fontWeight(.bold)
                     .foregroundColor(.white)
 
                 Spacer()
@@ -144,28 +147,33 @@ struct PlayerGroupCard: View {
                     onEdit()
                 } label: {
                     Image(systemName: "pencil")
+                        .font(Design.Typography.body)
                         .foregroundColor(Design.Colors.brandGold)
                 }
+                .accessibilityLabel("Edit \(group.groupName)")
 
                 Button {
                     showDeleteConfirmation = true
                 } label: {
                     Image(systemName: "trash")
+                        .font(Design.Typography.body)
                         .foregroundColor(Design.Colors.dangerRed)
                 }
+                .accessibilityLabel("Delete \(group.groupName)")
             }
 
             // Player Count
             HStack {
                 Image(systemName: "person.3.fill")
                     .foregroundColor(Design.Colors.brandGold)
+                    .accessibilityHidden(true)
 
                 Text("\(group.playerNames.count) players")
                     .foregroundColor(.white.opacity(0.7))
 
                 Spacer()
             }
-            .font(.subheadline)
+            .font(Design.Typography.subheadline)
 
             Divider()
                 .background(.white.opacity(0.2))
@@ -177,13 +185,14 @@ struct PlayerGroupCard: View {
                         Image(systemName: "person.fill")
                             .foregroundColor(.white.opacity(0.5))
                             .frame(width: 20)
+                            .accessibilityHidden(true)
 
                         Text(name)
                             .foregroundColor(.white)
 
                         Spacer()
                     }
-                    .font(.body)
+                    .font(Design.Typography.body)
                 }
             }
         }

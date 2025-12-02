@@ -36,6 +36,7 @@ struct VotingView: View {
                                 .foregroundStyle(Design.Colors.textSecondary)
                         }
                         .padding(.top, 40)
+                        .accessiblePhaseHeader("Voting for \(currentPlayer.name)", instruction: "Choose a player to vote out")
 
                         // Alive players to vote for (Grid layout)
                         LazyVGrid(columns: [
@@ -62,6 +63,7 @@ struct VotingView: View {
                         showConfirmation = true
                     } label: {
                         Text("Lock Vote")
+                            .font(Design.Typography.headline)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(CTAButtonStyle(kind: .primary))
@@ -69,6 +71,7 @@ struct VotingView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(Design.Colors.surface0.opacity(0.95))
+                    .accessibleButton("Lock vote", hint: "Confirms your vote. Cannot be changed.")
                 }
             } else {
                 Text("Error: Player not found")
@@ -117,13 +120,15 @@ struct VotingPlayerCard: View {
                         )
 
                     Text(player.name.prefix(1).uppercased())
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(Design.Typography.title2)
                         .foregroundStyle(isSelected ? Design.Colors.brandGold : Design.Colors.textSecondary)
                 }
+                .accessibilityHidden(true)
 
                 // Player name
                 Text(player.name)
-                    .font(.subheadline.bold())
+                    .font(Design.Typography.subheadline)
+                    .fontWeight(.bold)
                     .foregroundStyle(Design.Colors.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
@@ -133,14 +138,17 @@ struct VotingPlayerCard: View {
                 if isSelected {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
+                            .font(Design.Typography.caption)
                         Text("Selected")
-                            .font(.caption2.bold())
+                            .font(Design.Typography.caption2)
+                            .fontWeight(.bold)
                     }
                     .foregroundStyle(Design.Colors.brandGold)
+                    .accessibilityHidden(true)
                 } else {
                     Text(" ")
-                        .font(.caption2)
+                        .font(Design.Typography.caption2)
+                        .accessibilityHidden(true)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -161,6 +169,7 @@ struct VotingPlayerCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibleSelection(player.name, isSelected: isSelected, hint: isSelected ? "Selected for elimination" : "Tap to select for elimination")
     }
 }
 
