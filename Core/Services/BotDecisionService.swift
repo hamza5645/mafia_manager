@@ -138,12 +138,10 @@ final class BotDecisionService {
                 }
 
                 if !survivors.isEmpty && Double.random(in: 0...1) < 0.6 {
-                    // Guaranteed non-nil since survivors is non-empty
-                    return survivors.randomElement()!.id
+                    return survivors.randomElement()?.id ?? nonMafiaTargets.first?.id ?? botPlayer.id
                 }
 
-                // Guaranteed non-nil since nonMafiaTargets is non-empty
-                return nonMafiaTargets.randomElement()!.id
+                return nonMafiaTargets.randomElement()?.id ?? validTargets.first?.id ?? botPlayer.id
             }
         } else {
             // Bot Citizen/Inspector/Doctor: Vote somewhat randomly
@@ -157,17 +155,16 @@ final class BotDecisionService {
                 }
 
                 if untargetedPlayers.count >= 2 && Double.random(in: 0...1) < 0.5 {
-                    // Guaranteed non-nil since untargetedPlayers has >= 2 elements
-                    return untargetedPlayers.randomElement()!.id
+                    return untargetedPlayers.randomElement()?.id ?? validTargets.first?.id ?? botPlayer.id
                 }
             }
 
-            // Default: random vote - guaranteed non-nil since validTargets is non-empty
-            return validTargets.randomElement()!.id
+            // Default: random vote
+            return validTargets.randomElement()?.id ?? botPlayer.id
         }
 
-        // Fallback - guaranteed non-nil since validTargets is non-empty (checked at top)
-        return validTargets.randomElement()!.id
+        // Fallback
+        return validTargets.randomElement()?.id ?? botPlayer.id
     }
 
     // MARK: - Utility
