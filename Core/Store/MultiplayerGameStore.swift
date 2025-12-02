@@ -164,7 +164,7 @@ final class MultiplayerGameStore: ObservableObject {
             isConnecting = false
         } catch {
             isConnecting = false
-            connectionError = error.localizedDescription
+            connectionError = mapSessionError(error)
             throw error
         }
     }
@@ -211,7 +211,7 @@ final class MultiplayerGameStore: ObservableObject {
             isConnecting = false
         } catch {
             isConnecting = false
-            connectionError = error.localizedDescription
+            connectionError = mapSessionError(error)
             throw error
         }
     }
@@ -2138,19 +2138,26 @@ final class MultiplayerGameStore: ObservableObject {
         let alivePlayers = allPlayers.filter { $0.isAlive }
         let mafiaCount = alivePlayers.filter { $0.role == .mafia }.count
         let nonMafiaCount = alivePlayers.filter { $0.role != .mafia }.count
-
-        // HAMZA-90: End game when all humans die (only bots remain)
         let aliveHumans = alivePlayers.filter { !$0.isBot }
+
+        // HAMZA-167: End game when all humans die or leave (no point playing with just bots)
+        // Determine winner based on remaining bot composition
         if aliveHumans.isEmpty && !alivePlayers.isEmpty {
-            print("🎮 [evaluateWinners] All humans dead - Mafia wins by default")
-            return (winner: .mafia, isGameOver: true)
+            if mafiaCount == 0 {
+                print("🎮 [evaluateWinners] All humans gone, no mafia bots remain - Citizens win")
+                return (winner: .citizen, isGameOver: true)
+            } else {
+                print("🎮 [evaluateWinners] All humans gone, mafia bots remain - Mafia wins")
+                return (winner: .mafia, isGameOver: true)
+            }
         }
 
+        // Citizens win: All mafia eliminated (humans or bots)
         if mafiaCount == 0 {
             return (winner: .citizen, isGameOver: true)
         }
 
-        // Mafia wins only when ALL non-Mafia are dead
+        // Mafia wins: All non-mafia eliminated (humans or bots)
         if nonMafiaCount == 0 {
             return (winner: .mafia, isGameOver: true)
         }
@@ -2561,6 +2568,61 @@ final class MultiplayerGameStore: ObservableObject {
             isBot: sessionPlayer.isBot,
             removalNote: sessionPlayer.removalNote
         )
+    }
+
+    // MARK: - Error Mapping
+
+    /// Maps raw errors to user-friendly messages, following AuthStore.mapAuthError() pattern
+    private func mapSessionError(_ error: Error) -> String {
+        // 1. Handle known error types with LocalizedError descriptions
+        if let sessionError = error as? SessionError {
+            return sessionError.errorDescription ?? "Session error occurred"
+        }
+        if let realtimeError = error as? RealtimeError {
+            return realtimeError.errorDescription ?? "Connection error occurred"
+        }
+
+        // 2. Network errors
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return "Network error. Please check your internet connection."
+        }
+
+        // 3. Extract and map Supabase/PostgREST errors
+        if let message = extractSupabaseMessage(from: nsError) {
+            let normalized = message.lowercased()
+
+            if normalized.contains("jwt expired") || normalized.contains("token expired") {
+                return "Your session has expired. Please sign in again."
+            }
+            if normalized.contains("not found") || normalized.contains("does not exist") {
+                return "Game session not found. It may have ended."
+            }
+            if normalized.contains("connection refused") || normalized.contains("pgrst") {
+                return "Unable to connect to game server. Please try again."
+            }
+            if normalized.contains("permission denied") || normalized.contains("rls") {
+                return "You don't have permission to perform this action."
+            }
+            if normalized.contains("duplicate") || normalized.contains("unique") {
+                return "You're already in this session."
+            }
+        }
+
+        // 4. Generic fallback
+        return "Connection error. Please check your internet and try again."
+    }
+
+    /// Extracts Supabase error messages from NSError userInfo
+    private func extractSupabaseMessage(from error: NSError) -> String? {
+        // Check various NSError userInfo locations for Supabase messages
+        if let message = error.userInfo["error_description"] as? String, !message.isEmpty {
+            return message
+        }
+        if let message = error.userInfo[NSLocalizedDescriptionKey] as? String, !message.isEmpty {
+            return message
+        }
+        return nil
     }
 
     // MARK: - Cleanup
