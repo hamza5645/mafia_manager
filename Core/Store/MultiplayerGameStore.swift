@@ -72,6 +72,58 @@ final class MultiplayerGameStore: ObservableObject {
         isResolvingPhase = false
     }
 
+    // MARK: - PERF: Single-Pass Player Categorization
+
+    /// Categories of alive players computed in a single pass
+    /// PERF: Reduces O(n*k) filtering passes to O(n) where k is number of categories
+    private struct AlivePlayerCategories {
+        var mafia: [SessionPlayer] = []
+        var doctors: [SessionPlayer] = []
+        var inspectors: [SessionPlayer] = []
+        var citizens: [SessionPlayer] = []
+        var humans: [SessionPlayer] = []
+        var bots: [SessionPlayer] = []
+        var nonHostHumans: [SessionPlayer] = []
+        var all: [SessionPlayer] = []
+    }
+
+    /// Categorize all alive players in a single pass
+    /// - Parameter hostUserId: The host's user ID (to identify non-host players)
+    /// - Returns: Categorized alive players
+    private func categorizeAlivePlayers(hostUserId: UUID?) -> AlivePlayerCategories {
+        var categories = AlivePlayerCategories()
+
+        for player in allPlayers where player.isAlive {
+            categories.all.append(player)
+
+            // Categorize by role
+            switch player.role {
+            case .mafia:
+                categories.mafia.append(player)
+            case .doctor:
+                categories.doctors.append(player)
+            case .inspector:
+                categories.inspectors.append(player)
+            case .citizen:
+                categories.citizens.append(player)
+            case .none:
+                break
+            }
+
+            // Categorize by player type
+            if player.isBot {
+                categories.bots.append(player)
+            } else {
+                categories.humans.append(player)
+                if player.userId != hostUserId {
+                    categories.nonHostHumans.append(player)
+                }
+            }
+        }
+
+        return categories
+    }
+
     /// Detects when a session has been fully reset to lobby (e.g., after rematch)
     private func isFreshLobbyState(_ session: GameSession) -> Bool {
         session.currentPhase == "lobby"
@@ -1353,9 +1405,8 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
-        let aliveMafia = allPlayers.filter { $0.isAlive && $0.role == .mafia }
-        let aliveDoctors = allPlayers.filter { $0.isAlive && $0.role == .doctor }
-        let aliveInspectors = allPlayers.filter { $0.isAlive && $0.role == .inspector }
+        // PERF: Single-pass categorization instead of 6+ separate filter calls
+        let categories = categorizeAlivePlayers(hostUserId: session.hostUserId)
 
         let mafiaActions = await loadActionsSafely(
             sessionId: session.id,
@@ -1372,12 +1423,6 @@ final class MultiplayerGameStore: ObservableObject {
             actionType: .doctorProtect,
             phaseIndex: nightIndex
         )
-
-        // Check if all alive, non-host human players have marked themselves as ready
-        // (Host doesn't need to mark ready since they control phase advancement)
-        let alivePlayers = allPlayers.filter { $0.isAlive }
-        let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
-        let aliveNonHostHumans = aliveHumanPlayers.filter { $0.userId != session.hostUserId }
 
         // Track who has already submitted an action so we don't block on missing ready flags
         let mafiaActors = Set(mafiaActions.map { $0.actorPlayerId })
@@ -1400,7 +1445,8 @@ final class MultiplayerGameStore: ObservableObject {
             }
         } ?? true
 
-        let readyNonHostHumans = aliveNonHostHumans.filter { player in
+        // PERF: Use pre-categorized nonHostHumans instead of filtering again
+        let readyNonHostHumans = categories.nonHostHumans.filter { player in
             let role = player.role
             let passive = (role == .citizen)
 
@@ -1420,7 +1466,7 @@ final class MultiplayerGameStore: ObservableObject {
             return passive || player.isReady || hasAction
         }
 
-        let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+        let nonHostReady = categories.nonHostHumans.isEmpty || readyNonHostHumans.count == categories.nonHostHumans.count
         let allReady = nonHostReady && (!hostHasActiveRole || hostHasSubmitted)
 
         await MainActor.run {
@@ -1740,8 +1786,9 @@ final class MultiplayerGameStore: ObservableObject {
         }
         guard let session = currentSession else { return }
 
-        let alivePlayers = allPlayers.filter { $0.isAlive }
-        let aliveBotIds = alivePlayers.filter { $0.isBot }.map { $0.playerId }
+        // PERF: Single-pass categorization instead of multiple filter chains
+        let categories = categorizeAlivePlayers(hostUserId: session.hostUserId)
+        let aliveBotIds = categories.bots.map { $0.playerId }
 
         // HAMZA-FIX: Fetch current vote actions FIRST to check real state
         var voteActions = await loadActionsSafely(
@@ -1774,11 +1821,9 @@ final class MultiplayerGameStore: ObservableObject {
             }
         }
 
-        // Check if all alive, non-host human players have marked themselves as ready
-        let aliveHumanPlayers = alivePlayers.filter { !$0.isBot }
-        let aliveNonHostHumans = aliveHumanPlayers.filter { $0.userId != session.hostUserId }
-        let readyNonHostHumans = aliveNonHostHumans.filter { $0.isReady }
-        let nonHostReady = aliveNonHostHumans.isEmpty || readyNonHostHumans.count == aliveNonHostHumans.count
+        // PERF: Use pre-categorized players instead of chained filters
+        let readyNonHostHumans = categories.nonHostHumans.filter { $0.isReady }
+        let nonHostReady = categories.nonHostHumans.isEmpty || readyNonHostHumans.count == categories.nonHostHumans.count
 
         // Check if host has voted (only required if host is alive)
         let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
@@ -2623,16 +2668,33 @@ final class MultiplayerGameStore: ObservableObject {
 
     // MARK: - Cleanup
 
+    // PERF: Ensure all timers and tasks are cleaned up to prevent memory leaks
     deinit {
         // Capture timer references directly before self is deallocated
         // Timer.invalidate() is thread-safe, so we can call it synchronously
         let heartbeat = heartbeatTimer
         let playerRefresh = playerRefreshTimer
+        let hostMonitor = hostMonitorTimer
+        let rematch = rematchTimer
         let autoAdvance = pendingAutoAdvanceTask
 
-        // Invalidate timers and cancel tasks synchronously
+        // Invalidate timers synchronously
         heartbeat?.invalidate()
         playerRefresh?.invalidate()
+        hostMonitor?.invalidate()
+        rematch?.invalidate()
+
+        // Cancel pending tasks
         autoAdvance?.cancel()
+
+        // Schedule realtime service cleanup on MainActor
+        // (can't directly access @MainActor properties from deinit)
+        let service = realtimeService
+        Task { @MainActor in
+            service.onDisconnect = nil
+            service.scheduleCleanup()
+        }
+
+        print("🧹 [MultiplayerGameStore] deinit - cleaned up timers, tasks, scheduled realtime cleanup")
     }
 }

@@ -157,7 +157,7 @@ struct MultiplayerLobbyView: View {
 
                                 // HAMZA-94: Sort players by humans first
                                 VStack(spacing: 12) {
-                                    ForEach(multiplayerStore.visiblePlayers.sortedHumansFirst()) { playerInfo in
+                                    ForEach(multiplayerStore.visiblePlayers.sortedHumansFirst(), id: \.id) { playerInfo in
                                         PlayerRow(
                                             playerInfo: playerInfo,
                                             isMe: playerInfo.id == multiplayerStore.myPlayer?.id,

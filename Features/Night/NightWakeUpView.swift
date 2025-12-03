@@ -201,6 +201,8 @@ struct NightWakeUpView: View {
 
     // MARK: - Wake Up Screens
 
+    // PERF: @ViewBuilder enables view identity preservation, reduces temporary allocations
+    @ViewBuilder
     private func wakeUpScreen(for role: Role) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 32) {
@@ -284,7 +286,7 @@ struct NightWakeUpView: View {
 
                     // Show all mafia members
                     VStack(spacing: 12) {
-                        ForEach(store.mafiaPlayers) { player in
+                        ForEach(store.mafiaPlayers, id: \.id) { player in
                             HStack(spacing: 12) {
                                 Circle()
                                     .fill(Design.Colors.dangerRed.opacity(0.3))
@@ -360,7 +362,7 @@ struct NightWakeUpView: View {
                         .foregroundColor(Design.Colors.textSecondary)
 
                     VStack(spacing: 12) {
-                        ForEach(inspectorPlayers) { player in
+                        ForEach(inspectorPlayers, id: \.id) { player in
                             HStack(spacing: 12) {
                                 Circle()
                                     .fill(Design.Colors.actionBlue.opacity(0.3))
@@ -436,7 +438,7 @@ struct NightWakeUpView: View {
                         .foregroundColor(Design.Colors.textSecondary)
 
                     VStack(spacing: 12) {
-                        ForEach(doctorPlayers) { player in
+                        ForEach(doctorPlayers, id: \.id) { player in
                             HStack(spacing: 12) {
                                 Circle()
                                     .fill(Design.Colors.successGreen.opacity(0.3))
@@ -485,6 +487,7 @@ struct NightWakeUpView: View {
 
     // MARK: - Action Screens
 
+    @ViewBuilder
     private func actionScreen(for role: Role) -> some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -523,6 +526,7 @@ struct NightWakeUpView: View {
         }
     }
 
+    @ViewBuilder
     private func playerSelectionList(for role: Role) -> some View {
         let players = filteredPlayers(for: role)
         // Adaptive spacing: use smaller spacing when there are many players
@@ -1021,6 +1025,7 @@ struct NightWakeUpView: View {
     }
 
     /// View shown when a bot is taking their turn
+    @ViewBuilder
     private func botActingView(for role: Role) -> some View {
         VStack(spacing: 40) {
             Spacer()

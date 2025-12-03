@@ -177,6 +177,7 @@ private struct PlayerRoleCard: View {
                         )
                     )
             }
+            .drawingGroup() // PERF: GPU-accelerated rendering for complex gradients
         )
         .overlay(
             RoundedRectangle(cornerRadius: Design.Radii.large, style: .continuous)

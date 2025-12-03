@@ -614,33 +614,59 @@ final class SessionService {
     }
 
     /// Assign roles and numbers to all players
+    /// PERF: Uses batch RPC to reduce N sequential requests to 1
     func assignRolesAndNumbers(
         sessionId: UUID,
         assignments: [(playerId: UUID, role: Role, number: Int)]
     ) async throws {
-        // Update each player with their role and number
-        for assignment in assignments {
-            struct UpdateData: Encodable {
-                let playerNumber: Int
-                let role: String
+        // Build assignment array for batch RPC
+        let assignmentData: [[String: Any]] = assignments.map { assignment in
+            [
+                "player_id": assignment.playerId.uuidString.lowercased(),
+                "role": assignment.role.rawValue,
+                "number": assignment.number
+            ]
+        }
 
-                enum CodingKeys: String, CodingKey {
-                    case playerNumber = "player_number"
-                    case role
+        // Try batch RPC first (single database transaction)
+        do {
+            // Convert to AnyJSON for Supabase RPC
+            let assignmentsJSON = try JSONSerialization.data(withJSONObject: assignmentData)
+            let assignmentsString = String(data: assignmentsJSON, encoding: .utf8) ?? "[]"
+
+            let params: [String: AnyJSON] = [
+                "p_session_id": .string(sessionId.uuidString.lowercased()),
+                "p_assignments": .string(assignmentsString)
+            ]
+
+            try await supabase.rpc("batch_assign_roles", params: params).execute()
+            print("✅ [SessionService] Batch role assignment completed via RPC")
+        } catch {
+            // Fallback to sequential updates if RPC fails
+            print("⚠️ [SessionService] Batch RPC failed, falling back to sequential updates: \(error)")
+            for assignment in assignments {
+                struct UpdateData: Encodable {
+                    let playerNumber: Int
+                    let role: String
+
+                    enum CodingKeys: String, CodingKey {
+                        case playerNumber = "player_number"
+                        case role
+                    }
                 }
+
+                let updateData = UpdateData(
+                    playerNumber: assignment.number,
+                    role: assignment.role.rawValue
+                )
+
+                try await supabase
+                    .from("session_players")
+                    .update(updateData)
+                    .eq("session_id", value: sessionId.uuidString.lowercased())
+                    .eq("player_id", value: assignment.playerId.uuidString.lowercased())
+                    .execute()
             }
-
-            let updateData = UpdateData(
-                playerNumber: assignment.number,
-                role: assignment.role.rawValue
-            )
-
-            try await supabase
-                .from("session_players")
-                .update(updateData)
-                .eq("session_id", value: sessionId.uuidString.lowercased())
-                .eq("player_id", value: assignment.playerId.uuidString.lowercased())
-                .execute()
         }
 
         // Update session with assigned numbers

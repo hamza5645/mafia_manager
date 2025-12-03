@@ -162,11 +162,13 @@ struct VotingPlayerCard: View {
                             .stroke(isSelected ? Design.Colors.brandGold : Design.Colors.stroke, lineWidth: isSelected ? 2 : 1)
                     )
             )
+            // PERF: Fixed radius, animate opacity only for GPU efficiency
             .shadow(
-                color: isSelected ? Design.Colors.brandGold.opacity(0.2) : Color.clear,
-                radius: isSelected ? 8 : 0,
-                y: isSelected ? 4 : 0
+                color: Design.Colors.brandGold.opacity(isSelected ? 0.2 : 0),
+                radius: 8,
+                y: 4
             )
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
         .buttonStyle(.plain)
         .accessibleSelection(player.name, isSelected: isSelected, hint: isSelected ? "Selected for elimination" : "Tap to select for elimination")

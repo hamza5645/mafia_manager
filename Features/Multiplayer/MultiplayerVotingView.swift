@@ -71,9 +71,10 @@ struct MultiplayerVotingView: View {
 
                 // Player Selection
                 // HAMZA-141: Reduced spacing for better display with many players
+                // PERF: LazyVStack defers rendering until visible
                 ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(alivePlayers) { player in
+                    LazyVStack(spacing: 8) {
+                        ForEach(alivePlayers, id: \.id) { player in
                             VoteTargetButton(
                                 playerInfo: player,
                                 isSelected: selectedTargetId == player.playerId
@@ -343,11 +344,13 @@ struct VoteTargetButton: View {
                         lineWidth: isSelected ? 2 : 1
                     )
             )
+            // PERF: Fixed radius, animate opacity only for GPU efficiency
             .shadow(
-                color: isSelected ? Design.Colors.brandGold.opacity(0.3) : .clear,
+                color: Design.Colors.brandGold.opacity(isSelected ? 0.3 : 0),
                 radius: 6,
                 y: 3
             )
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
         .buttonStyle(PlainButtonStyle())
     }

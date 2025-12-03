@@ -380,6 +380,7 @@ final class RealtimeService: ObservableObject {
     ///   - onPlayerUpdate: Callback for player updates
     ///   - onActionUpdate: Callback for action updates
     ///   - onReconnected: Called when successfully reconnected
+    /// PERF: Refactored from recursive to loop-based to prevent call stack growth
     func attemptResubscribe(
         sessionId: UUID,
         onSessionUpdate: @escaping (GameSession) -> Void,
@@ -390,57 +391,53 @@ final class RealtimeService: ObservableObject {
         // Cancel any pending reconnect task
         reconnectTask?.cancel()
 
-        // Exponential backoff: 1s, 2s, 4s, 8s, 16s (max 30s)
-        let baseDelay: Double = 1.0
-        let maxDelay: Double = 30.0
-        let delay = min(baseDelay * pow(2.0, Double(reconnectAttempts)), maxDelay)
-
         reconnectTask = Task {
             isReconnecting = true
-            print("⏳ [RealtimeService] Attempting reconnect in \(delay)s (attempt \(reconnectAttempts + 1)/10)")
 
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            // Exponential backoff constants
+            let baseDelay: Double = 1.0
+            let maxDelay: Double = 30.0
+            let maxAttempts = 10
 
-            guard !Task.isCancelled else {
-                print("🛑 [RealtimeService] Reconnect attempt cancelled")
-                return
-            }
+            // Loop-based retry instead of recursion
+            while reconnectAttempts < maxAttempts && !Task.isCancelled {
+                let delay = min(baseDelay * pow(2.0, Double(reconnectAttempts)), maxDelay)
+                print("⏳ [RealtimeService] Attempting reconnect in \(delay)s (attempt \(reconnectAttempts + 1)/\(maxAttempts))")
 
-            do {
-                try await subscribeToSession(
-                    sessionId: sessionId,
-                    onSessionUpdate: onSessionUpdate,
-                    onPlayerUpdate: onPlayerUpdate,
-                    onActionUpdate: onActionUpdate
-                )
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
 
-                // Successfully reconnected
-                print("✅ [RealtimeService] Reconnected successfully after \(reconnectAttempts + 1) attempts")
-                isReconnecting = false
-
-                // Trigger snapshot resync
-                await onReconnected()
-            } catch {
-                reconnectAttempts += 1
-
-                // Give up after 10 attempts
-                if reconnectAttempts >= 10 {
-                    print("❌ [RealtimeService] Max reconnect attempts reached. Giving up.")
-                    isReconnecting = false
-                    connectionError = "Failed to reconnect after 10 attempts"
-                    return
+                guard !Task.isCancelled else {
+                    print("🛑 [RealtimeService] Reconnect attempt cancelled")
+                    break
                 }
 
-                // Retry
-                print("🔄 [RealtimeService] Reconnect attempt \(reconnectAttempts) failed, will retry")
-                attemptResubscribe(
-                    sessionId: sessionId,
-                    onSessionUpdate: onSessionUpdate,
-                    onPlayerUpdate: onPlayerUpdate,
-                    onActionUpdate: onActionUpdate,
-                    onReconnected: onReconnected
-                )
+                do {
+                    try await subscribeToSession(
+                        sessionId: sessionId,
+                        onSessionUpdate: onSessionUpdate,
+                        onPlayerUpdate: onPlayerUpdate,
+                        onActionUpdate: onActionUpdate
+                    )
+
+                    // Successfully reconnected
+                    print("✅ [RealtimeService] Reconnected successfully after \(reconnectAttempts + 1) attempts")
+                    isReconnecting = false
+
+                    // Trigger snapshot resync
+                    await onReconnected()
+                    return // Success - exit the loop and task
+                } catch {
+                    reconnectAttempts += 1
+                    print("🔄 [RealtimeService] Reconnect attempt \(reconnectAttempts) failed, will retry")
+                }
             }
+
+            // Max attempts reached or cancelled
+            if reconnectAttempts >= maxAttempts {
+                print("❌ [RealtimeService] Max reconnect attempts reached. Giving up.")
+                connectionError = "Failed to reconnect after \(maxAttempts) attempts"
+            }
+            isReconnecting = false
         }
     }
 
