@@ -118,9 +118,9 @@ private struct SelectionCard: View {
                     .frame(width: 28, height: 28)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline)
+                    Text(title).font(Design.Typography.headline)
                     Text(help)
-                        .font(.footnote)
+                        .font(Design.Typography.footnote)
                         .foregroundStyle(Design.Colors.textSecondary)
                 }
             }
@@ -161,7 +161,7 @@ private struct SelectionCard: View {
             if let sel = selectionID, let p = players.first(where: { $0.id == sel }) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Selected: #\(p.number) – \(p.name)")
-                        .font(.subheadline)
+                        .font(Design.Typography.subheadline)
                     switch resultKind {
                     case .none:
                         EmptyView()
@@ -170,11 +170,12 @@ private struct SelectionCard: View {
                             Text("Result:")
                             Chip(text: p.role.displayName.uppercased(), style: .outline(p.role.accentColor))
                         }
-                        .font(.subheadline.bold())
+                        .font(Design.Typography.subheadline)
+                        .fontWeight(.bold)
                     }
                 }
             } else {
-                Text("No selection yet").font(.subheadline).foregroundStyle(Design.Colors.textSecondary)
+                Text("No selection yet").font(Design.Typography.subheadline).foregroundStyle(Design.Colors.textSecondary)
             }
         }
         .padding(.vertical, 6)

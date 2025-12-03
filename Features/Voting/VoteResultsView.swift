@@ -2,6 +2,7 @@ import SwiftUI
 
 struct VoteResultsView: View {
     @EnvironmentObject private var store: GameStore
+    @State private var showEndGameConfirmation = false
 
     private var votingSession: VotingSession? {
         store.state.currentVotingSession
@@ -122,6 +123,24 @@ struct VoteResultsView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
     }
 }
 

@@ -258,16 +258,22 @@ struct RoleRevealView: View {
 
             // Action button
             Button {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                // Show blur immediately for privacy
+                withAnimation(Design.Animations.easeInOut) {
                     showBlur = true
                 }
 
+                // After blur transition delay, update state while still blurred
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Reset state while blur is still showing
+                    isRoleRevealed = false
                     store.advanceToNextPlayer()
 
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isRoleRevealed = false
-                        showBlur = false
+                    // Then hide blur after state has settled
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(Design.Animations.easeInOut) {
+                            showBlur = false
+                        }
                     }
                 }
             } label: {
@@ -299,43 +305,5 @@ struct RoleRevealView: View {
     }
 }
 
-// Role card styling (reused from AssignmentsView)
-private struct RoleCardPalette {
-    let numberColor: Color
-    let iconColor: Color
-    let iconBackground: Color
-    let borderColor: Color
-    let glowColor: Color
-    let backgroundGradient: LinearGradient
-
-    init(role: Role) {
-        let accent = role.accentColor
-        self.iconColor = accent
-        self.iconBackground = accent.opacity(0.2)
-        self.borderColor = accent.opacity(0.7)
-        self.numberColor = Design.Colors.textPrimary
-
-        // Role-specific glow colors
-        switch role {
-        case .mafia:
-            self.glowColor = Design.Colors.glowRed
-        case .doctor:
-            self.glowColor = Design.Colors.glowGreen
-        case .inspector:
-            self.glowColor = Design.Colors.glowBlue
-        case .citizen:
-            self.glowColor = Color.clear
-        }
-
-        // Enhanced gradient with richer colors
-        let top = accent.opacity(role == .citizen ? 0.12 : 0.2)
-        let middle = Design.Colors.surface1.opacity(0.95)
-        let bottom = Design.Colors.surface2.opacity(0.9)
-        self.backgroundGradient = LinearGradient(
-            colors: [top, middle, bottom],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
+// RoleCardPalette now located in Core/Components/RoleCardPalette.swift
 

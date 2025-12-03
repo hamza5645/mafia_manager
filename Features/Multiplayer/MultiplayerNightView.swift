@@ -82,9 +82,9 @@ struct MultiplayerNightView: View {
                         .padding(.vertical, 16)
                         .background(
                             isSubmitting
-                                ? roleAccentColor(for: myRole).opacity(0.7)
+                                ? roleAccentColor(for: myRole).opacity(Design.Opacity.strong)
                                 : (selectedTargetId == nil
-                                    ? Design.Colors.textSecondary.opacity(0.3)
+                                    ? Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
                                     : roleAccentColor(for: myRole))
                         )
                         .foregroundColor(Design.Colors.surface0)
@@ -166,7 +166,7 @@ struct MultiplayerNightView: View {
                         .foregroundStyle(
                             multiplayerStore.isPhaseReadyToAdvance
                                 ? Design.Colors.brandGold
-                                : Design.Colors.textSecondary.opacity(0.5)
+                                : Design.Colors.textSecondary.opacity(Design.Opacity.medium)
                         )
                         .padding(.vertical, 8)
                         .padding(.horizontal, 16)

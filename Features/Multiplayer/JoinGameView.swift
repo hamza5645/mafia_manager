@@ -10,7 +10,6 @@ struct JoinGameView: View {
     @State private var isJoining = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
-    @ScaledMetric(relativeTo: .title) private var roomCodeFontSize: CGFloat = 24
 
     var body: some View {
         NavigationStack {
@@ -63,7 +62,7 @@ struct JoinGameView: View {
                                     .foregroundStyle(Design.Colors.textPrimary)
 
                                 TextField("XXXXXX", text: $roomCode)
-                                    .font(.system(size: roomCodeFontSize, weight: .bold, design: .monospaced))
+                                    .font(Design.Typography.roomCode)
                                     .textInputAutocapitalization(.characters)
                                     .disableAutocorrection(true)
                                     .multilineTextAlignment(.center)
@@ -103,7 +102,7 @@ struct JoinGameView: View {
                             HStack {
                                 if isJoining {
                                     ProgressView()
-                                        .tint(.white)
+                                        .tint(Design.Colors.surface0)
                                 } else {
                                     Text("Join Room")
                                         .font(Design.Typography.body)
@@ -114,7 +113,7 @@ struct JoinGameView: View {
                             .background(
                                 canJoin
                                     ? Design.Colors.brandGold
-                                    : Design.Colors.textSecondary.opacity(0.3)
+                                    : Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
                             )
                             .foregroundColor(Design.Colors.surface0)
                             .cornerRadius(Design.Radii.medium)

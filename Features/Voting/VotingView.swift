@@ -6,6 +6,7 @@ struct VotingView: View {
 
     @State private var selectedTargetID: UUID?
     @State private var showConfirmation = false
+    @State private var showEndGameConfirmation = false
 
     private var currentPlayer: Player? {
         guard currentPlayerIndex >= 0 && currentPlayerIndex < store.state.players.count else {
@@ -79,6 +80,24 @@ struct VotingView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
         .alert("Confirm Vote", isPresented: $showConfirmation) {
             Button("Confirm", role: .destructive) {
                 confirmVote()

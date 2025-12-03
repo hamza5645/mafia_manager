@@ -3,6 +3,7 @@ import SwiftUI
 struct BotVotingRevealView: View {
     @EnvironmentObject private var store: GameStore
     @ScaledMetric(relativeTo: .title2) private var headerIconSize: CGFloat = 28
+    @State private var showEndGameConfirmation = false
 
     private var botVotes: [(bot: Player, target: Player)] {
         guard let session = store.state.currentVotingSession else { return [] }
@@ -68,6 +69,24 @@ struct BotVotingRevealView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEndGameConfirmation = true
+                } label: {
+                    Text("End Game")
+                        .foregroundColor(Design.Colors.dangerRed)
+                }
+            }
+        }
+        .alert("Are you sure you want to end the game?", isPresented: $showEndGameConfirmation) {
+            Button("End Game", role: .destructive) {
+                store.endGameEarly()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will end the current game without determining a winner.")
+        }
     }
 }
 

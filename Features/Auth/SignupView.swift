@@ -26,12 +26,12 @@ struct SignupView: View {
                     VStack(spacing: 8) {
                         Text(isUpgrading ? "Create Account" : "Create Account")
                             .font(Design.Typography.title1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .accessibilityAddTraits(.isHeader)
 
                         Text(isUpgrading ? "Keep your game progress" : "Join Mafia Manager")
                             .font(Design.Typography.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Design.Colors.textSecondary)
                     }
                     .padding(.top, 40)
 
@@ -45,7 +45,7 @@ struct SignupView: View {
 
                             Text("Your game stats will be saved to your new account")
                                 .font(Design.Typography.footnote)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Design.Colors.textSecondary)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
@@ -64,7 +64,7 @@ struct SignupView: View {
                             .textInputAutocapitalization(.words)
                             .padding()
                             .background(Design.Colors.surface1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .cornerRadius(Design.Radii.card)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -81,7 +81,7 @@ struct SignupView: View {
                             .keyboardType(.emailAddress)
                             .padding()
                             .background(Design.Colors.surface1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .cornerRadius(Design.Radii.card)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -96,7 +96,7 @@ struct SignupView: View {
                             .disableAutocorrection(true)
                             .padding()
                             .background(Design.Colors.surface1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .cornerRadius(Design.Radii.card)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -111,7 +111,7 @@ struct SignupView: View {
                             .disableAutocorrection(true)
                             .padding()
                             .background(Design.Colors.surface1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .cornerRadius(Design.Radii.card)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -183,16 +183,16 @@ struct SignupView: View {
                         HStack {
                             if authStore.isLoading {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(Design.Colors.textPrimary)
                             } else {
                                 Text("Create Account")
-                                    .fontWeight(.semibold)
+                                    .font(Design.Typography.headline)
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Design.Colors.actionBlue)
-                        .foregroundColor(.white)
+                        .foregroundColor(Design.Colors.textPrimary)
                         .cornerRadius(Design.Radii.button)
                         .shadow(color: Design.Colors.actionBlue.opacity(0.3), radius: 16, y: 8)
                     }
@@ -203,16 +203,16 @@ struct SignupView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Password must:")
                             .font(Design.Typography.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Design.Colors.textSecondary)
 
                         HStack(spacing: 8) {
                             Image(systemName: sanitizedPassword.count >= 6 ? "checkmark.circle.fill" : "circle")
                                 .font(Design.Typography.caption)
-                                .foregroundColor(sanitizedPassword.count >= 6 ? Design.Colors.successGreen : .white.opacity(0.3))
+                                .foregroundColor(sanitizedPassword.count >= 6 ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
                                 .accessibilityHidden(true)
                             Text("Be at least 6 characters")
                                 .font(Design.Typography.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Design.Colors.textSecondary)
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("At least 6 characters: \(sanitizedPassword.count >= 6 ? "met" : "not met")")
@@ -220,11 +220,11 @@ struct SignupView: View {
                         HStack(spacing: 8) {
                             Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "circle")
                                 .font(Design.Typography.caption)
-                                .foregroundColor(passwordsMatch ? Design.Colors.successGreen : .white.opacity(0.3))
+                                .foregroundColor(passwordsMatch ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
                                 .accessibilityHidden(true)
                             Text("Match confirmation")
                                 .font(Design.Typography.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Design.Colors.textSecondary)
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Passwords match: \(passwordsMatch ? "met" : "not met")")
@@ -241,7 +241,7 @@ struct SignupView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Text("Already have an account?")
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Design.Colors.textSecondary)
                                 Text("Sign In")
                                     .foregroundColor(Design.Colors.brandGold)
                                     .fontWeight(.semibold)
@@ -257,7 +257,7 @@ struct SignupView: View {
                         } label: {
                             Text("Cancel")
                                 .font(Design.Typography.subheadline)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Design.Colors.textSecondary)
                         }
                         .padding(.bottom, 32)
                     }

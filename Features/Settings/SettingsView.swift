@@ -27,18 +27,18 @@ struct SettingsView: View {
                                         .frame(width: 50, height: 50)
                                         .overlay(
                                             Text(authStore.userProfile?.displayName.prefix(1).uppercased() ?? "U")
-                                                .font(.title3.bold())
+                                                .font(Design.Typography.title3)
                                                 .foregroundColor(Design.Colors.brandGold)
                                         )
 
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(authStore.userProfile?.displayName ?? "User")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
+                                            .font(Design.Typography.headline)
+                                            .foregroundColor(Design.Colors.textPrimary)
 
                                         Text("View Profile")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.7))
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.textSecondary)
                                     }
                                 }
                                 .padding(.vertical, 8)
@@ -53,7 +53,7 @@ struct SettingsView: View {
                                             .frame(width: 50, height: 50)
 
                                         Text(guestDisplayInitial)
-                                            .font(.title3.bold())
+                                            .font(Design.Typography.title3)
                                             .foregroundColor(Design.Colors.brandGold)
 
                                         // Guest badge
@@ -72,12 +72,12 @@ struct SettingsView: View {
 
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Guest Player")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
+                                            .font(Design.Typography.headline)
+                                            .foregroundColor(Design.Colors.textPrimary)
 
                                         Text("Playing as: \(guestDisplayName)")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.7))
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.textSecondary)
                                     }
                                 }
                                 .padding(.vertical, 8)
@@ -98,7 +98,7 @@ struct SettingsView: View {
                                                 .font(Design.Typography.subheadline)
                                                 .fontWeight(.semibold)
                                         }
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Design.Colors.textPrimary)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                         .background(Design.Colors.surface2)
@@ -138,25 +138,25 @@ struct SettingsView: View {
                                         .frame(width: 50, height: 50)
                                         .overlay(
                                             Image(systemName: "person.circle.fill")
-                                                .font(.title2)
+                                                .font(Design.Typography.title2)
                                                 .foregroundColor(Design.Colors.actionBlue)
                                         )
 
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Login / Sign Up")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
+                                            .font(Design.Typography.headline)
+                                            .foregroundColor(Design.Colors.textPrimary)
 
                                         Text("Save your stats and custom roles")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.7))
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.textSecondary)
                                     }
 
                                     Spacer()
 
                                     Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.3))
+                                        .font(Design.Typography.caption)
+                                        .foregroundColor(Design.Colors.textTertiary)
                                 }
                                 .padding(.vertical, 8)
                             }
@@ -285,12 +285,12 @@ struct SettingsRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(Design.Typography.body)
-                    .foregroundColor(.white)
+                    .foregroundColor(Design.Colors.textPrimary)
 
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(Design.Typography.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Design.Colors.textSecondary)
                 }
             }
         }

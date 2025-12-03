@@ -94,7 +94,7 @@ struct CreateGameView: View {
                             HStack {
                                 if isCreating {
                                     ProgressView()
-                                        .tint(.white)
+                                        .tint(Design.Colors.surface0)
                                 } else {
                                     Text("Create Room")
                                         .font(Design.Typography.body)
@@ -104,7 +104,7 @@ struct CreateGameView: View {
                             .padding(.vertical, 16)
                             .background(
                                 playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? Design.Colors.textSecondary.opacity(0.3)
+                                    ? Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
                                     : Design.Colors.brandGold
                             )
                             .foregroundColor(Design.Colors.surface0)

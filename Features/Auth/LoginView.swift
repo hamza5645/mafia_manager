@@ -25,7 +25,7 @@ struct LoginView: View {
 
                         Text("Sign in to continue")
                             .font(Design.Typography.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Design.Colors.textSecondary)
                     }
                     .padding(.top, 60)
 
@@ -38,7 +38,7 @@ struct LoginView: View {
                             .keyboardType(.emailAddress)
                             .padding()
                             .background(Design.Colors.surface1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .cornerRadius(Design.Radii.card)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -50,7 +50,7 @@ struct LoginView: View {
                             .disableAutocorrection(true)
                             .padding()
                             .background(Design.Colors.surface1)
-                            .foregroundColor(.white)
+                            .foregroundColor(Design.Colors.textPrimary)
                             .cornerRadius(Design.Radii.card)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -77,18 +77,18 @@ struct LoginView: View {
                         HStack {
                             if authStore.isLoading {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(Design.Colors.textPrimary)
                             } else {
                                 Text("Sign In")
-                                    .fontWeight(.semibold)
+                                    .font(Design.Typography.headline)
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(Design.Colors.actionBlue)
-                        .foregroundColor(.white)
+                        .foregroundColor(Design.Colors.textPrimary)
                         .cornerRadius(Design.Radii.card)
-                        .shadow(color: Design.Colors.actionBlue.opacity(0.3), radius: 16, y: 8)
+                        .shadow(color: Design.Colors.glowBlue, radius: Design.Shadows.large.radius, y: Design.Shadows.large.y)
                     }
                     .disabled(authStore.isLoading || sanitizedEmail.isEmpty || sanitizedPassword.isEmpty)
                     .padding(.horizontal, 32)
@@ -111,7 +111,7 @@ struct LoginView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text("Don't have an account?")
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Design.Colors.textSecondary)
                             Text("Sign Up")
                                 .foregroundColor(Design.Colors.brandGold)
                                 .fontWeight(.semibold)
@@ -156,13 +156,13 @@ struct PasswordResetView: View {
             VStack(spacing: 24) {
                 Text("Reset Password")
                     .font(Design.Typography.title1)
-                    .foregroundColor(.white)
+                    .foregroundColor(Design.Colors.textPrimary)
                     .padding(.top, 40)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Enter your email address and we'll send you a link to reset your password")
                     .font(Design.Typography.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Design.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
 
@@ -173,7 +173,7 @@ struct PasswordResetView: View {
                     .keyboardType(.emailAddress)
                     .padding()
                     .background(Design.Colors.surface1)
-                    .foregroundColor(.white)
+                    .foregroundColor(Design.Colors.textPrimary)
                     .cornerRadius(Design.Radii.card)
                     .overlay(
                         RoundedRectangle(cornerRadius: Design.Radii.card)
@@ -210,16 +210,16 @@ struct PasswordResetView: View {
                     HStack {
                         if authStore.isLoading {
                             ProgressView()
-                                .tint(.white)
+                                .tint(Design.Colors.textPrimary)
                         } else {
                             Text("Send Reset Link")
-                                .fontWeight(.semibold)
+                                .font(Design.Typography.headline)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                     .background(Design.Colors.actionBlue)
-                    .foregroundColor(.white)
+                    .foregroundColor(Design.Colors.textPrimary)
                     .cornerRadius(Design.Radii.card)
                 }
                 .disabled(authStore.isLoading || sanitizedResetEmail.isEmpty)

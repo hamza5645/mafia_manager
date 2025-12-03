@@ -56,7 +56,17 @@ enum Design {
         static let lg: CGFloat = 16
         static let xl: CGFloat = 20
         static let xxl: CGFloat = 24
+        static let xxxl: CGFloat = 32
+        static let xxxxl: CGFloat = 40
         static let grid: CGFloat = 8
+    }
+
+    enum Opacity {
+        static let subtle: Double = 0.15
+        static let disabled: Double = 0.3
+        static let light: Double = 0.3
+        static let medium: Double = 0.5
+        static let strong: Double = 0.7
     }
 
     enum Typography {
@@ -90,6 +100,7 @@ enum Design {
         static let quick = Animation.spring(response: 0.25, dampingFraction: 0.9)
         static let smooth = Animation.spring(response: 0.35, dampingFraction: 0.85)
         static let bouncy = Animation.spring(response: 0.4, dampingFraction: 0.75)
+        static let easeInOut = Animation.easeInOut(duration: 0.3)
     }
 }
 

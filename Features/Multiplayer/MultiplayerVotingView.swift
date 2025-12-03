@@ -104,7 +104,7 @@ struct MultiplayerVotingView: View {
                             .padding(.vertical, 16)
                             .background(
                                 (selectedTargetId == nil && dayIndex > 0)
-                                    ? Design.Colors.textSecondary.opacity(0.3)
+                                    ? Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
                                     : Design.Colors.brandGold
                             )
                             .foregroundColor(Design.Colors.surface0)
@@ -183,7 +183,7 @@ struct MultiplayerVotingView: View {
                     .foregroundStyle(
                         multiplayerStore.isPhaseReadyToAdvance
                             ? Design.Colors.brandGold
-                            : Design.Colors.textSecondary.opacity(0.5)
+                            : Design.Colors.textSecondary.opacity(Design.Opacity.medium)
                     )
                     .padding(.vertical, 8)
                     .padding(.horizontal, 16)
@@ -206,7 +206,7 @@ struct MultiplayerVotingView: View {
 
             Image(systemName: "eye.slash.fill")
                 .font(Design.Typography.displayEmoji)
-                .foregroundStyle(Design.Colors.textSecondary.opacity(0.5))
+                .foregroundStyle(Design.Colors.textSecondary.opacity(Design.Opacity.medium))
                 .accessibilityHidden(true)
 
             Text("Spectating")
