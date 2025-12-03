@@ -47,8 +47,6 @@ struct RootView: View {
                         hasSeenIntro = true
                     }
                 )
-            } else if gameStore.returnToSoloSetup {
-                SetupView()
             } else if gameStore.state.players.isEmpty || gameStore.isFreshSetup {
                 GameModeSelectionView()
             } else {

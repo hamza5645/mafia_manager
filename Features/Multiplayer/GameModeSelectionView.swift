@@ -2,11 +2,13 @@ import SwiftUI
 
 struct GameModeSelectionView: View {
     @EnvironmentObject private var authStore: AuthStore
+    @EnvironmentObject private var gameStore: GameStore
     @State private var selectedMode: GameMode?
     @State private var showingAuth = false
     @State private var showingSettings = false
     @State private var showingGuestNameInput = false
     @State private var autoNavigateOnline = false  // Trigger auto navigation after guest login
+    @State private var autoNavigateLocal = false   // Trigger auto navigation for "Play Again"
     @ScaledMetric(relativeTo: .body) private var gearIconSize: CGFloat = 20
 
     enum GameMode: Hashable {
@@ -107,6 +109,12 @@ struct GameModeSelectionView: View {
                 isActive: $autoNavigateOnline
             ) { EmptyView() }
 
+            // Hidden link to push Local flow automatically for "Play Again"
+            NavigationLink(
+                destination: SetupView(),
+                isActive: $autoNavigateLocal
+            ) { EmptyView() }
+
             .navigationDestination(for: GameMode.self) { mode in
                 switch mode {
                 case .local:
@@ -145,6 +153,13 @@ struct GameModeSelectionView: View {
                         showingGuestNameInput = false
                     }
                 )
+            }
+            .onAppear {
+                // Auto-navigate to local setup for "Play Again" flow
+                if gameStore.returnToSoloSetup {
+                    selectedMode = .local
+                    autoNavigateLocal = true
+                }
             }
         }
     }
