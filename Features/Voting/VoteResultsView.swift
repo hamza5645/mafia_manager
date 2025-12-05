@@ -201,6 +201,7 @@ struct VoteCountRow: View {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack {
         VoteResultsView()
@@ -222,3 +223,4 @@ struct VoteCountRow: View {
             }())
     }
 }
+#endif
