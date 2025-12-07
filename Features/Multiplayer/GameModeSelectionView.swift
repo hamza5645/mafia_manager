@@ -26,7 +26,7 @@ struct GameModeSelectionView: View {
                     VStack(spacing: 32) {
                         // Title
                         VStack(spacing: 10) {
-                            Text("MAFIA MANAGER")
+                            Text("MAFIA")
                                 .font(Design.Typography.largeTitle)
                                 .kerning(1.5)
                                 .foregroundStyle(

@@ -29,7 +29,7 @@ struct SignupView: View {
                             .foregroundColor(Design.Colors.textPrimary)
                             .accessibilityAddTraits(.isHeader)
 
-                        Text(isUpgrading ? "Keep your game progress" : "Join Mafia Manager")
+                        Text(isUpgrading ? "Keep your game progress" : "Join Mafia")
                             .font(Design.Typography.subheadline)
                             .foregroundColor(Design.Colors.textSecondary)
                     }

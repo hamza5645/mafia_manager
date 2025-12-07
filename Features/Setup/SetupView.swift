@@ -26,7 +26,7 @@ struct SetupView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Enhanced Title Section with Gradient
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("MAFIA MANAGER")
+                    Text("MAFIA")
                         .font(Design.Typography.largeTitle)
                         .kerning(1.5)
                         .foregroundStyle(

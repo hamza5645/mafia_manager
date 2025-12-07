@@ -29,7 +29,6 @@
 		2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5A2E68EF3A002C5B31 /* Role.swift */; };
 		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
-		2F5F248D2EE31210000710F6 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2F5F248C2EE31210000710F6 /* Info.plist */; };
 		2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* Vision.md */; };
 		2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */; };
 		2F9C12BC2EC4F21300D06767 /* Core/Services/BotDecisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9C12BB2EC4F21300D06767 /* Core/Services/BotDecisionService.swift */; };
@@ -117,7 +116,6 @@
 		2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
 		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		2F5F248C2EE31210000710F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = mafia_manager/Info.plist; sourceTree = "<group>"; };
 		2F78C7742EAEC2B1004BC2A7 /* Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Vision.md; sourceTree = "<group>"; };
 		2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathRevealView.swift; sourceTree = "<group>"; };
 		2F9C12BB2EC4F21300D06767 /* Core/Services/BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/BotDecisionService.swift; sourceTree = SOURCE_ROOT; };
@@ -376,7 +374,6 @@
 		2FF7CF162E68E6E70023D42B = {
 			isa = PBXGroup;
 			children = (
-				2F5F248C2EE31210000710F6 /* Info.plist */,
 				2F1E70062ED1BB19004366E6 /* Assets.xcassets */,
 				2F3DBB552E68EF3A002C5B31 /* buildServer.json */,
 				2F3DBB612E68EF3A002C5B31 /* Core */,
@@ -535,7 +532,6 @@
 			files = (
 				2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */,
 				2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */,
-				2F5F248D2EE31210000710F6 /* Info.plist in Resources */,
 				2F3DBB752E68EF3A002C5B31 /* README.md in Resources */,
 				A73CA2BD45494EA3A36D7A53 /* mafia_gunshot.wav in Resources */,
 				9EA73543D2004D3AA739EE52 /* police_siren.wav in Resources */,
@@ -753,6 +749,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Mafia;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -786,6 +783,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Mafia;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

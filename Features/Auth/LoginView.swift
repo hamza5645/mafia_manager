@@ -18,7 +18,7 @@ struct LoginView: View {
                 VStack(spacing: 32) {
                     // Title
                     VStack(spacing: 8) {
-                        Text("Mafia Manager")
+                        Text("Mafia")
                             .font(Design.Typography.largeTitle)
                             .foregroundColor(Design.Colors.brandGold)
                             .accessibilityAddTraits(.isHeader)

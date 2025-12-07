@@ -177,7 +177,7 @@ private struct IntroScreen1: View {
                             .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textSecondary)
 
-                        Text("Mafia Manager")
+                        Text("Mafia")
                             .font(Design.Typography.largeTitle)
                             .fontWeight(.heavy)
                             .foregroundStyle(
