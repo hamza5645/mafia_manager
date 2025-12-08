@@ -154,6 +154,19 @@ struct CreateGameView: View {
         errorMessage = nil
 
         Task {
+            // Auto sign-in as guest if not authenticated
+            if !authStore.isAuthenticated {
+                let success = await authStore.signInAsGuest(displayName: trimmedName)
+                if !success {
+                    await MainActor.run {
+                        isCreating = false
+                        errorMessage = "Failed to connect. Please try again."
+                    }
+                    return
+                }
+            }
+
+            // Now create the session
             do {
                 try await multiplayerStore.createSession(
                     playerName: trimmedName,

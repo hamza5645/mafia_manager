@@ -510,18 +510,26 @@ final class SessionService {
         )
 
         do {
-            // CRITICAL: Verify session is still valid right before insert
-            // This ensures the JWT token is fresh and included in the request
-            guard let _authSession = try? await supabase.auth.session else {
+            // CRITICAL: Get session for auth header
+            guard let authSession = try? await supabase.auth.session else {
                 throw SessionError.notAuthenticated
             }
 
-            let players: [SessionPlayer] = try await supabase
-                .from("session_players")
-                .insert(createData)
-                .select()
-                .execute()
-                .value
+            // Use RPC function to bypass RLS issues with anonymous auth
+            // The function validates auth.uid() internally and returns SETOF session_players
+            let players: [SessionPlayer] = try await supabase.rpc(
+                "add_session_player",
+                params: [
+                    "p_session_id": AnyJSON.string(sessionId.uuidString.lowercased()),
+                    "p_user_id": userId != nil ? AnyJSON.string(userId!.uuidString.lowercased()) : AnyJSON.null,
+                    "p_player_id": AnyJSON.string(playerId.uuidString.lowercased()),
+                    "p_player_name": AnyJSON.string(playerName),
+                    "p_is_bot": AnyJSON.bool(isBot)
+                ]
+            )
+            .setHeader(name: "Authorization", value: "Bearer \(authSession.accessToken)")
+            .execute()
+            .value
 
             guard let player = players.first else {
                 throw SessionError.playerNotCreated

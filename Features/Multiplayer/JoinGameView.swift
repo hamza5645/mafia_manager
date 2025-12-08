@@ -174,6 +174,19 @@ struct JoinGameView: View {
         errorMessage = nil
 
         Task {
+            // Auto sign-in as guest if not authenticated
+            if !authStore.isAuthenticated {
+                let success = await authStore.signInAsGuest(displayName: trimmedName)
+                if !success {
+                    await MainActor.run {
+                        isJoining = false
+                        errorMessage = "Failed to connect. Please try again."
+                    }
+                    return
+                }
+            }
+
+            // Now join the session
             do {
                 try await multiplayerStore.joinSession(
                     roomCode: roomCode,
