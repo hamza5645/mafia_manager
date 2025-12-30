@@ -282,7 +282,7 @@ struct MultiplayerLobbyView: View {
                     Button {
                         showingLeaveConfirmation = true
                     } label: {
-                        Text("Leave & Quit")
+                        Text("Leave")
                             .font(Design.Typography.body)
                             .foregroundStyle(Design.Colors.dangerRed)
                             .frame(maxWidth: .infinity)
