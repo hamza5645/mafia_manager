@@ -1012,8 +1012,9 @@ final class MultiplayerGameStore: ObservableObject {
             return nil
         }
 
-        // Use current round ID from session, or generate a new one if missing
-        let roundId = session.currentRoundId ?? UUID()
+        // FIX: Use resolved round ID instead of fallback to prevent orphan actions
+        // when Realtime hasn't propagated currentRoundId yet (same fix as submitVote)
+        let roundId = try await resolvedRoundId()
 
         let action: GameAction
 
@@ -2499,8 +2500,9 @@ final class MultiplayerGameStore: ObservableObject {
     ) async throws {
         guard let session = currentSession else { return }
 
-        // Use current round ID from session, or generate a new one if missing
-        let roundId = session.currentRoundId ?? UUID()
+        // FIX: Use resolved round ID instead of fallback to prevent orphan actions
+        // when Realtime hasn't propagated currentRoundId yet (same fix as submitVote)
+        let roundId = try await resolvedRoundId()
 
         let action: GameAction
 
