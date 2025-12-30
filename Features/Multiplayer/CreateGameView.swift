@@ -10,6 +10,7 @@ struct CreateGameView: View {
     @State private var isCreating = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
+    @State private var hasStartedSession = false
 
     var body: some View {
         NavigationStack {
@@ -122,7 +123,14 @@ struct CreateGameView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if hasStartedSession {
+                            Task {
+                                try? await multiplayerStore.leaveSession()
+                                dismiss()
+                            }
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
             }
@@ -137,6 +145,14 @@ struct CreateGameView: View {
                     playerName = displayName
                 } else if let guestName = authStore.guestDisplayName, !guestName.isEmpty {
                     playerName = guestName
+                }
+            }
+            .onDisappear {
+                // Cleanup on swipe-to-dismiss if session was started but not navigated to lobby
+                if hasStartedSession && !showingLobby {
+                    Task {
+                        try? await multiplayerStore.leaveSession()
+                    }
                 }
             }
         }
@@ -168,6 +184,11 @@ struct CreateGameView: View {
 
             // Now create the session
             do {
+                // Mark session as started before async call
+                await MainActor.run {
+                    hasStartedSession = true
+                }
+
                 try await multiplayerStore.createSession(
                     playerName: trimmedName,
                     botCount: botCount
@@ -180,6 +201,7 @@ struct CreateGameView: View {
             } catch {
                 await MainActor.run {
                     isCreating = false
+                    hasStartedSession = false // Reset on failure
                     errorMessage = error.localizedDescription
                 }
             }

@@ -47,6 +47,9 @@ final class MultiplayerGameStore: ObservableObject {
     private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
+    // Combine subscription storage (prevents immediate deallocation)
+    private var reconnectingSubscription: AnyCancellable?
+
     // Host health monitoring (HAMZA-165: Host disconnect detection)
     private var hostMonitorTimer: Timer?
     private let hostOfflineThreshold: TimeInterval = 15.0 // 3 missed heartbeats (5s each)
@@ -134,7 +137,8 @@ final class MultiplayerGameStore: ObservableObject {
 
     init() {
         // Observe RealtimeService connection state changes
-        _ = realtimeService.$isReconnecting
+        // CRITICAL: Store subscription to prevent immediate deallocation
+        reconnectingSubscription = realtimeService.$isReconnecting
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isReconnecting in
                 self?.isRealtimeReconnecting = isReconnecting
@@ -161,6 +165,13 @@ final class MultiplayerGameStore: ObservableObject {
 
         resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
+
+        // Reset connection state from any previous session
+        isRealtimeConnected = false
+        isRealtimeReconnecting = false
+        isHostOffline = false
+        currentSessionId = nil
+        wasKicked = false
 
         isConnecting = true
         connectionError = nil
@@ -229,6 +240,13 @@ final class MultiplayerGameStore: ObservableObject {
 
         resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
+
+        // Reset connection state from any previous session
+        isRealtimeConnected = false
+        isRealtimeReconnecting = false
+        isHostOffline = false
+        currentSessionId = nil
+        wasKicked = false
 
         isConnecting = true
         connectionError = nil
@@ -2681,6 +2699,7 @@ final class MultiplayerGameStore: ObservableObject {
         let hostMonitor = hostMonitorTimer
         let rematch = rematchTimer
         let autoAdvance = pendingAutoAdvanceTask
+        let combineSubscription = reconnectingSubscription
 
         // Invalidate timers synchronously
         heartbeat?.invalidate()
@@ -2688,15 +2707,18 @@ final class MultiplayerGameStore: ObservableObject {
         hostMonitor?.invalidate()
         rematch?.invalidate()
 
-        // Cancel pending tasks
+        // Cancel pending tasks and subscriptions
         autoAdvance?.cancel()
+        combineSubscription?.cancel()
 
         // Schedule realtime service cleanup on MainActor
         // (can't directly access @MainActor properties from deinit)
+        // Use Task.detached to avoid MainActor requirement in deinit
         let service = realtimeService
-        Task { @MainActor in
+        Task.detached { @MainActor in
             service.onDisconnect = nil
-            service.scheduleCleanup()
+            // unsubscribeAll() now cancels reconnectTask internally
+            await service.unsubscribeAll()
         }
 
         print("🧹 [MultiplayerGameStore] deinit - cleaned up timers, tasks, scheduled realtime cleanup")

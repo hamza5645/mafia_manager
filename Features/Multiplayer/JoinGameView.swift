@@ -10,6 +10,7 @@ struct JoinGameView: View {
     @State private var isJoining = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
+    @State private var hasStartedSession = false
 
     var body: some View {
         NavigationStack {
@@ -131,7 +132,14 @@ struct JoinGameView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if hasStartedSession {
+                            Task {
+                                try? await multiplayerStore.leaveSession()
+                                dismiss()
+                            }
+                        } else {
+                            dismiss()
+                        }
                     }
                     .accessibilityHint("Close join game and return to the previous screen")
                 }
@@ -147,6 +155,14 @@ struct JoinGameView: View {
                     playerName = displayName
                 } else if let guestName = authStore.guestDisplayName, !guestName.isEmpty {
                     playerName = guestName
+                }
+            }
+            .onDisappear {
+                // Cleanup on swipe-to-dismiss if session was started but not navigated to lobby
+                if hasStartedSession && !showingLobby {
+                    Task {
+                        try? await multiplayerStore.leaveSession()
+                    }
                 }
             }
         }
@@ -188,6 +204,11 @@ struct JoinGameView: View {
 
             // Now join the session
             do {
+                // Mark session as started before async call
+                await MainActor.run {
+                    hasStartedSession = true
+                }
+
                 try await multiplayerStore.joinSession(
                     roomCode: roomCode,
                     playerName: trimmedName
@@ -200,6 +221,7 @@ struct JoinGameView: View {
             } catch {
                 await MainActor.run {
                     isJoining = false
+                    hasStartedSession = false // Reset on failure
                     errorMessage = error.localizedDescription
                 }
             }

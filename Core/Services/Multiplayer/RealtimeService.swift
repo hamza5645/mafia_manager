@@ -329,6 +329,16 @@ final class RealtimeService: ObservableObject {
 
     /// Unsubscribe from all channels
     func unsubscribeAll() async {
+        // CRITICAL: Cancel reconnect task FIRST to prevent race condition
+        // Without this, a reconnect loop can re-subscribe AFTER we've cleaned up
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        isReconnecting = false
+        reconnectAttempts = 0
+
+        // Allow cancellation to propagate before cleanup
+        await Task.yield()
+
         // Cancel all channel status monitoring tasks
         channelStatusTasks.values.forEach { $0.cancel() }
         channelStatusTasks.removeAll()
