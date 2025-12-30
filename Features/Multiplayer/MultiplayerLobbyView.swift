@@ -45,6 +45,10 @@ struct MultiplayerLobbyView: View {
                         MultiplayerVotingResultsView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
 
+                    case .voteDeathReveal(let dayIndex, _, _, _, _, _):
+                        MultiplayerVoteDeathRevealView(dayIndex: dayIndex)
+                            .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+
                     case .gameOver:
                         MultiplayerGameOverView()
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))

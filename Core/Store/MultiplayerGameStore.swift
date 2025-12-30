@@ -1960,7 +1960,56 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
-        // Apply eliminations
+        // Cache eliminated player info BEFORE any elimination occurs
+        var eliminatedName: String?
+        var eliminatedNumber: Int?
+        var eliminatedRole: String?
+        var eliminatedVoteCount: Int?
+
+        if let eliminatedId = eliminatedPlayerId {
+            if let player = allPlayers.first(where: { $0.playerId == eliminatedId }) {
+                eliminatedName = player.playerName
+                eliminatedNumber = player.playerNumber
+                eliminatedRole = player.role?.rawValue
+            }
+            eliminatedVoteCount = voteCounts[eliminatedId]
+        }
+
+        // Transition to vote death reveal phase (NOT applying elimination yet)
+        let revealPhaseData: PhaseData = .voteDeathReveal(
+            dayIndex: dayIndex,
+            eliminatedPlayerId: eliminatedPlayerId,
+            eliminatedPlayerName: eliminatedName,
+            eliminatedPlayerNumber: eliminatedNumber,
+            eliminatedPlayerRole: eliminatedRole,
+            voteCount: eliminatedVoteCount
+        )
+
+        try await sessionService.updateSessionState(
+            sessionId: session.id,
+            currentPhase: "vote_death_reveal",
+            phaseData: revealPhaseData,
+            dayIndex: session.dayIndex,
+            dayHistory: session.dayHistory,
+            isGameOver: nil,
+            winner: nil
+        )
+    }
+
+    /// Called by host after vote death reveal animation completes
+    func completeVoteDeathReveal(dayIndex: Int) async throws {
+        guard isHost else { throw SessionError.notHost }
+        guard case .voteDeathReveal(
+            let activeDayIndex,
+            let eliminatedPlayerId,
+            _, _, _, _
+        ) = currentSession?.currentPhaseData,
+              activeDayIndex == dayIndex else {
+            return
+        }
+        guard let session = currentSession else { return }
+
+        // NOW apply eliminations
         var removedPlayerIds: [UUID] = []
         var hostEliminated = false
         if let eliminated = eliminatedPlayerId {
@@ -2017,6 +2066,7 @@ final class MultiplayerGameStore: ObservableObject {
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
         }
 
+        // CRITICAL: Host transfer happens AFTER reveal completes
         await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
     }
 

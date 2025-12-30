@@ -74,6 +74,14 @@ enum PhaseData: Codable, Sendable, Equatable {
     case deathReveal(nightIndex: Int)
     case voting(dayIndex: Int)
     case votingResults(dayIndex: Int, voteCounts: [UUID: Int], eliminatedPlayerId: UUID?)
+    case voteDeathReveal(
+        dayIndex: Int,
+        eliminatedPlayerId: UUID?,
+        eliminatedPlayerName: String?,
+        eliminatedPlayerNumber: Int?,
+        eliminatedPlayerRole: String?,
+        voteCount: Int?
+    )
     case gameOver(winner: String?)
 
     private enum CodingKeys: String, CodingKey {
@@ -85,6 +93,10 @@ enum PhaseData: Codable, Sendable, Equatable {
         case winner
         case voteCounts
         case eliminatedPlayerId
+        case eliminatedPlayerName
+        case eliminatedPlayerNumber
+        case eliminatedPlayerRole
+        case voteCount
     }
 
     init(from decoder: Decoder) throws {
@@ -115,6 +127,21 @@ enum PhaseData: Codable, Sendable, Equatable {
             let voteCounts = try container.decode([UUID: Int].self, forKey: .voteCounts)
             let eliminatedPlayerId = try container.decodeIfPresent(UUID.self, forKey: .eliminatedPlayerId)
             self = .votingResults(dayIndex: dayIndex, voteCounts: voteCounts, eliminatedPlayerId: eliminatedPlayerId)
+        case "voteDeathReveal":
+            let dayIndex = try container.decode(Int.self, forKey: .dayIndex)
+            let eliminatedPlayerId = try container.decodeIfPresent(UUID.self, forKey: .eliminatedPlayerId)
+            let eliminatedPlayerName = try container.decodeIfPresent(String.self, forKey: .eliminatedPlayerName)
+            let eliminatedPlayerNumber = try container.decodeIfPresent(Int.self, forKey: .eliminatedPlayerNumber)
+            let eliminatedPlayerRole = try container.decodeIfPresent(String.self, forKey: .eliminatedPlayerRole)
+            let voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount)
+            self = .voteDeathReveal(
+                dayIndex: dayIndex,
+                eliminatedPlayerId: eliminatedPlayerId,
+                eliminatedPlayerName: eliminatedPlayerName,
+                eliminatedPlayerNumber: eliminatedPlayerNumber,
+                eliminatedPlayerRole: eliminatedPlayerRole,
+                voteCount: voteCount
+            )
         case "gameOver":
             let winner = try container.decodeIfPresent(String.self, forKey: .winner)
             self = .gameOver(winner: winner)
@@ -150,6 +177,14 @@ enum PhaseData: Codable, Sendable, Equatable {
             try container.encode(dayIndex, forKey: .dayIndex)
             try container.encode(voteCounts, forKey: .voteCounts)
             try container.encodeIfPresent(eliminatedPlayerId, forKey: .eliminatedPlayerId)
+        case .voteDeathReveal(let dayIndex, let eliminatedPlayerId, let eliminatedPlayerName, let eliminatedPlayerNumber, let eliminatedPlayerRole, let voteCount):
+            try container.encode("voteDeathReveal", forKey: .type)
+            try container.encode(dayIndex, forKey: .dayIndex)
+            try container.encodeIfPresent(eliminatedPlayerId, forKey: .eliminatedPlayerId)
+            try container.encodeIfPresent(eliminatedPlayerName, forKey: .eliminatedPlayerName)
+            try container.encodeIfPresent(eliminatedPlayerNumber, forKey: .eliminatedPlayerNumber)
+            try container.encodeIfPresent(eliminatedPlayerRole, forKey: .eliminatedPlayerRole)
+            try container.encodeIfPresent(voteCount, forKey: .voteCount)
         case .gameOver(let winner):
             try container.encode("gameOver", forKey: .type)
             try container.encodeIfPresent(winner, forKey: .winner)
