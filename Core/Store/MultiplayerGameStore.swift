@@ -1243,6 +1243,10 @@ final class MultiplayerGameStore: ObservableObject {
             // Reset all players' ready status at the start of night phase
             await resetAllPlayersReady()
 
+            // CRITICAL: Refresh session to get correct roundId before processing bots
+            // Fixes bug where inspector bot actions get wrong roundId due to Realtime delay
+            try? await refreshSession()
+
             if !processedBotNightIndices.contains(nightIndex) {
                 do {
                     try await processBotActions(nightIndex: nightIndex)
