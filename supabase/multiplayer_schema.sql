@@ -467,11 +467,8 @@ BEGIN
         WHERE session_id = p_session_id
           AND player_id = p_target_player_id;
 
-        IF v_result = 'mafia' THEN
-            RETURN json_build_object('success', true, 'result', 'mafia');
-        ELSE
-            RETURN json_build_object('success', true, 'result', 'not_mafia');
-        END IF;
+        -- Return the actual role (mafia, doctor, citizen, inspector)
+        RETURN json_build_object('success', true, 'result', v_result);
     END IF;
 
     RETURN json_build_object('success', true);
