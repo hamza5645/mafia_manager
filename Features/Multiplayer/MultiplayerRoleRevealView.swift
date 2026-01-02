@@ -12,12 +12,11 @@ struct MultiplayerRoleRevealView: View {
             Design.Colors.surface0.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 32) {
-                        Spacer().frame(height: 20)
+                Spacer()
 
-                        if let myRole = multiplayerStore.myRole,
-                           let myNumber = multiplayerStore.myNumber {
+                VStack(spacing: 24) {
+                    if let myRole = multiplayerStore.myRole,
+                       let myNumber = multiplayerStore.myNumber {
                     
                     // Role Icon
                     ZStack {
@@ -70,32 +69,31 @@ struct MultiplayerRoleRevealView: View {
                             .padding(.top, 4)
                     }
 
-                    // Mafia teammates (if applicable)
+                    // Mafia teammates (if applicable) - centered horizontal pills
                     if myRole == .mafia && !multiplayerStore.mafiaTeammates.isEmpty {
                         VStack(spacing: 12) {
                             Text("Your Mafia Teammates")
                                 .font(Design.Typography.body)
                                 .foregroundStyle(Design.Colors.textSecondary)
 
-                            // HAMZA-136: Numbers are kept secret - show names only
-                            VStack(spacing: 8) {
+                            // HAMZA-136: Numbers are kept secret - show names only (centered pills)
+                            HStack(spacing: 10) {
                                 ForEach(multiplayerStore.mafiaTeammates) { teammate in
-                                    HStack {
+                                    HStack(spacing: 6) {
                                         Image(systemName: "person.fill")
-                                            .font(Design.Typography.body)
+                                            .font(Design.Typography.caption)
                                             .accessibilityHidden(true)
                                         Text(teammate.playerName)
                                             .font(Design.Typography.body)
                                     }
                                     .foregroundStyle(Design.Colors.dangerRed)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(Design.Colors.dangerRed.opacity(0.1))
-                                    .cornerRadius(Design.Radii.small)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(Design.Colors.dangerRed.opacity(0.15))
+                                    .cornerRadius(20)
                                 }
                             }
                         }
-                        .padding(.horizontal, 20)
                         .padding(.top, 8)
                     }
 
@@ -103,10 +101,9 @@ struct MultiplayerRoleRevealView: View {
                     ProgressView()
                         .tint(Design.Colors.brandGold)
                 }
-
-                        Spacer().frame(height: 40)
-                    }
                 }
+
+                Spacer()
 
                 // Confirm Button (all human players must confirm, including host)
                 // Host must mark as seen before they can start the night phase

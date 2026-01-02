@@ -34,7 +34,7 @@ struct MultiplayerNightView: View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: 16) {
                 // Header
                 VStack(spacing: 8) {
                     Text("Night \(nightIndex + 1)")
@@ -49,7 +49,7 @@ struct MultiplayerNightView: View {
                             .padding(.horizontal, 20)
                     }
                 }
-                .padding(.top, 40)
+                .padding(.top, 24)
 
                 Spacer()
 
@@ -138,7 +138,8 @@ struct MultiplayerNightView: View {
                                 .padding(.top, 4)
                         }
                     }
-                    .padding(.bottom, multiplayerStore.isHost ? 8 : 40)
+                    .padding(.top, 8)
+                    .padding(.bottom, multiplayerStore.isHost ? 8 : 24)
                 }
 
                 // Host Controls
@@ -191,6 +192,12 @@ struct MultiplayerNightView: View {
         }
         .onChange(of: multiplayerStore.myPlayer?.isReady) { _, _ in
             Task { await autoReadyIfPassive() }
+        }
+        .onChange(of: nightIndex) { _, _ in
+            // Reset state when transitioning to a new night
+            hasSubmitted = false
+            selectedTargetId = nil
+            inspectorResult = nil
         }
     }
 
@@ -257,7 +264,7 @@ struct MultiplayerNightView: View {
     }
 
     private var mafiaView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 12) {
             // Show mafia teammates as pill-shaped chips
             if !multiplayerStore.mafiaTeammates.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
@@ -293,7 +300,7 @@ struct MultiplayerNightView: View {
             targetSelectionView(
                 title: "Choose Target",
                 subtitle: "Coordinate with your team",
-                players: alivePlayers // Visibility rules already filter appropriately
+                players: alivePlayers
             )
         }
     }
@@ -467,7 +474,8 @@ struct MultiplayerNightView: View {
                             accentColor: roleAccentColor(for: myRole),
                             voteCount: voteCounts[player.playerId] ?? 0
                         ) {
-                            guard !isSubmitting else { return }
+                            // Disable selection after submission
+                            guard !isSubmitting && !hasSubmitted else { return }
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
                                 selectedTargetId = player.playerId
                             }
@@ -478,6 +486,7 @@ struct MultiplayerNightView: View {
                 .padding(.horizontal, 20)
             }
         }
+        .opacity(hasSubmitted ? 0.6 : 1.0) // Dim grid after submission
     }
 
     private func roleInstructionText(for role: Role) -> Text {
