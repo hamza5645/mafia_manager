@@ -47,6 +47,13 @@ final class MultiplayerGameStore: ObservableObject {
     private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
+    // HAMZA-FIX: Bot reactive voting - track which bots have submitted night actions
+    private var botNightActionsSubmitted: Set<UUID> = []  // Track bot playerIds that already voted this night
+    private var previousNightVotes: [UUID: UUID] = [:]  // [actorId: previousTargetId] for vote change tracking
+
+    // Vote counts for real-time UI updates
+    @Published var nightVoteCounts: [ActionType: [UUID: Int]] = [:]  // [actionType: [targetId: count]]
+
     // Combine subscription storage (prevents immediate deallocation)
     private var reconnectingSubscription: AnyCancellable?
 
@@ -73,6 +80,9 @@ final class MultiplayerGameStore: ObservableObject {
         processedBotVotingDays.removeAll()
         isPhaseReadyToAdvance = false
         isResolvingPhase = false
+        botNightActionsSubmitted.removeAll()
+        previousNightVotes.removeAll()
+        nightVoteCounts.removeAll()
     }
 
     // MARK: - PERF: Single-Pass Player Categorization
@@ -133,6 +143,29 @@ final class MultiplayerGameStore: ObservableObject {
             && session.dayIndex == 0
             && session.nightHistory.isEmpty
             && session.dayHistory.isEmpty
+    }
+
+    // MARK: - Bot Reactive Voting Helpers
+
+    /// Check if there are alive human players with a specific role
+    /// Used to determine if bots should wait for human votes or vote independently
+    private func hasHumanWithRole(_ role: Role) -> Bool {
+        allPlayers.contains { !$0.isBot && $0.isAlive && $0.role == role }
+    }
+
+    /// Get bots with a specific role that are alive
+    private func getAliveBotsWithRole(_ role: Role) -> [SessionPlayer] {
+        allPlayers.filter { $0.isBot && $0.isAlive && $0.role == role }
+    }
+
+    /// Convert ActionType to Role for matching
+    private func roleFromActionType(_ actionType: ActionType) -> Role? {
+        switch actionType {
+        case .mafiaTarget: return .mafia
+        case .doctorProtect: return .doctor
+        case .inspectorCheck: return .inspector
+        case .vote: return nil  // Day voting, not role-specific
+        }
     }
 
     init() {
@@ -725,15 +758,20 @@ final class MultiplayerGameStore: ObservableObject {
         // This prevents stale actions from previous phases (Realtime replays) from triggering duplicate resolution
         guard let session = currentSession else { return }
 
+        var isNightPhase = false
+        var activeNightIndex: Int?
+
         switch session.currentPhaseData {
-        case .night(let activeNightIndex, _):
+        case .night(let nightIndex, _):
             // Only process night actions for the current night
             guard action.actionType == .mafiaTarget || action.actionType == .doctorProtect || action.actionType == .inspectorCheck else {
                 return
             }
-            guard action.phaseIndex == activeNightIndex else {
+            guard action.phaseIndex == nightIndex else {
                 return
             }
+            isNightPhase = true
+            activeNightIndex = nightIndex
 
         case .voting(let activeDayIndex):
             // Only process vote actions for the current day
@@ -749,12 +787,109 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
+        // HAMZA-FIX: Update vote counts for real-time UI
+        if isNightPhase, let targetId = action.targetPlayerId {
+            updateNightVoteCount(action: action)
+        }
+
+        // HAMZA-FIX: Bot coordination - if this is a human action, trigger bots to follow
+        if isNightPhase, let nightIndex = activeNightIndex {
+            handleNightActionForBotCoordination(action: action, nightIndex: nightIndex)
+        }
+
         // If we made it here, the action is for the current active phase
         if isHost {
             Task {
                 await self.evaluatePhaseProgression(trigger: "action_update")
             }
         }
+    }
+
+    // MARK: - Bot Reactive Voting & Vote Count Tracking
+
+    /// Update vote counts for real-time UI display
+    /// Handles vote changes by decrementing old target and incrementing new target
+    private func updateNightVoteCount(action: GameAction) {
+        guard let targetId = action.targetPlayerId else { return }
+
+        let actorId = action.actorPlayerId
+        let actionType = action.actionType
+
+        // Initialize counts for this action type if not exists
+        if nightVoteCounts[actionType] == nil {
+            nightVoteCounts[actionType] = [:]
+        }
+
+        // Check if this actor has a previous vote (vote change)
+        if let previousTargetId = previousNightVotes[actorId], previousTargetId != targetId {
+            // Decrement old target count
+            if let oldCount = nightVoteCounts[actionType]?[previousTargetId], oldCount > 0 {
+                nightVoteCounts[actionType]?[previousTargetId] = oldCount - 1
+            }
+        }
+
+        // Increment new target count
+        nightVoteCounts[actionType]?[targetId, default: 0] += 1
+
+        // Track this vote for future change detection
+        previousNightVotes[actorId] = targetId
+
+        print("📊 [VoteCount] \(actionType): updated counts = \(nightVoteCounts[actionType] ?? [:])")
+    }
+
+    /// Handle bot coordination when a human submits a night action
+    /// Bots with the same role will immediately match the human's target
+    private func handleNightActionForBotCoordination(action: GameAction, nightIndex: Int) {
+        // Only host can submit bot actions
+        guard isHost else { return }
+
+        // Get the role for this action type
+        guard let role = roleFromActionType(action.actionType) else { return }
+
+        // Check if the action is from a human player
+        let isHumanAction = allPlayers.contains { player in
+            player.playerId == action.actorPlayerId && !player.isBot
+        }
+
+        guard isHumanAction else { return }
+
+        // Get the target from this action
+        guard let humanTargetId = action.targetPlayerId else { return }
+
+        // Get bots with the same role that haven't submitted yet
+        let botsToSubmit = getAliveBotsWithRole(role).filter { bot in
+            !botNightActionsSubmitted.contains(bot.playerId)
+        }
+
+        guard !botsToSubmit.isEmpty else { return }
+
+        print("🤖 [BotCoordination] Human \(role) voted for target. Triggering \(botsToSubmit.count) bot(s) to follow.")
+
+        // Submit matching actions for each bot
+        Task {
+            for bot in botsToSubmit {
+                do {
+                    try await submitBotAction(
+                        botPlayerId: bot.playerId,
+                        actionType: action.actionType,
+                        nightIndex: nightIndex,
+                        targetPlayerId: humanTargetId
+                    )
+                    botNightActionsSubmitted.insert(bot.playerId)
+                    print("🤖 [BotCoordination] Bot \(bot.playerName) submitted \(action.actionType) matching human target")
+                } catch {
+                    print("❌ [BotCoordination] Failed to submit bot action for \(bot.playerName): \(error)")
+                }
+            }
+        }
+    }
+
+    /// Clear bot night action tracking when entering a new night phase
+    func clearBotNightActionsForNewNight() {
+        botNightActionsSubmitted.removeAll()
+        previousNightVotes.removeAll()
+        nightVoteCounts.removeAll()
+        print("🔄 [BotCoordination] Cleared bot night action tracking for new night")
     }
 
     // MARK: - Player Management
@@ -1557,10 +1692,20 @@ final class MultiplayerGameStore: ObservableObject {
             roundId: session.currentRoundId
         )
 
-        let mafiaTargetId = determineMajorityTarget(from: mafiaActions)
+        // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
+        let alivePlayers = allPlayers.filter { $0.isAlive }
+        let validMafiaTargets = alivePlayers.filter { $0.role != .mafia }.map { $0.playerId }
+        let validInspectorTargets = alivePlayers.filter { $0.role != .inspector }.map { $0.playerId }
+        let validDoctorTargets = alivePlayers.map { $0.playerId }  // Doctor can protect anyone
+
+        // HAMZA-FIX: Use new determineMajorityTarget with tie-breakers (NEVER returns nil when valid targets exist)
+        let mafiaTargetId = determineMajorityTarget(from: mafiaActions, validTargets: validMafiaTargets)
+        let doctorTargetId = determineMajorityTarget(from: doctorActions, validTargets: validDoctorTargets)
+        let inspectorTargetId = determineMajorityTarget(from: inspectorActions, validTargets: validInspectorTargets)
+
         let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
-        let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
+        let doctorProtectedId = doctorTargetId ?? (targetWasSaved ? mafiaTargetId : doctorProtectionIds.first)
 
         // Build lookup from visiblePlayers (same source that works for target resolution)
         let playerNumberLookup = Dictionary(uniqueKeysWithValues:
@@ -1581,8 +1726,8 @@ final class MultiplayerGameStore: ObservableObject {
             .compactMap { $0 }
             .sorted()
 
-        // Inspector checked ID can be public (but result stays private)
-        let inspectorCheckedId = inspectorActions.first?.targetPlayerId
+        // Inspector checked ID uses majority vote with tie-breakers (same as other roles)
+        let inspectorCheckedId = inspectorTargetId
 
         // Phase 1: Record actions WITHOUT applying deaths (isResolved=false, resultingDeaths=[])
         let nightRecord = NightActionRecord(
@@ -1720,10 +1865,20 @@ final class MultiplayerGameStore: ObservableObject {
             roundId: session.currentRoundId
         )
 
-        let mafiaTargetId = determineMajorityTarget(from: mafiaActions)
+        // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
+        let alivePlayers = allPlayers.filter { $0.isAlive }
+        let validMafiaTargets = alivePlayers.filter { $0.role != .mafia }.map { $0.playerId }
+        let validInspectorTargets = alivePlayers.filter { $0.role != .inspector }.map { $0.playerId }
+        let validDoctorTargets = alivePlayers.map { $0.playerId }
+
+        // HAMZA-FIX: Use new determineMajorityTarget with tie-breakers
+        let mafiaTargetId = determineMajorityTarget(from: mafiaActions, validTargets: validMafiaTargets)
+        let doctorTargetId = determineMajorityTarget(from: doctorActions, validTargets: validDoctorTargets)
+        let _ = determineMajorityTarget(from: inspectorActions, validTargets: validInspectorTargets)  // Inspector result logged
+
         let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
-        let doctorProtectedId = targetWasSaved ? mafiaTargetId : doctorProtectionIds.first
+        let doctorProtectedId = doctorTargetId ?? (targetWasSaved ? mafiaTargetId : doctorProtectionIds.first)
 
         var resultingDeaths: [UUID] = []
         var hostEliminated = false
@@ -2149,7 +2304,13 @@ final class MultiplayerGameStore: ObservableObject {
         await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
     }
 
-    private func determineMajorityTarget(from actions: [GameAction]) -> UUID? {
+    /// Determine the target from multiple actions using majority vote
+    /// HAMZA-FIX: GUARANTEED to return a target (never nil) - uses tie-breakers
+    /// - Parameters:
+    ///   - actions: The submitted actions to count votes from
+    ///   - validTargets: Fallback list of valid targets if no votes exist
+    /// - Returns: The chosen target UUID (NEVER nil when validTargets is non-empty)
+    private func determineMajorityTarget(from actions: [GameAction], validTargets: [UUID]) -> UUID? {
         var counts: [UUID: Int] = [:]
         for action in actions {
             guard let targetId = action.targetPlayerId else { continue }
@@ -2157,15 +2318,54 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         guard let maxVotes = counts.values.max(), maxVotes > 0 else {
-            return nil
+            // FALLBACK: No votes submitted - pick first valid target
+            print("⚠️ [determineMajorityTarget] No votes found, using fallback target")
+            return validTargets.first
         }
 
         let leaders = counts.filter { $0.value == maxVotes }
-        // If tie (more than one leader), no one is eliminated
-        guard leaders.count == 1 else {
-            return nil
+
+        // Single winner - return it
+        if leaders.count == 1 {
+            return leaders.first?.key
         }
-        return leaders.first?.key
+
+        // TIE-BREAKER 1: Prefer targets voted by humans
+        let humanActorIds = Set(allPlayers.filter { !$0.isBot }.map { $0.playerId })
+        let humanVotedTargets = actions
+            .filter { humanActorIds.contains($0.actorPlayerId) }
+            .compactMap { $0.targetPlayerId }
+
+        let leadersWithHumanVotes = leaders.keys.filter { humanVotedTargets.contains($0) }
+        if leadersWithHumanVotes.count == 1 {
+            print("🎯 [determineMajorityTarget] Tie broken by human vote priority")
+            return leadersWithHumanVotes.first
+        }
+
+        // TIE-BREAKER 2: First vote wins (chronological)
+        let leaderSet = Set(leaders.keys)
+        let firstAction = actions
+            .filter { action in
+                guard let targetId = action.targetPlayerId else { return false }
+                return leaderSet.contains(targetId)
+            }
+            .sorted { $0.createdAt < $1.createdAt }
+            .first
+
+        if let target = firstAction?.targetPlayerId {
+            print("🎯 [determineMajorityTarget] Tie broken by first vote (chronological)")
+            return target
+        }
+
+        // FINAL FALLBACK: Return any leader (should never reach here)
+        print("⚠️ [determineMajorityTarget] Using final fallback - any leader")
+        return leaders.keys.first ?? validTargets.first
+    }
+
+    /// Legacy wrapper for backward compatibility - returns nil on empty actions
+    /// Use the new version with validTargets for guaranteed non-nil results
+    private func determineMajorityTargetLegacy(from actions: [GameAction]) -> UUID? {
+        return determineMajorityTarget(from: actions, validTargets: [])
     }
 
     @discardableResult
@@ -2348,9 +2548,13 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Bot Actions (Host Only)
 
     /// Process bot actions for current phase
+    /// HAMZA-FIX: Bots now follow humans - only process independently if no humans have that role
     func processBotActions(nightIndex: Int) async throws {
         guard isHost else { return }
         guard let session = currentSession else { return }
+
+        // Clear tracking for this new night phase
+        clearBotNightActionsForNewNight()
 
         let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
         guard !aliveBots.isEmpty else { return }
@@ -2358,68 +2562,77 @@ final class MultiplayerGameStore: ObservableObject {
         let alivePlayersList = allPlayers.filter { $0.isAlive }
         let localAlivePlayers = alivePlayersList.map { makeLocalPlayer(from: $0) }
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
+
+        // Group bots by role to process each role's coordination separately
         let mafiaBots = aliveBots.filter { $0.role == .mafia }
-        // Compute a single shared Mafia target so bot teammates never split votes
-        let sharedMafiaTarget = botService.chooseCoordinatedMafiaTarget(
-            mafiaBots: mafiaBots.map { makeLocalPlayer(from: $0) },
-            alivePlayers: localAlivePlayers,
-            nightHistory: nightHistory
-        )
+        let doctorBots = aliveBots.filter { $0.role == .doctor }
+        let inspectorBots = aliveBots.filter { $0.role == .inspector }
 
-        for bot in aliveBots {
-            guard let botRole = bot.role else {
-                continue
-            }
-
-            let botAsPlayer = makeLocalPlayer(from: bot)
-
-            var targetId: UUID?
-
-            switch botRole {
-            case .mafia:
-                targetId = sharedMafiaTarget ?? botService.chooseMafiaTarget(
-                    botPlayer: botAsPlayer,
+        // MAFIA: Only process independently if NO human Mafia
+        if !mafiaBots.isEmpty && !hasHumanWithRole(.mafia) {
+            // No human Mafia - bots vote independently but coordinated with each other
+            let sharedMafiaTarget = botService.chooseCoordinatedMafiaTarget(
+                mafiaBots: mafiaBots.map { makeLocalPlayer(from: $0) },
+                alivePlayers: localAlivePlayers,
+                nightHistory: nightHistory
+            )
+            for bot in mafiaBots {
+                let targetId = sharedMafiaTarget ?? botService.chooseMafiaTarget(
+                    botPlayer: makeLocalPlayer(from: bot),
                     alivePlayers: localAlivePlayers,
                     nightHistory: nightHistory
                 )
-            case .doctor:
-                targetId = botService.chooseDoctorProtection(
-                    botPlayer: botAsPlayer,
+                try await submitBotActionAndTrack(bot: bot, actionType: .mafiaTarget, nightIndex: nightIndex, targetId: targetId)
+            }
+            print("🤖 [processBotActions] Mafia bots voted independently (no human Mafia)")
+        } else if !mafiaBots.isEmpty {
+            print("🤖 [processBotActions] Mafia bots waiting for human vote via Realtime")
+        }
+
+        // DOCTOR: Only process independently if NO human Doctor
+        if !doctorBots.isEmpty && !hasHumanWithRole(.doctor) {
+            for bot in doctorBots {
+                let targetId = botService.chooseDoctorProtection(
+                    botPlayer: makeLocalPlayer(from: bot),
                     alivePlayers: localAlivePlayers,
                     nightHistory: nightHistory
                 )
-            case .inspector:
-                targetId = botService.chooseInspectorTarget(
-                    botPlayer: botAsPlayer,
+                try await submitBotActionAndTrack(bot: bot, actionType: .doctorProtect, nightIndex: nightIndex, targetId: targetId)
+            }
+            print("🤖 [processBotActions] Doctor bots voted independently (no human Doctor)")
+        } else if !doctorBots.isEmpty {
+            print("🤖 [processBotActions] Doctor bots waiting for human vote via Realtime")
+        }
+
+        // INSPECTOR: Only process independently if NO human Inspector
+        if !inspectorBots.isEmpty && !hasHumanWithRole(.inspector) {
+            for bot in inspectorBots {
+                let targetId = botService.chooseInspectorTarget(
+                    botPlayer: makeLocalPlayer(from: bot),
                     alivePlayers: localAlivePlayers,
                     nightHistory: nightHistory
                 )
-            case .citizen:
-                // Citizens don't have night actions
-                continue
+                try await submitBotActionAndTrack(bot: bot, actionType: .inspectorCheck, nightIndex: nightIndex, targetId: targetId)
             }
+            print("🤖 [processBotActions] Inspector bots voted independently (no human Inspector)")
+        } else if !inspectorBots.isEmpty {
+            print("🤖 [processBotActions] Inspector bots waiting for human vote via Realtime")
+        }
+    }
 
-            // Submit bot action
-            let actionType: ActionType = switch botRole {
-            case .mafia: .mafiaTarget
-            case .doctor: .doctorProtect
-            case .inspector: .inspectorCheck
-            case .citizen: .vote // Not used for night
-            }
-
-            if actionType != .vote {
-                do {
-                    try await submitBotAction(
-                        botPlayerId: bot.playerId,
-                        actionType: actionType,
-                        nightIndex: nightIndex,
-                        targetPlayerId: targetId
-                    )
-                } catch {
-                    print("❌ [processBotActions] Failed to submit action for \(bot.playerName): \(error)")
-                    // Continue processing other bots even if one fails
-                }
-            }
+    /// Helper to submit bot action and track it
+    private func submitBotActionAndTrack(bot: SessionPlayer, actionType: ActionType, nightIndex: Int, targetId: UUID?) async throws {
+        do {
+            try await submitBotAction(
+                botPlayerId: bot.playerId,
+                actionType: actionType,
+                nightIndex: nightIndex,
+                targetPlayerId: targetId
+            )
+            botNightActionsSubmitted.insert(bot.playerId)
+        } catch {
+            print("❌ [processBotActions] Failed to submit action for \(bot.playerName): \(error)")
+            // Continue processing other bots even if one fails
         }
     }
 

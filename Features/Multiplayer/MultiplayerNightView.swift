@@ -424,6 +424,19 @@ struct MultiplayerNightView: View {
         subtitle: String,
         players: [PublicPlayerInfo]
     ) -> some View {
+        // HAMZA-FIX: Get action type for vote count lookup
+        let actionType: ActionType? = {
+            switch myRole {
+            case .mafia: return .mafiaTarget
+            case .doctor: return .doctorProtect
+            case .inspector: return .inspectorCheck
+            default: return nil
+            }
+        }()
+
+        // Get vote counts for this action type
+        let voteCounts = actionType.flatMap { multiplayerStore.nightVoteCounts[$0] } ?? [:]
+
         VStack(alignment: .leading, spacing: 16) {
             // Header
             VStack(alignment: .leading, spacing: 4) {
@@ -451,7 +464,8 @@ struct MultiplayerNightView: View {
                         TargetGridCell(
                             name: player.playerName,
                             isSelected: selectedTargetId == player.playerId,
-                            accentColor: roleAccentColor(for: myRole)
+                            accentColor: roleAccentColor(for: myRole),
+                            voteCount: voteCounts[player.playerId] ?? 0
                         ) {
                             guard !isSubmitting else { return }
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
@@ -605,21 +619,39 @@ struct TargetGridCell: View {
     let name: String
     let isSelected: Bool
     let accentColor: Color
+    let voteCount: Int  // HAMZA-FIX: Vote count for real-time coordination display
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 10) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(isSelected ? accentColor.opacity(0.2) : Design.Colors.surface2)
-                        .frame(width: 48, height: 48)
-                    Image(systemName: "person.fill")
-                        .font(Design.Typography.title3)
-                        .foregroundStyle(isSelected ? accentColor : Design.Colors.textSecondary)
+                // Icon with vote count badge
+                ZStack(alignment: .topTrailing) {
+                    ZStack {
+                        Circle()
+                            .fill(isSelected ? accentColor.opacity(0.2) : Design.Colors.surface2)
+                            .frame(width: 48, height: 48)
+                        Image(systemName: "person.fill")
+                            .font(Design.Typography.title3)
+                            .foregroundStyle(isSelected ? accentColor : Design.Colors.textSecondary)
+                    }
+                    .accessibilityHidden(true)
+
+                    // Vote count badge - only show if > 0
+                    if voteCount > 0 {
+                        Text("\(voteCount)")
+                            .font(Design.Typography.caption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Design.Colors.surface0)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(accentColor)
+                            )
+                            .offset(x: 4, y: -4)
+                            .accessibilityLabel("\(voteCount) votes")
+                    }
                 }
-                .accessibilityHidden(true)
 
                 // Name
                 Text(name)
