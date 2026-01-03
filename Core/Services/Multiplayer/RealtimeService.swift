@@ -207,16 +207,34 @@ final class RealtimeService: ObservableObject {
         tokens.append(actionToken)
 
         // Subscribe to tentative selection broadcasts (real-time vote preview)
-        let tentativeToken = await channel.onBroadcast(event: "tentative_selection") { message in
-            Task { @MainActor in
+        let tentativeToken = await channel.onBroadcast(event: "tentative_selection") { [weak self] message in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 do {
-                    // The message is the payload directly - convert to JSON data
-                    let jsonData = try JSONSerialization.data(withJSONObject: message)
+                    // The message is a [String: AnyJSON] dictionary from Supabase
+                    // AnyJSON is Codable, so we encode it to Data, then decode as TentativeSelection
+
+                    // Check if payload is nested (Supabase may wrap broadcast payloads)
+                    let payloadToEncode: JSONObject
+                    if let innerPayload = message["payload"], case .object(let inner) = innerPayload {
+                        payloadToEncode = inner
+                    } else {
+                        // Message is the payload directly
+                        payloadToEncode = message
+                    }
+
+                    // Encode the AnyJSON dictionary to Data using JSONEncoder
+                    let encoder = JSONEncoder()
+                    let jsonData = try encoder.encode(payloadToEncode)
+
+                    // Decode using our custom decoder with date handling
                     let selection = try self.decoder.decode(TentativeSelection.self, from: jsonData)
                     print("📡 [RealtimeService] Tentative selection received: \(selection.actionType) -> \(selection.targetPlayerId?.uuidString.prefix(8) ?? "nil")")
                     onTentativeSelection(selection)
                 } catch {
                     print("❌ [RealtimeService] Failed to decode tentative selection: \(error)")
+                    // Log the raw message keys for debugging
+                    print("❌ [RealtimeService] Raw message keys: \(message.keys)")
                 }
             }
         }
