@@ -23,6 +23,10 @@ struct MultiplayerNightView: View {
         multiplayerStore.myRole
     }
 
+    var isAlive: Bool {
+        multiplayerStore.myPlayer?.isAlive ?? false
+    }
+
     // HAMZA-94: Sort players by humans first
     var alivePlayers: [PublicPlayerInfo] {
         multiplayerStore.visiblePlayers
@@ -41,7 +45,8 @@ struct MultiplayerNightView: View {
                         .font(Design.Typography.title1)
                         .foregroundStyle(Design.Colors.textPrimary)
 
-                    if let role = myRole {
+                    // Only show role instructions for alive players
+                    if isAlive, let role = myRole {
                         roleInstructionText(for: role)
                             .font(Design.Typography.body)
                             .foregroundStyle(Design.Colors.textSecondary)
@@ -53,17 +58,21 @@ struct MultiplayerNightView: View {
 
                 Spacer()
 
-                // Role-specific content
-                if let role = myRole {
-                    roleSpecificView(for: role)
+                // Role-specific content - dead players see spectator view
+                if isAlive {
+                    if let role = myRole {
+                        roleSpecificView(for: role)
+                    } else {
+                        spectatorView
+                    }
                 } else {
-                    spectatorView
+                    eliminatedSpectatorView
                 }
 
                 Spacer()
 
                 // Submit Button (all players with active roles) - HAMZA-95: Improved UI/UX
-                if myRole != nil && myRole != .citizen && !hasSubmitted {
+                if isAlive && myRole != nil && myRole != .citizen && !hasSubmitted {
                     Button {
                         submitAction()
                     } label: {
@@ -102,8 +111,8 @@ struct MultiplayerNightView: View {
                     }
 
                     Spacer().frame(height: multiplayerStore.isHost ? 8 : 40)
-                } else if hasSubmitted || myRole == .citizen {
-                    // Ready indicator for all players - HAMZA-95: Improved with action summary
+                } else if isAlive && (hasSubmitted || myRole == .citizen) {
+                    // Ready indicator for alive players only - HAMZA-95: Improved with action summary
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(Design.Typography.displayEmoji)
@@ -343,6 +352,29 @@ struct MultiplayerNightView: View {
         }
     }
 
+    private var eliminatedSpectatorView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+
+            Image(systemName: "eye.slash.fill")
+                .font(Design.Typography.displayEmoji)
+                .foregroundStyle(Design.Colors.textSecondary.opacity(Design.Opacity.medium))
+                .accessibilityHidden(true)
+
+            Text("Spectating")
+                .font(Design.Typography.title2)
+                .foregroundStyle(Design.Colors.textPrimary)
+
+            Text("You are eliminated. Watch the night unfold...")
+                .font(Design.Typography.body)
+                .foregroundStyle(Design.Colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            Spacer()
+        }
+    }
+
     private func inspectorResultView(role: String) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.seal.fill")
@@ -530,7 +562,7 @@ struct MultiplayerNightView: View {
     }
 
     private func submitAction() {
-        guard let role = myRole else { return }
+        guard isAlive, let role = myRole else { return }
 
         isSubmitting = true
         submitError = nil // Clear any previous error
