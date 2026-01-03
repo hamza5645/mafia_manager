@@ -1672,6 +1672,12 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
+        // FIX: Refresh players from database to ensure we have latest playerNumber values
+        // This prevents stale data race condition where human player actions from other devices
+        // have actorPlayerId that doesn't match the host's outdated visiblePlayers lookup
+        try await refreshPlayers()
+        updateVisiblePlayers()
+
         // Re-fetch actions to ensure we have latest state (filtered by round_id to prevent action replay)
         let mafiaActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
@@ -1844,6 +1850,10 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
         guard let session = currentSession else { return }
+
+        // FIX: Refresh players from database to ensure we have latest playerNumber values
+        try await refreshPlayers()
+        updateVisiblePlayers()
 
         // Re-fetch actions to ensure we have latest state (filtered by round_id to prevent action replay)
         let mafiaActions = try await sessionService.getActionsForPhase(
