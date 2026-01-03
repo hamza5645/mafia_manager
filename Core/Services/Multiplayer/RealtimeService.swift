@@ -76,7 +76,8 @@ final class RealtimeService: ObservableObject {
         sessionId: UUID,
         onSessionUpdate: @escaping (GameSession) -> Void,
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
-        onActionUpdate: @escaping (GameAction) -> Void
+        onActionUpdate: @escaping (GameAction) -> Void,
+        onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in }
     ) async throws {
         let channelName = "session:\(sessionId.uuidString.lowercased())"
 
@@ -204,6 +205,22 @@ final class RealtimeService: ObservableObject {
                 }
             }
         tokens.append(actionToken)
+
+        // Subscribe to tentative selection broadcasts (real-time vote preview)
+        let tentativeToken = await channel.onBroadcast(event: "tentative_selection") { message in
+            Task { @MainActor in
+                do {
+                    // The message is the payload directly - convert to JSON data
+                    let jsonData = try JSONSerialization.data(withJSONObject: message)
+                    let selection = try self.decoder.decode(TentativeSelection.self, from: jsonData)
+                    print("📡 [RealtimeService] Tentative selection received: \(selection.actionType) -> \(selection.targetPlayerId?.uuidString.prefix(8) ?? "nil")")
+                    onTentativeSelection(selection)
+                } catch {
+                    print("❌ [RealtimeService] Failed to decode tentative selection: \(error)")
+                }
+            }
+        }
+        tokens.append(tentativeToken)
 
         // CRITICAL: Allow Supabase's filter registrations (scheduled via Task { @MainActor … })
         // to run before we join the channel; otherwise no postgres filters are sent to server.
