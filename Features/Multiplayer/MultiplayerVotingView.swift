@@ -16,9 +16,11 @@ struct MultiplayerVotingView: View {
     }
 
     // HAMZA-94: Sort players by humans first
+    // Mafia cannot vote for their teammates
     var alivePlayers: [PublicPlayerInfo] {
-        multiplayerStore.visiblePlayers
-            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+        let mafiaTeammateIds = Set(multiplayerStore.mafiaTeammates.map { $0.playerId })
+        return multiplayerStore.visiblePlayers
+            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id && !mafiaTeammateIds.contains($0.playerId) }
             .sortedHumansFirst()
     }
 
