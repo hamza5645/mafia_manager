@@ -329,6 +329,8 @@ final class GameStore: ObservableObject {
     }
 
     func transitionToMorning() {
+        // Don't overwrite gameOver phase - game may have ended during night resolution
+        guard !state.isGameOver else { return }
         state.currentPhase = .morning
         save()
     }
