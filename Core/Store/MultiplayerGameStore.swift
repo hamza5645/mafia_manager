@@ -54,6 +54,10 @@ final class MultiplayerGameStore: ObservableObject {
     // Vote counts for real-time UI updates
     @Published var nightVoteCounts: [ActionType: [UUID: Int]] = [:]  // [actionType: [targetId: count]]
 
+    // Tentative selection counts (before submission) for real-time vote preview
+    @Published var tentativeVoteCounts: [ActionType: [UUID: Int]] = [:]  // [actionType: [targetId: count]]
+    private var tentativeSelections: [UUID: UUID] = [:]  // [actorId: currentTargetId] for change tracking
+
     // Combine subscription storage (prevents immediate deallocation)
     private var reconnectingSubscription: AnyCancellable?
 
@@ -83,6 +87,8 @@ final class MultiplayerGameStore: ObservableObject {
         botNightActionsSubmitted.removeAll()
         previousNightVotes.removeAll()
         nightVoteCounts.removeAll()
+        tentativeVoteCounts.removeAll()
+        tentativeSelections.removeAll()
     }
 
     // MARK: - PERF: Single-Pass Player Categorization
@@ -576,6 +582,11 @@ final class MultiplayerGameStore: ObservableObject {
                     self?.isRealtimeConnected = true
                     self?.handleActionUpdate(action)
                 }
+            },
+            onTentativeSelection: { [weak self] selection in
+                Task { @MainActor in
+                    self?.handleTentativeSelection(selection)
+                }
             }
         )
         isRealtimeConnected = true
@@ -889,7 +900,119 @@ final class MultiplayerGameStore: ObservableObject {
         botNightActionsSubmitted.removeAll()
         previousNightVotes.removeAll()
         nightVoteCounts.removeAll()
+        tentativeVoteCounts.removeAll()
+        tentativeSelections.removeAll()
         print("🔄 [BotCoordination] Cleared bot night action tracking for new night")
+    }
+
+    // MARK: - Tentative Selection (Real-time Vote Preview)
+
+    /// Handle incoming tentative selection broadcast from another player
+    private func handleTentativeSelection(_ selection: TentativeSelection) {
+        let actorId = selection.actorPlayerId
+        let actionType = selection.actionType
+
+        // Skip if this is my own selection (already handled locally)
+        if actorId == myPlayer?.playerId {
+            return
+        }
+
+        // Initialize counts for this action type if not exists
+        if tentativeVoteCounts[actionType] == nil {
+            tentativeVoteCounts[actionType] = [:]
+        }
+
+        // Check if this actor has a previous tentative selection (selection change)
+        if let previousTargetId = tentativeSelections[actorId] {
+            // Decrement old target count
+            if let oldCount = tentativeVoteCounts[actionType]?[previousTargetId], oldCount > 0 {
+                tentativeVoteCounts[actionType]?[previousTargetId] = oldCount - 1
+                // Remove entry if count reaches 0
+                if tentativeVoteCounts[actionType]?[previousTargetId] == 0 {
+                    tentativeVoteCounts[actionType]?.removeValue(forKey: previousTargetId)
+                }
+            }
+        }
+
+        // Handle new selection
+        if let targetId = selection.targetPlayerId {
+            // Increment new target count
+            tentativeVoteCounts[actionType]?[targetId, default: 0] += 1
+            tentativeSelections[actorId] = targetId
+        } else {
+            // Player deselected - remove from tracking
+            tentativeSelections.removeValue(forKey: actorId)
+        }
+
+        print("📊 [TentativeVote] \(actionType): updated tentative counts = \(tentativeVoteCounts[actionType] ?? [:])")
+    }
+
+    /// Broadcast a tentative selection to other players (called when tapping on a target)
+    func broadcastTentativeSelection(
+        actionType: ActionType,
+        targetPlayerId: UUID?,
+        phaseIndex: Int
+    ) async {
+        guard let sessionId = currentSession?.id,
+              let myPlayerId = myPlayer?.playerId else {
+            print("⚠️ [TentativeVote] Cannot broadcast - not in session")
+            return
+        }
+
+        let selection = TentativeSelection(
+            actorPlayerId: myPlayerId,
+            targetPlayerId: targetPlayerId,
+            actionType: actionType,
+            phaseIndex: phaseIndex
+        )
+
+        // Update local counts immediately for instant feedback
+        handleTentativeSelectionLocally(selection)
+
+        // Broadcast to other players
+        do {
+            try await realtimeService.broadcastMessage(
+                sessionId: sessionId,
+                event: "tentative_selection",
+                payload: selection
+            )
+            print("📡 [TentativeVote] Broadcasted selection: \(actionType) -> \(targetPlayerId?.uuidString.prefix(8) ?? "nil")")
+        } catch {
+            print("❌ [TentativeVote] Failed to broadcast selection: \(error)")
+        }
+    }
+
+    /// Handle local tentative selection (for the current player)
+    private func handleTentativeSelectionLocally(_ selection: TentativeSelection) {
+        let actorId = selection.actorPlayerId
+        let actionType = selection.actionType
+
+        // Initialize counts for this action type if not exists
+        if tentativeVoteCounts[actionType] == nil {
+            tentativeVoteCounts[actionType] = [:]
+        }
+
+        // Check if this actor has a previous tentative selection (selection change)
+        if let previousTargetId = tentativeSelections[actorId] {
+            // Decrement old target count
+            if let oldCount = tentativeVoteCounts[actionType]?[previousTargetId], oldCount > 0 {
+                tentativeVoteCounts[actionType]?[previousTargetId] = oldCount - 1
+                // Remove entry if count reaches 0
+                if tentativeVoteCounts[actionType]?[previousTargetId] == 0 {
+                    tentativeVoteCounts[actionType]?.removeValue(forKey: previousTargetId)
+                }
+            }
+        }
+
+        // Handle new selection
+        if let targetId = selection.targetPlayerId {
+            // Increment new target count
+            tentativeVoteCounts[actionType]?[targetId, default: 0] += 1
+            tentativeSelections[actorId] = targetId
+        } else {
+            // Player deselected - remove from tracking
+            tentativeSelections.removeValue(forKey: actorId)
+        }
     }
 
     // MARK: - Player Management

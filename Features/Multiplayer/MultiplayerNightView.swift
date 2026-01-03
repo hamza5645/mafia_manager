@@ -441,8 +441,8 @@ struct MultiplayerNightView: View {
             }
         }()
 
-        // Get vote counts for this action type
-        let voteCounts = actionType.flatMap { multiplayerStore.nightVoteCounts[$0] } ?? [:]
+        // Get tentative vote counts for real-time preview (shows immediately on tap)
+        let voteCounts = actionType.flatMap { multiplayerStore.tentativeVoteCounts[$0] } ?? [:]
 
         VStack(alignment: .leading, spacing: 16) {
             // Header
@@ -480,6 +480,17 @@ struct MultiplayerNightView: View {
                                 selectedTargetId = player.playerId
                             }
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+                            // Broadcast tentative selection immediately on tap
+                            if let actionType = actionType {
+                                Task {
+                                    await multiplayerStore.broadcastTentativeSelection(
+                                        actionType: actionType,
+                                        targetPlayerId: player.playerId,
+                                        phaseIndex: nightIndex
+                                    )
+                                }
+                            }
                         }
                     }
                 }

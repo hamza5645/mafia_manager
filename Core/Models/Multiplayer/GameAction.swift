@@ -143,3 +143,21 @@ struct ActionParams: Encodable, Sendable {
     let p_actor_player_id: UUID
     let p_target_player_id: UUID?
 }
+
+// MARK: - Tentative Selection (for real-time vote preview)
+
+/// Represents a tentative selection broadcasted via Realtime before submission.
+/// This allows players to see what others are considering targeting in real-time.
+struct TentativeSelection: Codable, Sendable {
+    let actorPlayerId: UUID
+    let targetPlayerId: UUID?  // nil means deselected
+    let actionType: ActionType
+    let phaseIndex: Int
+
+    enum CodingKeys: String, CodingKey {
+        case actorPlayerId = "actor_player_id"
+        case targetPlayerId = "target_player_id"
+        case actionType = "action_type"
+        case phaseIndex = "phase_index"
+    }
+}
