@@ -1918,6 +1918,13 @@ final class MultiplayerGameStore: ObservableObject {
         updatedHistory.sort { $0.nightIndex < $1.nightIndex }
         currentSession?.nightHistory = updatedHistory
 
+        // CRITICAL: Apply deaths to local state BEFORE win check so evaluateWinners sees correct counts
+        for playerId in resultingDeaths {
+            if let index = allPlayers.firstIndex(where: { $0.playerId == playerId }) {
+                allPlayers[index].isAlive = false
+            }
+        }
+
         // Check win conditions AFTER death but BEFORE phase transition
         let winnerCheck = evaluateWinners(startOfDay: true)
         let nextPhaseName: String
