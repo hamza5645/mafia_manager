@@ -2454,9 +2454,15 @@ final class MultiplayerGameStore: ObservableObject {
         let nonMafiaCount = alivePlayers.filter { $0.role != .mafia }.count
         let aliveHumans = alivePlayers.filter { !$0.isBot }
 
+        // Edge case: Everyone is dead - game ends with no winner
+        if alivePlayers.isEmpty {
+            print("🎮 [evaluateWinners] All players are dead - Game ends with no winner")
+            return (winner: nil, isGameOver: true)
+        }
+
         // HAMZA-167: End game when all humans die or leave (no point playing with just bots)
         // Determine winner based on remaining bot composition
-        if aliveHumans.isEmpty && !alivePlayers.isEmpty {
+        if aliveHumans.isEmpty {
             if mafiaCount == 0 {
                 print("🎮 [evaluateWinners] All humans gone, no mafia bots remain - Citizens win")
                 return (winner: .citizen, isGameOver: true)

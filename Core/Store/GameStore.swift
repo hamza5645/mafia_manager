@@ -701,6 +701,15 @@ final class GameStore: ObservableObject {
 
         let mafiaCount = aliveMafia.count
         let nonMafiaCount = aliveNonMafia.count
+        let totalAlive = mafiaCount + nonMafiaCount
+
+        // Edge case: Everyone is dead - game ends with no winner
+        if totalAlive == 0 {
+            state.isGameOver = true
+            state.winner = nil // No winner - everyone died
+            state.currentPhase = .gameOver
+            return
+        }
 
         if mafiaCount == 0 {
             state.isGameOver = true
@@ -788,8 +797,10 @@ final class GameStore: ObservableObject {
             let winnerText: String
             if state.winner == .mafia {
                 winnerText = "Mafia"
-            } else {
+            } else if state.winner == .citizen {
                 winnerText = "Citizens"
+            } else {
+                winnerText = "No Winner (Everyone Died)"
             }
             lines.append("Winner: \(winnerText)")
         }
