@@ -189,6 +189,7 @@ struct MultiplayerLobbyView: View {
 
                 VStack(spacing: 12) {
                     // Ready Status (non-host players only)
+                    // Button shows the ACTION that will happen (not current state)
                     if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
                         Button {
                             Task {
@@ -196,32 +197,32 @@ struct MultiplayerLobbyView: View {
                             }
                         } label: {
                             HStack {
-                                Image(systemName: myPlayer.isReady ? "checkmark.circle.fill" : "circle")
+                                Image(systemName: myPlayer.isReady ? "xmark.circle" : "checkmark.circle")
                                     .font(Design.Typography.title3)
                                     .accessibilityHidden(true)
 
-                                Text(myPlayer.isReady ? "Ready" : "Not Ready")
+                                Text(myPlayer.isReady ? "Cancel Ready" : "Ready")
                                     .font(Design.Typography.body)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
                                 myPlayer.isReady
-                                    ? Design.Colors.successGreen.opacity(0.2)
-                                    : Design.Colors.surface1
+                                    ? Design.Colors.surface1
+                                    : Design.Colors.successGreen.opacity(0.2)
                             )
                             .foregroundColor(
                                 myPlayer.isReady
-                                    ? Design.Colors.successGreen
-                                    : Design.Colors.textPrimary
+                                    ? Design.Colors.textPrimary
+                                    : Design.Colors.successGreen
                             )
                             .cornerRadius(Design.Radii.medium)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Design.Radii.medium)
                                     .stroke(
                                         myPlayer.isReady
-                                            ? Design.Colors.successGreen
-                                            : Design.Colors.stroke.opacity(0.3),
+                                            ? Design.Colors.stroke.opacity(0.3)
+                                            : Design.Colors.successGreen,
                                         lineWidth: 1
                                     )
                             )
