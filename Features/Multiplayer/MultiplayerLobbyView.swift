@@ -565,7 +565,8 @@ struct MultiplayerMorningView: View {
         let numbers = record.mafiaPlayerNumbers.sorted()
         let mafiaLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
-        if let targetNumber = playerNumber(for: record.mafiaTargetId) {
+        // Only show target if there are actual mafia actors
+        if !numbers.isEmpty, let targetNumber = playerNumber(for: record.mafiaTargetId) {
             return "\(mafiaLabel) → #\(targetNumber)"
         }
         return mafiaLabel
@@ -575,7 +576,8 @@ struct MultiplayerMorningView: View {
         let numbers = record.inspectorPlayerNumbers.sorted()
         let policeLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
-        if let inspectedNumber = playerNumber(for: record.inspectorCheckedId) {
+        // Only show target if there are actual police actors
+        if !numbers.isEmpty, let inspectedNumber = playerNumber(for: record.inspectorCheckedId) {
             return "\(policeLabel) → #\(inspectedNumber)"
         }
         return policeLabel
@@ -585,7 +587,8 @@ struct MultiplayerMorningView: View {
         let numbers = record.doctorPlayerNumbers.sorted()
         let doctorLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
-        if let protectedNumber = playerNumber(for: record.doctorProtectedId) {
+        // Only show target if there are actual doctor actors
+        if !numbers.isEmpty, let protectedNumber = playerNumber(for: record.doctorProtectedId) {
             return "\(doctorLabel) → #\(protectedNumber)"
         }
         return doctorLabel
@@ -598,9 +601,10 @@ struct MultiplayerMorningView: View {
             return deathNumbers.map { "#\($0)" }.joined(separator: ", ")
         }
 
-        // No deaths - check if doctor saved someone
+        // No deaths - check if doctor saved someone (only if doctor actually exists!)
         if let targetNumber = playerNumber(for: record.mafiaTargetId),
-           record.doctorProtectedId == record.mafiaTargetId {
+           record.doctorProtectedId == record.mafiaTargetId,
+           !record.doctorPlayerNumbers.isEmpty {  // Defense-in-depth: verify doctor exists
             return "None (Doctor saved #\(targetNumber))"
         }
 

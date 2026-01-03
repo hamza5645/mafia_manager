@@ -2445,12 +2445,16 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Determine the target from multiple actions using majority vote
-    /// HAMZA-FIX: GUARANTEED to return a target (never nil) - uses tie-breakers
+    /// Returns nil if no actions exist (role doesn't exist in game), uses tie-breakers otherwise
     /// - Parameters:
     ///   - actions: The submitted actions to count votes from
-    ///   - validTargets: Fallback list of valid targets if no votes exist
-    /// - Returns: The chosen target UUID (NEVER nil when validTargets is non-empty)
+    ///   - validTargets: Fallback list of valid targets if no votes exist but actors submitted actions
+    /// - Returns: The chosen target UUID, or nil if no actions exist (role doesn't exist in game)
     private func determineMajorityTarget(from actions: [GameAction], validTargets: [UUID]) -> UUID? {
+        // FIX: If no actions at all, return nil (no actors of this role exist in the game)
+        // This prevents phantom doctor/inspector protection in games without those roles (4-5 players)
+        guard !actions.isEmpty else { return nil }
+
         var counts: [UUID: Int] = [:]
         for action in actions {
             guard let targetId = action.targetPlayerId else { continue }
@@ -2458,7 +2462,7 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         guard let maxVotes = counts.values.max(), maxVotes > 0 else {
-            // FALLBACK: No votes submitted - pick first valid target
+            // FALLBACK: Role actors exist but haven't submitted targets - pick first valid target
             print("⚠️ [determineMajorityTarget] No votes found, using fallback target")
             return validTargets.first
         }
