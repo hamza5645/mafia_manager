@@ -165,6 +165,32 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    // MARK: - Session Validation
+
+    /// Ensure auth session is still valid (refresh if needed)
+    /// Call this when app resumes from background after extended period
+    func ensureValidSession() async {
+        guard isAuthenticated else { return }
+
+        do {
+            // This will refresh the session if the token is expired
+            // Supabase SDK handles the refresh logic internally
+            if let session = await authService.currentSession {
+                // Update tokens in case they were refreshed
+                saveAccessToken(session.accessToken)
+                saveRefreshToken(session.refreshToken)
+                print("✅ [AuthStore] Session validated/refreshed")
+            } else {
+                // No session available - may need to re-authenticate
+                print("⚠️ [AuthStore] No active session found during validation")
+            }
+        } catch {
+            print("⚠️ [AuthStore] Session validation failed: \(error)")
+            // Don't clear auth state here - let the user continue
+            // The next API call will fail if token is truly invalid
+        }
+    }
+
     // MARK: - Secure Token Management
 
     private func saveAccessToken(_ token: String) {

@@ -1,5 +1,15 @@
 import SwiftUI
 
+// MARK: - App Lifecycle Notification Names
+
+extension Notification.Name {
+    /// Posted when the app becomes active (returns from background)
+    static let appDidBecomeActive = Notification.Name("appDidBecomeActive")
+
+    /// Posted when the app is about to enter background
+    static let appWillEnterBackground = Notification.Name("appWillEnterBackground")
+}
+
 @main
 struct mafia_managerApp: App {
     @StateObject private var gameStore = GameStore()
@@ -23,8 +33,17 @@ struct mafia_managerApp: App {
                     gameStore.setAuthStore(authStore)
                 }
                 .onChange(of: scenePhase) { newPhase in
-                    if newPhase == .background || newPhase == .inactive {
+                    switch newPhase {
+                    case .background, .inactive:
+                        // Save game state immediately
                         try? Persistence.shared.saveImmediately(gameStore.state)
+                        // Notify multiplayer services to pause (save battery)
+                        NotificationCenter.default.post(name: .appWillEnterBackground, object: nil)
+                    case .active:
+                        // Notify multiplayer services to reconnect
+                        NotificationCenter.default.post(name: .appDidBecomeActive, object: nil)
+                    @unknown default:
+                        break
                     }
                 }
         }

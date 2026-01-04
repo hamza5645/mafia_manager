@@ -61,6 +61,9 @@ final class MultiplayerGameStore: ObservableObject {
     // Combine subscription storage (prevents immediate deallocation)
     private var reconnectingSubscription: AnyCancellable?
 
+    // App lifecycle observers (background/foreground transitions)
+    private var appLifecycleObservers: [NSObjectProtocol] = []
+
     // Host health monitoring (HAMZA-165: Host disconnect detection)
     private var hostMonitorTimer: Timer?
     private let hostOfflineThreshold: TimeInterval = 15.0 // 3 missed heartbeats (5s each)
@@ -189,6 +192,36 @@ final class MultiplayerGameStore: ObservableObject {
                 await self?.handleRealtimeDisconnect(sessionId: sessionId)
             }
         }
+
+        // Setup app lifecycle observers for background/foreground transitions
+        setupAppLifecycleObservers()
+    }
+
+    /// Setup NotificationCenter observers for app lifecycle events
+    private func setupAppLifecycleObservers() {
+        // Observer for app becoming active (returning from background)
+        let activeObserver = NotificationCenter.default.addObserver(
+            forName: .appDidBecomeActive,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.handleAppResume()
+            }
+        }
+        appLifecycleObservers.append(activeObserver)
+
+        // Observer for app entering background
+        let backgroundObserver = NotificationCenter.default.addObserver(
+            forName: .appWillEnterBackground,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.prepareForBackground()
+            }
+        }
+        appLifecycleObservers.append(backgroundObserver)
     }
 
     // MARK: - Session Lifecycle
@@ -1400,6 +1433,90 @@ final class MultiplayerGameStore: ObservableObject {
             try await refreshPlayers()
         } catch {
             print("❌ [MultiplayerGameStore] Snapshot resync failed: \(error)")
+        }
+    }
+
+    // MARK: - App Lifecycle Handling
+
+    /// Called when app returns from background - reconnect Realtime and restart timers
+    /// This fixes the freeze bug when returning after 5+ minutes in background
+    private func handleAppResume() async {
+        guard isInSession, let sessionId = currentSessionId else {
+            print("🔄 [MultiplayerGameStore] App resumed but not in session - skipping reconnect")
+            return
+        }
+
+        print("🔄 [MultiplayerGameStore] App resumed - reconnecting to session: \(sessionId)")
+
+        // 1. Ensure auth token is fresh (handles hour+ background periods)
+        await authStore?.ensureValidSession()
+
+        // 2. Force reconnect Realtime (don't trust stale WebSocket connection)
+        await realtimeService.forceReconnect(
+            sessionId: sessionId,
+            onSessionUpdate: { [weak self] session in
+                Task { @MainActor in
+                    self?.handleSessionUpdate(session)
+                }
+            },
+            onPlayerUpdate: { [weak self] player in
+                Task { @MainActor in
+                    self?.handlePlayerUpdate(player)
+                }
+            },
+            onActionUpdate: { [weak self] action in
+                Task { @MainActor in
+                    await self?.handleActionUpdate(action)
+                }
+            },
+            onTentativeSelection: { [weak self] selection in
+                Task { @MainActor in
+                    self?.handleTentativeSelection(selection)
+                }
+            },
+            onReconnected: { [weak self] in
+                await self?.performSnapshotResync()
+            }
+        )
+
+        // 3. Restart timers (they were paused in prepareForBackground)
+        restartAllTimers()
+
+        // 4. Immediately send heartbeat to mark player online
+        if let playerId = myPlayer?.id {
+            try? await sessionService.updatePlayerHeartbeat(playerId: playerId)
+        }
+
+        print("✅ [MultiplayerGameStore] App resume handling complete")
+    }
+
+    /// Called when app enters background - pause timers to save battery
+    private func prepareForBackground() {
+        guard isInSession else { return }
+
+        print("🌙 [MultiplayerGameStore] App entering background - pausing timers")
+
+        // Stop timers to save battery (no point sending heartbeats when iOS suspends us)
+        stopHeartbeat()
+        stopPlayerRefreshTimer()
+        stopHostMonitorTimer()
+
+        // Note: We don't disconnect Realtime here - iOS will handle suspension
+        // The forceReconnect on resume will handle any stale connections
+    }
+
+    /// Restart all timers after app resume
+    private func restartAllTimers() {
+        guard isInSession else { return }
+
+        print("🔄 [MultiplayerGameStore] Restarting timers...")
+
+        startHeartbeat()
+
+        if isHost {
+            startPlayerRefreshTimer()
+        } else {
+            startHostMonitorTimer()
         }
     }
 
@@ -3115,6 +3232,7 @@ final class MultiplayerGameStore: ObservableObject {
         let rematch = rematchTimer
         let autoAdvance = pendingAutoAdvanceTask
         let combineSubscription = reconnectingSubscription
+        let lifecycleObservers = appLifecycleObservers
 
         // Invalidate timers synchronously
         heartbeat?.invalidate()
@@ -3125,6 +3243,9 @@ final class MultiplayerGameStore: ObservableObject {
         // Cancel pending tasks and subscriptions
         autoAdvance?.cancel()
         combineSubscription?.cancel()
+
+        // Remove app lifecycle notification observers
+        lifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
 
         // Schedule realtime service cleanup on MainActor
         // (can't directly access @MainActor properties from deinit)

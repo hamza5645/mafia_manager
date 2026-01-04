@@ -486,6 +486,58 @@ final class RealtimeService: ObservableObject {
         }
     }
 
+    /// Force reconnect after app resume - don't trust existing connection state
+    /// This is called when the app returns from background to ensure fresh connections
+    func forceReconnect(
+        sessionId: UUID,
+        onSessionUpdate: @escaping (GameSession) -> Void,
+        onPlayerUpdate: @escaping (SessionPlayer) -> Void,
+        onActionUpdate: @escaping (GameAction) -> Void,
+        onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in },
+        onReconnected: @escaping () async -> Void
+    ) async {
+        print("🔄 [RealtimeService] Force reconnect initiated for session: \(sessionId)")
+
+        // 1. Cancel any pending reconnect attempts
+        reconnectTask?.cancel()
+        reconnectTask = nil
+
+        // 2. Unsubscribe from all channels (cleanup potentially stale connections)
+        await unsubscribeAll()
+
+        // 3. Reset connection state
+        isConnected = false
+        reconnectAttempts = 0
+        connectionError = nil
+        isReconnecting = false
+
+        // 4. Attempt fresh subscription
+        do {
+            try await subscribeToSession(
+                sessionId: sessionId,
+                onSessionUpdate: onSessionUpdate,
+                onPlayerUpdate: onPlayerUpdate,
+                onActionUpdate: onActionUpdate,
+                onTentativeSelection: onTentativeSelection
+            )
+
+            print("✅ [RealtimeService] Force reconnect successful")
+            await onReconnected()
+        } catch {
+            print("❌ [RealtimeService] Force reconnect failed: \(error)")
+            connectionError = error.localizedDescription
+
+            // Fall back to exponential backoff retry
+            attemptResubscribe(
+                sessionId: sessionId,
+                onSessionUpdate: onSessionUpdate,
+                onPlayerUpdate: onPlayerUpdate,
+                onActionUpdate: onActionUpdate,
+                onReconnected: onReconnected
+            )
+        }
+    }
+
     /// Schedule cleanup of reconnect resources on the main thread
     func scheduleCleanup() {
         Task { @MainActor [weak self] in
