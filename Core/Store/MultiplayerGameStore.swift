@@ -2735,12 +2735,27 @@ final class MultiplayerGameStore: ObservableObject {
 
         // Citizens win: All mafia eliminated (humans or bots)
         if mafiaCount == 0 {
+            print("🎮 [evaluateWinners] No mafia alive - Citizens win")
             return (winner: .citizen, isGameOver: true)
         }
 
-        // Mafia wins: All non-mafia eliminated (humans or bots)
-        if nonMafiaCount == 0 {
-            return (winner: .mafia, isGameOver: true)
+        // Mafia majority check - timing determines threshold
+        // startOfDay=true (after night): Mafia needs strict majority (> non-mafia)
+        //   - Tie means citizens can still vote out a Mafia member
+        // startOfDay=false (after voting): Mafia needs >= non-mafia
+        //   - Tie means Mafia will kill at night, guaranteeing majority
+        if startOfDay {
+            // After night resolution: strict majority required
+            if mafiaCount > nonMafiaCount {
+                print("🎮 [evaluateWinners] Mafia majority at day start (\(mafiaCount) > \(nonMafiaCount)) - Mafia wins")
+                return (winner: .mafia, isGameOver: true)
+            }
+        } else {
+            // After voting (going into night): tie or majority = Mafia wins
+            if mafiaCount >= nonMafiaCount {
+                print("🎮 [evaluateWinners] Mafia majority/tie after voting (\(mafiaCount) >= \(nonMafiaCount)) - Mafia wins")
+                return (winner: .mafia, isGameOver: true)
+            }
         }
 
         return (winner: nil, isGameOver: false)

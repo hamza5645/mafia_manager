@@ -713,18 +713,35 @@ final class GameStore: ObservableObject {
             return
         }
 
+        // Citizens win: All mafia eliminated
         if mafiaCount == 0 {
             state.isGameOver = true
             state.winner = .citizen // represent villagers team
             state.currentPhase = .gameOver
             return
         }
-        // Mafia wins only when ALL non-Mafia are dead
-        if nonMafiaCount == 0 {
-            state.isGameOver = true
-            state.winner = .mafia
-            state.currentPhase = .gameOver
-            return
+
+        // Mafia majority check - timing determines threshold
+        // startOfDay=true (after night): Mafia needs strict majority (> non-mafia)
+        //   - Tie means citizens can still vote out a Mafia member
+        // startOfDay=false (after voting): Mafia needs >= non-mafia
+        //   - Tie means Mafia will kill at night, guaranteeing majority
+        if startOfDay {
+            // After night resolution: strict majority required
+            if mafiaCount > nonMafiaCount {
+                state.isGameOver = true
+                state.winner = .mafia
+                state.currentPhase = .gameOver
+                return
+            }
+        } else {
+            // After voting (going into night): tie or majority = Mafia wins
+            if mafiaCount >= nonMafiaCount {
+                state.isGameOver = true
+                state.winner = .mafia
+                state.currentPhase = .gameOver
+                return
+            }
         }
     }
 
