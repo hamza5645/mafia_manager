@@ -62,14 +62,14 @@ struct JoinGameView: View {
                                     .font(Design.Typography.body)
                                     .foregroundStyle(Design.Colors.textPrimary)
 
-                                TextField("XXXXXX", text: $roomCode)
+                                TextField("000000", text: $roomCode)
                                     .font(Design.Typography.roomCode)
-                                    .textInputAutocapitalization(.characters)
+                                    .keyboardType(.numberPad)
                                     .disableAutocorrection(true)
                                     .multilineTextAlignment(.center)
                                     .padding(.vertical, 20)
                                     .accessibilityLabel("Room code")
-                                    .accessibilityHint("Enter the six character room code from the host")
+                                    .accessibilityHint("Enter the six digit room code from the host")
                                     .background(Design.Colors.surface1)
                                     .cornerRadius(Design.Radii.medium)
                                     .overlay(
@@ -77,11 +77,11 @@ struct JoinGameView: View {
                                             .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
                                     )
                                     .onChange(of: roomCode) { _, newValue in
-                                        // Auto-uppercase and limit to 6 characters
-                                        roomCode = String(newValue.uppercased().prefix(6))
+                                        // Filter to digits only and limit to 6 digits
+                                        roomCode = String(newValue.filter { $0.isNumber }.prefix(6))
                                     }
 
-                                Text("Ask the host for the 6-character room code")
+                                Text("Ask the host for the 6-digit room code")
                                     .font(Design.Typography.footnote)
                                     .foregroundStyle(Design.Colors.textSecondary)
                             }
@@ -182,7 +182,7 @@ struct JoinGameView: View {
         }
 
         guard roomCode.count == 6 else {
-            errorMessage = "Room code must be 6 characters"
+            errorMessage = "Room code must be 6 digits"
             return
         }
 

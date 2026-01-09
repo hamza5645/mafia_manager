@@ -287,7 +287,7 @@ USING (
 -- 7. HELPER FUNCTIONS
 -- =====================================================
 
--- Generate unique 6-character room code
+-- Generate unique 6-digit room code (numbers only for easier sharing)
 CREATE OR REPLACE FUNCTION public.generate_room_code()
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -295,7 +295,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    chars TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- Exclude ambiguous chars
+    chars TEXT := '0123456789'; -- Numbers only
     result TEXT := '';
     i INT;
     code_exists BOOLEAN;

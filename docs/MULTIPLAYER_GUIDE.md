@@ -58,7 +58,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
 **Host creates a game:**
 1. Navigate to: Game Mode Selection → Online Game → Create Game
 2. Enter player name, set bot count, configure timers
-3. Receive 6-character room code (e.g., "AB3K7M")
+3. Receive 6-digit room code (e.g., "847291")
 4. Wait in lobby for players to join
 
 **Players join:**

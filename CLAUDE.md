@@ -397,7 +397,7 @@ Typical task delegation:
 
 **Host-client model**: One player is host (creates session), others are clients (join via room code).
 
-**Room codes**: 6-character uppercase alphanumeric, collision-safe via DB unique constraint.
+**Room codes**: 6-digit numeric codes, collision-safe via DB unique constraint.
 
 **Phase flow** (host controls):
 1. `lobby` → Host configures settings, players join, mark ready
