@@ -100,26 +100,26 @@ struct MultiplayerVotingView: View {
                     Button {
                         submitVote()
                     } label: {
-                        Text(selectedTargetId == nil ? "Abstain" : "Submit Vote")
+                        Text("Submit Vote")
                             .font(Design.Typography.body)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
-                                (selectedTargetId == nil && dayIndex > 0)
+                                selectedTargetId == nil
                                     ? Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
                                     : Design.Colors.brandGold
                             )
                             .foregroundColor(Design.Colors.surface0)
                             .cornerRadius(Design.Radii.medium)
                     }
-                    .disabled(isSubmitting || (selectedTargetId == nil && dayIndex > 0))
+                    .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
                     .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
-                    
-                    if selectedTargetId == nil && dayIndex > 0 {
-                        Text("You must vote for someone after the first day")
+
+                    if selectedTargetId == nil {
+                        Text("Select a player to vote for")
                             .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Colors.dangerRed)
+                            .foregroundStyle(Design.Colors.textSecondary)
                             .padding(.bottom, 8)
                     }
                 }
@@ -140,10 +140,6 @@ struct MultiplayerVotingView: View {
                     if let targetId = selectedTargetId,
                        let target = alivePlayers.first(where: { $0.playerId == targetId }) {
                         Text("You voted for \(target.playerName)")
-                            .font(Design.Typography.body)
-                            .foregroundStyle(Design.Colors.textSecondary)
-                    } else {
-                        Text("You abstained from voting")
                             .font(Design.Typography.body)
                             .foregroundStyle(Design.Colors.textSecondary)
                     }
