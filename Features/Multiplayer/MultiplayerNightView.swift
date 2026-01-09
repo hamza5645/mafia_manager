@@ -34,6 +34,15 @@ struct MultiplayerNightView: View {
             .sortedHumansFirst()
     }
 
+    // Mafia cannot target their teammates
+    var mafiaTargets: [PublicPlayerInfo] {
+        // Use computed property for fresh Mafia teammate IDs
+        let mafiaTeammateIds = multiplayerStore.mafiaTeammatePlayerIds
+        return multiplayerStore.visiblePlayers
+            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id && !mafiaTeammateIds.contains($0.playerId) }
+            .sortedHumansFirst()
+    }
+
     // Doctor can protect themselves, so include self in the list
     var alivePlayersIncludingSelf: [PublicPlayerInfo] {
         multiplayerStore.visiblePlayers
@@ -316,7 +325,7 @@ struct MultiplayerNightView: View {
             targetSelectionView(
                 title: "Choose Target",
                 subtitle: "Coordinate with your team",
-                players: alivePlayers
+                players: mafiaTargets
             )
         }
     }

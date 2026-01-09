@@ -26,6 +26,17 @@ final class MultiplayerGameStore: ObservableObject {
     @Published var myNumber: Int?
     @Published var mafiaTeammates: [PublicPlayerInfo] = [] // Only populated if I'm mafia
 
+    /// Computed set of Mafia teammate player IDs (uses allPlayers for freshness)
+    /// This is computed at access time to avoid stale data issues
+    var mafiaTeammatePlayerIds: Set<UUID> {
+        guard myRole == .mafia else { return Set() }
+        return Set(
+            allPlayers
+                .filter { $0.role == .mafia && $0.id != myPlayer?.id }
+                .map { $0.playerId }
+        )
+    }
+
     // Phase progression state
     @Published var isPhaseReadyToAdvance: Bool = false
 
