@@ -300,10 +300,10 @@ struct MultiplayerLobbyView: View {
                     print("🔘 [MultiplayerLobbyView] isStarting = false")
                 }
             } catch SessionError.invalidPhase {
-                print("❌ [MultiplayerLobbyView] Failed to start game: Not all players ready")
+                print("❌ [MultiplayerLobbyView] Failed to start game: Invalid player count")
                 await MainActor.run {
                     isStarting = false
-                    startGameError = "All players must be ready before starting"
+                    startGameError = "Need 4-19 players to start"
                 }
             } catch {
                 print("❌ [MultiplayerLobbyView] Failed to start game: \(error)")

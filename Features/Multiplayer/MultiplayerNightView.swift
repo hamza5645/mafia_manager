@@ -725,8 +725,8 @@ struct TargetGridCell: View {
                 Text(name)
                     .font(Design.Typography.body)
                     .foregroundStyle(Design.Colors.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .frame(maxWidth: .infinity)
             }
             .padding(.vertical, 14)

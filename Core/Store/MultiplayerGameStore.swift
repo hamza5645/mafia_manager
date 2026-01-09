@@ -1216,19 +1216,8 @@ final class MultiplayerGameStore: ObservableObject {
             throw SessionError.notHost
         }
 
-        // Ensure we have enough players
-        let humanPlayers = allPlayers.filter { !$0.isBot }
+        // Ensure we have enough players (everyone is ready by default)
         let totalPlayers = allPlayers.count
-
-        // Check readiness: bots are always ready, non-host humans must be explicitly ready
-        // Host is excluded from readiness check since they can't mark themselves ready in the UI
-        let nonHostHumans = humanPlayers.filter { $0.id != myPlayer?.id }
-        let readyNonHostHumans = nonHostHumans.filter { $0.isReady }
-
-        // All non-host humans must be ready, bots and host are always considered ready
-        guard readyNonHostHumans.count == nonHostHumans.count else {
-            throw SessionError.invalidPhase
-        }
 
         guard totalPlayers >= 4, totalPlayers <= 19 else {
             throw SessionError.invalidPhase
