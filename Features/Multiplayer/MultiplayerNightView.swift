@@ -34,6 +34,13 @@ struct MultiplayerNightView: View {
             .sortedHumansFirst()
     }
 
+    // Doctor can protect themselves, so include self in the list
+    var alivePlayersIncludingSelf: [PublicPlayerInfo] {
+        multiplayerStore.visiblePlayers
+            .filter { $0.isAlive }
+            .sortedHumansFirst()
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -250,8 +257,8 @@ struct MultiplayerNightView: View {
         case .doctor:
             targetSelectionView(
                 title: "Protect a Player",
-                subtitle: "Choose wisely",
-                players: alivePlayers
+                subtitle: "You can protect yourself",
+                players: alivePlayersIncludingSelf
             )
         case .inspector:
             if let result = inspectorResult {
