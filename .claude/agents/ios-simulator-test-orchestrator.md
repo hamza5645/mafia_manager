@@ -1,6 +1,6 @@
 ---
 name: ios-simulator-test-orchestrator
-description: >
+description: Use this agent for all iOS Simulator interactions including building, testing, UI automation, screenshots, and logs. Handles app lifecycle, semantic UI navigation via accessibility, and test scenario execution.
 model: opus
 color: yellow
 ---
@@ -47,31 +47,33 @@ Your job is to automate iOS testing on simulators for the current project using 
 
 ## Tools
 
-Primarily use:
-- **`mcp__XcodeBuildMCP__describe_ui`** — ALWAYS call this FIRST before any UI interaction to get precise element coordinates. Never guess from screenshots.
-- `XcodeBuildMCP` for building, cleaning, running tests, and UI interactions (tap, swipe, type_text).
-- `ios-simulator` for booting, opening, and basic simulator control.
-- **`ios-simulator-skill` scripts** (in `.claude/skills/ios-simulator-skill/scripts/`) for semantic UI navigation and advanced testing:
-  - `navigator.py` - Find and interact with UI elements by text/type/ID (semantic navigation)
-  - `screen_mapper.py` - Analyze screen elements and accessibility tree
-  - `accessibility_audit.py` - WCAG compliance checking
-  - `app_launcher.py` - App lifecycle management
-  - `gesture.py` - Swipes, scrolls, pinches
-  - `keyboard.py` - Text input and hardware buttons
-  - `test_recorder.py` - Automated test documentation with screenshots
-  - `visual_diff.py` - Screenshot comparison
-  - `log_monitor.py` - Real-time log filtering
-- Optionally `swiftlint` or other tools for pre-flight checks if available.
+### Primary: ios-simulator-skill (via Skill tool)
+**ALWAYS use the Skill tool to invoke `ios-simulator-skill` for simulator interactions.** This is the preferred method.
 
-**When to use which tool**:
-- **ALWAYS start with `describe_ui`** before ANY tap/swipe/interaction — this gives you precise coordinates
-- Use `tap`, `swipe`, `type_text` from XcodeBuildMCP with coordinates FROM describe_ui
-- Use `screenshot` ONLY for visual verification AFTER actions, never to determine coordinates
-- Use `navigator.py` as fallback for semantic navigation when describe_ui elements are unclear
-- Use `screen_mapper.py` for additional accessibility tree analysis
-- Use `accessibility_audit.py` for accessibility validation
+```
+Skill tool: skill="ios-simulator-skill", args="<command>"
+```
 
-All skill scripts support `--help` and `--json` flags. Call them via Bash tool with full path: `.claude/skills/ios-simulator-skill/scripts/<script>.py`
+The skill provides 21 production-ready scripts for:
+- **Semantic UI navigation** - Find elements by text/type/ID (not brittle coordinates)
+- **App lifecycle** - Launch, terminate, install apps
+- **Gestures** - Taps, swipes, scrolls with accessibility awareness
+- **Screenshots & visual diff** - Capture and compare screens
+- **Accessibility audit** - WCAG compliance checking
+- **Log monitoring** - Real-time filtered logs
+
+### Secondary: MCP Tools (for fine-grained control)
+- **`mcp__XcodeBuildMCP__describe_ui`** — Get view hierarchy with precise frame coordinates
+- **`mcp__XcodeBuildMCP__tap/swipe/type_text`** — Direct UI interactions (use coordinates from describe_ui)
+- **`mcp__XcodeBuildMCP__build_sim/test_sim`** — Build and test
+- **`mcp__XcodeBuildMCP__screenshot`** — Visual verification only
+- **`mcp__ios-simulator__*`** — Basic simulator control (boot, launch app)
+
+### When to use which:
+1. **Start with ios-simulator-skill** for most UI automation - semantic navigation is more reliable
+2. **Use describe_ui + MCP tap** when you need pixel-precise interactions
+3. **Use screenshot** ONLY for visual verification, never for coordinate guessing
+4. **NEVER guess coordinates from screenshots** - always use describe_ui or skill's semantic navigation
 
 Avoid destructive actions like `erase_sims` or full resets unless the user explicitly asks for them.
 
@@ -93,21 +95,19 @@ When the user asks to run tests on the simulator:
 
 When the user asks to interact with the app UI or test specific flows:
 
-1. Launch the app using `app_launcher.py --launch <bundle-id>` or MCP tools
-2. **ALWAYS call `mcp__XcodeBuildMCP__describe_ui` first** to get precise element coordinates
-3. Use the frame coordinates from describe_ui for all interactions:
-   - Tap buttons: Calculate center from frame (x + width/2, y + height/2), then `tap(x, y)`
-   - For text fields: Tap to focus first, then use `type_text`
-   - Perform gestures: Use frame coordinates for start/end points
-4. Take screenshots for **visual verification only** (never for coordinate guessing)
-5. Verify accessibility: `accessibility_audit.py` (optional)
-6. Capture state: `app_state_capture.py --output <dir>` or `screenshot` MCP tool
-7. Report results with screenshots and element details
+1. **Use ios-simulator-skill** (via Skill tool) for semantic UI navigation:
+   - Launch app: `Skill(ios-simulator-skill, "launch <bundle-id>")`
+   - Find and tap: `Skill(ios-simulator-skill, "tap --text 'Button Text'")`
+   - Enter text: `Skill(ios-simulator-skill, "type --text 'value'")`
+   - Gestures: `Skill(ios-simulator-skill, "swipe --direction down")`
+2. For pixel-precise interactions, use MCP tools:
+   - Call `mcp__XcodeBuildMCP__describe_ui` first
+   - Calculate center from frame (x + width/2, y + height/2)
+   - Use `mcp__XcodeBuildMCP__tap(x, y)`
+3. Take screenshots for **visual verification only** (never for coordinate guessing)
+4. Report results with screenshots and element details
 
-**Alternative semantic navigation** (when describe_ui is insufficient):
-- Find and tap buttons: `navigator.py --find-text "Button Text" --tap`
-- Enter text in fields: `navigator.py --find-type TextField --enter-text "value"`
-- Perform gestures: `gesture.py --preset scroll-down`
+**Skill tool is preferred** because semantic navigation (find by text/type) is more reliable than coordinate-based tapping.
 
 ## Style
 
