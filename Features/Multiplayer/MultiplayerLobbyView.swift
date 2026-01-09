@@ -188,47 +188,6 @@ struct MultiplayerLobbyView: View {
                 Spacer()
 
                 VStack(spacing: 12) {
-                    // Ready Status (non-host players only)
-                    // Button shows the ACTION that will happen (not current state)
-                    if let myPlayer = multiplayerStore.myPlayer, !multiplayerStore.isHost {
-                        Button {
-                            Task {
-                                try? await multiplayerStore.toggleReady()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: myPlayer.isReady ? "xmark.circle" : "checkmark.circle")
-                                    .font(Design.Typography.title3)
-                                    .accessibilityHidden(true)
-
-                                Text(myPlayer.isReady ? "Cancel Ready" : "Ready")
-                                    .font(Design.Typography.body)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                myPlayer.isReady
-                                    ? Design.Colors.surface1
-                                    : Design.Colors.successGreen.opacity(0.2)
-                            )
-                            .foregroundColor(
-                                myPlayer.isReady
-                                    ? Design.Colors.textPrimary
-                                    : Design.Colors.successGreen
-                            )
-                            .cornerRadius(Design.Radii.medium)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                    .stroke(
-                                        myPlayer.isReady
-                                            ? Design.Colors.stroke.opacity(0.3)
-                                            : Design.Colors.successGreen,
-                                        lineWidth: 1
-                                    )
-                            )
-                        }
-                    }
-
                     // Start Game Button (host only)
                     if multiplayerStore.isHost {
                         VStack(spacing: 8) {
@@ -259,16 +218,9 @@ struct MultiplayerLobbyView: View {
                             // Validation messages
                             VStack(spacing: 8) {
                                 let playerCount = multiplayerStore.visiblePlayers.count
-                                let humanPlayers = multiplayerStore.visiblePlayers.filter { !$0.isBot }
-                                let nonHostHumans = humanPlayers.filter { $0.id != multiplayerStore.myPlayer?.id }
-                                let notReadyCount = nonHostHumans.filter { !$0.isReady }.count
 
                                 if playerCount < 4 || playerCount > 19 {
                                     Text("Need 4-19 total players to start")
-                                        .font(Design.Typography.footnote)
-                                        .foregroundStyle(Design.Colors.dangerRed)
-                                } else if notReadyCount > 0 {
-                                    Text("\(notReadyCount) player\(notReadyCount == 1 ? "" : "s") not ready")
                                         .font(Design.Typography.footnote)
                                         .foregroundStyle(Design.Colors.dangerRed)
                                 }
@@ -305,11 +257,6 @@ struct MultiplayerLobbyView: View {
     private func calculateButtonHeight() -> CGFloat {
         var height: CGFloat = 20 // Base padding
 
-        // Ready button height (shown for non-host players only)
-        if !multiplayerStore.isHost {
-            height += 60 // Button with padding
-        }
-
         // Start button height (host only)
         if multiplayerStore.isHost {
             height += 120 // Button + validation messages
@@ -323,11 +270,7 @@ struct MultiplayerLobbyView: View {
 
     private var canStart: Bool {
         let playerCount = multiplayerStore.visiblePlayers.count
-        let humanPlayers = multiplayerStore.visiblePlayers.filter { !$0.isBot }
-        let nonHostHumans = humanPlayers.filter { $0.id != multiplayerStore.myPlayer?.id }
-        let allNonHostHumansReady = nonHostHumans.allSatisfy { $0.isReady }
-
-        return playerCount >= 4 && playerCount <= 19 && allNonHostHumansReady
+        return playerCount >= 4 && playerCount <= 19
     }
 
     private func startGame() {
@@ -463,23 +406,9 @@ struct PlayerRow: View {
                         }
                     }
                 }
-
-                if !playerInfo.isBot && !playerInfo.isReady && !isHost {
-                    Text("Not ready")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
             }
 
             Spacer()
-
-            // Ready Checkmark (host is always ready since they control game start)
-            if !playerInfo.isBot && (playerInfo.isReady || isHost) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(Design.Typography.title3)
-                    .foregroundStyle(Design.Colors.successGreen)
-                    .accessibilityLabel("Ready")
-            }
 
             // Remove Button (Host only)
             if let onRemove = onRemove {

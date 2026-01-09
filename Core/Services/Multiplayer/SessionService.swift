@@ -506,7 +506,7 @@ final class SessionService {
             isBot: isBot,
             isAlive: true,
             isOnline: !isBot, // Bots start offline
-            isReady: isBot // Bots are always ready
+            isReady: true // Everyone is ready by default
         )
 
         do {
@@ -821,7 +821,7 @@ final class SessionService {
             .from("session_players")
             .update(PlayerResetData(
                 isAlive: true,
-                isReady: false,
+                isReady: true, // Keep everyone ready on rematch
                 role: nil,
                 playerNumber: nil
             ))
@@ -1008,7 +1008,7 @@ final class SessionService {
             .from("session_players")
             .update(PlayerReset(
                 isAlive: true,
-                isReady: false,
+                isReady: true, // Keep everyone ready on rematch
                 role: nil,
                 playerNumber: nil
             ))
