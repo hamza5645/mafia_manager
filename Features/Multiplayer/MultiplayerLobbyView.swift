@@ -159,9 +159,9 @@ struct MultiplayerLobbyView: View {
                                     .foregroundStyle(Design.Colors.textPrimary)
                                     .padding(.horizontal, 20)
 
-                                // HAMZA-94: Sort players by humans first
+                                // HAMZA-94: Sort players: host first, then humans, then bots
                                 VStack(spacing: 12) {
-                                    ForEach(multiplayerStore.visiblePlayers.sortedHumansFirst(), id: \.id) { playerInfo in
+                                    ForEach(multiplayerStore.visiblePlayers.sortedForLobby(hostId: multiplayerStore.allPlayers.first?.id), id: \.id) { playerInfo in
                                         PlayerRow(
                                             playerInfo: playerInfo,
                                             isMe: playerInfo.id == multiplayerStore.myPlayer?.id,

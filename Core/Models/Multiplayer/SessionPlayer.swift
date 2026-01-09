@@ -107,6 +107,26 @@ extension Array where Element == SessionPlayer {
             return player1.playerName.localizedCaseInsensitiveCompare(player2.playerName) == .orderedAscending
         }
     }
+
+    /// Returns players sorted with host first, then humans alphabetically, then bots alphabetically.
+    func sortedForLobby(hostId: UUID?) -> [SessionPlayer] {
+        self.sorted { player1, player2 in
+            // Host always first
+            let isHost1 = player1.id == hostId
+            let isHost2 = player2.id == hostId
+            if isHost1 != isHost2 {
+                return isHost1
+            }
+
+            // Humans before bots
+            if player1.isBot != player2.isBot {
+                return !player1.isBot
+            }
+
+            // Alphabetically within group
+            return player1.playerName.localizedCaseInsensitiveCompare(player2.playerName) == .orderedAscending
+        }
+    }
 }
 
 extension Array where Element == PublicPlayerInfo {
@@ -116,6 +136,26 @@ extension Array where Element == PublicPlayerInfo {
             if player1.isBot != player2.isBot {
                 return !player1.isBot // Humans first
             }
+            return player1.playerName.localizedCaseInsensitiveCompare(player2.playerName) == .orderedAscending
+        }
+    }
+
+    /// Returns players sorted with host first, then humans alphabetically, then bots alphabetically.
+    func sortedForLobby(hostId: UUID?) -> [PublicPlayerInfo] {
+        self.sorted { player1, player2 in
+            // Host always first
+            let isHost1 = player1.id == hostId
+            let isHost2 = player2.id == hostId
+            if isHost1 != isHost2 {
+                return isHost1
+            }
+
+            // Humans before bots
+            if player1.isBot != player2.isBot {
+                return !player1.isBot
+            }
+
+            // Alphabetically within group
             return player1.playerName.localizedCaseInsensitiveCompare(player2.playerName) == .orderedAscending
         }
     }
