@@ -16,12 +16,11 @@ struct MultiplayerVotingView: View {
     }
 
     // HAMZA-94: Sort players by humans first
-    // Mafia cannot vote for their teammates
+    // Note: Mafia CAN vote on teammates during day (to maintain cover)
+    // Only night targeting restricts Mafia from targeting teammates
     var alivePlayers: [PublicPlayerInfo] {
-        // Use computed property for fresh Mafia teammate IDs
-        let mafiaTeammateIds = multiplayerStore.mafiaTeammatePlayerIds
         return multiplayerStore.visiblePlayers
-            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id && !mafiaTeammateIds.contains($0.playerId) }
+            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
             .sortedHumansFirst()
     }
 
