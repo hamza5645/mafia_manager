@@ -14,6 +14,8 @@
 		291403FD0E26754FDC71DF76 /* Features/Night/NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71A38E01278BB90A26CA5C /* Features/Night/NightWakeUpView.swift */; };
 		2F01F3CD2EC0EEFD002EC6CD /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */; };
 		2F1E70072ED1BB19004366E6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2F1E70062ED1BB19004366E6 /* Assets.xcassets */; };
+		2F35621C2F15961B00A78B71 /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */; };
+		2F3562202F16361D00A78B71 /* RealtimeEventProcessor 2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35621F2F16361D00A78B71 /* RealtimeEventProcessor 2.swift */; };
 		2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB552E68EF3A002C5B31 /* buildServer.json */; };
 		2F3DBB752E68EF3A002C5B31 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB712E68EF3A002C5B31 /* README.md */; };
 		2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB592E68EF3A002C5B31 /* Player.swift */; };
@@ -102,6 +104,8 @@
 		27C2E67C3193BB6623D30344 /* SessionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
 		2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		2F1E70062ED1BB19004366E6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingView.swift; sourceTree = "<group>"; };
+		2F35621F2F16361D00A78B71 /* RealtimeEventProcessor 2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealtimeEventProcessor 2.swift"; sourceTree = "<group>"; };
 		2F3DBB552E68EF3A002C5B31 /* buildServer.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = buildServer.json; sourceTree = "<group>"; };
 		2F3DBB562E68EF3A002C5B31 /* DayAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAction.swift; sourceTree = "<group>"; };
 		2F3DBB572E68EF3A002C5B31 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
@@ -195,6 +199,7 @@
 			children = (
 				F7D2DD545CD373564E027525 /* RealtimeService.swift */,
 				27C2E67C3193BB6623D30344 /* SessionService.swift */,
+				2F35621F2F16361D00A78B71 /* RealtimeEventProcessor 2.swift */,
 			);
 			path = Multiplayer;
 			sourceTree = "<group>";
@@ -401,6 +406,7 @@
 		5161D6F72CFF6B32C97E6F78 /* Multiplayer */ = {
 			isa = PBXGroup;
 			children = (
+				2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */,
 				2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */,
 				DF2607CD1D18895BC894B618 /* CreateGameView.swift */,
 				152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */,
@@ -551,6 +557,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2F3562202F16361D00A78B71 /* RealtimeEventProcessor 2.swift in Sources */,
 				2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */,
 				2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */,
 				2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */,
@@ -578,6 +585,7 @@
 				650E154B6CD70025846E975D /* LoginView.swift in Sources */,
 				7F663480AC89982C964BBEC8 /* ProfileView.swift in Sources */,
 				289CD2C8F599CF39B1185E93 /* SignupView.swift in Sources */,
+				2F35621C2F15961B00A78B71 /* MultiplayerVotingView.swift in Sources */,
 				E2F914A70BD661E561900644 /* PlayerStatsView.swift in Sources */,
 				0BE60C3DAEC30B54849E843F /* CustomRolesView.swift in Sources */,
 				B2F8EDAC09AF2903C3554A43 /* SettingsView.swift in Sources */,

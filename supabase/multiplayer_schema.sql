@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
     -- Round ID for action isolation (prevents action replay across rounds)
     current_round_id UUID DEFAULT gen_random_uuid(),
 
+    -- Phase sequence number (monotonic counter for drift detection)
+    -- Increments on every phase change to help clients detect missed updates
+    phase_sequence INT DEFAULT 0,
+
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
@@ -731,6 +735,32 @@ $$;
 -- Add rematch_deadline column to game_sessions
 ALTER TABLE public.game_sessions
 ADD COLUMN IF NOT EXISTS rematch_deadline TIMESTAMPTZ;
+
+-- Add phase_sequence column to game_sessions (for drift detection)
+ALTER TABLE public.game_sessions
+ADD COLUMN IF NOT EXISTS phase_sequence INT DEFAULT 0;
+
+-- Trigger function to auto-increment phase_sequence on phase change
+CREATE OR REPLACE FUNCTION public.increment_phase_sequence()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Only increment if the phase actually changed
+    IF OLD.current_phase IS DISTINCT FROM NEW.current_phase OR
+       OLD.current_phase_data::text IS DISTINCT FROM NEW.current_phase_data::text THEN
+        NEW.phase_sequence := COALESCE(OLD.phase_sequence, 0) + 1;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+-- Create trigger to auto-increment phase_sequence
+DROP TRIGGER IF EXISTS increment_phase_sequence_trigger ON public.game_sessions;
+CREATE TRIGGER increment_phase_sequence_trigger
+    BEFORE UPDATE ON public.game_sessions
+    FOR EACH ROW
+    EXECUTE FUNCTION public.increment_phase_sequence();
 
 -- Atomic RPC: Execute Rematch
 -- Handles: host transfer, removes non-confirmed players, resets session to lobby

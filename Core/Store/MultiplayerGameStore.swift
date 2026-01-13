@@ -51,6 +51,10 @@ final class MultiplayerGameStore: ObservableObject {
     // Heartbeat timer
     private var heartbeatTimer: Timer?
     private var playerRefreshTimer: Timer?
+    private var consistencyCheckTimer: Timer?
+    private var lastResyncTime: Date?
+    private let resyncDebounceInterval: TimeInterval = 2.0  // Minimum 2 seconds between resyncs
+    private var isPerformingResync = false
     private var pendingAutoAdvanceTask: Task<Void, Never>?
     private var processedBotNightIndices: Set<Int> = []
     private var processedBotVotingDays: Set<Int> = []
@@ -381,6 +385,7 @@ final class MultiplayerGameStore: ObservableObject {
         stopHeartbeat()
         stopHostMonitorTimer() // HAMZA-165: Stop monitoring host
         stopPlayerRefreshTimer()
+        stopConsistencyCheckTimer()
         await realtimeService.unsubscribeAll()
 
         // Remove player directly by their session player ID (works for both authenticated and unauthenticated users)
@@ -631,9 +636,19 @@ final class MultiplayerGameStore: ObservableObject {
                 Task { @MainActor in
                     self?.handleTentativeSelection(selection)
                 }
+            },
+            onDecodeError: { [weak self] error, table in
+                // CRITICAL: Decode errors mean we missed an update - trigger full resync
+                print("⚠️ [MultiplayerGameStore] Decode error in \(table): \(error) - triggering resync")
+                Task { @MainActor in
+                    await self?.performSnapshotResync()
+                }
             }
         )
         isRealtimeConnected = true
+
+        // Start consistency checking timer (safety net for missed events)
+        startConsistencyCheckTimer()
     }
 
     // MARK: - Realtime Disconnect Recovery
@@ -669,6 +684,12 @@ final class MultiplayerGameStore: ObservableObject {
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
                     self?.handleActionUpdate(action)
+                }
+            },
+            onDecodeError: { [weak self] error, table in
+                print("⚠️ [MultiplayerGameStore] Decode error in \(table) after reconnect: \(error)")
+                Task { @MainActor in
+                    await self?.performSnapshotResync()
                 }
             },
             onReconnected: { [weak self] in
@@ -1423,14 +1444,100 @@ final class MultiplayerGameStore: ObservableObject {
         heartbeatTimer = nil
     }
 
+    // MARK: - Consistency Check Timer (Fix 5: Polling Fallback)
+
+    /// Start periodic consistency checking as a safety net for missed Realtime events
+    /// Polls every 10 seconds to detect drift between local and server state
+    private func startConsistencyCheckTimer() {
+        stopConsistencyCheckTimer()
+
+        consistencyCheckTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.validateStateConsistency()
+            }
+        }
+        print("✅ [MultiplayerGameStore] Consistency check timer started (10s interval)")
+    }
+
+    private func stopConsistencyCheckTimer() {
+        consistencyCheckTimer?.invalidate()
+        consistencyCheckTimer = nil
+    }
+
+    /// Validate local state against server state and resync if drift detected
+    /// This is a safety net for cases where Realtime events are missed
+    private func validateStateConsistency() async {
+        // Skip if in middle of phase resolution or resync to avoid false positives
+        guard !isResolvingPhase, !isPerformingResync else {
+            print("⏳ [MultiplayerGameStore] Skipping consistency check - operation in progress")
+            return
+        }
+        guard isInSession, let sessionId = currentSession?.id else { return }
+
+        do {
+            // Fetch current server state
+            guard let serverSession = try await sessionService.getSession(sessionId: sessionId) else {
+                print("⚠️ [MultiplayerGameStore] Consistency check: session not found on server")
+                return
+            }
+
+            // Check for phase sequence drift (catches missed updates)
+            let localSeq = currentSession?.phaseSequence ?? 0
+            let serverSeq = serverSession.phaseSequence ?? 0
+
+            if serverSeq > localSeq {
+                print("⚠️ [MultiplayerGameStore] Phase sequence drift detected!")
+                print("  Local sequence: \(localSeq)")
+                print("  Server sequence: \(serverSeq)")
+                print("  Missed \(serverSeq - localSeq) phase update(s)")
+                print("  Triggering full resync...")
+                await performSnapshotResync()
+                return
+            }
+
+            // Also check for phase drift by content (backup check)
+            if serverSession.currentPhase != currentSession?.currentPhase ||
+               serverSession.currentPhaseData != currentSession?.currentPhaseData {
+                print("⚠️ [MultiplayerGameStore] Phase content drift detected!")
+                print("  Local: \(currentSession?.currentPhase ?? "nil") / \(String(describing: currentSession?.currentPhaseData))")
+                print("  Server: \(serverSession.currentPhase) / \(String(describing: serverSession.currentPhaseData))")
+                print("  Triggering full resync...")
+                await performSnapshotResync()
+            }
+        } catch {
+            print("❌ [MultiplayerGameStore] Consistency check failed: \(error)")
+            // Don't resync on network errors - wait for next check
+        }
+    }
+
     // MARK: - Snapshot Resync (Pure Realtime Recovery)
 
     /// Perform a one-time snapshot resync after Realtime reconnect
     /// This fetches the latest session and player state to heal missed events
+    /// Includes debouncing to prevent rapid-fire resyncs from multiple errors
     private func performSnapshotResync() async {
+        // Debounce: Skip if recently resynced
+        if let lastResync = lastResyncTime,
+           Date().timeIntervalSince(lastResync) < resyncDebounceInterval {
+            print("⏳ [MultiplayerGameStore] Skipping resync - debounce active (last resync \(Date().timeIntervalSince(lastResync))s ago)")
+            return
+        }
+
+        // Guard against concurrent resyncs
+        guard !isPerformingResync else {
+            print("⏳ [MultiplayerGameStore] Skipping resync - already in progress")
+            return
+        }
+
+        isPerformingResync = true
+        lastResyncTime = Date()
+        defer { isPerformingResync = false }
+
+        print("🔄 [MultiplayerGameStore] Performing snapshot resync...")
         do {
             try await refreshSession()
             try await refreshPlayers()
+            print("✅ [MultiplayerGameStore] Snapshot resync completed successfully")
         } catch {
             print("❌ [MultiplayerGameStore] Snapshot resync failed: \(error)")
         }
@@ -1474,6 +1581,12 @@ final class MultiplayerGameStore: ObservableObject {
                     self?.handleTentativeSelection(selection)
                 }
             },
+            onDecodeError: { [weak self] error, table in
+                print("⚠️ [MultiplayerGameStore] Decode error in \(table) after app resume: \(error)")
+                Task { @MainActor in
+                    await self?.performSnapshotResync()
+                }
+            },
             onReconnected: { [weak self] in
                 await self?.performSnapshotResync()
             }
@@ -1500,6 +1613,7 @@ final class MultiplayerGameStore: ObservableObject {
         stopHeartbeat()
         stopPlayerRefreshTimer()
         stopHostMonitorTimer()
+        stopConsistencyCheckTimer()
 
         // Note: We don't disconnect Realtime here - iOS will handle suspension
         // The forceReconnect on resume will handle any stale connections
@@ -1512,6 +1626,7 @@ final class MultiplayerGameStore: ObservableObject {
         print("🔄 [MultiplayerGameStore] Restarting timers...")
 
         startHeartbeat()
+        startConsistencyCheckTimer()
 
         if isHost {
             startPlayerRefreshTimer()

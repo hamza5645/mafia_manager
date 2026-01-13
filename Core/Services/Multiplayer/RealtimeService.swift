@@ -27,6 +27,9 @@ final class RealtimeService: ObservableObject {
 
     // Disconnect callback for triggering recovery from MultiplayerGameStore
     var onDisconnect: ((UUID) -> Void)?
+
+    // Event processor for serial event handling (prevents race conditions)
+    private var eventProcessor: RealtimeEventProcessor?
     
     // Custom decoder for Supabase dates
     private let decoder: JSONDecoder = {
@@ -72,12 +75,20 @@ final class RealtimeService: ObservableObject {
     // MARK: - Channel Management
 
     /// Subscribe to session updates
+    /// - Parameters:
+    ///   - sessionId: The session to subscribe to
+    ///   - onSessionUpdate: Called when session data changes
+    ///   - onPlayerUpdate: Called when player data changes
+    ///   - onActionUpdate: Called when game actions change
+    ///   - onTentativeSelection: Called for vote preview broadcasts
+    ///   - onDecodeError: Called when a Realtime event fails to decode (triggers resync)
     func subscribeToSession(
         sessionId: UUID,
         onSessionUpdate: @escaping (GameSession) -> Void,
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
         onActionUpdate: @escaping (GameAction) -> Void,
-        onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in }
+        onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in },
+        onDecodeError: @escaping (Error, String) -> Void = { _, _ in }
     ) async throws {
         let channelName = "session:\(sessionId.uuidString.lowercased())"
 
@@ -90,6 +101,31 @@ final class RealtimeService: ObservableObject {
         // Array to store subscription tokens (prevents garbage collection)
         var tokens: [RealtimeSubscription] = []
 
+        // CRITICAL: Create serial event processor to guarantee FIFO ordering
+        // Without this, events from different tables can execute out of order,
+        // causing one client to see stale phase data while others progress.
+        let processor = RealtimeEventProcessor { @MainActor event in
+            switch event {
+            case .sessionUpdate(let session):
+                onSessionUpdate(session)
+            case .playerUpdate(let player):
+                onPlayerUpdate(player)
+            case .playerDeletion:
+                // Player deletions trigger a refresh in the store via decode error path
+                // This ensures immediate reaction rather than waiting for polling
+                onDecodeError(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Player deleted")), "session_players")
+            case .actionUpdate(let action):
+                onActionUpdate(action)
+            case .tentativeSelection(let selection):
+                onTentativeSelection(selection)
+            case .decodeError(let errorDescription, let table):
+                // Create a simple error from the description for the callback
+                let error = NSError(domain: "RealtimeService", code: -1, userInfo: [NSLocalizedDescriptionKey: errorDescription])
+                onDecodeError(error, table)
+            }
+        }
+        self.eventProcessor = processor
+
         // Subscribe to game_sessions table changes
         let sessionToken = await channel
             .onPostgresChange(
@@ -97,32 +133,35 @@ final class RealtimeService: ObservableObject {
                 schema: "public",
                 table: "game_sessions",
                 filter: "id=eq.\(sessionId.uuidString.lowercased())"
-            ) { payload in
-                Task { @MainActor in
+            ) { [weak self] payload in
+                guard let self = self else { return }
+                Task {
                     switch payload {
                     case .insert(let action):
                         print("🟢 [RealtimeService] Session INSERT event received")
                         do {
                             let session = try action.decodeRecord(as: GameSession.self, decoder: self.decoder)
                             print("✅ [RealtimeService] Session decoded: phase=\(session.currentPhase)")
-                            onSessionUpdate(session)
+                            await processor.enqueue(.sessionUpdate(session))
                         } catch {
                             print("❌ [RealtimeService] Failed to decode session from INSERT: \(error)")
                             if let jsonData = try? JSONEncoder().encode(action.record) {
                                 print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
                             }
+                            await processor.enqueue(.decodeError(errorDescription: error.localizedDescription, table: "game_sessions"))
                         }
                     case .update(let action):
                         print("🟡 [RealtimeService] Session UPDATE event received")
                         do {
                             let session = try action.decodeRecord(as: GameSession.self, decoder: self.decoder)
                             print("✅ [RealtimeService] Session decoded: phase=\(session.currentPhase), phaseData=\(String(describing: session.currentPhaseData))")
-                            onSessionUpdate(session)
+                            await processor.enqueue(.sessionUpdate(session))
                         } catch {
                             print("❌ [RealtimeService] Failed to decode session from UPDATE: \(error)")
                             if let jsonData = try? JSONEncoder().encode(action.record) {
                                 print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
                             }
+                            await processor.enqueue(.decodeError(errorDescription: error.localizedDescription, table: "game_sessions"))
                         }
                     case .delete:
                         print("🔴 [RealtimeService] Session DELETE event received")
@@ -140,36 +179,39 @@ final class RealtimeService: ObservableObject {
                 schema: "public",
                 table: "session_players",
                 filter: "session_id=eq.\(sessionId.uuidString.lowercased())"
-            ) { payload in
-                Task { @MainActor in
+            ) { [weak self] payload in
+                guard let self = self else { return }
+                Task {
                     switch payload {
                     case .insert(let action):
                         print("🟢 [RealtimeService] Player INSERT event received")
                         do {
                             let player = try action.decodeRecord(as: SessionPlayer.self, decoder: self.decoder)
                             print("✅ [RealtimeService] Player decoded successfully: \(player.playerName) (ID: \(player.id))")
-                            onPlayerUpdate(player)
+                            await processor.enqueue(.playerUpdate(player))
                         } catch {
                             print("❌ [RealtimeService] Failed to decode player from INSERT: \(error)")
                             if let jsonData = try? JSONEncoder().encode(action.record) {
                                 print("❌ [RealtimeService] Raw data: \(String(data: jsonData, encoding: .utf8) ?? "Unable to encode")")
                             }
+                            await processor.enqueue(.decodeError(errorDescription: error.localizedDescription, table: "session_players"))
                         }
                     case .update(let action):
                         print("🟡 [RealtimeService] Player UPDATE event received")
                         do {
                             let player = try action.decodeRecord(as: SessionPlayer.self, decoder: self.decoder)
                             print("✅ [RealtimeService] Player updated: \(player.playerName) (ID: \(player.id))")
-                            onPlayerUpdate(player)
+                            await processor.enqueue(.playerUpdate(player))
                         } catch {
                             print("❌ [RealtimeService] Failed to decode player from UPDATE: \(error)")
+                            await processor.enqueue(.decodeError(errorDescription: error.localizedDescription, table: "session_players"))
                         }
-                    case .delete(let action):
+                    case .delete:
                         print("🔴 [RealtimeService] Player DELETE event received")
-                        // For deletions, we can't decode a full player object
-                        // The store will handle this by refreshing the players list
+                        // For deletions, trigger a player refresh via decode error path
                         // This ensures we get the current state from the server
-                        print("✅ [RealtimeService] Player deletion detected - refresh will be handled by store")
+                        print("✅ [RealtimeService] Player deletion detected - triggering refresh")
+                        await processor.enqueue(.playerDeletion(deletedPlayerId: nil))
                     }
                 }
             }
@@ -182,22 +224,25 @@ final class RealtimeService: ObservableObject {
                 schema: "public",
                 table: "game_actions",
                 filter: "session_id=eq.\(sessionId.uuidString.lowercased())"
-            ) { payload in
-                Task { @MainActor in
+            ) { [weak self] payload in
+                guard let self = self else { return }
+                Task {
                     switch payload {
                     case .insert(let action):
                         do {
                             let gameAction = try action.decodeRecord(as: GameAction.self, decoder: self.decoder)
-                            onActionUpdate(gameAction)
+                            await processor.enqueue(.actionUpdate(gameAction))
                         } catch {
                             print("❌ [RealtimeService] Failed to decode action from INSERT: \(error)")
+                            await processor.enqueue(.decodeError(errorDescription: error.localizedDescription, table: "game_actions"))
                         }
                     case .update(let action):
                         do {
                             let gameAction = try action.decodeRecord(as: GameAction.self, decoder: self.decoder)
-                            onActionUpdate(gameAction)
+                            await processor.enqueue(.actionUpdate(gameAction))
                         } catch {
                             print("❌ [RealtimeService] Failed to decode action from UPDATE: \(error)")
+                            await processor.enqueue(.decodeError(errorDescription: error.localizedDescription, table: "game_actions"))
                         }
                     case .delete:
                         break
@@ -208,8 +253,8 @@ final class RealtimeService: ObservableObject {
 
         // Subscribe to tentative selection broadcasts (real-time vote preview)
         let tentativeToken = await channel.onBroadcast(event: "tentative_selection") { [weak self] message in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
+            guard let self = self else { return }
+            Task {
                 do {
                     // The message is a [String: AnyJSON] dictionary from Supabase
                     // AnyJSON is Codable, so we encode it to Data, then decode as TentativeSelection
@@ -230,11 +275,12 @@ final class RealtimeService: ObservableObject {
                     // Decode using our custom decoder with date handling
                     let selection = try self.decoder.decode(TentativeSelection.self, from: jsonData)
                     print("📡 [RealtimeService] Tentative selection received: \(selection.actionType) -> \(selection.targetPlayerId?.uuidString.prefix(8) ?? "nil")")
-                    onTentativeSelection(selection)
+                    await processor.enqueue(.tentativeSelection(selection))
                 } catch {
                     print("❌ [RealtimeService] Failed to decode tentative selection: \(error)")
                     // Log the raw message keys for debugging
                     print("❌ [RealtimeService] Raw message keys: \(message.keys)")
+                    // Don't trigger resync for tentative selections - they're not critical
                 }
             }
         }
@@ -424,6 +470,7 @@ final class RealtimeService: ObservableObject {
     ///   - onSessionUpdate: Callback for session updates
     ///   - onPlayerUpdate: Callback for player updates
     ///   - onActionUpdate: Callback for action updates
+    ///   - onDecodeError: Callback for decode errors (triggers resync)
     ///   - onReconnected: Called when successfully reconnected
     /// PERF: Refactored from recursive to loop-based to prevent call stack growth
     func attemptResubscribe(
@@ -431,6 +478,7 @@ final class RealtimeService: ObservableObject {
         onSessionUpdate: @escaping (GameSession) -> Void,
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
         onActionUpdate: @escaping (GameAction) -> Void,
+        onDecodeError: @escaping (Error, String) -> Void = { _, _ in },
         onReconnected: @escaping () async -> Void
     ) {
         // Cancel any pending reconnect task
@@ -461,7 +509,8 @@ final class RealtimeService: ObservableObject {
                         sessionId: sessionId,
                         onSessionUpdate: onSessionUpdate,
                         onPlayerUpdate: onPlayerUpdate,
-                        onActionUpdate: onActionUpdate
+                        onActionUpdate: onActionUpdate,
+                        onDecodeError: onDecodeError
                     )
 
                     // Successfully reconnected
@@ -494,6 +543,7 @@ final class RealtimeService: ObservableObject {
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
         onActionUpdate: @escaping (GameAction) -> Void,
         onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in },
+        onDecodeError: @escaping (Error, String) -> Void = { _, _ in },
         onReconnected: @escaping () async -> Void
     ) async {
         print("🔄 [RealtimeService] Force reconnect initiated for session: \(sessionId)")
@@ -518,7 +568,8 @@ final class RealtimeService: ObservableObject {
                 onSessionUpdate: onSessionUpdate,
                 onPlayerUpdate: onPlayerUpdate,
                 onActionUpdate: onActionUpdate,
-                onTentativeSelection: onTentativeSelection
+                onTentativeSelection: onTentativeSelection,
+                onDecodeError: onDecodeError
             )
 
             print("✅ [RealtimeService] Force reconnect successful")
@@ -533,6 +584,7 @@ final class RealtimeService: ObservableObject {
                 onSessionUpdate: onSessionUpdate,
                 onPlayerUpdate: onPlayerUpdate,
                 onActionUpdate: onActionUpdate,
+                onDecodeError: onDecodeError,
                 onReconnected: onReconnected
             )
         }

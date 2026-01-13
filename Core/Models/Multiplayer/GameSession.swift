@@ -32,6 +32,10 @@ struct GameSession: Codable, Identifiable, Sendable {
     // Rematch support
     var rematchDeadline: Date?
 
+    // Phase sequence number (monotonic counter for drift detection)
+    // Increments on every phase change to help clients detect missed updates
+    var phaseSequence: Int?
+
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -54,6 +58,7 @@ struct GameSession: Codable, Identifiable, Sendable {
         case dayHistory = "day_history"
         case currentRoundId = "current_round_id"
         case rematchDeadline = "rematch_deadline"
+        case phaseSequence = "phase_sequence"
         case updatedAt = "updated_at"
     }
 }
