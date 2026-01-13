@@ -760,287 +760,6 @@ final class SessionService {
         return actions
     }
 
-    // MARK: - Play Again (HAMZA-88)
-
-    /// Reset session for playing again - keeps players but resets game state
-    func resetSessionForPlayAgain(sessionId: UUID) async throws {
-        // 1. Reset game_sessions to lobby state
-        struct SessionResetData: Encodable {
-            let currentPhase: String
-            let currentPhaseData: PhaseData?
-            let currentRoundId: String?
-            let dayIndex: Int
-            let nightHistory: [NightActionRecord]
-            let dayHistory: [DayActionRecord]
-            let isGameOver: Bool
-            let winner: String?
-
-            enum CodingKeys: String, CodingKey {
-                case currentPhase = "current_phase"
-                case currentPhaseData = "current_phase_data"
-                case currentRoundId = "current_round_id"
-                case dayIndex = "day_index"
-                case nightHistory = "night_history"
-                case dayHistory = "day_history"
-                case isGameOver = "is_game_over"
-                case winner
-            }
-        }
-
-        try await supabase
-            .from("game_sessions")
-            .update(SessionResetData(
-                currentPhase: "lobby",
-                currentPhaseData: nil,
-                currentRoundId: nil,
-                dayIndex: 0,
-                nightHistory: [],
-                dayHistory: [],
-                isGameOver: false,
-                winner: nil
-            ))
-            .eq("id", value: sessionId.uuidString.lowercased())
-            .execute()
-
-        // 2. Reset all session_players
-        struct PlayerResetData: Encodable {
-            let isAlive: Bool
-            let isReady: Bool
-            let role: String?
-            let playerNumber: Int?
-
-            enum CodingKeys: String, CodingKey {
-                case isAlive = "is_alive"
-                case isReady = "is_ready"
-                case role
-                case playerNumber = "player_number"
-            }
-        }
-
-        try await supabase
-            .from("session_players")
-            .update(PlayerResetData(
-                isAlive: true,
-                isReady: true, // Keep everyone ready on rematch
-                role: nil,
-                playerNumber: nil
-            ))
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .execute()
-
-        // 3. Delete all game_actions for this session
-        try await supabase
-            .from("game_actions")
-            .delete()
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .execute()
-    }
-
-    // MARK: - Rematch Flow
-
-    /// Start rematch confirmation phase (sets deadline, marks initiator and all bots as ready)
-    func startRematchConfirmation(sessionId: UUID, initiatorPlayerId: UUID) async throws {
-        let deadline = Date().addingTimeInterval(45) // 45 seconds
-
-        // Update session with deadline
-        struct SessionUpdate: Encodable {
-            let rematchDeadline: Date
-
-            enum CodingKeys: String, CodingKey {
-                case rematchDeadline = "rematch_deadline"
-            }
-        }
-
-        try await supabase
-            .from("game_sessions")
-            .update(SessionUpdate(rematchDeadline: deadline))
-            .eq("id", value: sessionId.uuidString.lowercased())
-            .execute()
-
-        // Mark initiator as ready (confirmed for rematch)
-        try await updatePlayerReady(playerId: initiatorPlayerId, isReady: true)
-
-        // Auto-mark all bots as ready (they can't decline)
-        let players = try await getSessionPlayers(sessionId: sessionId)
-        let bots = players.filter { $0.isBot }
-        for bot in bots {
-            try await updatePlayerReady(playerId: bot.id, isReady: true)
-        }
-    }
-
-    /// Execute rematch via atomic RPC - handles host transfer, removes non-confirmed players
-    func executeRematch(sessionId: UUID) async throws -> (success: Bool, error: String?) {
-        struct RematchResponse: Decodable {
-            let success: Bool
-            let error: String?
-            let newHostUserId: String?
-            let confirmedCount: Int?
-        }
-
-        do {
-            let response: RematchResponse = try await supabase
-                .rpc("execute_rematch", params: ["p_session_id": AnyJSON.string(sessionId.uuidString.lowercased())])
-                .single()
-                .execute()
-                .value
-
-            return (response.success, response.error)
-        } catch {
-            print("❌ executeRematch RPC failed: \(error)")
-            // Fallback for environments where the RPC isn't deployed yet
-            do {
-                return try await executeRematchClientSide(sessionId: sessionId)
-            } catch {
-                print("❌ executeRematch client-side fallback failed: \(error)")
-                return (false, error.localizedDescription)
-            }
-        }
-    }
-
-    /// Rematch fallback that mirrors the server RPC for setups missing the SQL function
-    private func executeRematchClientSide(sessionId: UUID) async throws -> (Bool, String?) {
-        // Non-hosts cannot perform the updates directly due to RLS
-        if
-            let authSession = try? await supabase.auth.session,
-            let session = try? await getSession(sessionId: sessionId),
-            session.hostUserId != authSession.user.id
-        {
-            return (false, "Only the host can start a rematch right now")
-        }
-
-        // Fetch players to determine readiness and host candidate
-        let players: [SessionPlayer] = try await supabase
-            .from("session_players")
-            .select()
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .order("joined_at")
-            .execute()
-            .value
-
-        let readyPlayers = players.filter { $0.isReady }
-        guard readyPlayers.count >= 4 else {
-            return (false, "Not enough players")
-        }
-
-        // Remove non-confirmed humans
-        _ = try await supabase
-            .from("session_players")
-            .delete()
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .eq("is_bot", value: false)
-            .eq("is_ready", value: false)
-            .select()
-            .execute()
-
-        // Oldest confirmed human becomes host
-        let readyHumans = readyPlayers
-            .filter { !$0.isBot && $0.userId != nil }
-            .sorted { $0.joinedAt < $1.joinedAt }
-
-        guard let newHostUserId = readyHumans.first?.userId else {
-            return (false, "No valid host found")
-        }
-
-        struct SessionReset: Encodable {
-            let hostUserId: String
-            let status: String
-            let currentPhase: String
-            let currentPhaseData: PhaseData?
-            let currentRoundId: String?
-            let dayIndex: Int
-            let nightHistory: [NightActionRecord]
-            let dayHistory: [DayActionRecord]
-            let isGameOver: Bool
-            let winner: String?
-            let rematchDeadline: Date?
-            let updatedAt: Date
-
-            enum CodingKeys: String, CodingKey {
-                case hostUserId = "host_user_id"
-                case status
-                case currentPhase = "current_phase"
-                case currentPhaseData = "current_phase_data"
-                case currentRoundId = "current_round_id"
-                case dayIndex = "day_index"
-                case nightHistory = "night_history"
-                case dayHistory = "day_history"
-                case isGameOver = "is_game_over"
-                case winner
-                case rematchDeadline = "rematch_deadline"
-                case updatedAt = "updated_at"
-            }
-        }
-
-        try await supabase
-            .from("game_sessions")
-            .update(SessionReset(
-                hostUserId: newHostUserId.uuidString.lowercased(),
-                status: SessionStatus.waiting.rawValue,
-                currentPhase: "lobby",
-                currentPhaseData: .lobby,
-                currentRoundId: nil,
-                dayIndex: 0,
-                nightHistory: [],
-                dayHistory: [],
-                isGameOver: false,
-                winner: nil,
-                rematchDeadline: nil,
-                updatedAt: Date()
-            ))
-            .eq("id", value: sessionId.uuidString.lowercased())
-            .execute()
-
-        struct PlayerReset: Encodable {
-            let isAlive: Bool
-            let isReady: Bool
-            let role: String?
-            let playerNumber: Int?
-
-            enum CodingKeys: String, CodingKey {
-                case isAlive = "is_alive"
-                case isReady = "is_ready"
-                case role
-                case playerNumber = "player_number"
-            }
-        }
-
-        try await supabase
-            .from("session_players")
-            .update(PlayerReset(
-                isAlive: true,
-                isReady: true, // Keep everyone ready on rematch
-                role: nil,
-                playerNumber: nil
-            ))
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .execute()
-
-        try await supabase
-            .from("game_actions")
-            .delete()
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .execute()
-
-        return (true, nil)
-    }
-
-    /// Cancel rematch (clear deadline)
-    func cancelRematch(sessionId: UUID) async throws {
-        struct SessionUpdate: Encodable {
-            let rematchDeadline: Date?
-
-            enum CodingKeys: String, CodingKey {
-                case rematchDeadline = "rematch_deadline"
-            }
-        }
-
-        try await supabase
-            .from("game_sessions")
-            .update(SessionUpdate(rematchDeadline: nil))
-            .eq("id", value: sessionId.uuidString.lowercased())
-            .execute()
-    }
-
     // MARK: - Instant Return to Lobby (Play Again)
 
     /// Instantly return a player to lobby - resets session if needed, handles host transfer
@@ -1079,112 +798,50 @@ final class SessionService {
     }
 
     /// Reset session to lobby state - called by first player to click "Play Again"
+    /// Uses RPC with SECURITY DEFINER to bypass RLS (non-host can trigger reset)
+    /// Includes row locking to handle race conditions (first caller wins)
     private func resetSessionToLobby(
         sessionId: UUID,
         firstClickerUserId: UUID,
         originalHostUserId: UUID
     ) async throws {
-        // Determine who should be host:
-        // - If original host is the first clicker, they stay host
-        // - Otherwise, first clicker becomes temp host
+        // First clicker becomes host (original host can reclaim via transferHost later)
         let newHostUserId = firstClickerUserId
 
-        struct SessionReset: Encodable {
-            let hostUserId: String
-            let status: String
-            let currentPhase: String
-            let currentPhaseData: PhaseData?
-            let currentRoundId: String?
-            let dayIndex: Int
-            let nightHistory: [NightActionRecord]
-            let dayHistory: [DayActionRecord]
-            let isGameOver: Bool
-            let winner: String?
-            let rematchDeadline: Date?
-            let updatedAt: Date
+        struct ResetResponse: Decodable {
+            let success: Bool
+            let error: String?
+            let alreadyInLobby: Bool?
+            let newHostId: String?
 
             enum CodingKeys: String, CodingKey {
-                case hostUserId = "host_user_id"
-                case status
-                case currentPhase = "current_phase"
-                case currentPhaseData = "current_phase_data"
-                case currentRoundId = "current_round_id"
-                case dayIndex = "day_index"
-                case nightHistory = "night_history"
-                case dayHistory = "day_history"
-                case isGameOver = "is_game_over"
-                case winner
-                case rematchDeadline = "rematch_deadline"
-                case updatedAt = "updated_at"
+                case success
+                case error
+                case alreadyInLobby = "already_in_lobby"
+                case newHostId = "new_host_id"
             }
         }
 
-        // Reset session to lobby
-        try await supabase
-            .from("game_sessions")
-            .update(SessionReset(
-                hostUserId: newHostUserId.uuidString.lowercased(),
-                status: SessionStatus.waiting.rawValue,
-                currentPhase: "lobby",
-                currentPhaseData: .lobby,
-                currentRoundId: nil,
-                dayIndex: 0,
-                nightHistory: [],
-                dayHistory: [],
-                isGameOver: false,
-                winner: nil,
-                rematchDeadline: nil,
-                updatedAt: Date()
-            ))
-            .eq("id", value: sessionId.uuidString.lowercased())
+        let params: [String: AnyJSON] = [
+            "p_session_id": .string(sessionId.uuidString.lowercased()),
+            "p_caller_user_id": .string(firstClickerUserId.uuidString.lowercased()),
+            "p_new_host_user_id": .string(newHostUserId.uuidString.lowercased())
+        ]
+
+        let response: ResetResponse = try await supabase
+            .rpc("reset_session_to_lobby", params: params)
+            .single()
             .execute()
+            .value
 
-        struct PlayerReset: Encodable {
-            let isAlive: Bool
-            let isReady: Bool
-            let role: String?
-            let playerNumber: Int?
-
-            enum CodingKeys: String, CodingKey {
-                case isAlive = "is_alive"
-                case isReady = "is_ready"
-                case role
-                case playerNumber = "player_number"
-            }
+        if !response.success {
+            throw SessionError.operationFailed(response.error ?? "Failed to reset session to lobby")
         }
 
-        // Reset human players (alive, no role, no number, NOT ready - they must click Play Again)
-        try await supabase
-            .from("session_players")
-            .update(PlayerReset(
-                isAlive: true,
-                isReady: false,
-                role: nil,
-                playerNumber: nil
-            ))
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .eq("is_bot", value: false)
-            .execute()
-
-        // Auto-ready bots (they can't click Play Again, so they auto-join lobby)
-        try await supabase
-            .from("session_players")
-            .update(PlayerReset(
-                isAlive: true,
-                isReady: true,
-                role: nil,
-                playerNumber: nil
-            ))
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .eq("is_bot", value: true)
-            .execute()
-
-        // Delete all game actions from previous game
-        try await supabase
-            .from("game_actions")
-            .delete()
-            .eq("session_id", value: sessionId.uuidString.lowercased())
-            .execute()
+        // If already in lobby (concurrent click), that's fine - idempotent success
+        if response.alreadyInLobby == true {
+            print("ℹ️ [SessionService] Session already in lobby (concurrent Play Again click)")
+        }
     }
 
     /// Transfer host to a specific user (used when original host joins lobby)
@@ -1247,6 +904,7 @@ enum SessionError: LocalizedError {
     case sessionMismatch
     case noActiveSession
     case playerNotFound
+    case operationFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -1272,6 +930,8 @@ enum SessionError: LocalizedError {
             return "No active game session"
         case .playerNotFound:
             return "Player not found in session"
+        case .operationFailed(let message):
+            return message
         }
     }
 }

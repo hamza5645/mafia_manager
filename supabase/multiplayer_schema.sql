@@ -834,6 +834,80 @@ BEGIN
 END;
 $$;
 
+-- Atomic RPC: Reset Session to Lobby (Play Again)
+-- Allows any session participant to trigger reset when game is over
+-- Uses row locking to prevent race conditions with concurrent clicks
+CREATE OR REPLACE FUNCTION public.reset_session_to_lobby(
+    p_session_id UUID,
+    p_caller_user_id UUID,
+    p_new_host_user_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_session game_sessions%ROWTYPE;
+BEGIN
+    -- Lock session row to prevent race conditions (first caller wins)
+    SELECT * INTO v_session
+    FROM public.game_sessions
+    WHERE id = p_session_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Session not found');
+    END IF;
+
+    -- If session is already in lobby, just return success (idempotent)
+    IF v_session.current_phase = 'lobby' THEN
+        RETURN jsonb_build_object('success', true, 'already_in_lobby', true);
+    END IF;
+
+    -- Only allow reset when game is over
+    IF v_session.current_phase != 'game_over' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Game is not over');
+    END IF;
+
+    -- Verify caller is in the session
+    IF NOT public.user_is_in_session(p_session_id, p_caller_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'User not in session');
+    END IF;
+
+    -- Reset session to lobby with new host
+    UPDATE public.game_sessions
+    SET host_user_id = p_new_host_user_id,
+        status = 'waiting',
+        current_phase = 'lobby',
+        current_phase_data = jsonb_build_object('type', 'lobby'),
+        current_round_id = NULL,
+        day_index = 0,
+        night_history = '[]'::jsonb,
+        day_history = '[]'::jsonb,
+        is_game_over = false,
+        winner = NULL,
+        rematch_deadline = NULL,
+        updated_at = NOW()
+    WHERE id = p_session_id;
+
+    -- Reset human players (not ready - they must click Play Again)
+    UPDATE public.session_players
+    SET is_alive = true, is_ready = false, role = NULL, player_number = NULL
+    WHERE session_id = p_session_id AND is_bot = false;
+
+    -- Auto-ready bots (they can't click Play Again)
+    UPDATE public.session_players
+    SET is_alive = true, is_ready = true, role = NULL, player_number = NULL
+    WHERE session_id = p_session_id AND is_bot = true;
+
+    -- Clear game actions from previous game
+    DELETE FROM public.game_actions WHERE session_id = p_session_id;
+
+    RETURN jsonb_build_object('success', true, 'new_host_id', p_new_host_user_id);
+END;
+$$;
+
 -- =====================================================
 -- 11. PLAYER REMOVAL RPC (BYPASSES RLS)
 -- =====================================================

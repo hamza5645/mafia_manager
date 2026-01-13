@@ -14,8 +14,8 @@
 		291403FD0E26754FDC71DF76 /* Features/Night/NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71A38E01278BB90A26CA5C /* Features/Night/NightWakeUpView.swift */; };
 		2F01F3CD2EC0EEFD002EC6CD /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */; };
 		2F1E70072ED1BB19004366E6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2F1E70062ED1BB19004366E6 /* Assets.xcassets */; };
+		2F315FC92F164086005D282D /* RealtimeEventProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */; };
 		2F35621C2F15961B00A78B71 /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */; };
-		2F3562202F16361D00A78B71 /* RealtimeEventProcessor 2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35621F2F16361D00A78B71 /* RealtimeEventProcessor 2.swift */; };
 		2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB552E68EF3A002C5B31 /* buildServer.json */; };
 		2F3DBB752E68EF3A002C5B31 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB712E68EF3A002C5B31 /* README.md */; };
 		2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB592E68EF3A002C5B31 /* Player.swift */; };
@@ -104,8 +104,8 @@
 		27C2E67C3193BB6623D30344 /* SessionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
 		2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		2F1E70062ED1BB19004366E6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeEventProcessor.swift; sourceTree = "<group>"; };
 		2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingView.swift; sourceTree = "<group>"; };
-		2F35621F2F16361D00A78B71 /* RealtimeEventProcessor 2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealtimeEventProcessor 2.swift"; sourceTree = "<group>"; };
 		2F3DBB552E68EF3A002C5B31 /* buildServer.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = buildServer.json; sourceTree = "<group>"; };
 		2F3DBB562E68EF3A002C5B31 /* DayAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAction.swift; sourceTree = "<group>"; };
 		2F3DBB572E68EF3A002C5B31 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
@@ -197,9 +197,9 @@
 		20985C0AB7B1B665C55C3943 /* Multiplayer */ = {
 			isa = PBXGroup;
 			children = (
+				2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */,
 				F7D2DD545CD373564E027525 /* RealtimeService.swift */,
 				27C2E67C3193BB6623D30344 /* SessionService.swift */,
-				2F35621F2F16361D00A78B71 /* RealtimeEventProcessor 2.swift */,
 			);
 			path = Multiplayer;
 			sourceTree = "<group>";
@@ -557,7 +557,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2F3562202F16361D00A78B71 /* RealtimeEventProcessor 2.swift in Sources */,
+				2F315FC92F164086005D282D /* RealtimeEventProcessor.swift in Sources */,
 				2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */,
 				2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */,
 				2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */,
