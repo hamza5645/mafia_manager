@@ -33,6 +33,20 @@ struct SessionPlayer: Codable, Identifiable, Sendable {
         case joinedAt = "joined_at"
         case removalNote = "removal_note"
     }
+
+    // MARK: - Display-relevant comparison to prevent heartbeat-induced flickering
+
+    /// Returns true if display-relevant properties match (ignores heartbeat/connection state).
+    /// Used to prevent unnecessary SwiftUI re-renders when only background properties change.
+    func displayPropertiesEqual(to other: SessionPlayer) -> Bool {
+        return self.playerName == other.playerName
+            && self.playerNumber == other.playerNumber
+            && self.role == other.role
+            && self.isAlive == other.isAlive
+            && self.isBot == other.isBot
+            && self.isReady == other.isReady
+            && self.removalNote == other.removalNote
+    }
 }
 
 // Public player info (what everyone can see)

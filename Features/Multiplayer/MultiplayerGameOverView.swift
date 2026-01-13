@@ -4,14 +4,11 @@ struct MultiplayerGameOverView: View {
     @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
     @Environment(\.dismiss) private var dismiss
 
-    // Rematch countdown state
-    @State private var remainingSeconds: Int = 45
-    @State private var countdownTimer: Timer?
-
     // Error handling state
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLeaving = false
+    @State private var isReturningToLobby = false
 
     private var winner: Role? {
         multiplayerStore.currentSession?.winner
@@ -73,25 +70,13 @@ struct MultiplayerGameOverView: View {
                 roleChip(role: role)
             }
 
-            // Status - show alive/dead OR rematch confirmation
-            if multiplayerStore.isInRematchPhase && !player.isBot {
-                // Show rematch confirmation status
-                if player.isReady {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Design.Colors.successGreen)
-                } else {
-                    Image(systemName: "clock")
-                        .foregroundStyle(Design.Colors.textSecondary)
-                }
+            // Alive/dead status
+            if !player.isAlive {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(Design.Colors.dangerRed.opacity(0.6))
             } else {
-                // Normal alive/dead status
-                if !player.isAlive {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Design.Colors.dangerRed.opacity(0.6))
-                } else {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Design.Colors.successGreen.opacity(0.6))
-                }
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Design.Colors.successGreen.opacity(0.6))
             }
         }
         .padding(.vertical, 8)
@@ -223,82 +208,66 @@ struct MultiplayerGameOverView: View {
     private var buttonRow: some View {
         let mafiaWon = winner == .mafia
         let isNoWinner = winner == nil
-        let hasConfirmed = multiplayerStore.hasConfirmedRematch
-        let isInRematch = multiplayerStore.isInRematchPhase
-        let confirmedCount = multiplayerStore.rematchConfirmedCount
-        let totalHumans = multiplayerStore.totalHumanPlayers
+        let lobbyCount = multiplayerStore.playersInLobbyCount
 
         return VStack(spacing: Design.Spacing.md) {
-            // Rematch status (when in rematch phase)
-            if isInRematch {
-                VStack(spacing: 8) {
-                    // Countdown timer
-                    Text("\(remainingSeconds)s")
-                        .font(Design.Typography.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundStyle(remainingSeconds <= 10 ? Design.Colors.dangerRed : Design.Colors.brandGold)
-                        .contentTransition(.numericText())
-
-                    // Player count
-                    HStack(spacing: 8) {
-                        Image(systemName: "person.2.fill")
-                        Text("\(confirmedCount)/\(totalHumans) ready")
-                    }
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.textSecondary)
+            // Show how many players are in lobby waiting
+            if lobbyCount > 0 {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.2.fill")
+                    Text("\(lobbyCount) in lobby")
                 }
-                .padding(.bottom, 8)
+                .font(Design.Typography.body)
+                .foregroundStyle(Design.Colors.textSecondary)
+                .padding(.bottom, 4)
             }
 
-            // Play Again / Confirm button - ALL PLAYERS can see
+            // Play Again button - instantly returns to lobby
             Button {
                 Task {
+                    guard !isReturningToLobby else { return }
+                    isReturningToLobby = true
                     do {
-                        if !isInRematch {
-                            // Start rematch confirmation
-                            try await multiplayerStore.initiateRematch()
-                        } else if !hasConfirmed {
-                            // Confirm rematch
-                            try await multiplayerStore.confirmRematch()
-                        }
-                        // If already confirmed, button is disabled
+                        try await multiplayerStore.returnToLobby()
+                        // Navigation to lobby happens automatically via phase change
                     } catch {
                         errorMessage = error.localizedDescription
                         showError = true
                     }
+                    isReturningToLobby = false
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: hasConfirmed ? "checkmark.circle.fill" : ((mafiaWon && !isNoWinner) ? "flame.fill" : "arrow.clockwise"))
-                        .font(Design.Typography.callout)
-                        .fontWeight(.semibold)
-                        .accessibilityHidden(true)
-                    Text(hasConfirmed ? "Waiting for others..." : "Play Again")
-                        .font(Design.Typography.headline)
+                    if isReturningToLobby {
+                        ProgressView()
+                            .tint(Design.Colors.textPrimary)
+                    } else {
+                        Image(systemName: (mafiaWon && !isNoWinner) ? "flame.fill" : "arrow.clockwise")
+                            .font(Design.Typography.callout)
+                            .fontWeight(.semibold)
+                            .accessibilityHidden(true)
+                        Text("Play Again")
+                            .font(Design.Typography.headline)
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(CTAButtonStyle(kind: hasConfirmed ? .secondary : ((mafiaWon && !isNoWinner) ? .danger : .primary)))
-            .disabled(hasConfirmed)
+            .buttonStyle(CTAButtonStyle(kind: (mafiaWon && !isNoWinner) ? .danger : .primary))
+            .disabled(isReturningToLobby)
 
             // Leave / Return to Menu
             Button {
                 Task {
+                    guard !isLeaving else { return }
+                    isLeaving = true
                     do {
-                        guard !isLeaving else { return }
-                        isLeaving = true
-
-                        if isInRematch { try await multiplayerStore.declineRematch() }
-                        else { try await multiplayerStore.leaveSession() }
-
+                        try await multiplayerStore.declinePlayAgain()
                         await MainActor.run { dismiss() }
                     } catch {
                         errorMessage = error.localizedDescription
                         showError = true
                     }
-                    await MainActor.run {
-                        isLeaving = false
-                    }
+                    isLeaving = false
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -310,7 +279,7 @@ struct MultiplayerGameOverView: View {
                             .font(Design.Typography.callout)
                             .fontWeight(.semibold)
                             .accessibilityHidden(true)
-                        Text(isInRematch ? "Leave" : "Return to Menu")
+                        Text("Return to Menu")
                             .font(Design.Typography.headline)
                     }
                 }
@@ -318,24 +287,6 @@ struct MultiplayerGameOverView: View {
             }
             .buttonStyle(CTAButtonStyle(kind: .secondary))
             .disabled(isLeaving)
-        }
-        .onAppear { startCountdownIfNeeded() }
-        .onChange(of: multiplayerStore.rematchDeadline) { _ in startCountdownIfNeeded() }
-        .onDisappear { countdownTimer?.invalidate() }
-    }
-
-    private func startCountdownIfNeeded() {
-        countdownTimer?.invalidate()
-        guard let deadline = multiplayerStore.rematchDeadline else { return }
-
-        remainingSeconds = max(0, Int(deadline.timeIntervalSinceNow))
-
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            guard let deadline = multiplayerStore.rematchDeadline else {
-                countdownTimer?.invalidate()
-                return
-            }
-            remainingSeconds = max(0, Int(deadline.timeIntervalSinceNow))
         }
     }
 }

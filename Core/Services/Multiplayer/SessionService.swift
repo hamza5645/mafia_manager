@@ -1041,6 +1041,189 @@ final class SessionService {
             .execute()
     }
 
+    // MARK: - Instant Return to Lobby (Play Again)
+
+    /// Instantly return a player to lobby - resets session if needed, handles host transfer
+    /// - Parameters:
+    ///   - sessionId: The session to return to
+    ///   - playerId: The session_player ID clicking "Play Again"
+    ///   - playerUserId: The user ID of the clicking player
+    ///   - originalHostUserId: The original host's user ID (for host reclaim logic)
+    func returnToLobby(
+        sessionId: UUID,
+        playerId: UUID,
+        playerUserId: UUID,
+        originalHostUserId: UUID
+    ) async throws {
+        // 1. Check current session state
+        guard let session = try await getSession(sessionId: sessionId) else {
+            throw SessionError.sessionNotFound
+        }
+
+        // 2. If session is not in lobby, reset it (first clicker triggers this)
+        if session.currentPhase != "lobby" {
+            try await resetSessionToLobby(
+                sessionId: sessionId,
+                firstClickerUserId: playerUserId,
+                originalHostUserId: originalHostUserId
+            )
+        } else {
+            // Session already in lobby - check if original host is joining and should reclaim
+            if playerUserId == originalHostUserId && session.hostUserId != originalHostUserId {
+                try await transferHost(sessionId: sessionId, toUserId: originalHostUserId)
+            }
+        }
+
+        // 3. Mark this player as ready (in lobby)
+        try await updatePlayerReady(playerId: playerId, isReady: true)
+    }
+
+    /// Reset session to lobby state - called by first player to click "Play Again"
+    private func resetSessionToLobby(
+        sessionId: UUID,
+        firstClickerUserId: UUID,
+        originalHostUserId: UUID
+    ) async throws {
+        // Determine who should be host:
+        // - If original host is the first clicker, they stay host
+        // - Otherwise, first clicker becomes temp host
+        let newHostUserId = firstClickerUserId
+
+        struct SessionReset: Encodable {
+            let hostUserId: String
+            let status: String
+            let currentPhase: String
+            let currentPhaseData: PhaseData?
+            let currentRoundId: String?
+            let dayIndex: Int
+            let nightHistory: [NightActionRecord]
+            let dayHistory: [DayActionRecord]
+            let isGameOver: Bool
+            let winner: String?
+            let rematchDeadline: Date?
+            let updatedAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case hostUserId = "host_user_id"
+                case status
+                case currentPhase = "current_phase"
+                case currentPhaseData = "current_phase_data"
+                case currentRoundId = "current_round_id"
+                case dayIndex = "day_index"
+                case nightHistory = "night_history"
+                case dayHistory = "day_history"
+                case isGameOver = "is_game_over"
+                case winner
+                case rematchDeadline = "rematch_deadline"
+                case updatedAt = "updated_at"
+            }
+        }
+
+        // Reset session to lobby
+        try await supabase
+            .from("game_sessions")
+            .update(SessionReset(
+                hostUserId: newHostUserId.uuidString.lowercased(),
+                status: SessionStatus.waiting.rawValue,
+                currentPhase: "lobby",
+                currentPhaseData: .lobby,
+                currentRoundId: nil,
+                dayIndex: 0,
+                nightHistory: [],
+                dayHistory: [],
+                isGameOver: false,
+                winner: nil,
+                rematchDeadline: nil,
+                updatedAt: Date()
+            ))
+            .eq("id", value: sessionId.uuidString.lowercased())
+            .execute()
+
+        struct PlayerReset: Encodable {
+            let isAlive: Bool
+            let isReady: Bool
+            let role: String?
+            let playerNumber: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case isAlive = "is_alive"
+                case isReady = "is_ready"
+                case role
+                case playerNumber = "player_number"
+            }
+        }
+
+        // Reset human players (alive, no role, no number, NOT ready - they must click Play Again)
+        try await supabase
+            .from("session_players")
+            .update(PlayerReset(
+                isAlive: true,
+                isReady: false,
+                role: nil,
+                playerNumber: nil
+            ))
+            .eq("session_id", value: sessionId.uuidString.lowercased())
+            .eq("is_bot", value: false)
+            .execute()
+
+        // Auto-ready bots (they can't click Play Again, so they auto-join lobby)
+        try await supabase
+            .from("session_players")
+            .update(PlayerReset(
+                isAlive: true,
+                isReady: true,
+                role: nil,
+                playerNumber: nil
+            ))
+            .eq("session_id", value: sessionId.uuidString.lowercased())
+            .eq("is_bot", value: true)
+            .execute()
+
+        // Delete all game actions from previous game
+        try await supabase
+            .from("game_actions")
+            .delete()
+            .eq("session_id", value: sessionId.uuidString.lowercased())
+            .execute()
+    }
+
+    /// Transfer host to a specific user (used when original host joins lobby)
+    private func transferHost(sessionId: UUID, toUserId: UUID) async throws {
+        // Verify the target user is still in the session before transfer
+        let playerCheck: [SessionPlayer] = try await supabase
+            .from("session_players")
+            .select()
+            .eq("session_id", value: sessionId.uuidString.lowercased())
+            .eq("user_id", value: toUserId.uuidString.lowercased())
+            .execute()
+            .value
+
+        // Only transfer if the user exists in the session
+        guard !playerCheck.isEmpty else {
+            print("⚠️ [SessionService] Cannot transfer host - user \(toUserId) not in session")
+            return
+        }
+
+        struct HostUpdate: Encodable {
+            let hostUserId: String
+            let updatedAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case hostUserId = "host_user_id"
+                case updatedAt = "updated_at"
+            }
+        }
+
+        try await supabase
+            .from("game_sessions")
+            .update(HostUpdate(
+                hostUserId: toUserId.uuidString.lowercased(),
+                updatedAt: Date()
+            ))
+            .eq("id", value: sessionId.uuidString.lowercased())
+            .execute()
+    }
+
 }
 
 // MARK: - Helper Structs
