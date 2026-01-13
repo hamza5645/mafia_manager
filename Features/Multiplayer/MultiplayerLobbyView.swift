@@ -10,6 +10,13 @@ struct MultiplayerLobbyView: View {
     @State private var hasLeftSession = false
     @State private var startGameError: String?
 
+    /// The session player ID of the host (found by matching userId to session.hostUserId)
+    private var hostSessionPlayerId: UUID? {
+        multiplayerStore.allPlayers.first(where: {
+            $0.userId == multiplayerStore.currentSession?.hostUserId
+        })?.id
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -161,11 +168,11 @@ struct MultiplayerLobbyView: View {
 
                                 // HAMZA-94: Sort players: host first, then humans, then bots
                                 VStack(spacing: 12) {
-                                    ForEach(multiplayerStore.visiblePlayers.sortedForLobby(hostId: multiplayerStore.allPlayers.first?.id), id: \.id) { playerInfo in
+                                    ForEach(multiplayerStore.visiblePlayers.sortedForLobby(hostId: hostSessionPlayerId), id: \.id) { playerInfo in
                                         PlayerRow(
                                             playerInfo: playerInfo,
                                             isMe: playerInfo.id == multiplayerStore.myPlayer?.id,
-                                            isHost: playerInfo.id == multiplayerStore.allPlayers.first?.id,
+                                            isHost: playerInfo.id == hostSessionPlayerId,
                                             isHostOffline: multiplayerStore.isHostOffline, // HAMZA-165
                                             onRemove: (multiplayerStore.isHost && playerInfo.id != multiplayerStore.myPlayer?.id) ? {
                                                 removePlayer(playerInfo)
