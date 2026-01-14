@@ -652,6 +652,16 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func handlePlayerUpdate(_ player: SessionPlayer) {
+        // STALENESS GUARD: Ignore player updates with roles during lobby phase
+        // This prevents stale Realtime events from previous games from overwriting new role assignments
+        // Similar to how handleActionUpdate() filters by phase_index to prevent stale action processing
+        if let session = currentSession,
+           session.currentPhase == "lobby",
+           player.role != nil {
+            print("⚠️ [handlePlayerUpdate] Ignoring stale event: \(player.playerName) has role=\(player.role?.rawValue ?? "nil") during lobby phase")
+            return
+        }
+
         var displayChanged = false
 
         if let index = allPlayers.firstIndex(where: { $0.id == player.id }) {
@@ -1200,8 +1210,14 @@ final class MultiplayerGameStore: ObservableObject {
         roles += Array(repeating: .citizen, count: remaining)
         roles.shuffle(using: &rng)
 
-        // Create assignments
-        return allPlayers.enumerated().map { index, player in
+        // RANDOMNESS FIX: Shuffle players to completely decouple join order from role assignment
+        // This ensures role distribution is independent of player join timestamps
+        // Previously, allPlayers was ordered by joined_at, so Bot1 (inserted first) always got roles[0]
+        // With this fix, each player gets a role from a randomly selected position
+        let shuffledPlayers = allPlayers.shuffled(using: &rng)
+
+        // Create assignments using shuffled player order
+        return shuffledPlayers.enumerated().map { index, player in
             (playerId: player.playerId, role: roles[index], number: assignedNumbers[index])
         }
     }
