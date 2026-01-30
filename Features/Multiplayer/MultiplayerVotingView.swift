@@ -39,6 +39,9 @@ struct MultiplayerVotingView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .task {
+            await multiplayerStore.syncPlayerRoster()
+        }
     }
 
     private var alivePlayerView: some View {

@@ -1055,6 +1055,15 @@ final class MultiplayerGameStore: ObservableObject {
         updateVisiblePlayers()
     }
 
+    /// Public wrapper to refresh the player roster (useful when UI suspects stale lists).
+    func syncPlayerRoster() async {
+        do {
+            try await refreshPlayers()
+        } catch {
+            print("⚠️ [MultiplayerGameStore] Failed to refresh player roster: \(error)")
+        }
+    }
+
     private func updateVisiblePlayers() {
         // Create public player info list (everyone can see names, numbers, alive status)
         visiblePlayers = allPlayers.map { PublicPlayerInfo(from: $0) }

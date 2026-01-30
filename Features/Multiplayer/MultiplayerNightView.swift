@@ -210,6 +210,7 @@ struct MultiplayerNightView: View {
         }
         .navigationBarBackButtonHidden(true)
         .task {
+            await multiplayerStore.syncPlayerRoster()
             await autoReadyIfPassive()
         }
         .onChange(of: myRole) { _, _ in
