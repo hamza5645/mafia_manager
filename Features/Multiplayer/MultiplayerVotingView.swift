@@ -20,7 +20,7 @@ struct MultiplayerVotingView: View {
     // Only night targeting restricts Mafia from targeting teammates
     var alivePlayers: [PublicPlayerInfo] {
         return multiplayerStore.visiblePlayers
-            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+            .filter { $0.isAlive && $0.playerId != multiplayerStore.myPlayer?.playerId }
             .sortedHumansFirst()
     }
 

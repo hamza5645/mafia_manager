@@ -32,7 +32,7 @@ final class MultiplayerGameStore: ObservableObject {
         guard myRole == .mafia else { return Set() }
         return Set(
             allPlayers
-                .filter { $0.role == .mafia && $0.id != myPlayer?.id }
+                .filter { $0.role == .mafia && $0.playerId != myPlayer?.playerId }
                 .map { $0.playerId }
         )
     }
@@ -1062,7 +1062,7 @@ final class MultiplayerGameStore: ObservableObject {
         // If I'm mafia, populate mafia teammates
         if myRole == .mafia {
             mafiaTeammates = allPlayers
-                .filter { $0.role == .mafia && $0.id != myPlayer?.id }
+                .filter { $0.role == .mafia && $0.playerId != myPlayer?.playerId }
                 .map { PublicPlayerInfo(from: $0) }
         } else {
             mafiaTeammates = []

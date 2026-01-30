@@ -30,7 +30,7 @@ struct MultiplayerNightView: View {
     // HAMZA-94: Sort players by humans first
     var alivePlayers: [PublicPlayerInfo] {
         multiplayerStore.visiblePlayers
-            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id }
+            .filter { $0.isAlive && $0.playerId != multiplayerStore.myPlayer?.playerId }
             .sortedHumansFirst()
     }
 
@@ -39,7 +39,7 @@ struct MultiplayerNightView: View {
         // Use computed property for fresh Mafia teammate IDs
         let mafiaTeammateIds = multiplayerStore.mafiaTeammatePlayerIds
         return multiplayerStore.visiblePlayers
-            .filter { $0.isAlive && $0.id != multiplayerStore.myPlayer?.id && !mafiaTeammateIds.contains($0.playerId) }
+            .filter { $0.isAlive && $0.playerId != multiplayerStore.myPlayer?.playerId && !mafiaTeammateIds.contains($0.playerId) }
             .sortedHumansFirst()
     }
 
