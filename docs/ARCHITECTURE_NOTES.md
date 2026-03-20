@@ -42,7 +42,7 @@ Hardcoded in `GameStore.roleDistribution()`:
 
 ## Service Layer
 
-**Persistence** (`Core/Services/Persistence.swift`):
+**Persistence** (`Core/Gameplay/Services/Persistence.swift`):
 - Singleton, thread-safe (`@unchecked Sendable`)
 - JSON to Application Support: `save(GameState)`, `load()`, `reset()`
 - Atomic writes, pretty-printed, silent failures

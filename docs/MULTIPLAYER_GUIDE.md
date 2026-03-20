@@ -108,7 +108,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
 
 ## Code Architecture
 
-### Models (`Core/Models/Multiplayer/`)
+### Models (`Core/Multiplayer/Models/`)
 
 ```swift
 GameSession      // Room state, settings, current phase
@@ -117,14 +117,14 @@ GameAction       // Night/day actions
 PhaseTimer       // Phase countdown timers
 ```
 
-### Services (`Core/Services/Multiplayer/`)
+### Services (`Core/Multiplayer/Services/`)
 
 ```swift
 SessionService   // CRUD operations for sessions/players
 RealtimeService  // WebSocket subscriptions & presence
 ```
 
-### Store (`Core/Store/`)
+### Store (`Core/Multiplayer/Store/`)
 
 ```swift
 MultiplayerGameStore  // Coordinates multiplayer state
@@ -132,7 +132,7 @@ MultiplayerGameStore  // Coordinates multiplayer state
                       // Manages real-time sync
 ```
 
-### Views (`Features/Multiplayer/`)
+### Views (`Features/Multiplayer/Entry/` + `Features/Multiplayer/Flow/`)
 
 ```swift
 GameModeSelectionView    // Choose Local vs Online

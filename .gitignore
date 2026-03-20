@@ -11,7 +11,7 @@ build/
 node_modules/
 Pods/
 *.log
-Vision.md
+docs/Vision.md
 
 # Sensitive configuration files - DO NOT COMMIT
 Core/Services/SupabaseConfig.swiftMakefile

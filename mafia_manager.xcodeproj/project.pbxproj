@@ -11,7 +11,7 @@
 		0ECA67702A1EE2E0FB10D789 /* PlayerGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */; };
 		10DAF7DE4AEC34822198C1AE /* VoteResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19330122242ADD89372639F0 /* VoteResultsView.swift */; };
 		289CD2C8F599CF39B1185E93 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */; };
-		291403FD0E26754FDC71DF76 /* Features/Night/NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71A38E01278BB90A26CA5C /* Features/Night/NightWakeUpView.swift */; };
+		291403FD0E26754FDC71DF76 /* NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */; };
 		2F01F3CD2EC0EEFD002EC6CD /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */; };
 		2F1E70072ED1BB19004366E6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2F1E70062ED1BB19004366E6 /* Assets.xcassets */; };
 		2F315FC92F164086005D282D /* RealtimeEventProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */; };
@@ -33,7 +33,7 @@
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
 		2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* Vision.md */; };
 		2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */; };
-		2F9C12BC2EC4F21300D06767 /* Core/Services/BotDecisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9C12BB2EC4F21300D06767 /* Core/Services/BotDecisionService.swift */; };
+		2F9C12BC2EC4F21300D06767 /* BotDecisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */; };
 		2FD6A3AA2EBB311100D43510 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3A92EBB311100D43510 /* Auth */; };
 		2FD6A3AC2EBB311100D43510 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AB2EBB311100D43510 /* Functions */; };
 		2FD6A3AE2EBB311100D43510 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AD2EBB311100D43510 /* PostgREST */; };
@@ -61,7 +61,6 @@
 		7B3E887FC46C875E7F3DD91E /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582569330F61BF4D7DC63263 /* AuthStore.swift */; };
 		7E14C60FAC9686FE2E4AE201 /* GameAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B566F2D0BA02374F0EA21AD /* GameAction.swift */; };
 		7F663480AC89982C964BBEC8 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895520245FFCE2891105A416 /* ProfileView.swift */; };
-		851EFB2472651BC23AF3F12D /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */; };
 		8638D2DEBAEB0BB360F4EFFD /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */; };
 		8887C32EEDDA4E8EBE2A3A75 /* InputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */; };
 		8EC3587C2C8FF2AA68055283 /* SessionPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE756B643538C66E089F8E6C /* SessionPlayer.swift */; };
@@ -90,17 +89,17 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0B71A38E01278BB90A26CA5C /* Features/Night/NightWakeUpView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Features/Night/NightWakeUpView.swift; sourceTree = SOURCE_ROOT; };
+		0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NightWakeUpView.swift; sourceTree = "<group>"; };
 		0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerGameOverView.swift; sourceTree = "<group>"; };
 		0FFCAAB712B0B3CA1DCD9128 /* GuestNameInputView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuestNameInputView.swift; sourceTree = "<group>"; };
-		1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Features/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		14862413A29957F28E086D12 /* VotingSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VotingSession.swift; sourceTree = "<group>"; };
 		152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameModeSelectionView.swift; sourceTree = "<group>"; };
-		17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomRolesView.swift; path = Features/Stats/CustomRolesView.swift; sourceTree = SOURCE_ROOT; };
+		17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomRolesView.swift; sourceTree = "<group>"; };
 		184E9CF7F1C093EF1E8A2106 /* MultiplayerLobbyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerLobbyView.swift; sourceTree = "<group>"; };
 		19330122242ADD89372639F0 /* VoteResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoteResultsView.swift; sourceTree = "<group>"; };
-		1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerGroupsView.swift; path = Features/Stats/PlayerGroupsView.swift; sourceTree = "<group>"; };
-		2625D31F7758B229B06FC51C /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthService.swift; path = Core/Services/AuthService.swift; sourceTree = SOURCE_ROOT; };
+		1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGroupsView.swift; sourceTree = "<group>"; };
+		2625D31F7758B229B06FC51C /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		27C2E67C3193BB6623D30344 /* SessionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
 		2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		2F1E70062ED1BB19004366E6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -123,55 +122,44 @@
 		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2F78C7742EAEC2B1004BC2A7 /* Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Vision.md; sourceTree = "<group>"; };
 		2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathRevealView.swift; sourceTree = "<group>"; };
-		2F9C12BB2EC4F21300D06767 /* Core/Services/BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/BotDecisionService.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3BD2EBB354500D43510 /* Core/Store/AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Store/AuthStore.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3BF2EBB358900D43510 /* Features/Auth/LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Auth/LoginView.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3C02EBB358900D43510 /* Features/Auth/ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Auth/ProfileView.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3C12EBB358900D43510 /* Features/Auth/SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Auth/SignupView.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3C32EBB358900D43510 /* Features/Settings/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3C52EBB358900D43510 /* Features/Stats/CustomRolesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Stats/CustomRolesView.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3C62EBB358900D43510 /* Features/Stats/PlayerStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Stats/PlayerStatsView.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3CE2EBB370B00D43510 /* Core/Services/AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/AuthService.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3D02EBB370B00D43510 /* Core/Services/SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/SupabaseConfig.swift; sourceTree = SOURCE_ROOT; };
-		2FD6A3D12EBB370B00D43510 /* Core/Services/SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Services/SupabaseService.swift; sourceTree = SOURCE_ROOT; };
+		2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotDecisionService.swift; sourceTree = "<group>"; };
 		2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVoteDeathRevealView.swift; sourceTree = "<group>"; };
 		2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3630833E19A1FEC52C82BB7A /* JoinGameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JoinGameView.swift; sourceTree = "<group>"; };
-		3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingView.swift; sourceTree = "<group>"; };
-		4499CE3EB8728265E3984899 /* PlayerGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerGroup.swift; path = Core/Models/PlayerGroup.swift; sourceTree = "<group>"; };
-		582569330F61BF4D7DC63263 /* AuthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthStore.swift; path = Core/Store/AuthStore.swift; sourceTree = SOURCE_ROOT; };
+		4499CE3EB8728265E3984899 /* PlayerGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGroup.swift; sourceTree = "<group>"; };
+		582569330F61BF4D7DC63263 /* AuthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		5B566F2D0BA02374F0EA21AD /* GameAction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameAction.swift; sourceTree = "<group>"; };
 		6597710FF291702FBC0A4750 /* VotingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VotingView.swift; sourceTree = "<group>"; };
 		733E894B28BB497697DE0ACD /* doctor_ecg.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = doctor_ecg.wav; sourceTree = "<group>"; };
 		73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerGameStore.swift; sourceTree = "<group>"; };
 		7D56F8B50DF3FF0F13CB9907 /* QuickStartSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickStartSheet.swift; sourceTree = "<group>"; };
-		7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RoleRevealView.swift; path = Features/Assignments/RoleRevealView.swift; sourceTree = SOURCE_ROOT; };
-		7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SupabaseService.swift; path = Core/Services/SupabaseService.swift; sourceTree = SOURCE_ROOT; };
+		7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoleRevealView.swift; sourceTree = "<group>"; };
+		7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = mafia_gunshot.wav; sourceTree = "<group>"; };
-		889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CustomRoleConfig.swift; path = Core/Models/CustomRoleConfig.swift; sourceTree = SOURCE_ROOT; };
-		895520245FFCE2891105A416 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfileView.swift; path = Features/Auth/ProfileView.swift; sourceTree = SOURCE_ROOT; };
+		889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomRoleConfig.swift; sourceTree = "<group>"; };
+		895520245FFCE2891105A416 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerNightView.swift; sourceTree = "<group>"; };
-		958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserProfile.swift; path = Core/Models/UserProfile.swift; sourceTree = SOURCE_ROOT; };
-		99FF17F2386FC18783995D1B /* SupabaseConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SupabaseConfig.swift; path = Core/Services/SupabaseConfig.swift; sourceTree = SOURCE_ROOT; };
-		9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerStatsView.swift; path = Features/Stats/PlayerStatsView.swift; sourceTree = SOURCE_ROOT; };
+		958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		99FF17F2386FC18783995D1B /* SupabaseConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
+		9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerStatsView.swift; sourceTree = "<group>"; };
 		A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightOutcomeView.swift; sourceTree = "<group>"; };
 		AA0000012E69000000000001 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		AA0000052E69010000000005 /* RoleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleStyle.swift; sourceTree = "<group>"; };
 		AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerMenuView.swift; sourceTree = "<group>"; };
-		B1709435DE4A42E7402F6A60 /* PlayerStats.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlayerStats.swift; path = Core/Models/PlayerStats.swift; sourceTree = SOURCE_ROOT; };
-		B3203E55E05959A3B5751E94 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoginView.swift; path = Features/Auth/LoginView.swift; sourceTree = SOURCE_ROOT; };
-		B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SignupView.swift; path = Features/Auth/SignupView.swift; sourceTree = SOURCE_ROOT; };
+		B1709435DE4A42E7402F6A60 /* PlayerStats.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerStats.swift; sourceTree = "<group>"; };
+		B3203E55E05959A3B5751E94 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
 		BE756B643538C66E089F8E6C /* SessionPlayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionPlayer.swift; sourceTree = "<group>"; };
 		BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerRoleRevealView.swift; sourceTree = "<group>"; };
 		C555B969C34DF85304449F7D /* BotVotingRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BotVotingRevealView.swift; sourceTree = "<group>"; };
-		CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainHelper.swift; path = Core/Services/KeychainHelper.swift; sourceTree = SOURCE_ROOT; };
+		CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		D21D488C56C94775B5A786B0 /* police_siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = police_siren.wav; sourceTree = "<group>"; };
-		D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DatabaseService.swift; path = Core/Services/DatabaseService.swift; sourceTree = SOURCE_ROOT; };
-		D59F350DCAA6EDFB11650FED /* PrivacyBlurView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PrivacyBlurView.swift; path = Core/Components/PrivacyBlurView.swift; sourceTree = SOURCE_ROOT; };
+		D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		D59F350DCAA6EDFB11650FED /* PrivacyBlurView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrivacyBlurView.swift; sourceTree = "<group>"; };
 		DF2607CD1D18895BC894B618 /* CreateGameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CreateGameView.swift; sourceTree = "<group>"; };
 		E0C90EBFF924E1F597649EEF /* wakeup_rooster.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = wakeup_rooster.wav; sourceTree = "<group>"; };
 		E8E9FFD598221E37F715D320 /* GameSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
-		F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InputValidator.swift; path = Core/Services/InputValidator.swift; sourceTree = SOURCE_ROOT; };
+		F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InputValidator.swift; sourceTree = "<group>"; };
 		F7D2DD545CD373564E027525 /* RealtimeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RealtimeService.swift; sourceTree = "<group>"; };
 		F96A975EA673CBD0F8479E7B /* RoleCardPalette.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoleCardPalette.swift; sourceTree = "<group>"; };
 		ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingResultsView.swift; sourceTree = "<group>"; };
@@ -194,16 +182,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		20985C0AB7B1B665C55C3943 /* Multiplayer */ = {
-			isa = PBXGroup;
-			children = (
-				2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */,
-				F7D2DD545CD373564E027525 /* RealtimeService.swift */,
-				27C2E67C3193BB6623D30344 /* SessionService.swift */,
-			);
-			path = Multiplayer;
-			sourceTree = "<group>";
-		};
 		2D6E15484F7B54CFCB79994F /* Voting */ = {
 			isa = PBXGroup;
 			children = (
@@ -222,61 +200,17 @@
 			path = Intro;
 			sourceTree = "<group>";
 		};
-		2F3DBB5B2E68EF3A002C5B31 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB562E68EF3A002C5B31 /* DayAction.swift */,
-				2F3DBB572E68EF3A002C5B31 /* GameState.swift */,
-				2F3DBB582E68EF3A002C5B31 /* NightAction.swift */,
-				2F3DBB592E68EF3A002C5B31 /* Player.swift */,
-				2F3DBB5A2E68EF3A002C5B31 /* Role.swift */,
-				958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */,
-				B1709435DE4A42E7402F6A60 /* PlayerStats.swift */,
-				889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */,
-				14862413A29957F28E086D12 /* VotingSession.swift */,
-				AFB8EDC7822DA0FCEC01607F /* Multiplayer */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		2F3DBB5E2E68EF3A002C5B31 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				2F9C12BB2EC4F21300D06767 /* Core/Services/BotDecisionService.swift */,
-				2FD6A3CE2EBB370B00D43510 /* Core/Services/AuthService.swift */,
-				2FD6A3D02EBB370B00D43510 /* Core/Services/SupabaseConfig.swift */,
-				2FD6A3D12EBB370B00D43510 /* Core/Services/SupabaseService.swift */,
-				2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */,
-				2625D31F7758B229B06FC51C /* AuthService.swift */,
-				99FF17F2386FC18783995D1B /* SupabaseConfig.swift */,
-				7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */,
-				F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */,
-				CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */,
-				D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */,
-				20985C0AB7B1B665C55C3943 /* Multiplayer */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		2F3DBB602E68EF3A002C5B31 /* Store */ = {
-			isa = PBXGroup;
-			children = (
-				2FD6A3BD2EBB354500D43510 /* Core/Store/AuthStore.swift */,
-				2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */,
-				582569330F61BF4D7DC63263 /* AuthStore.swift */,
-				73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */,
-			);
-			path = Store;
-			sourceTree = "<group>";
-		};
 		2F3DBB612E68EF3A002C5B31 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				2F3DBB5B2E68EF3A002C5B31 /* Models */,
-				2F3DBB5E2E68EF3A002C5B31 /* Services */,
-				2F3DBB602E68EF3A002C5B31 /* Store */,
 				AA0000022E69000000000002 /* UI */,
 				69E62B2722384CE701263572 /* Components */,
+				2FAA73FE2F6E12A100BB7792 /* Backend */,
+				2FAA73FF2F6E12A100BB7792 /* Support */,
+				2FAA74022F6E12A700BB7792 /* Gameplay */,
+				2FAA74032F6E12A700BB7792 /* Auth */,
+				2FAA74042F6E12A700BB7792 /* Multiplayer */,
+				2FAA74052F6E12A700BB7792 /* Stats */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -312,7 +246,7 @@
 			children = (
 				2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */,
 				A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */,
-				0B71A38E01278BB90A26CA5C /* Features/Night/NightWakeUpView.swift */,
+				0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */,
 			);
 			path = Night;
 			sourceTree = "<group>";
@@ -343,12 +277,191 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
+		2FAA73FD2F6E12A100BB7792 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		2FAA73FE2F6E12A100BB7792 /* Backend */ = {
+			isa = PBXGroup;
+			children = (
+				99FF17F2386FC18783995D1B /* SupabaseConfig.swift */,
+				D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */,
+				7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */,
+			);
+			path = Backend;
+			sourceTree = "<group>";
+		};
+		2FAA73FF2F6E12A100BB7792 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		2FAA74002F6E12A100BB7792 /* Entry */ = {
+			isa = PBXGroup;
+			children = (
+				DF2607CD1D18895BC894B618 /* CreateGameView.swift */,
+				152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */,
+				3630833E19A1FEC52C82BB7A /* JoinGameView.swift */,
+				AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */,
+			);
+			path = Entry;
+			sourceTree = "<group>";
+		};
+		2FAA74012F6E12A100BB7792 /* Flow */ = {
+			isa = PBXGroup;
+			children = (
+				184E9CF7F1C093EF1E8A2106 /* MultiplayerLobbyView.swift */,
+				8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */,
+				BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */,
+				ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */,
+				2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */,
+				0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */,
+				2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */,
+			);
+			path = Flow;
+			sourceTree = "<group>";
+		};
+		2FAA74022F6E12A700BB7792 /* Gameplay */ = {
+			isa = PBXGroup;
+			children = (
+				2FAA74092F6E12B000BB7792 /* Models */,
+				2FAA740A2F6E12B000BB7792 /* Services */,
+				2FAA740B2F6E12B000BB7792 /* Store */,
+			);
+			path = Gameplay;
+			sourceTree = "<group>";
+		};
+		2FAA74032F6E12A700BB7792 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				2FAA74062F6E12B000BB7792 /* Services */,
+				2FAA74072F6E12B000BB7792 /* Models */,
+				2FAA74082F6E12B000BB7792 /* Store */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		2FAA74042F6E12A700BB7792 /* Multiplayer */ = {
+			isa = PBXGroup;
+			children = (
+				2FAA740C2F6E12B000BB7792 /* Models */,
+				2FAA740D2F6E12B000BB7792 /* Services */,
+				2FAA740E2F6E12B000BB7792 /* Store */,
+			);
+			path = Multiplayer;
+			sourceTree = "<group>";
+		};
+		2FAA74052F6E12A700BB7792 /* Stats */ = {
+			isa = PBXGroup;
+			children = (
+				2FAA740F2F6E12B000BB7792 /* Models */,
+			);
+			path = Stats;
+			sourceTree = "<group>";
+		};
+		2FAA74062F6E12B000BB7792 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2625D31F7758B229B06FC51C /* AuthService.swift */,
+				CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		2FAA74072F6E12B000BB7792 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		2FAA74082F6E12B000BB7792 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				582569330F61BF4D7DC63263 /* AuthStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		2FAA74092F6E12B000BB7792 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB562E68EF3A002C5B31 /* DayAction.swift */,
+				2F3DBB572E68EF3A002C5B31 /* GameState.swift */,
+				2F3DBB582E68EF3A002C5B31 /* NightAction.swift */,
+				2F3DBB592E68EF3A002C5B31 /* Player.swift */,
+				2F3DBB5A2E68EF3A002C5B31 /* Role.swift */,
+				14862413A29957F28E086D12 /* VotingSession.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		2FAA740A2F6E12B000BB7792 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */,
+				2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		2FAA740B2F6E12B000BB7792 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		2FAA740C2F6E12B000BB7792 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				E8E9FFD598221E37F715D320 /* GameSession.swift */,
+				5B566F2D0BA02374F0EA21AD /* GameAction.swift */,
+				BE756B643538C66E089F8E6C /* SessionPlayer.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		2FAA740D2F6E12B000BB7792 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */,
+				F7D2DD545CD373564E027525 /* RealtimeService.swift */,
+				27C2E67C3193BB6623D30344 /* SessionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		2FAA740E2F6E12B000BB7792 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		2FAA740F2F6E12B000BB7792 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */,
+				B1709435DE4A42E7402F6A60 /* PlayerStats.swift */,
+				4499CE3EB8728265E3984899 /* PlayerGroup.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
 		2FD6A3C22EBB358900D43510 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				2FD6A3BF2EBB358900D43510 /* Features/Auth/LoginView.swift */,
-				2FD6A3C02EBB358900D43510 /* Features/Auth/ProfileView.swift */,
-				2FD6A3C12EBB358900D43510 /* Features/Auth/SignupView.swift */,
 				B3203E55E05959A3B5751E94 /* LoginView.swift */,
 				895520245FFCE2891105A416 /* ProfileView.swift */,
 				B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */,
@@ -361,7 +474,6 @@
 		2FD6A3C42EBB358900D43510 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				2FD6A3C32EBB358900D43510 /* Features/Settings/SettingsView.swift */,
 				1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -370,10 +482,9 @@
 		2FD6A3C72EBB358900D43510 /* Stats */ = {
 			isa = PBXGroup;
 			children = (
-				2FD6A3C52EBB358900D43510 /* Features/Stats/CustomRolesView.swift */,
-				2FD6A3C62EBB358900D43510 /* Features/Stats/PlayerStatsView.swift */,
 				9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */,
 				17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */,
+				1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */,
 			);
 			path = Stats;
 			sourceTree = "<group>";
@@ -386,12 +497,10 @@
 				2F3DBB612E68EF3A002C5B31 /* Core */,
 				2F3DBB6E2E68EF3A002C5B31 /* Features */,
 				532A4160448E4D7897EE80A5 /* Resources */,
-				2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */,
 				2F3DBB712E68EF3A002C5B31 /* README.md */,
 				2F78C7742EAEC2B1004BC2A7 /* Vision.md */,
 				2FF7CF202E68E6E70023D42B /* Products */,
-				4499CE3EB8728265E3984899 /* PlayerGroup.swift */,
-				1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */,
+				2FAA73FD2F6E12A100BB7792 /* App */,
 			);
 			sourceTree = "<group>";
 		};
@@ -406,18 +515,8 @@
 		5161D6F72CFF6B32C97E6F78 /* Multiplayer */ = {
 			isa = PBXGroup;
 			children = (
-				2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */,
-				2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */,
-				DF2607CD1D18895BC894B618 /* CreateGameView.swift */,
-				152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */,
-				3630833E19A1FEC52C82BB7A /* JoinGameView.swift */,
-				184E9CF7F1C093EF1E8A2106 /* MultiplayerLobbyView.swift */,
-				AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */,
-				8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */,
-				3E8EE73A33E42C9BC6F981BE /* MultiplayerVotingView.swift */,
-				ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */,
-				BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */,
-				0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */,
+				2FAA74002F6E12A100BB7792 /* Entry */,
+				2FAA74012F6E12A100BB7792 /* Flow */,
 			);
 			path = Multiplayer;
 			sourceTree = "<group>";
@@ -446,16 +545,6 @@
 				AA0000052E69010000000005 /* RoleStyle.swift */,
 			);
 			path = UI;
-			sourceTree = "<group>";
-		};
-		AFB8EDC7822DA0FCEC01607F /* Multiplayer */ = {
-			isa = PBXGroup;
-			children = (
-				5B566F2D0BA02374F0EA21AD /* GameAction.swift */,
-				E8E9FFD598221E37F715D320 /* GameSession.swift */,
-				BE756B643538C66E089F8E6C /* SessionPlayer.swift */,
-			);
-			path = Multiplayer;
 			sourceTree = "<group>";
 		};
 		C2EB945FA9FE4AFBB354EA2A3B15A56F /* Sounds */ = {
@@ -592,8 +681,8 @@
 				A1AA07220B426B151121CE31 /* PlayerGroup.swift in Sources */,
 				2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */,
 				0ECA67702A1EE2E0FB10D789 /* PlayerGroupsView.swift in Sources */,
-				291403FD0E26754FDC71DF76 /* Features/Night/NightWakeUpView.swift in Sources */,
-				2F9C12BC2EC4F21300D06767 /* Core/Services/BotDecisionService.swift in Sources */,
+				291403FD0E26754FDC71DF76 /* NightWakeUpView.swift in Sources */,
+				2F9C12BC2EC4F21300D06767 /* BotDecisionService.swift in Sources */,
 				8887C32EEDDA4E8EBE2A3A75 /* InputValidator.swift in Sources */,
 				8F7BF14C95BEF8711634945D /* KeychainHelper.swift in Sources */,
 				2FE1416A2F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift in Sources */,
@@ -616,7 +705,6 @@
 				A6F2EBA288006553601C428A /* MultiplayerLobbyView.swift in Sources */,
 				4F4E46B0C916E8916D77F815 /* MultiplayerMenuView.swift in Sources */,
 				69F628B35751454DDC5EABEC /* MultiplayerNightView.swift in Sources */,
-				851EFB2472651BC23AF3F12D /* MultiplayerVotingView.swift in Sources */,
 				2f6f5287f79217 /* MultiplayerVotingResultsView.swift in Sources */,
 				67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */,
 				C49D034AF71B89B3068D5C9F /* QuickStartSheet.swift in Sources */,

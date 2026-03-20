@@ -73,17 +73,18 @@ xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager clean
 2. **Multiplayer mode** (new): Multi-device via Supabase Realtime, state in SessionService
 
 **Feature-based structure**:
-- `Core/Models/` — Codable data models
-  - Solo: `Player`, `Role`, `GameState`, `NightAction`, `DayAction`
-  - Multiplayer: `GameSession`, `SessionPlayer`, `GameAction`, `PhaseTimer`
-- `Core/Store/` — **GameStore** (solo game logic) and **AuthStore** (auth state)
-- `Core/Services/` — Persistence (JSON), Supabase Auth/Database/Realtime, SeededRandom
-  - Multiplayer: `SessionService`, `RealtimeService`
+- `App/` — App entry point and root phase routing
+- `Core/Auth/` — Auth state, auth services, and `UserProfile`
+- `Core/Backend/` — Shared Supabase/database wiring
+- `Core/Gameplay/` — Shared gameplay models plus solo persistence/store logic
+- `Core/Multiplayer/` — Multiplayer models, services, and store
+- `Core/Stats/` — Stats/custom-role/player-group models
+- `Core/Support/` — Shared utilities such as validation
 - `Core/Components/` — Reusable UI building blocks (PrivacyBlurView, CTAButtonStyle, Chips)
 - `Core/UI/` — Design tokens and theme configuration
 - `Features/` — Screen-specific views
   - Solo: `Setup`, `Assignments`, `Night`, `Day`, `Morning`, `GameOver`
-  - Multiplayer: `GameModeSelection`, `CreateGame`, `JoinGame`, `MultiplayerLobby`, `MultiplayerNight`, `MultiplayerVoting`
+  - Multiplayer: `Entry/` (menu/create/join) and `Flow/` (lobby/gameplay screens)
   - Shared: `Auth`, `Stats`, `Settings`
 
 ## Critical Patterns
@@ -125,10 +126,10 @@ This allows the UI to ask "Was target saved?" before committing the death.
 ## Project Structure (Quick Reference)
 
 ```
-Core/               — Business logic (Models, Stores, Services)
+App/                — App entry point & root view setup
+Core/               — Domain-organized business logic
 Features/           — UI screens (phase views + auth/stats/settings)
-mafia_managerApp.swift          — App entry point & root view setup
-mafia_managerTests/             — Unit tests
+mafia_managerTests/ — Unit tests
 supabase/           — Database schema (setup.sql, multiplayer_schema.sql)
 docs/               — Architecture guides & documentation
 scripts/            — Build automation (run_ios_sim.sh)
@@ -137,21 +138,21 @@ scripts/            — Build automation (run_ios_sim.sh)
 ## Key Files (What's Important & Why)
 
 ### Solo Mode Core
-- [Core/Store/GameStore.swift](Core/Store/GameStore.swift) — **Central state manager**. All game mutations (setupPlayers, assignRoles, endNight, voting) flow through here. Views are subscribers, never direct mutators.
-- [mafia_managerApp.swift](mafia_managerApp.swift) — **Root view with phase-based routing**. Switches on `gameStore.state.currentPhase` to display appropriate UI. No NavigationLinks—phases transition via GameStore methods.
-- [Core/Models/GameState.swift](Core/Models/GameState.swift) — **Root state model for solo mode** (players, currentPhase, nightHistory, dayHistory, gameResult). Fully Codable.
-- [Core/Models/NightAction.swift](Core/Models/NightAction.swift) — **Night phase outcomes** (mafiaTargetID, inspectorCheckedID, doctorProtectedID, deaths). Used by two-phase resolution.
+- [Core/Gameplay/Store/GameStore.swift](Core/Gameplay/Store/GameStore.swift) — **Central state manager**. All game mutations (setupPlayers, assignRoles, endNight, voting) flow through here. Views are subscribers, never direct mutators.
+- [App/mafia_managerApp.swift](App/mafia_managerApp.swift) — **Root view with phase-based routing**. Switches on `gameStore.state.currentPhase` to display appropriate UI. No NavigationLinks—phases transition via GameStore methods.
+- [Core/Gameplay/Models/GameState.swift](Core/Gameplay/Models/GameState.swift) — **Root state model for solo mode** (players, currentPhase, nightHistory, dayHistory, gameResult). Fully Codable.
+- [Core/Gameplay/Models/NightAction.swift](Core/Gameplay/Models/NightAction.swift) — **Night phase outcomes** (mafiaTargetID, inspectorCheckedID, doctorProtectedID, deaths). Used by two-phase resolution.
 - [Features/Night/NightWakeUpView.swift](Features/Night/NightWakeUpView.swift) — **Implements two-phase resolution pattern**. Calls endNight(), then asks Doctor if save succeeded, then resolveNightOutcome(). Critical reference for night logic.
 
 ### Multiplayer Mode Core
-- [Core/Services/Multiplayer/SessionService.swift](Core/Services/Multiplayer/SessionService.swift) — **Session CRUD & mutations**. Create sessions, join, submit actions. Writes to Supabase tables.
-- [Core/Services/Multiplayer/RealtimeService.swift](Core/Services/Multiplayer/RealtimeService.swift) — **Realtime subscriptions manager**. Listens to game_sessions, session_players, game_actions, phase_timers. Broadcasts changes to MultiplayerGameStore.
-- [Core/Models/Multiplayer/GameSession.swift](Core/Models/Multiplayer/GameSession.swift) — **Session metadata** (roomCode, host, phase, winner). Synced via Realtime.
-- [Core/Models/Multiplayer/GameAction.swift](Core/Models/Multiplayer/GameAction.swift) — **Night/day actions** submitted by players (Mafia target, Police investigation, Doctor protection, vote). Synced to Supabase.
+- [Core/Multiplayer/Services/SessionService.swift](Core/Multiplayer/Services/SessionService.swift) — **Session CRUD & mutations**. Create sessions, join, submit actions. Writes to Supabase tables.
+- [Core/Multiplayer/Services/RealtimeService.swift](Core/Multiplayer/Services/RealtimeService.swift) — **Realtime subscriptions manager**. Listens to game_sessions, session_players, game_actions, phase_timers. Broadcasts changes to MultiplayerGameStore.
+- [Core/Multiplayer/Models/GameSession.swift](Core/Multiplayer/Models/GameSession.swift) — **Session metadata** (roomCode, host, phase, winner). Synced via Realtime.
+- [Core/Multiplayer/Models/GameAction.swift](Core/Multiplayer/Models/GameAction.swift) — **Night/day actions** submitted by players (Mafia target, Police investigation, Doctor protection, vote). Synced to Supabase.
 
 ### Shared Services
-- [Core/Store/AuthStore.swift](Core/Store/AuthStore.swift) — **Authentication state** (user, token, isAuthenticated). Manages Supabase Auth sessions & keychain.
-- [Core/Services/Persistence.swift](Core/Services/Persistence.swift) — **JSON persistence** with debouncing (300ms). Atomic writes to Application Support. Error callbacks for UI.
+- [Core/Auth/Store/AuthStore.swift](Core/Auth/Store/AuthStore.swift) — **Authentication state** (user, token, isAuthenticated). Manages Supabase Auth sessions & keychain.
+- [Core/Gameplay/Services/Persistence.swift](Core/Gameplay/Services/Persistence.swift) — **JSON persistence** with debouncing (300ms). Atomic writes to Application Support. Error callbacks for UI.
 - [supabase/setup.sql](supabase/setup.sql) — **Base tables**: profiles, player_stats, custom_roles_configs. Run this first.
 - [supabase/multiplayer_schema.sql](supabase/multiplayer_schema.sql) — **Multiplayer tables**: game_sessions, session_players, game_actions, phase_timers. Requires RLS policies.
 
@@ -168,9 +169,9 @@ Run with `Cmd+U` in Xcode or via xcodebuild test command above.
 ## Common Development Tasks
 
 ### Adding a New Phase to Solo Mode
-1. Add case to `GamePhase` enum in `Core/Models/GamePhase.swift`
+1. Add case to `GamePhase` enum in `Core/Gameplay/Models/GameState.swift`
 2. Create view in `Features/[PhaseName]/[PhaseName]View.swift`
-3. Add switch case in `mafia_managerApp.swift`'s `phaseBasedView` to display the view
+3. Add switch case in `App/mafia_managerApp.swift`'s `phaseBasedView` to display the view
 4. Add phase transition method in `GameStore` (e.g., `func advanceToNextPhase()`)
 5. Call that method from your new view's button actions
 
@@ -243,7 +244,7 @@ Run tests: `xcodebuild test -destination "platform=iOS Simulator,name=iPhone 17 
 1. Run `supabase/setup.sql` in your SQL Editor to create base tables
 2. Run `supabase/multiplayer_schema.sql` to create multiplayer tables
 3. Disable email confirmation: Settings → Auth Providers → Email → Email Confirmations (OFF)
-4. Update `Core/Services/SupabaseConfig.swift` with your project URL + anon key
+4. Update `Core/Backend/SupabaseConfig.swift` with your project URL + anon key
 5. Enable Realtime for tables: `game_sessions`, `session_players`, `game_actions`, `phase_timers`
 
 ### Solo Mode Only

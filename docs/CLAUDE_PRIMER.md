@@ -3,8 +3,9 @@
 **What it is**: Offline-first iOS game assistant for the party game Mafia. Built with SwiftUI (iOS 16+), MVVM pattern, local JSON persistence + optional Supabase cloud sync.
 
 **Key directories**:
-- `Core/` — Models, GameStore (single source of truth), AuthStore, Services (Persistence, Supabase)
-- `Features/` — SwiftUI views (Setup, Night, Day, GameOver, Auth, Stats)
+- `App/` — App entry point and root phase routing
+- `Core/` — Domain-organized business logic (`Auth`, `Backend`, `Gameplay`, `Multiplayer`, `Stats`, `Support`)
+- `Features/` — SwiftUI views (Setup, Night, Day, GameOver, Auth, Stats, Multiplayer entry/flow)
 - `scripts/` — Build/launch automation
 - `supabase/` — Database schema (setup.sql)
 
@@ -28,6 +29,6 @@ xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager \
 **Supabase setup**:
 1. Run `supabase/setup.sql` in SQL Editor
 2. Disable email confirmation (Auth → Providers → Email)
-3. Update `Core/Services/SupabaseConfig.swift` with your URL + anon key
+3. Update `Core/Backend/SupabaseConfig.swift` with your URL + anon key
 
 **Read next**: `docs/ARCHITECTURE_NOTES.md` for deep patterns, `docs/ASKING_CLAUDE_EFFECTIVELY.md` for how to query me efficiently.
