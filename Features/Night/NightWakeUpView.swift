@@ -6,6 +6,7 @@ struct NightWakeUpView: View {
     @State private var selectedTargetID: UUID?
     @State private var showResult = false
     @State private var investigationResult: (isMafia: Bool, role: Role)?
+    @State private var investigationWasBlocked = false
     @State private var showTransition = false
     @State private var showInitialSleepScreen = true
     @State private var showStartNightTransition = false
@@ -497,6 +498,8 @@ struct NightWakeUpView: View {
                 // Player selection
                 if !showResult {
                     playerSelectionList(for: role)
+                } else if investigationWasBlocked {
+                    blockedInvestigationView
                 } else if let result = investigationResult {
                     investigationResultView(result: result)
                 }
@@ -590,6 +593,34 @@ struct NightWakeUpView: View {
                             .stroke(result.isMafia ? Design.Colors.dangerRed.opacity(0.5) : Design.Colors.successGreen.opacity(0.5), lineWidth: 2)
                     )
             )
+        }
+    }
+
+    private var blockedInvestigationView: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .fill(Design.Colors.textSecondary.opacity(0.18))
+                        .frame(width: 100, height: 100)
+
+                    Image(systemName: "eye.slash.fill")
+                        .font(Design.Typography.displayEmoji)
+                        .foregroundStyle(Design.Colors.textSecondary)
+                        .accessibilityHidden(true)
+                }
+
+                Text("Investigation Blocked")
+                    .font(Design.Typography.title1)
+                    .foregroundColor(Design.Colors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("You cannot identify another Police player.")
+                    .font(Design.Typography.body)
+                    .foregroundColor(Design.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .cardStyle()
         }
     }
 
@@ -714,11 +745,8 @@ struct NightWakeUpView: View {
 
         case .inspector:
             if !showResult {
-                // Show investigation result
                 if let targetID = selectedTargetID,
-                   let target = store.player(by: targetID) {
-                    investigationResult = (isMafia: target.role == .mafia, role: target.role)
-
+                   store.player(by: targetID) != nil {
                     // Record investigation
                     // Only use data from unresolved night (current night)
                     let currentNight = store.state.nightHistory.last
@@ -729,6 +757,16 @@ struct NightWakeUpView: View {
                         inspectorCheckedID: selectedTargetID,
                         doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
                     )
+
+                    if let recordedNight = store.state.nightHistory.last,
+                       let role = recordedNight.inspectorResultRole,
+                       let isMafia = recordedNight.inspectorResultIsMafia {
+                        investigationResult = (isMafia: isMafia, role: role)
+                        investigationWasBlocked = false
+                    } else {
+                        investigationResult = nil
+                        investigationWasBlocked = true
+                    }
 
                     withAnimation {
                         showResult = true
@@ -749,6 +787,7 @@ struct NightWakeUpView: View {
                         selectedTargetID = nil
                         showResult = false
                         investigationResult = nil
+                        investigationWasBlocked = false
                     }
                 }
             }

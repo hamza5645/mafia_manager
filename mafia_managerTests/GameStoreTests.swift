@@ -208,6 +208,25 @@ final class GameStoreTests: XCTestCase {
         }
     }
 
+    func testApplyVotingResult_TieStillAdvancesDay() {
+        setupGame(playerCount: 6)
+
+        let alivePlayers = gameStore.state.players.filter(\.alive)
+        var votingSession = VotingSession(dayIndex: gameStore.currentDayIndex)
+        votingSession.recordVote(from: alivePlayers[0].id, for: alivePlayers[2].id)
+        votingSession.recordVote(from: alivePlayers[1].id, for: alivePlayers[2].id)
+        votingSession.recordVote(from: alivePlayers[2].id, for: alivePlayers[3].id)
+        votingSession.recordVote(from: alivePlayers[3].id, for: alivePlayers[3].id)
+        _ = votingSession.tallyVotes()
+
+        gameStore.setVotingSessionForPreview(votingSession)
+        gameStore.applyVotingResult()
+
+        XCTAssertEqual(gameStore.state.dayIndex, 1)
+        XCTAssertEqual(gameStore.state.dayHistory.count, 1)
+        XCTAssertTrue(gameStore.state.dayHistory[0].removedPlayerIDs.isEmpty)
+    }
+
     // MARK: - Day Phase Tests
 
     func testApplyDayRemovals() {

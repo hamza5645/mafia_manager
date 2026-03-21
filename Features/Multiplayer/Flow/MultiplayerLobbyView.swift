@@ -670,6 +670,11 @@ struct MultiplayerDeathRevealView: View {
             return role
         }
 
+        if let rawRole = record.revealedDeathRoles[player.playerId.uuidString.lowercased()],
+           let role = Role(rawValue: rawRole) {
+            return role
+        }
+
         // Otherwise, infer from role-specific number arrays in night record
         if record.mafiaPlayerNumbers.contains(playerNum) {
             return .mafia

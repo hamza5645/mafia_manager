@@ -12,13 +12,14 @@
 -- Assigns roles and numbers to all players in a single database transaction
 -- Reduces N sequential HTTP requests to 1 RPC call
 
-CREATE OR REPLACE FUNCTION batch_assign_roles(
+CREATE OR REPLACE FUNCTION public.batch_assign_roles(
     p_session_id UUID,
     p_assignments JSONB -- Array of {player_id, role, number}
 )
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     assignment JSONB;
@@ -40,8 +41,7 @@ BEGIN
 
         UPDATE public.session_players
         SET role = player_role,
-            player_number = player_number,
-            updated_at = NOW()
+            player_number = player_number
         WHERE session_id = p_session_id
           AND player_id = player_uuid;
 
@@ -53,7 +53,7 @@ END;
 $$;
 
 -- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION batch_assign_roles(UUID, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.batch_assign_roles(UUID, JSONB) TO authenticated;
 
 -- =====================================================
 -- 2. BATCH FETCH ACTIONS BY TYPES RPC
@@ -61,7 +61,7 @@ GRANT EXECUTE ON FUNCTION batch_assign_roles(UUID, JSONB) TO authenticated;
 -- Fetches all actions of specified types in a single query
 -- Replaces 3 separate queries for mafia/inspector/doctor actions
 
-CREATE OR REPLACE FUNCTION fetch_actions_by_types(
+CREATE OR REPLACE FUNCTION public.fetch_actions_by_types(
     p_session_id UUID,
     p_round_id UUID,
     p_action_types TEXT[] -- Array of action types
@@ -79,6 +79,7 @@ RETURNS TABLE (
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
+SET search_path = public
 AS $$
     SELECT
         id,
@@ -96,7 +97,7 @@ AS $$
 $$;
 
 -- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION fetch_actions_by_types(UUID, UUID, TEXT[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fetch_actions_by_types(UUID, UUID, TEXT[]) TO authenticated;
 
 -- =====================================================
 -- 3. PERFORMANCE INDEXES

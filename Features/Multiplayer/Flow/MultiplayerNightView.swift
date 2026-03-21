@@ -50,6 +50,11 @@ struct MultiplayerNightView: View {
             .sortedHumansFirst()
     }
 
+    var inspectorTargets: [PublicPlayerInfo] {
+        let roleLookup = Dictionary(uniqueKeysWithValues: multiplayerStore.allPlayers.map { ($0.playerId, $0.role) })
+        return alivePlayers.filter { roleLookup[$0.playerId] != .inspector }
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -270,11 +275,8 @@ struct MultiplayerNightView: View {
             } else {
                 targetSelectionView(
                     title: "Investigate a Player",
-                    subtitle: "Discover their role",
-                    players: alivePlayers.filter { player in
-                        // Can't investigate other inspectors (if visible)
-                        true // Privacy filter handles this
-                    }
+                    subtitle: "Find out whether they are Mafia",
+                    players: inspectorTargets
                 )
             }
         case .citizen:
@@ -389,7 +391,7 @@ struct MultiplayerNightView: View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.seal.fill")
                 .font(Design.Typography.displayEmoji)
-                .foregroundStyle(Design.Colors.successGreen)
+                .foregroundStyle(resultColor(for: role))
                 .accessibilityHidden(true)
 
             Text("Investigation Complete")
@@ -406,21 +408,21 @@ struct MultiplayerNightView: View {
 
             // Show the actual role with appropriate color
             VStack(spacing: 8) {
-                Text("Their Role:")
+                Text("Result:")
                     .font(Design.Typography.body)
                     .foregroundStyle(Design.Colors.textSecondary)
 
-                Text(roleDisplayName(for: role))
+                Text(resultDisplayName(for: role))
                     .font(Design.Typography.title1)
                     .fontWeight(.bold)
-                    .foregroundStyle(roleColor(for: role))
+                    .foregroundStyle(resultColor(for: role))
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(roleColor(for: role).opacity(0.1))
+                    .background(resultColor(for: role).opacity(0.1))
                     .cornerRadius(Design.Radii.medium)
             }
 
-            Text("Wait for other players to finish...")
+            Text(resultDescription(for: role))
                 .font(Design.Typography.footnote)
                 .foregroundStyle(Design.Colors.textSecondary)
                 .padding(.top, 8)
@@ -428,18 +430,12 @@ struct MultiplayerNightView: View {
         .padding(.horizontal, 20)
     }
 
-    private func roleDisplayName(for roleString: String) -> String {
-        switch roleString.lowercased() {
+    private func resultDisplayName(for roleString: String) -> String {
+        switch normalizedInspectorResult(roleString) {
         case "mafia":
             return "Mafia"
         case "not_mafia":
             return "Not Mafia"
-        case "doctor":
-            return "Doctor"
-        case "inspector":
-            return "Inspector"
-        case "citizen":
-            return "Citizen"
         case "blocked":
             return "Blocked"
         default:
@@ -447,22 +443,42 @@ struct MultiplayerNightView: View {
         }
     }
 
-    private func roleColor(for roleString: String) -> Color {
-        switch roleString.lowercased() {
+    private func resultColor(for roleString: String) -> Color {
+        switch normalizedInspectorResult(roleString) {
         case "mafia":
             return Design.Colors.dangerRed
         case "not_mafia":
             return Design.Colors.successGreen
-        case "doctor":
-            return Design.Colors.successGreen
-        case "inspector":
-            return Design.Colors.actionBlue
-        case "citizen":
-            return Design.Colors.brandGold
         case "blocked":
             return Design.Colors.textSecondary
         default:
             return Design.Colors.textSecondary
+        }
+    }
+
+    private func resultDescription(for roleString: String) -> String {
+        switch normalizedInspectorResult(roleString) {
+        case "mafia":
+            return "That player is part of the Mafia."
+        case "not_mafia":
+            return "That player is not Mafia."
+        case "blocked":
+            return "Your investigation returned no actionable information."
+        default:
+            return "Wait for other players to finish..."
+        }
+    }
+
+    private func normalizedInspectorResult(_ roleString: String) -> String {
+        switch roleString.lowercased() {
+        case "mafia":
+            return "mafia"
+        case "doctor", "citizen", "not_mafia":
+            return "not_mafia"
+        case "inspector", "blocked":
+            return "blocked"
+        default:
+            return roleString.lowercased()
         }
     }
 

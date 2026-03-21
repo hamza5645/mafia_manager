@@ -218,6 +218,7 @@ struct NightActionRecord: Codable, Sendable {
     let doctorProtectedId: UUID?
     var targetWasSaved: Bool?
     var resultingDeaths: [UUID] // Mutable to allow Phase 2 to set final deaths
+    var revealedDeathRoles: [String: String]
     let mafiaPlayerNumbers: [Int]
     let doctorPlayerNumbers: [Int]
     let inspectorPlayerNumbers: [Int]
@@ -232,6 +233,7 @@ struct NightActionRecord: Codable, Sendable {
         case doctorProtectedId = "doctor_protected_id"
         case targetWasSaved = "target_was_saved"
         case resultingDeaths = "resulting_deaths"
+        case revealedDeathRoles = "revealed_death_roles"
         case mafiaPlayerNumbers = "mafia_player_numbers"
         case doctorPlayerNumbers = "doctor_player_numbers"
         case inspectorPlayerNumbers = "inspector_player_numbers"
@@ -248,6 +250,7 @@ struct NightActionRecord: Codable, Sendable {
         doctorProtectedId: UUID?,
         targetWasSaved: Bool? = nil,
         resultingDeaths: [UUID],
+        revealedDeathRoles: [String: String] = [:],
         mafiaPlayerNumbers: [Int] = [],
         doctorPlayerNumbers: [Int] = [],
         inspectorPlayerNumbers: [Int] = [],
@@ -261,6 +264,7 @@ struct NightActionRecord: Codable, Sendable {
         self.doctorProtectedId = doctorProtectedId
         self.targetWasSaved = targetWasSaved
         self.resultingDeaths = resultingDeaths
+        self.revealedDeathRoles = revealedDeathRoles
         self.mafiaPlayerNumbers = mafiaPlayerNumbers
         self.doctorPlayerNumbers = doctorPlayerNumbers
         self.inspectorPlayerNumbers = inspectorPlayerNumbers
@@ -279,6 +283,7 @@ struct NightActionRecord: Codable, Sendable {
         doctorProtectedId = try container.decodeIfPresent(UUID.self, forKey: .doctorProtectedId)
         targetWasSaved = try container.decodeIfPresent(Bool.self, forKey: .targetWasSaved)
         resultingDeaths = try container.decode([UUID].self, forKey: .resultingDeaths)
+        revealedDeathRoles = (try? container.decode([String: String].self, forKey: .revealedDeathRoles)) ?? [:]
         // Default to empty arrays for backwards compatibility
         mafiaPlayerNumbers = (try? container.decode([Int].self, forKey: .mafiaPlayerNumbers)) ?? []
         doctorPlayerNumbers = (try? container.decode([Int].self, forKey: .doctorPlayerNumbers)) ?? []
@@ -297,6 +302,7 @@ struct NightActionRecord: Codable, Sendable {
         try container.encodeIfPresent(doctorProtectedId, forKey: .doctorProtectedId)
         try container.encodeIfPresent(targetWasSaved, forKey: .targetWasSaved)
         try container.encode(resultingDeaths, forKey: .resultingDeaths)
+        try container.encode(revealedDeathRoles, forKey: .revealedDeathRoles)
         try container.encode(mafiaPlayerNumbers, forKey: .mafiaPlayerNumbers)
         try container.encode(doctorPlayerNumbers, forKey: .doctorPlayerNumbers)
         try container.encode(inspectorPlayerNumbers, forKey: .inspectorPlayerNumbers)

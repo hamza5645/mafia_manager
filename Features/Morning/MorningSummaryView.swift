@@ -18,7 +18,7 @@ struct MorningSummaryView: View {
                             Image(systemName: "moon.stars.fill")
                                 .foregroundStyle(Design.Colors.brandGold)
                                 .accessibilityHidden(true)
-                            Text("Night \(night.nightIndex + 1) Summary")
+                            Text("Night \(night.nightIndex) Summary")
                                 .font(Design.Typography.headline)
                         }
                         .accessibilityAddTraits(.isHeader)

@@ -59,9 +59,9 @@ This allows:
 - INSERT: Users can only create actions for their own player_id
 - UPDATE: Users can only update their own actions
 
-### `phase_timers` Table
-- SELECT: Users can view timers in sessions they're part of
-- ALL: Hosts can manage timers in their sessions
+### Legacy `phase_timers` Note
+- The current checked-in multiplayer schema does not define `phase_timers`.
+- Any older notes about `phase_timers` policies should be treated as historical only.
 
 ## Migrations Applied
 
@@ -107,7 +107,6 @@ All functions now have `SET search_path = public` to prevent search path injecti
 | `session_players` | 1 | 1 | 1 | 1 | **4** |
 | `game_sessions` | 1 | 1 | 1 | 1 | **4** |
 | `game_actions` | 1 | 1 | 1 | 0 | **3** |
-| `phase_timers` | 1 | 0 | 0 | 0 | **1** *(+ 1 ALL policy)* |
 
 ## How to Use
 
@@ -135,4 +134,3 @@ All functions now have `SET search_path = public` to prevent search path injecti
 - Verify real-time updates work correctly
 - Test adding bots as host
 - Test leaving/kicking players
-

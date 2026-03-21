@@ -214,6 +214,7 @@ final class MultiplayerGameStore: ObservableObject {
     private enum LobbySnapshotRefreshTrigger: String {
         case roleAssignmentRecovery = "role_assignment_recovery"
         case lobbyResetRecovery = "lobby_reset_recovery"
+        case finalRoleReveal = "final_role_reveal"
     }
 
     private func lobbySnapshotRefreshTrigger(
@@ -234,6 +235,10 @@ final class MultiplayerGameStore: ObservableObject {
 
         if let previousPhase, previousPhase != "lobby", newSession.currentPhase == "lobby" {
             return .lobbyResetRecovery
+        }
+
+        if newSession.currentPhase == "game_over", previousPhase != "game_over" {
+            return .finalRoleReveal
         }
 
         return nil
@@ -1362,7 +1367,7 @@ final class MultiplayerGameStore: ObservableObject {
                 targetPlayerId: targetPlayerId
             )
         case .inspectorCheck:
-            // No local logic - handled by server RPC
+            // Server returns only mafia / not_mafia / blocked to preserve inspector privacy.
             action = .inspectorAction(
                 sessionId: session.id,
                 roundId: roundId,
@@ -2122,6 +2127,7 @@ final class MultiplayerGameStore: ObservableObject {
             doctorProtectedId: doctorProtectedId,
             targetWasSaved: targetWasSaved,
             resultingDeaths: [],  // Empty - deaths not applied yet
+            revealedDeathRoles: [:],
             mafiaPlayerNumbers: mafiaPlayerNumbers,
             doctorPlayerNumbers: doctorPlayerNumbers,
             inspectorPlayerNumbers: inspectorPlayerNumbers,
@@ -2172,6 +2178,7 @@ final class MultiplayerGameStore: ObservableObject {
         // Update the record with final results
         nightRecord.targetWasSaved = targetWasSaved
         nightRecord.resultingDeaths = resultingDeaths
+        nightRecord.revealedDeathRoles = revealedDeathRoles(for: resultingDeaths)
         nightRecord.isResolved = true  // Mark as resolved
 
         // Update local history
@@ -2217,6 +2224,11 @@ final class MultiplayerGameStore: ObservableObject {
         )
 
         if success {
+            currentSession?.currentPhase = nextPhaseName
+            currentSession?.currentPhaseData = nextPhaseData
+            currentSession?.isGameOver = winnerCheck.isGameOver
+            currentSession?.winner = winnerCheck.winner
+
             // Update local player state to match DB
             for playerId in resultingDeaths {
                 if let index = allPlayers.firstIndex(where: { $0.playerId == playerId }) {
@@ -2260,6 +2272,16 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         return nightRecord.doctorProtectedId == mafiaTargetId
+    }
+
+    private func revealedDeathRoles(for playerIds: [UUID]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: playerIds.compactMap { playerId in
+            guard let role = allPlayers.first(where: { $0.playerId == playerId })?.role else {
+                return nil
+            }
+
+            return (playerId.uuidString.lowercased(), role.rawValue)
+        })
     }
 
     /// Legacy single-phase resolution (DEPRECATED - kept for backwards compatibility, will be removed)
@@ -2347,6 +2369,7 @@ final class MultiplayerGameStore: ObservableObject {
             doctorProtectedId: doctorProtectedId,
             targetWasSaved: targetWasSaved,
             resultingDeaths: resultingDeaths,
+            revealedDeathRoles: revealedDeathRoles(for: resultingDeaths),
             mafiaPlayerNumbers: mafiaPlayerNumbers,
             doctorPlayerNumbers: doctorPlayerNumbers,
             inspectorPlayerNumbers: inspectorPlayerNumbers,
@@ -2430,15 +2453,14 @@ final class MultiplayerGameStore: ObservableObject {
             }
         }
 
-        // PERF: Use pre-categorized players instead of chained filters
-        let readyNonHostHumans = categories.nonHostHumans.filter { $0.isReady }
+        let humanVotes = Set(voteActions.map(\.actorPlayerId))
+        let readyNonHostHumans = categories.nonHostHumans.filter { humanVotes.contains($0.playerId) }
         let nonHostReady = categories.nonHostHumans.isEmpty || readyNonHostHumans.count == categories.nonHostHumans.count
 
         // Check if host has voted (only required if host is alive)
         let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
         let hostIsAlive = hostPlayer?.isAlive ?? false
-        let hostVote = voteActions.first { $0.actorPlayerId == hostPlayer?.playerId }
-        let hostHasVoted = hostVote != nil
+        let hostHasVoted = hostPlayer.map { humanVotes.contains($0.playerId) } ?? false
 
         // HAMZA-FIX: Re-count bot votes after potential processing
         let finalBotVotes = voteActions.filter { action in

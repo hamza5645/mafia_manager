@@ -37,7 +37,8 @@ Hardcoded in `GameStore.roleDistribution()`:
 ## Inspector Logic
 
 - Cannot check other inspectors (targeting rule)
-- Returns full Role if target is not inspector
+- Solo mode stores the full role locally only for valid non-inspector checks
+- Multiplayer returns `mafia`, `not_mafia`, or `blocked`
 - Stores both `inspectorResultIsMafia: Bool?` and `inspectorResultRole: Role?`
 
 ## Service Layer

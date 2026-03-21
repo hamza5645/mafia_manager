@@ -186,6 +186,117 @@ AS $$
     );
 $$;
 
+-- Add a player to a session using a single RPC so fresh setups do not depend on
+-- unpublished dashboard state. Human players can add themselves; hosts can add bots.
+CREATE OR REPLACE FUNCTION public.add_session_player(
+    p_session_id UUID,
+    p_user_id UUID,
+    p_player_id UUID,
+    p_player_name TEXT,
+    p_is_bot BOOLEAN DEFAULT false
+)
+RETURNS SETOF public.session_players
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_session public.game_sessions%ROWTYPE;
+    v_inserted public.session_players%ROWTYPE;
+    v_player_count INT;
+BEGIN
+    SELECT * INTO v_session
+    FROM public.game_sessions
+    WHERE id = p_session_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Session not found: %', p_session_id;
+    END IF;
+
+    IF v_session.status <> 'waiting' OR v_session.current_phase <> 'lobby' THEN
+        RAISE EXCEPTION 'Session is not joinable: %', p_session_id;
+    END IF;
+
+    SELECT COUNT(*) INTO v_player_count
+    FROM public.session_players
+    WHERE session_id = p_session_id;
+
+    IF v_player_count >= v_session.max_players THEN
+        RAISE EXCEPTION 'Session is full: %', p_session_id;
+    END IF;
+
+    IF p_is_bot THEN
+        IF auth.uid() IS DISTINCT FROM v_session.host_user_id THEN
+            RAISE EXCEPTION 'Only the host can add bots to session %', p_session_id;
+        END IF;
+
+        IF p_user_id IS NOT NULL THEN
+            RAISE EXCEPTION 'Bots must not provide a user_id';
+        END IF;
+    ELSE
+        IF auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id THEN
+            RAISE EXCEPTION 'Authenticated user mismatch while joining session %', p_session_id;
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM public.session_players
+            WHERE session_id = p_session_id
+              AND user_id = p_user_id
+        ) THEN
+            RAISE EXCEPTION 'User % is already in session %', p_user_id, p_session_id;
+        END IF;
+    END IF;
+
+    INSERT INTO public.session_players (
+        session_id,
+        user_id,
+        player_id,
+        player_name,
+        is_bot,
+        is_alive,
+        is_online,
+        is_ready
+    ) VALUES (
+        p_session_id,
+        p_user_id,
+        p_player_id,
+        p_player_name,
+        p_is_bot,
+        true,
+        NOT p_is_bot,
+        true
+    )
+    RETURNING * INTO v_inserted;
+
+    RETURN QUERY
+    SELECT *
+    FROM public.session_players
+    WHERE id = v_inserted.id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.add_session_player(UUID, UUID, UUID, TEXT, BOOLEAN) TO authenticated;
+
+-- Reset all human players' ready flags in one call so phase transitions do not rely
+-- on a later migration being present.
+CREATE OR REPLACE FUNCTION public.reset_players_ready(p_session_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    UPDATE public.session_players
+    SET is_ready = false
+    WHERE session_id = p_session_id
+      AND is_bot = false;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reset_players_ready(UUID) TO authenticated;
+
 -- =====================================================
 -- 5. SESSION_PLAYERS TABLE POLICIES
 -- =====================================================
@@ -331,11 +442,14 @@ CREATE OR REPLACE FUNCTION public.get_visible_role(
 RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     player_role TEXT;
     viewer_role TEXT;
     player_user_id UUID;
+    session_phase TEXT;
+    session_is_game_over BOOLEAN;
 BEGIN
     -- Get the player's actual role and user_id
     SELECT role, user_id INTO player_role, player_user_id
@@ -344,6 +458,16 @@ BEGIN
 
     -- If viewing own role, return it
     IF player_user_id = p_viewing_user_id THEN
+        RETURN player_role;
+    END IF;
+
+    SELECT current_phase, is_game_over
+    INTO session_phase, session_is_game_over
+    FROM public.game_sessions
+    WHERE id = p_session_id;
+
+    -- At game over, reveal all final roles to every participant.
+    IF session_phase = 'game_over' OR COALESCE(session_is_game_over, false) THEN
         RETURN player_role;
     END IF;
 
@@ -471,8 +595,13 @@ BEGIN
         WHERE session_id = p_session_id
           AND player_id = p_target_player_id;
 
-        -- Return the actual role (mafia, doctor, citizen, inspector)
-        RETURN json_build_object('success', true, 'result', v_result);
+        IF v_result = 'mafia' THEN
+            RETURN json_build_object('success', true, 'result', 'mafia');
+        ELSIF v_result = 'inspector' THEN
+            RETURN json_build_object('success', true, 'result', 'blocked');
+        ELSIF v_result IS NOT NULL THEN
+            RETURN json_build_object('success', true, 'result', 'not_mafia');
+        END IF;
     END IF;
 
     RETURN json_build_object('success', true);
@@ -486,7 +615,9 @@ CREATE OR REPLACE FUNCTION public.resolve_night_atomic(
     p_night_record JSONB,
     p_eliminated_player_ids UUID[],
     p_next_phase TEXT,
-    p_next_phase_data JSONB
+    p_next_phase_data JSONB,
+    p_is_game_over BOOLEAN DEFAULT NULL,
+    p_winner TEXT DEFAULT NULL
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -554,6 +685,19 @@ BEGIN
     SET night_history = v_updated_history,
         current_phase = p_next_phase,
         current_phase_data = p_next_phase_data,
+        is_game_over = COALESCE(p_is_game_over, is_game_over),
+        winner = CASE
+            WHEN p_is_game_over IS TRUE OR p_winner IS NOT NULL THEN p_winner
+            ELSE winner
+        END,
+        status = CASE
+            WHEN p_is_game_over IS TRUE THEN 'completed'
+            ELSE status
+        END,
+        completed_at = CASE
+            WHEN p_is_game_over IS TRUE THEN NOW()
+            ELSE completed_at
+        END,
         updated_at = NOW()
     WHERE id = p_session_id;
 

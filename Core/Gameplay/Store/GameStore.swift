@@ -432,8 +432,15 @@ final class GameStore: ObservableObject {
         guard let votingSession = state.currentVotingSession,
               let eliminatedID = votingSession.eliminatedPlayerID else {
             // No elimination (tie or no votes) - move to next night
+            let dayAction = DayAction(dayIndex: currentDayIndex, removedPlayerIDs: [])
+            state.dayHistory.append(dayAction)
+            state.dayIndex += 1
             state.currentVotingSession = nil
-            wakeUpRole(.mafia)
+            evaluateWinners(startOfDay: false)
+            if !state.isGameOver {
+                wakeUpRole(.mafia)
+            }
+            save()
             return
         }
 
@@ -539,10 +546,8 @@ final class GameStore: ObservableObject {
         if let inspectID = inspectorCheckedID, let inspected = player(by: inspectID) {
             // Prevent police from identifying other police members
             if inspected.role == .inspector {
-                // BUG FIX: Provide feedback that inspector was blocked
-                // Set role to .inspector so UI knows what happened, but keep boolean nil
-                inspectorRole = .inspector
                 inspectorResult = nil
+                inspectorRole = nil
             } else {
                 inspectorRole = inspected.role
                 inspectorResult = (inspected.role == .mafia)
@@ -721,27 +726,12 @@ final class GameStore: ObservableObject {
             return
         }
 
-        // Mafia majority check - timing determines threshold
-        // startOfDay=true (after night): Mafia needs strict majority (> non-mafia)
-        //   - Tie means citizens can still vote out a Mafia member
-        // startOfDay=false (after voting): Mafia needs >= non-mafia
-        //   - Tie means Mafia will kill at night, guaranteeing majority
-        if startOfDay {
-            // After night resolution: strict majority required
-            if mafiaCount > nonMafiaCount {
-                state.isGameOver = true
-                state.winner = .mafia
-                state.currentPhase = .gameOver
-                return
-            }
-        } else {
-            // After voting (going into night): tie or majority = Mafia wins
-            if mafiaCount >= nonMafiaCount {
-                state.isGameOver = true
-                state.winner = .mafia
-                state.currentPhase = .gameOver
-                return
-            }
+        // Mafia win condition is parity or better at every resolution point.
+        if mafiaCount >= nonMafiaCount {
+            state.isGameOver = true
+            state.winner = .mafia
+            state.currentPhase = .gameOver
+            return
         }
     }
 

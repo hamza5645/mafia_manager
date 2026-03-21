@@ -82,3 +82,50 @@
 
 - This project’s Xcode navigator had path drift before the cleanup. Use Xcode-aware moves for source files so the project file stays consistent.
 - The repo still contains a duplicate on-disk `mafia_manager/Assets.xcassets` folder that was not touched in this session because the active target is already building successfully and that asset cleanup should be done as a separate verification pass.
+
+## MM-04 through MM-16 remediation pass
+
+### What Changed
+
+- Fixed solo rules regressions:
+  - Mafia now wins at parity after night resolution.
+  - Tied day votes now record a no-elimination day, increment `dayIndex`, and re-run winner evaluation.
+  - Solo inspector-on-inspector checks no longer leak a role through the UI.
+  - Morning summary no longer labels the first night as “Night 2”.
+- Fixed multiplayer app-side issues:
+  - Voting readiness now keys off actual submitted votes instead of `isReady`.
+  - Night death reveal now stores explicit revealed death roles instead of inferring from who submitted actions.
+  - Game-over UI now falls back to `currentPhaseData` for winner rendering.
+  - Entering `game_over` now forces a player snapshot refresh so newly visible roles can appear once the backend allows them.
+  - Inspector UI now only shows `mafia`, `not_mafia`, or `blocked`.
+- Fixed schema/migration drift in repo:
+  - Added checked-in definitions/migrations for `add_session_player` and `reset_players_ready`.
+  - Normalized `submit_game_action` inspector results.
+  - Extended `resolve_night_atomic` so game-over winner fields are written atomically with the phase transition.
+  - Fixed optional performance RPCs so `batch_assign_roles` accepts real JSONB payloads and no longer writes a nonexistent `updated_at` column.
+- Re-enabled the automated test path:
+  - Added a real `mafia_managerTests` target to the Xcode project.
+  - Added the test target to the shared scheme.
+  - Added a regression test covering tied-vote day advancement.
+- Updated docs:
+  - Multiplayer guide no longer claims `phase_timers` exists.
+  - Architecture notes now describe the corrected inspector behavior.
+  - Audit statuses now distinguish repo fixes from still-pending live Supabase deployment.
+
+### Validation
+
+- Xcode build succeeded after the changes.
+- `xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager -destination "platform=iOS Simulator,name=iPhone 17 Pro" test` now succeeds with 17 passing tests.
+- Live Supabase inspection confirmed the deployed DB is still on the old function bodies for `get_visible_role`, round-aware `submit_game_action`, `resolve_night_atomic`, and `batch_assign_roles`.
+- Attempting to apply the new DB migrations through the Supabase MCP failed because the connected project is exposed in read-only mode in this session.
+
+### Rollback
+
+- Revert the app/code changes if you want to restore the audited behavior, though that will reintroduce the bugs documented in `docs/AUDIT_2026-03-20.md`.
+- Revert the Xcode project changes if you intentionally want to disable the test target again.
+- Revert the new Supabase migration files if you do not want the backend contract upgrades queued for deployment.
+
+### Known Gotchas
+
+- The repo is fixed; the deployed Supabase project is not fully fixed until the new migrations are applied with write access.
+- `submit_game_action` is overloaded in the live DB, and the round-aware overload used by the app is still the old leaking version until deployment happens.

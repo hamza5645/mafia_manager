@@ -5,6 +5,41 @@ import Supabase
 final class SessionService {
     private let supabase = SupabaseService.shared.client
 
+    private func anyJSON<T: Encodable>(from value: T) throws -> AnyJSON {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(value)
+        let jsonObject = try JSONSerialization.jsonObject(with: data)
+
+        func convert(_ value: Any) -> AnyJSON? {
+            switch value {
+            case let dict as [String: Any]:
+                return .object(dict.compactMapValues { convert($0) })
+            case let array as [Any]:
+                return .array(array.compactMap { convert($0) })
+            case let string as String:
+                return .string(string)
+            case let number as NSNumber:
+                if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                    return .bool(number.boolValue)
+                }
+
+                let doubleValue = number.doubleValue
+                if doubleValue.truncatingRemainder(dividingBy: 1) == 0 {
+                    return .integer(number.intValue)
+                } else {
+                    return .double(doubleValue)
+                }
+            case _ as NSNull:
+                return .null
+            default:
+                return nil
+            }
+        }
+
+        return convert(jsonObject) ?? .null
+    }
+
     // MARK: - Session Management
 
     /// Create a new game session with a unique room code
@@ -368,46 +403,14 @@ final class SessionService {
         isGameOver: Bool? = nil,
         winner: Role? = nil
     ) async throws -> Bool {
-        // Encode night record and phase data to JSON using helper
-        func toAnyJSON<T: Encodable>(_ value: T) throws -> AnyJSON {
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            let data = try encoder.encode(value)
-            let jsonObject = try JSONSerialization.jsonObject(with: data)
-
-            func convert(_ value: Any) -> AnyJSON? {
-                switch value {
-                case let dict as [String: Any]:
-                    return .object(dict.compactMapValues { convert($0) })
-                case let array as [Any]:
-                    return .array(array.compactMap { convert($0) })
-                case let string as String:
-                    return .string(string)
-                case let number as NSNumber:
-                    if CFGetTypeID(number) == CFBooleanGetTypeID() {
-                        return number.boolValue ? .integer(1) : .integer(0)
-                    }
-
-                    let doubleValue = number.doubleValue
-                    if doubleValue.truncatingRemainder(dividingBy: 1) == 0 {
-                        return .integer(number.intValue)
-                    } else {
-                        return .double(doubleValue)
-                    }
-                default:
-                    return nil
-                }
-            }
-
-            return convert(jsonObject) ?? .null
-        }
-
         let params: [String: AnyJSON] = [
             "p_session_id": .string(sessionId.uuidString.lowercased()),
-            "p_night_record": try toAnyJSON(nightRecord),
+            "p_night_record": try anyJSON(from: nightRecord),
             "p_eliminated_player_ids": .array(eliminatedPlayerIds.map { .string($0.uuidString.lowercased()) }),
             "p_next_phase": .string(nextPhase),
-            "p_next_phase_data": try toAnyJSON(nextPhaseData)
+            "p_next_phase_data": try anyJSON(from: nextPhaseData),
+            "p_is_game_over": isGameOver.map(AnyJSON.bool) ?? .null,
+            "p_winner": winner.map { .string($0.rawValue) } ?? .null
         ]
 
         do {
@@ -416,30 +419,6 @@ final class SessionService {
                 .single()
                 .execute()
                 .value
-
-            // If RPC succeeded, update is_game_over and winner if needed
-            if result && (isGameOver != nil || winner != nil) {
-                struct GameOverUpdate: Encodable {
-                    let isGameOver: Bool?
-                    let winner: String?
-
-                    enum CodingKeys: String, CodingKey {
-                        case isGameOver = "is_game_over"
-                        case winner
-                    }
-                }
-
-                let gameOverData = GameOverUpdate(
-                    isGameOver: isGameOver,
-                    winner: winner?.rawValue
-                )
-
-                try await supabase
-                    .from("game_sessions")
-                    .update(gameOverData)
-                    .eq("id", value: sessionId.uuidString.lowercased())
-                    .execute()
-            }
 
             return result
         } catch {
@@ -537,7 +516,20 @@ final class SessionService {
 
             return player
         } catch {
-            throw error
+            print("⚠️ add_session_player RPC failed, falling back to direct insert: \(error)")
+
+            let players: [SessionPlayer] = try await supabase
+                .from("session_players")
+                .insert(createData)
+                .select()
+                .execute()
+                .value
+
+            guard let player = players.first else {
+                throw SessionError.playerNotCreated
+            }
+
+            return player
         }
     }
 
@@ -560,10 +552,29 @@ final class SessionService {
 
     /// Reset ready status for all human players in a session (single batch update)
     func resetAllPlayersReady(sessionId: UUID) async throws {
-        try await supabase.rpc(
-            "reset_players_ready",
-            params: ["p_session_id": AnyJSON.string(sessionId.uuidString.lowercased())]
-        ).execute()
+        do {
+            try await supabase.rpc(
+                "reset_players_ready",
+                params: ["p_session_id": AnyJSON.string(sessionId.uuidString.lowercased())]
+            ).execute()
+        } catch {
+            print("⚠️ reset_players_ready RPC failed, falling back to direct update: \(error)")
+
+            struct ReadyReset: Encodable {
+                let isReady: Bool
+
+                enum CodingKeys: String, CodingKey {
+                    case isReady = "is_ready"
+                }
+            }
+
+            try await supabase
+                .from("session_players")
+                .update(ReadyReset(isReady: false))
+                .eq("session_id", value: sessionId.uuidString.lowercased())
+                .eq("is_bot", value: false)
+                .execute()
+        }
     }
 
     /// Update a player's alive status and optional removal note
@@ -627,24 +638,32 @@ final class SessionService {
         sessionId: UUID,
         assignments: [(playerId: UUID, role: Role, number: Int)]
     ) async throws {
+        struct RoleAssignmentPayload: Encodable {
+            let playerId: String
+            let role: String
+            let number: Int
+
+            enum CodingKeys: String, CodingKey {
+                case playerId = "player_id"
+                case role
+                case number
+            }
+        }
+
         // Build assignment array for batch RPC
-        let assignmentData: [[String: Any]] = assignments.map { assignment in
-            [
-                "player_id": assignment.playerId.uuidString.lowercased(),
-                "role": assignment.role.rawValue,
-                "number": assignment.number
-            ]
+        let assignmentData: [RoleAssignmentPayload] = assignments.map { assignment in
+            RoleAssignmentPayload(
+                playerId: assignment.playerId.uuidString.lowercased(),
+                role: assignment.role.rawValue,
+                number: assignment.number
+            )
         }
 
         // Try batch RPC first (single database transaction)
         do {
-            // Convert to AnyJSON for Supabase RPC
-            let assignmentsJSON = try JSONSerialization.data(withJSONObject: assignmentData)
-            let assignmentsString = String(data: assignmentsJSON, encoding: .utf8) ?? "[]"
-
             let params: [String: AnyJSON] = [
                 "p_session_id": .string(sessionId.uuidString.lowercased()),
-                "p_assignments": .string(assignmentsString)
+                "p_assignments": try anyJSON(from: assignmentData)
             ]
 
             try await supabase.rpc("batch_assign_roles", params: params).execute()
@@ -887,7 +906,7 @@ final class SessionService {
 
 struct ActionResponse: Decodable, Sendable {
     let success: Bool
-    let result: String?  // Inspector result: "mafia" or "not_mafia"
+    let result: String?  // Inspector result: "mafia", "not_mafia", or "blocked"
 }
 
 // MARK: - Errors

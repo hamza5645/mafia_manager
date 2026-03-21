@@ -11,7 +11,15 @@ struct MultiplayerGameOverView: View {
     @State private var isReturningToLobby = false
 
     private var winner: Role? {
-        multiplayerStore.currentSession?.winner
+        if let winner = multiplayerStore.currentSession?.winner {
+            return winner
+        }
+
+        if case .gameOver(let winnerValue) = multiplayerStore.currentSession?.currentPhaseData {
+            return winnerValue.flatMap(Role.init(rawValue:))
+        }
+
+        return nil
     }
 
     var body: some View {

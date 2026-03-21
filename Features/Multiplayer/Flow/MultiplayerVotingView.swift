@@ -144,12 +144,10 @@ struct MultiplayerVotingView: View {
                             .foregroundStyle(Design.Colors.textSecondary)
                     }
 
-                    if let myPlayer = multiplayerStore.myPlayer, myPlayer.isReady {
-                        Text("Waiting for other players...")
-                            .font(Design.Typography.footnote)
-                            .foregroundStyle(Design.Colors.textSecondary)
-                            .padding(.top, 8)
-                    }
+                    Text("Waiting for other players...")
+                        .font(Design.Typography.footnote)
+                        .foregroundStyle(Design.Colors.textSecondary)
+                        .padding(.top, 8)
                 }
                 .padding(.bottom, 16)
             }

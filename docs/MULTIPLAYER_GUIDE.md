@@ -34,21 +34,20 @@ This creates:
 - `game_sessions` - Multiplayer game rooms
 - `session_players` - Players in each session
 - `game_actions` - Night and day actions
-- `phase_timers` - Phase countdown timers
+- required RPCs such as `add_session_player`, `reset_players_ready`, `submit_game_action`, and `resolve_night_atomic`
 
-> **Update:** Re-run this script after pulling the latest code so the `session_is_joinable()` helper and updated RLS policy are installed. Without it, joining a room fails with `row-level security` errors.
+> **Update:** Re-run this script after pulling the latest code so the helper/RPC fixes stay aligned with the app. Without it, joining a room or resetting readiness can fail even if the client code is current.
 
 ### 2. Enable Realtime
 
 In Supabase Dashboard → Database → Replication:
-- Enable replication for: `game_sessions`, `session_players`, `game_actions`, `phase_timers`
+- Enable replication for: `game_sessions`, `session_players`, `game_actions`
 
 Or via SQL (already in schema):
 ```sql
 ALTER PUBLICATION supabase_realtime ADD TABLE public.game_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.session_players;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.game_actions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
 ```
 
 ## Game Flow
@@ -83,7 +82,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
 
 **Night resolution:**
 - When all actions submitted OR timer expires
-- Server processes: mafia target, doctor save, inspector result
+- Server processes: mafia target, doctor save, inspector result (`mafia`, `not_mafia`, or `blocked`)
 - Transition to morning phase
 
 ### 4. Morning & Death Reveal
@@ -114,7 +113,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.phase_timers;
 GameSession      // Room state, settings, current phase
 SessionPlayer    // Player info with privacy filters
 GameAction       // Night/day actions
-PhaseTimer       // Phase countdown timers
 ```
 
 ### Services (`Core/Multiplayer/Services/`)
@@ -159,6 +157,7 @@ Implemented via:
 - Players see only their own role
 - Mafia see other mafia roles
 - Host sees all roles (for debugging)
+- Everyone sees final roles once the game is over
 - Dead players see nothing new
 
 ### Row Level Security
@@ -212,21 +211,9 @@ try await realtimeService.subscribeToSession(
 - Bots auto-submit actions at phase start
 - No client-side bot logic needed
 
-## Timer System
+## Phase Timing
 
-### Phase Timers
-
-```swift
-PhaseTimer(
-    sessionId: sessionId,
-    phaseName: "night_1",
-    durationSeconds: 60
-)
-```
-
-**Auto-advance:**
-- Timer expires → Host auto-submits missing actions
-- Graceful handling of AFK players
+The current multiplayer implementation does not persist countdowns in a dedicated `phase_timers` table. Phase progression is driven by host logic, submitted actions, and readiness checks.
 
 ## Migration from Local Mode
 
@@ -278,7 +265,6 @@ xcrun simctl boot "iPad Pro (11-inch)"
 - [ ] Role privacy (can't see others' roles)
 - [ ] Mafia coordination (see teammates)
 - [ ] Parallel night actions
-- [ ] Timer expiration handling
 - [ ] Disconnection/reconnection
 - [ ] Bot auto-actions
 - [ ] Private voting
@@ -303,10 +289,6 @@ xcrun simctl boot "iPad Pro (11-inch)"
 1. Check `game_actions` table policies
 2. Verify action type and phase index match
 3. Check for unique constraint violations
-
-### Issue: Timer not counting down
-
-**Solution:** Ensure `timerUpdateTimer` is running in MultiplayerGameStore
 
 ## Future Enhancements
 
