@@ -537,9 +537,11 @@ struct MultiplayerMorningView: View {
             return deathNumbers.map { "#\($0)" }.joined(separator: ", ")
         }
 
+        let targetWasSaved = record.targetWasSaved ?? (record.doctorProtectedId == record.mafiaTargetId)
+
         // No deaths - check if doctor saved someone (only if doctor actually exists!)
         if let targetNumber = playerNumber(for: record.mafiaTargetId),
-           record.doctorProtectedId == record.mafiaTargetId,
+           targetWasSaved,
            !record.doctorPlayerNumbers.isEmpty {  // Defense-in-depth: verify doctor exists
             return "None (Doctor saved #\(targetNumber))"
         }

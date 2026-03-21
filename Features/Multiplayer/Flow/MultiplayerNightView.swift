@@ -237,14 +237,8 @@ struct MultiplayerNightView: View {
                 // Call the new two-phase method: Phase 1
                 try await multiplayerStore.recordNightActions(nightIndex: nightIndex)
 
-                // Auto-determine if target was saved
-                let targetWasSaved = determineIfTargetWasSaved()
-
                 // Phase 2: Immediately resolve outcome without showing results sheet
-                try await multiplayerStore.resolveNightOutcome(
-                    nightIndex: nightIndex,
-                    targetWasSaved: targetWasSaved
-                )
+                try await multiplayerStore.resolveNightOutcome(nightIndex: nightIndex)
 
                 await MainActor.run {
                     isRecording = false
@@ -668,16 +662,6 @@ struct MultiplayerNightView: View {
         }
     }
 
-    private func determineIfTargetWasSaved() -> Bool {
-        guard let session = multiplayerStore.currentSession,
-              let nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }),
-              let mafiaTargetId = nightRecord.mafiaTargetId,
-              let doctorProtectedId = nightRecord.doctorProtectedId else {
-            return false
-        }
-
-        return mafiaTargetId == doctorProtectedId
-    }
 }
 
 // MARK: - Target Grid Cell

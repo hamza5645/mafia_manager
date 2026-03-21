@@ -31,7 +31,7 @@
 		2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5A2E68EF3A002C5B31 /* Role.swift */; };
 		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
 		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
-		2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* Vision.md */; };
+		2F78C7752EAEC2BA004BC2A7 /* docs/Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* docs/Vision.md */; };
 		2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */; };
 		2F9C12BC2EC4F21300D06767 /* BotDecisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */; };
 		2FD6A3AA2EBB311100D43510 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3A92EBB311100D43510 /* Auth */; };
@@ -120,7 +120,7 @@
 		2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
 		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		2F78C7742EAEC2B1004BC2A7 /* Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Vision.md; sourceTree = "<group>"; };
+		2F78C7742EAEC2B1004BC2A7 /* docs/Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = docs/Vision.md; sourceTree = "<group>"; };
 		2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathRevealView.swift; sourceTree = "<group>"; };
 		2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotDecisionService.swift; sourceTree = "<group>"; };
 		2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVoteDeathRevealView.swift; sourceTree = "<group>"; };
@@ -498,7 +498,7 @@
 				2F3DBB6E2E68EF3A002C5B31 /* Features */,
 				532A4160448E4D7897EE80A5 /* Resources */,
 				2F3DBB712E68EF3A002C5B31 /* README.md */,
-				2F78C7742EAEC2B1004BC2A7 /* Vision.md */,
+				2F78C7742EAEC2B1004BC2A7 /* docs/Vision.md */,
 				2FF7CF202E68E6E70023D42B /* Products */,
 				2FAA73FD2F6E12A100BB7792 /* App */,
 			);
@@ -628,7 +628,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2F78C7752EAEC2BA004BC2A7 /* Vision.md in Resources */,
+				2F78C7752EAEC2BA004BC2A7 /* docs/Vision.md in Resources */,
 				2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */,
 				2F3DBB752E68EF3A002C5B31 /* README.md in Resources */,
 				A73CA2BD45494EA3A36D7A53 /* mafia_gunshot.wav in Resources */,

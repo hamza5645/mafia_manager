@@ -1991,7 +1991,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
-        let doctorProtectedId = doctorTargetId ?? (targetWasSaved ? mafiaTargetId : doctorProtectionIds.first)
+        let doctorProtectedId = targetWasSaved ? mafiaTargetId : (doctorTargetId ?? doctorProtectionIds.first)
 
         // Build lookup from visiblePlayers (same source that works for target resolution)
         let playerNumberLookup = Dictionary(uniqueKeysWithValues:
@@ -2023,6 +2023,7 @@ final class MultiplayerGameStore: ObservableObject {
             inspectorCheckedId: inspectorCheckedId,
             inspectorResult: nil,
             doctorProtectedId: doctorProtectedId,
+            targetWasSaved: targetWasSaved,
             resultingDeaths: [],  // Empty - deaths not applied yet
             mafiaPlayerNumbers: mafiaPlayerNumbers,
             doctorPlayerNumbers: doctorPlayerNumbers,
@@ -2043,7 +2044,7 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Phase 2: Apply night outcomes atomically (with duplicate resolution guard)
-    func resolveNightOutcome(nightIndex: Int, targetWasSaved: Bool) async throws {
+    func resolveNightOutcome(nightIndex: Int) async throws {
         guard isHost else { return }
         guard let session = currentSession else {
             print("ERROR: [resolveNightOutcome] No current session - cannot resolve night \(nightIndex)")
@@ -2060,12 +2061,19 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
+        let targetWasSaved = try await resolveTargetWasSaved(
+            for: nightRecord,
+            nightIndex: nightIndex,
+            session: session
+        )
+
         var resultingDeaths: [UUID] = []
         if let targetId = nightRecord.mafiaTargetId, !targetWasSaved {
             resultingDeaths = [targetId]
         }
 
         // Update the record with final results
+        nightRecord.targetWasSaved = targetWasSaved
         nightRecord.resultingDeaths = resultingDeaths
         nightRecord.isResolved = true  // Mark as resolved
 
@@ -2129,6 +2137,34 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
+    private func resolveTargetWasSaved(
+        for nightRecord: NightActionRecord,
+        nightIndex: Int,
+        session: GameSession
+    ) async throws -> Bool {
+        if let targetWasSaved = nightRecord.targetWasSaved {
+            return targetWasSaved
+        }
+
+        guard let mafiaTargetId = nightRecord.mafiaTargetId else {
+            return false
+        }
+
+        if case .night(let activeNightIndex, _) = session.currentPhaseData,
+           activeNightIndex == nightIndex {
+            let doctorActions = try await sessionService.getActionsForPhase(
+                sessionId: session.id,
+                actionType: .doctorProtect,
+                phaseIndex: nightIndex,
+                roundId: session.currentRoundId
+            )
+            let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
+            return doctorProtectionIds.contains(mafiaTargetId)
+        }
+
+        return nightRecord.doctorProtectedId == mafiaTargetId
+    }
+
     /// Legacy single-phase resolution (DEPRECATED - kept for backwards compatibility, will be removed)
     private func resolveNightPhase(nightIndex: Int) async throws {
         guard isHost else { return }
@@ -2175,7 +2211,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
         let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
-        let doctorProtectedId = doctorTargetId ?? (targetWasSaved ? mafiaTargetId : doctorProtectionIds.first)
+        let doctorProtectedId = targetWasSaved ? mafiaTargetId : (doctorTargetId ?? doctorProtectionIds.first)
 
         var resultingDeaths: [UUID] = []
         var hostEliminated = false
@@ -2212,6 +2248,7 @@ final class MultiplayerGameStore: ObservableObject {
             inspectorCheckedId: inspectorCheckedId, // Public: Who was checked
             inspectorResult: nil, // Private: Result stays hidden
             doctorProtectedId: doctorProtectedId,
+            targetWasSaved: targetWasSaved,
             resultingDeaths: resultingDeaths,
             mafiaPlayerNumbers: mafiaPlayerNumbers,
             doctorPlayerNumbers: doctorPlayerNumbers,
