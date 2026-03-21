@@ -1,5 +1,27 @@
 # Session Changes
 
+## MM-01: `resolve_night_atomic()` snake_case fix
+
+### What Changed
+
+- Patched `public.resolve_night_atomic()` in `supabase/multiplayer_schema.sql` to read `night_index` first and tolerate legacy `nightIndex` only as a fallback.
+- Added migration `supabase/migrations/20260321110000_fix_resolve_night_atomic_json_keys.sql` so existing Supabase projects can deploy the RPC fix without re-running the full schema.
+- Hardened the RPC so malformed night payloads raise an error instead of silently nulling `night_index` and collapsing `night_history`.
+
+### Validation
+
+- Confirmed the Swift multiplayer payload already encodes snake_case keys, so no app-facing contract changes were required.
+- Verified against the connected Supabase project that the pre-fix live RPC still used camelCase lookups and matched the audit's live data anomaly counts.
+- Planned SQL verification after migration application to confirm prior `night_history` rows are preserved and `removal_note` receives a real night number.
+
+### Rollback
+
+- Re-apply the previous function body if you intentionally need the old behavior, though it will reintroduce history corruption for snake_case payloads.
+
+### Known Gotchas
+
+- MM-01 is fix-forward only. Sessions whose `night_history` was already collapsed before this patch are not reconstructed by this change.
+
 ## What Changed
 
 - Reorganized the app entry point into `App/mafia_managerApp.swift`.

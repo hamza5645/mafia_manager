@@ -495,28 +495,49 @@ SET search_path = public
 AS $$
 DECLARE
     v_night_index INT;
+    v_night_index_text TEXT;
     v_night_history JSONB;
     v_updated_history JSONB;
 BEGIN
-    -- Extract night_index from the record
-    v_night_index := (p_night_record->>'nightIndex')::INT;
+    -- Extract night_index from the record, tolerating legacy camelCase payloads.
+    v_night_index_text := COALESCE(
+        NULLIF(p_night_record->>'night_index', ''),
+        NULLIF(p_night_record->>'nightIndex', '')
+    );
 
-    -- Get current night_history
-    SELECT night_history INTO v_night_history
+    IF v_night_index_text IS NULL OR v_night_index_text !~ '^[0-9]+$' THEN
+        RAISE EXCEPTION 'resolve_night_atomic received invalid night index payload: %', p_night_record
+            USING ERRCODE = '22023';
+    END IF;
+
+    v_night_index := v_night_index_text::INT;
+
+    -- Get current night_history, defaulting null to an empty array.
+    SELECT COALESCE(night_history, '[]'::jsonb) INTO v_night_history
     FROM public.game_sessions
     WHERE id = p_session_id;
 
     -- Remove any existing record for this night_index (prevent duplicates)
     v_updated_history := (
-        SELECT jsonb_agg(elem)
+        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
         FROM jsonb_array_elements(v_night_history) elem
-        WHERE (elem->>'nightIndex')::INT != v_night_index
+        CROSS JOIN LATERAL (
+            SELECT CASE
+                WHEN COALESCE(
+                    NULLIF(elem->>'night_index', ''),
+                    NULLIF(elem->>'nightIndex', '')
+                ) ~ '^[0-9]+$'
+                THEN (
+                    COALESCE(
+                        NULLIF(elem->>'night_index', ''),
+                        NULLIF(elem->>'nightIndex', '')
+                    )
+                )::INT
+                ELSE NULL
+            END AS elem_night_index
+        ) existing_record
+        WHERE existing_record.elem_night_index IS DISTINCT FROM v_night_index
     );
-
-    -- If all records were removed, initialize empty array
-    IF v_updated_history IS NULL THEN
-        v_updated_history := '[]'::jsonb;
-    END IF;
 
     -- Append the new night record
     v_updated_history := v_updated_history || p_night_record;
