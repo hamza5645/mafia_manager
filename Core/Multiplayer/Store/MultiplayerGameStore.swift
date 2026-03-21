@@ -90,9 +90,53 @@ final class MultiplayerGameStore: ObservableObject {
     // Auth store reference
     private weak var authStore: AuthStore?
 
+#if DEBUG
+    // Test-only snapshot seams for deterministic lobby recovery coverage.
+    var testSessionSnapshotProvider: ((UUID) async throws -> GameSession?)?
+    var testPlayerSnapshotProvider: ((UUID) async throws -> [SessionPlayer])?
+    var testCurrentUserIdProvider: (() -> UUID?)?
+#endif
+
     func setAuthStore(_ authStore: AuthStore) {
         self.authStore = authStore
     }
+
+    private func currentUserId() -> UUID? {
+#if DEBUG
+        if let provider = testCurrentUserIdProvider {
+            return provider()
+        }
+#endif
+        return authStore?.currentUserId
+    }
+
+    private func loadSessionSnapshot(sessionId: UUID) async throws -> GameSession? {
+#if DEBUG
+        if let provider = testSessionSnapshotProvider {
+            return try await provider(sessionId)
+        }
+#endif
+        return try await sessionService.getSession(sessionId: sessionId)
+    }
+
+    private func loadPlayerSnapshot(sessionId: UUID) async throws -> [SessionPlayer] {
+#if DEBUG
+        if let provider = testPlayerSnapshotProvider {
+            return try await provider(sessionId)
+        }
+#endif
+        return try await sessionService.getSessionPlayers(sessionId: sessionId)
+    }
+
+#if DEBUG
+    func testHandleSessionUpdate(_ session: GameSession) {
+        handleSessionUpdate(session)
+    }
+
+    func testHandlePlayerUpdate(_ player: SessionPlayer) {
+        handlePlayerUpdate(player)
+    }
+#endif
 
     /// Clear per-game caches so bots/actions get re-processed for a brand new game
     private func resetPhaseProcessingState() {
@@ -165,6 +209,48 @@ final class MultiplayerGameStore: ObservableObject {
             && session.dayIndex == 0
             && session.nightHistory.isEmpty
             && session.dayHistory.isEmpty
+    }
+
+    private enum LobbySnapshotRefreshTrigger: String {
+        case roleAssignmentRecovery = "role_assignment_recovery"
+        case lobbyResetRecovery = "lobby_reset_recovery"
+    }
+
+    private func lobbySnapshotRefreshTrigger(
+        previousSessionId: UUID?,
+        previousPhase: String?,
+        previousPhaseData: PhaseData?,
+        newSession: GameSession
+    ) -> LobbySnapshotRefreshTrigger? {
+        guard previousSessionId == newSession.id else { return nil }
+
+        let didPhaseChange = previousPhase != newSession.currentPhase
+            || previousPhaseData != newSession.currentPhaseData
+        guard didPhaseChange else { return nil }
+
+        if previousPhase == "lobby", newSession.currentPhase != "lobby" {
+            return .roleAssignmentRecovery
+        }
+
+        if let previousPhase, previousPhase != "lobby", newSession.currentPhase == "lobby" {
+            return .lobbyResetRecovery
+        }
+
+        return nil
+    }
+
+    private func scheduleLobbySnapshotRefreshIfNeeded(_ trigger: LobbySnapshotRefreshTrigger) {
+        if trigger == .roleAssignmentRecovery && isHost {
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                try await self.refreshPlayers()
+            } catch {
+                print("⚠️ [MultiplayerGameStore] Failed lobby snapshot refresh (\(trigger.rawValue)): \(error)")
+            }
+        }
     }
 
     // MARK: - Bot Reactive Voting Helpers
@@ -244,7 +330,7 @@ final class MultiplayerGameStore: ObservableObject {
         playerName: String,
         botCount: Int = 0
     ) async throws {
-        guard let userId = authStore?.currentUserId else {
+        guard let userId = currentUserId() else {
             throw SessionError.notHost
         }
 
@@ -319,7 +405,7 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Join an existing session
     func joinSession(roomCode: String, playerName: String) async throws {
-        guard let userId = authStore?.currentUserId else {
+        guard let userId = currentUserId() else {
             throw SessionError.notHost
         }
 
@@ -599,7 +685,14 @@ final class MultiplayerGameStore: ObservableObject {
 
     private func handleSessionUpdate(_ session: GameSession) {
         let previousSessionId = currentSession?.id
+        let previousPhase = currentSession?.currentPhase
         let previousPhaseData = currentSession?.currentPhaseData
+        let lobbyRefreshTrigger = lobbySnapshotRefreshTrigger(
+            previousSessionId: previousSessionId,
+            previousPhase: previousPhase,
+            previousPhaseData: previousPhaseData,
+            newSession: session
+        )
 
         // New session or a full lobby reset (e.g., Play Again) -> clear bot/night caches
         if session.id != previousSessionId || isFreshLobbyState(session) {
@@ -614,6 +707,10 @@ final class MultiplayerGameStore: ObservableObject {
         currentSession = session
 
         updateHostStatus(using: session)
+
+        if let lobbyRefreshTrigger {
+            scheduleLobbySnapshotRefreshIfNeeded(lobbyRefreshTrigger)
+        }
 
         if session.currentPhaseData != previousPhaseData {
             scheduleAutoAdvance(for: session.currentPhaseData)
@@ -636,7 +733,7 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func updateHostStatus(using session: GameSession) {
-        guard let userId = authStore?.currentUserId else { return }
+        guard let userId = currentUserId() else { return }
         let newIsHost = (session.hostUserId == userId)
         if newIsHost != isHost {
             isHost = newIsHost
@@ -1004,7 +1101,7 @@ final class MultiplayerGameStore: ObservableObject {
     func refreshSession() async throws {
         guard let sessionId = currentSession?.id else { return }
         
-        if let latestSession = try await sessionService.getSession(sessionId: sessionId) {
+        if let latestSession = try await loadSessionSnapshot(sessionId: sessionId) {
             // Use handleSessionUpdate to ensure all side effects (timers, auto-advance) run
             // just as if we received a real-time update
             handleSessionUpdate(latestSession)
@@ -1014,12 +1111,12 @@ final class MultiplayerGameStore: ObservableObject {
     private func refreshPlayers() async throws {
         guard let sessionId = currentSession?.id else { return }
 
-        let players = try await sessionService.getSessionPlayers(sessionId: sessionId)
+        let players = try await loadPlayerSnapshot(sessionId: sessionId)
         guard sessionId == currentSession?.id else { return } // Session changed; drop stale data.
 
         // Check if current player was removed (kicked)
         let wasInSession = myPlayer != nil
-        let currentUserId = authStore?.currentUserId
+        let currentUserId = currentUserId()
 
         allPlayers = players
 
