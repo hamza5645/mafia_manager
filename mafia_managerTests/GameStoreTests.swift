@@ -208,6 +208,63 @@ final class GameStoreTests: XCTestCase {
         }
     }
 
+    func testEndNight_StoresOnlyAliveMafiaNumbers() throws {
+        setupGame(playerCount: 8)
+
+        let mafiaPlayers = gameStore.state.players.filter { $0.role == .mafia }
+        XCTAssertEqual(mafiaPlayers.count, 2)
+
+        let eliminatedMafia = try XCTUnwrap(mafiaPlayers.first)
+        let survivingNonMafia = try XCTUnwrap(gameStore.state.players.first { $0.role != .mafia })
+
+        gameStore.applyDayRemovals(
+            removed: [eliminatedMafia.id: true],
+            notes: [eliminatedMafia.id: "Eliminated"]
+        )
+
+        XCTAssertFalse(gameStore.player(by: eliminatedMafia.id)?.alive ?? true)
+
+        gameStore.endNight(
+            mafiaTargetID: survivingNonMafia.id,
+            inspectorCheckedID: nil,
+            doctorProtectedID: nil
+        )
+
+        let action = try XCTUnwrap(gameStore.state.nightHistory.last)
+        XCTAssertEqual(action.mafiaNumbers.count, 1)
+        XCTAssertEqual(action.mafiaNumbers, gameStore.aliveMafia.map(\.number).sorted())
+        XCTAssertFalse(action.mafiaNumbers.contains(eliminatedMafia.number))
+    }
+
+    func testEndNight_StoresOnlyAlivePoliceAndDoctorNumbers() throws {
+        setupGame(playerCount: 8)
+
+        let doctor = try XCTUnwrap(gameStore.state.players.first { $0.role == .doctor })
+        let inspector = try XCTUnwrap(gameStore.state.players.first { $0.role == .inspector })
+        let survivingNonMafia = try XCTUnwrap(
+            gameStore.state.players.first { player in
+                player.role == .citizen && player.id != doctor.id && player.id != inspector.id
+            }
+        )
+
+        gameStore.applyDayRemovals(
+            removed: [doctor.id: true, inspector.id: true],
+            notes: [doctor.id: "Eliminated", inspector.id: "Eliminated"]
+        )
+
+        gameStore.endNight(
+            mafiaTargetID: survivingNonMafia.id,
+            inspectorCheckedID: nil,
+            doctorProtectedID: nil
+        )
+
+        let action = try XCTUnwrap(gameStore.state.nightHistory.last)
+        XCTAssertEqual(action.inspectorNumbers ?? [], [])
+        XCTAssertEqual(action.doctorNumbers ?? [], [])
+        XCTAssertFalse((action.inspectorNumbers ?? []).contains(inspector.number))
+        XCTAssertFalse((action.doctorNumbers ?? []).contains(doctor.number))
+    }
+
     func testApplyVotingResult_TieStillAdvancesDay() {
         setupGame(playerCount: 6)
 

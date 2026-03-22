@@ -102,11 +102,31 @@ struct MorningSummaryView: View {
 // Removed local GlassButtonStyle; using global CTAButtonStyle instead.
 
 private extension MorningSummaryView {
+    func summaryVisiblePlayerNumbers(in night: NightAction) -> Set<Int> {
+        let recentlyEliminatedIDs = Set(night.resultingDeaths)
+        return Set(
+            store.state.players
+                .filter { $0.alive || recentlyEliminatedIDs.contains($0.id) }
+                .map(\.number)
+        )
+    }
+
+    func summaryRoleNumbers(for role: Role, in night: NightAction) -> [Int] {
+        let recentlyEliminatedIDs = Set(night.resultingDeaths)
+        return store.state.players
+            .filter { $0.role == role && ($0.alive || recentlyEliminatedIDs.contains($0.id)) }
+            .map(\.number)
+            .sorted()
+    }
+
     func mafiaSummary(for night: NightAction) -> String {
-        let numbers = night.mafiaNumbers.sorted()
+        let visibleNumbers = summaryVisiblePlayerNumbers(in: night)
+        let numbers = night.mafiaNumbers
+            .filter { visibleNumbers.contains($0) }
+            .sorted()
         let mafiaLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
-        if let targetNumber = store.number(for: night.mafiaTargetPlayerID) {
+        if !numbers.isEmpty, let targetNumber = store.number(for: night.mafiaTargetPlayerID) {
             return "\(mafiaLabel) → #\(targetNumber)"
         }
         return mafiaLabel
@@ -129,18 +149,18 @@ private extension MorningSummaryView {
     }
 
     func policeSummary(for night: NightAction) -> String {
-        let policeNumbers = store.state.players.filter { $0.role == .inspector }.map { $0.number }.sorted()
+        let policeNumbers = (night.inspectorNumbers ?? summaryRoleNumbers(for: .inspector, in: night)).sorted()
         let policeLabel = policeNumbers.isEmpty ? "—" : policeNumbers.map { "#\($0)" }.joined(separator: ", ")
-        if let inspectedNum = store.number(for: night.inspectorCheckedPlayerID) {
+        if !policeNumbers.isEmpty, let inspectedNum = store.number(for: night.inspectorCheckedPlayerID) {
             return "\(policeLabel) → #\(inspectedNum)"
         }
         return policeLabel
     }
 
     func doctorSummary(for night: NightAction) -> String {
-        let doctorNumbers = store.state.players.filter { $0.role == .doctor }.map { $0.number }.sorted()
+        let doctorNumbers = (night.doctorNumbers ?? summaryRoleNumbers(for: .doctor, in: night)).sorted()
         let doctorLabel = doctorNumbers.isEmpty ? "—" : doctorNumbers.map { "#\($0)" }.joined(separator: ", ")
-        if let protectedNum = store.number(for: night.doctorProtectedPlayerID) {
+        if !doctorNumbers.isEmpty, let protectedNum = store.number(for: night.doctorProtectedPlayerID) {
             return "\(doctorLabel) → #\(protectedNum)"
         }
         return doctorLabel

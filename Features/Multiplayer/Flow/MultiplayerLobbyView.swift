@@ -499,9 +499,25 @@ struct MultiplayerMorningView: View {
         return playerLookup[id]?.playerNumber
     }
 
+    private func summaryVisiblePlayerNumbers(in record: NightActionRecord) -> Set<Int> {
+        let recentlyEliminatedIDs = Set(record.resultingDeaths)
+        return Set(
+            multiplayerStore.visiblePlayers
+                .filter { $0.isAlive || recentlyEliminatedIDs.contains($0.playerId) }
+                .compactMap(\.playerNumber)
+        )
+    }
+
+    private func summaryRoleNumbers(_ recordedNumbers: [Int], in record: NightActionRecord) -> [Int] {
+        let visibleNumbers = summaryVisiblePlayerNumbers(in: record)
+        return recordedNumbers
+            .filter { visibleNumbers.contains($0) }
+            .sorted()
+    }
+
     // Helper functions matching local game format
     private func mafiaSummary(for record: NightActionRecord) -> String {
-        let numbers = record.mafiaPlayerNumbers.sorted()
+        let numbers = summaryRoleNumbers(record.mafiaPlayerNumbers, in: record)
         let mafiaLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
         // Only show target if there are actual mafia actors
@@ -512,7 +528,7 @@ struct MultiplayerMorningView: View {
     }
 
     private func policeSummary(for record: NightActionRecord) -> String {
-        let numbers = record.inspectorPlayerNumbers.sorted()
+        let numbers = summaryRoleNumbers(record.inspectorPlayerNumbers, in: record)
         let policeLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
         // Only show target if there are actual police actors
@@ -523,7 +539,7 @@ struct MultiplayerMorningView: View {
     }
 
     private func doctorSummary(for record: NightActionRecord) -> String {
-        let numbers = record.doctorPlayerNumbers.sorted()
+        let numbers = summaryRoleNumbers(record.doctorPlayerNumbers, in: record)
         let doctorLabel = numbers.isEmpty ? "—" : numbers.map { "#\($0)" }.joined(separator: ", ")
 
         // Only show target if there are actual doctor actors
@@ -545,7 +561,7 @@ struct MultiplayerMorningView: View {
         // No deaths - check if doctor saved someone (only if doctor actually exists!)
         if let targetNumber = playerNumber(for: record.mafiaTargetId),
            targetWasSaved,
-           !record.doctorPlayerNumbers.isEmpty {  // Defense-in-depth: verify doctor exists
+           !summaryRoleNumbers(record.doctorPlayerNumbers, in: record).isEmpty {
             return "None (Doctor saved #\(targetNumber))"
         }
 

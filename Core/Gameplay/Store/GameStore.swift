@@ -566,7 +566,18 @@ final class GameStore: ObservableObject {
             }
         }
 
-        let mafiaNumbers = state.players.filter { $0.role == .mafia }.map { $0.number }.sorted()
+        let mafiaNumbers = state.players
+            .filter { $0.role == .mafia && $0.alive }
+            .map { $0.number }
+            .sorted()
+        let inspectorNumbers = state.players
+            .filter { $0.role == .inspector && $0.alive }
+            .map { $0.number }
+            .sorted()
+        let doctorNumbers = state.players
+            .filter { $0.role == .doctor && $0.alive }
+            .map { $0.number }
+            .sorted()
         // BUG FIX: Track alive mafia IDs for accurate kill attribution
         let aliveMafiaIDs = state.players.filter { $0.role == .mafia && $0.alive }.map { $0.id }
 
@@ -579,6 +590,8 @@ final class GameStore: ObservableObject {
             doctorProtectedPlayerID: doctorProtectedID,
             resultingDeaths: resulting,
             mafiaNumbers: mafiaNumbers,
+            inspectorNumbers: inspectorNumbers,
+            doctorNumbers: doctorNumbers,
             aliveMafiaIDs: aliveMafiaIDs
         )
 

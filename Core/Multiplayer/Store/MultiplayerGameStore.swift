@@ -3331,6 +3331,8 @@ final class MultiplayerGameStore: ObservableObject {
                 doctorProtectedPlayerID: record.doctorProtectedId,
                 resultingDeaths: record.resultingDeaths,
                 mafiaNumbers: record.mafiaPlayerNumbers,
+                inspectorNumbers: record.inspectorPlayerNumbers,
+                doctorNumbers: record.doctorPlayerNumbers,
                 isResolved: true,
                 aliveMafiaIDs: nil,
                 mafiaPhaseCompleted: true,
