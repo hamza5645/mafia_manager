@@ -7,6 +7,7 @@ enum GamePhase: Codable, Sendable, Equatable {
     case nightTransition
     case morning
     case deathReveal
+    case voteDeathReveal
     case botVotingReveal
     case votingIndividual(currentPlayerIndex: Int)
     case votingResults
@@ -29,4 +30,3 @@ extension GameState {
         GameState(players: [], nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil, currentPhase: .roleReveal(currentPlayerIndex: 0), currentVotingSession: nil)
     }
 }
-

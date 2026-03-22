@@ -90,7 +90,7 @@ struct RootView: View {
             NightWakeUpView()
         case .morning:
             MorningSummaryView()
-        case .deathReveal:
+        case .deathReveal, .voteDeathReveal:
             DeathRevealView()
         case .botVotingReveal:
             BotVotingRevealView()

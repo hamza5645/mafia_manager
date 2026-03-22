@@ -1,5 +1,31 @@
 # Session Changes
 
+## MM-17: Solo vote elimination reveal
+
+### What Changed
+
+- Added a new solo `voteDeathReveal` phase so daytime eliminations pause on a reveal screen instead of jumping straight from vote results into the next night.
+- Updated `GameStore.applyVotingResult()` to route actual vote eliminations through that reveal phase while keeping tie/no-elimination days on the existing direct-to-night path.
+- Reused `DeathRevealView` for both night kills and vote eliminations with context-specific copy and continue behavior.
+- Updated `VoteResultsView` so the primary button reflects the new reveal step when a player was actually eliminated.
+- Added `GameStore` regression tests for:
+  - vote elimination entering the reveal phase,
+  - continuing from that reveal into the next night,
+  - continuing from that reveal into game over when the final mafia is voted out.
+
+### Validation
+
+- Xcode project build succeeded after the phase-routing and UI changes.
+- CLI `xcodebuild test` and Xcode-hosted targeted test execution both stalled in this session before producing a usable XCTest summary, so the new tests were added but not fully observed completing here.
+
+### Rollback
+
+- Revert the `voteDeathReveal` phase and restore the old `applyVotingResult()` behavior if you want vote results to advance directly into the next night again.
+
+### Known Gotchas
+
+- `DeathRevealView` now serves two solo contexts. If you change its copy or continue action later, verify both night deaths and vote eliminations still route correctly.
+
 ## MM-02: Persist multiplayer doctor saves across two-phase resolution
 
 ### What Changed

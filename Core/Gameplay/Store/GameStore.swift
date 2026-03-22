@@ -340,9 +340,22 @@ final class GameStore: ObservableObject {
         save()
     }
 
+    func transitionToVoteDeathReveal() {
+        state.currentPhase = .voteDeathReveal
+        save()
+    }
+
     func transitionToDay() {
         // Skip the old day management view and go directly to voting
         startVoting()
+    }
+
+    func completeVoteDeathReveal() {
+        if state.isGameOver {
+            transitionToGameOver()
+        } else {
+            wakeUpRole(.mafia)
+        }
     }
 
     func transitionToGameOver() {
@@ -460,12 +473,8 @@ final class GameStore: ObservableObject {
         // Check for winners
         evaluateWinners(startOfDay: false)
 
-        // If game isn't over, start next night
-        if !state.isGameOver {
-            wakeUpRole(.mafia)
-        }
-
-        save()
+        // Reveal who was voted out before moving on to the next phase.
+        transitionToVoteDeathReveal()
     }
 
     // MARK: - Role distribution

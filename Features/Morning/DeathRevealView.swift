@@ -4,12 +4,104 @@ struct DeathRevealView: View {
     @EnvironmentObject private var store: GameStore
     @State private var showEndGameConfirmation = false
 
-    private var lastNight: NightAction? { store.state.nightHistory.last }
+    private enum RevealContext {
+        case night
+        case vote
+    }
 
-    private var deadPlayers: [Player] {
-        guard let night = lastNight else { return [] }
-        return night.resultingDeaths.compactMap { deathID in
-            store.player(by: deathID)
+    private var revealContext: RevealContext {
+        if case .voteDeathReveal = store.state.currentPhase {
+            return .vote
+        }
+        return .night
+    }
+
+    private var lastNight: NightAction? { store.state.nightHistory.last }
+    private var lastDay: DayAction? { store.state.dayHistory.last }
+
+    private var revealedPlayers: [Player] {
+        switch revealContext {
+        case .night:
+            guard let night = lastNight else { return [] }
+            return night.resultingDeaths.compactMap { deathID in
+                store.player(by: deathID)
+            }
+        case .vote:
+            guard let day = lastDay else { return [] }
+            return day.removedPlayerIDs.compactMap { removedPlayerID in
+                store.player(by: removedPlayerID)
+            }
+        }
+    }
+
+    private var emptyStateTitle: String {
+        switch revealContext {
+        case .night:
+            return "No Deaths"
+        case .vote:
+            return "No Elimination"
+        }
+    }
+
+    private var emptyStateSubtitle: String {
+        switch revealContext {
+        case .night:
+            return "Everyone survived the night"
+        case .vote:
+            return "Nobody was voted out today"
+        }
+    }
+
+    private var emptyStateAccessibilityLabel: String {
+        switch revealContext {
+        case .night:
+            return "No deaths tonight. Everyone survived."
+        case .vote:
+            return "No elimination today. Nobody was voted out."
+        }
+    }
+
+    private var eliminationIconName: String {
+        switch revealContext {
+        case .night:
+            return "moon.zzz.fill"
+        case .vote:
+            return "person.fill.xmark"
+        }
+    }
+
+    private var eliminationTitleVerb: String {
+        switch revealContext {
+        case .night:
+            return "has Died"
+        case .vote:
+            return "was Voted Out"
+        }
+    }
+
+    private var continueButtonTitle: String {
+        if store.state.isGameOver {
+            return "View Result"
+        }
+
+        switch revealContext {
+        case .night:
+            return "Continue to Day \(store.currentDayIndex + 1)"
+        case .vote:
+            return "Continue to Night \(store.currentNightIndex)"
+        }
+    }
+
+    private var continueButtonAccessibilityLabel: String {
+        if store.state.isGameOver {
+            return "View game result"
+        }
+
+        switch revealContext {
+        case .night:
+            return "Continue to Day \(store.currentDayIndex + 1)"
+        case .vote:
+            return "Continue to Night \(store.currentNightIndex)"
         }
     }
 
@@ -43,7 +135,7 @@ struct DeathRevealView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        if deadPlayers.isEmpty {
+        if revealedPlayers.isEmpty {
             noDeathsView
         } else {
             deathRevealContent
@@ -77,16 +169,16 @@ struct DeathRevealView: View {
             }
 
             VStack(spacing: 12) {
-                Text("No Deaths")
+                Text(emptyStateTitle)
                     .font(Design.Typography.largeTitle)
                     .foregroundStyle(Design.Colors.textPrimary)
 
-                Text("Everyone survived the night")
+                Text(emptyStateSubtitle)
                     .font(Design.Typography.title3)
                     .foregroundColor(Design.Colors.textSecondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("No deaths tonight. Everyone survived.")
+            .accessibilityLabel(emptyStateAccessibilityLabel)
 
             Spacer()
 
@@ -97,13 +189,13 @@ struct DeathRevealView: View {
 
     private var deathRevealContent: some View {
         // Adaptive spacing based on number of deaths
-        let cardSpacing: CGFloat = deadPlayers.count > 2 ? 20 : 32
-        let topPadding: CGFloat = deadPlayers.count == 1 ? 40 : 20
+        let cardSpacing: CGFloat = revealedPlayers.count > 2 ? 20 : 32
+        let topPadding: CGFloat = revealedPlayers.count == 1 ? 40 : 20
 
         return ScrollView {
             VStack(spacing: cardSpacing) {
                 // Death cards
-                ForEach(deadPlayers, id: \.id) { player in
+                ForEach(revealedPlayers, id: \.id) { player in
                     deathCard(for: player)
                 }
 
@@ -129,7 +221,7 @@ struct DeathRevealView: View {
                     .shadow(color: Design.Colors.glowRed, radius: 20)
                     .frame(width: 100, height: 100)
 
-                Image(systemName: "moon.zzz.fill")
+                Image(systemName: eliminationIconName)
                     .font(Design.Typography.displayEmoji)
                     .foregroundStyle(Design.Colors.dangerRed)
                     .accessibilityHidden(true)
@@ -137,7 +229,7 @@ struct DeathRevealView: View {
             .padding(.top, 8)
 
             // Title: Name has Died
-            Text("\(player.name) has Died")
+            Text("\(player.name) \(eliminationTitleVerb)")
                 .font(Design.Typography.largeTitle)
                 .foregroundStyle(Design.Colors.textPrimary)
                 .multilineTextAlignment(.center)
@@ -173,7 +265,7 @@ struct DeathRevealView: View {
             .padding(.bottom, 8)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(player.name) has died. They were player number \(player.number). Their role was \(player.role.displayName).")
+        .accessibilityLabel(accessibilityLabel(for: player))
         .padding(.vertical, 36)
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity)
@@ -211,15 +303,29 @@ struct DeathRevealView: View {
             if store.state.isGameOver {
                 store.transitionToGameOver()
             } else {
-                store.transitionToDay()
+                switch revealContext {
+                case .night:
+                    store.transitionToDay()
+                case .vote:
+                    store.completeVoteDeathReveal()
+                }
             }
         } label: {
-            Text(store.state.isGameOver ? "View Result" : "Continue to Day \(store.currentDayIndex + 1)")
+            Text(continueButtonTitle)
                 .font(Design.Typography.headline)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(CTAButtonStyle(kind: .primary))
-        .accessibleButton(store.state.isGameOver ? "View game result" : "Continue to Day \(store.currentDayIndex + 1)")
+        .accessibleButton(continueButtonAccessibilityLabel)
+    }
+
+    private func accessibilityLabel(for player: Player) -> String {
+        switch revealContext {
+        case .night:
+            return "\(player.name) has died. They were player number \(player.number). Their role was \(player.role.displayName)."
+        case .vote:
+            return "\(player.name) was voted out. They were player number \(player.number). Their role was \(player.role.displayName)."
+        }
     }
 }
 

@@ -284,6 +284,70 @@ final class GameStoreTests: XCTestCase {
         XCTAssertTrue(gameStore.state.dayHistory[0].removedPlayerIDs.isEmpty)
     }
 
+    func testApplyVotingResult_EliminationTransitionsToVoteDeathReveal() throws {
+        setupGame(playerCount: 6)
+
+        let eliminatedPlayer = try XCTUnwrap(gameStore.state.players.first { $0.role != .mafia })
+        let voters = gameStore.state.players.filter { $0.id != eliminatedPlayer.id }
+        var votingSession = VotingSession(dayIndex: gameStore.currentDayIndex)
+
+        for voter in voters.prefix(3) {
+            votingSession.recordVote(from: voter.id, for: eliminatedPlayer.id)
+        }
+        _ = votingSession.tallyVotes()
+
+        gameStore.setVotingSessionForPreview(votingSession)
+        gameStore.applyVotingResult()
+
+        XCTAssertFalse(gameStore.player(by: eliminatedPlayer.id)?.alive ?? true)
+        XCTAssertEqual(gameStore.state.dayHistory.last?.removedPlayerIDs, [eliminatedPlayer.id])
+        XCTAssertEqual(gameStore.state.currentPhase, .voteDeathReveal)
+        XCTAssertNil(gameStore.state.currentVotingSession)
+        XCTAssertFalse(gameStore.state.isGameOver)
+    }
+
+    func testCompleteVoteDeathReveal_StartsNextNightAfterVoteElimination() throws {
+        setupGame(playerCount: 6)
+
+        let eliminatedPlayer = try XCTUnwrap(gameStore.state.players.first { $0.role != .mafia })
+        let voters = gameStore.state.players.filter { $0.id != eliminatedPlayer.id }
+        var votingSession = VotingSession(dayIndex: gameStore.currentDayIndex)
+
+        for voter in voters.prefix(3) {
+            votingSession.recordVote(from: voter.id, for: eliminatedPlayer.id)
+        }
+        _ = votingSession.tallyVotes()
+
+        gameStore.setVotingSessionForPreview(votingSession)
+        gameStore.applyVotingResult()
+        gameStore.completeVoteDeathReveal()
+
+        XCTAssertEqual(gameStore.state.currentPhase, .nightWakeUp(activeRole: .mafia))
+    }
+
+    func testCompleteVoteDeathReveal_ShowsGameOverWhenVoteEndsGame() throws {
+        setupGame(playerCount: 4)
+
+        let mafiaPlayer = try XCTUnwrap(gameStore.state.players.first { $0.role == .mafia })
+        let voters = gameStore.state.players.filter { $0.id != mafiaPlayer.id }
+        var votingSession = VotingSession(dayIndex: gameStore.currentDayIndex)
+
+        for voter in voters {
+            votingSession.recordVote(from: voter.id, for: mafiaPlayer.id)
+        }
+        _ = votingSession.tallyVotes()
+
+        gameStore.setVotingSessionForPreview(votingSession)
+        gameStore.applyVotingResult()
+
+        XCTAssertTrue(gameStore.state.isGameOver)
+        XCTAssertEqual(gameStore.state.currentPhase, .voteDeathReveal)
+
+        gameStore.completeVoteDeathReveal()
+
+        XCTAssertEqual(gameStore.state.currentPhase, .gameOver)
+    }
+
     // MARK: - Day Phase Tests
 
     func testApplyDayRemovals() {

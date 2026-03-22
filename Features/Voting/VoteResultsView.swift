@@ -23,6 +23,10 @@ struct VoteResultsView: View {
         .sorted { $0.votes > $1.votes }
     }
 
+    private var continueButtonTitle: String {
+        eliminatedPlayer == nil ? "Continue to Night" : "Reveal Eliminated Player"
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -114,7 +118,7 @@ struct VoteResultsView: View {
                 Button {
                     store.applyVotingResult()
                 } label: {
-                    Text("Continue to Night")
+                    Text(continueButtonTitle)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(CTAButtonStyle(kind: .primary))
