@@ -54,6 +54,7 @@ struct JoinGameView: View {
                                         RoundedRectangle(cornerRadius: Design.Radii.medium)
                                             .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
                                     )
+                                    .automationID("multiplayer.join.playerName")
                             }
 
                             // Room Code
@@ -80,6 +81,7 @@ struct JoinGameView: View {
                                         // Filter to digits only and limit to 6 digits
                                         roomCode = String(newValue.filter { $0.isNumber }.prefix(6))
                                     }
+                                    .automationID("multiplayer.join.roomCode")
 
                                 Text("Ask the host for the 6-digit room code")
                                     .font(Design.Typography.footnote)
@@ -123,6 +125,7 @@ struct JoinGameView: View {
                         .accessibilityHint("Attempts to join the room with your name and code")
                         .disabled(!canJoin || isJoining)
                         .padding(.horizontal, 20)
+                        .automationID("multiplayer.join.submit")
 
                         Spacer(minLength: 40)
                     }

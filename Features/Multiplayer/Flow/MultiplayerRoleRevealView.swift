@@ -128,6 +128,7 @@ struct MultiplayerRoleRevealView: View {
                     }
                     .disabled(isProcessing)
                     .padding(.horizontal, 20)
+                    .automationID("multiplayer.roleReveal.confirm")
                 } else if multiplayerStore.isHost {
                     // Host sees "Start Night" button after confirming their role
                     Button {
@@ -154,6 +155,7 @@ struct MultiplayerRoleRevealView: View {
                     .disabled(!isEveryoneReady)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 40)
+                    .automationID("multiplayer.roleReveal.startNight")
                 } else {
                     // Non-host players see "Waiting for others..." after confirming
                     VStack(spacing: 12) {

@@ -47,9 +47,10 @@ struct CreateGameView: View {
                                 .background(Design.Colors.surface2)
                                 .cornerRadius(Design.Radii.medium)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                        .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
+                                        RoundedRectangle(cornerRadius: Design.Radii.medium)
+                                            .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
                                 )
+                                .automationID("multiplayer.create.playerName")
                         }
                         .padding(.horizontal, 20)
 
@@ -114,6 +115,7 @@ struct CreateGameView: View {
                         .disabled(playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
+                        .automationID("multiplayer.create.submit")
 
                         Spacer(minLength: 40)
                     }

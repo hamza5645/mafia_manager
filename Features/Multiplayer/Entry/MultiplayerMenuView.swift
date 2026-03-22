@@ -64,6 +64,7 @@ struct MultiplayerMenuView: View {
                     }
                     .accessibilityLabel("Create online game")
                     .accessibilityHint("Start a new room and invite friends")
+                    .automationID("multiplayer.menu.createGame")
                     .buttonStyle(PlainButtonStyle())
 
                     // Join Game Button
@@ -94,6 +95,7 @@ struct MultiplayerMenuView: View {
                     }
                     .accessibilityLabel("Join online game")
                     .accessibilityHint("Enter a room code to join your friends")
+                    .automationID("multiplayer.menu.joinGame")
                     .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal, 20)

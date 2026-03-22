@@ -158,6 +158,10 @@ struct NightWakeUpView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                 }
+                .accessiblePhaseHeader(
+                    "Night \(store.currentNightIndex)",
+                    instruction: "Everyone close your eyes. Place the phone in the middle."
+                )
             }
 
             Spacer()
@@ -197,7 +201,6 @@ struct NightWakeUpView: View {
             .padding(.horizontal, Design.Spacing.lg)
             .accessibleButton("Everyone ready, start night", hint: "Begins the night phase")
         }
-        .accessiblePhaseHeader("Night \(store.currentNightIndex)", instruction: "Everyone close your eyes. Place the phone in the middle.")
     }
 
     // MARK: - Wake Up Screens

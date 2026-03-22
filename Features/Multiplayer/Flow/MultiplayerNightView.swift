@@ -122,6 +122,7 @@ struct MultiplayerNightView: View {
                     }
                     .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
+                    .automationID("multiplayer.night.submitAction")
 
                     // Show error message if submission failed
                     if let error = submitError {
@@ -210,6 +211,7 @@ struct MultiplayerNightView: View {
                     }
                     .disabled(!multiplayerStore.isPhaseReadyToAdvance || isRecording)
                     .padding(.bottom, 40)
+                    .automationID("multiplayer.night.finishPhase")
                 }
             }
         }

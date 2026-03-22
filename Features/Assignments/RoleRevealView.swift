@@ -168,9 +168,9 @@ struct RoleRevealView: View {
             .buttonStyle(CTAButtonStyle(kind: .primary))
             .padding(.top, 16)
             .accessibleButton("Show my role", hint: "Reveals your secret role assignment")
+            .automationID("solo.roleReveal.showRole")
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Give phone to \(player.name)")
     }
 
     private func roleRevealView(for player: Player, at index: Int) -> some View {
@@ -255,6 +255,7 @@ struct RoleRevealView: View {
                     )
             )
             .shadow(color: palette.glowColor.opacity(0.4), radius: 30, y: 10)
+            .accessiblePlayerCard(name: player.name, number: player.number, role: player.role.displayName)
 
             // Action button
             Button {
@@ -287,8 +288,9 @@ struct RoleRevealView: View {
             }
             .buttonStyle(CTAButtonStyle(kind: .secondary))
             .accessibleButton(index < store.state.players.count - 1 ? "I've seen my role, pass phone" : "Done, start game")
+            .automationID(index < store.state.players.count - 1 ? "solo.roleReveal.passPhone" : "solo.roleReveal.startGame")
         }
-        .accessiblePlayerCard(name: player.name, number: player.number, role: player.role.displayName)
+        .accessibilityElement(children: .contain)
     }
 
     private func roleDescription(for role: Role) -> String {
@@ -306,4 +308,3 @@ struct RoleRevealView: View {
 }
 
 // RoleCardPalette now located in Core/Components/RoleCardPalette.swift
-

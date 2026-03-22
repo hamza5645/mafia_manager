@@ -513,6 +513,7 @@ extension View {
             .accessibilityLabel(label)
             .accessibilityHint(hint ?? "")
             .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier(accessibilityIdentifierSlug(from: label))
     }
 
     /// Combines child elements and adds a descriptive label for player cards
@@ -544,5 +545,24 @@ extension View {
             .accessibilityLabel(label)
             .accessibilityHint(hint ?? (isSelected ? "Double tap to deselect" : "Double tap to select"))
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityIdentifier(accessibilityIdentifierSlug(from: label))
+    }
+
+    /// Adds a stable automation identifier for simulator and UI test flows.
+    func automationID(_ identifier: String) -> some View {
+        self.accessibilityIdentifier(identifier)
+    }
+
+    private func accessibilityIdentifierSlug(from label: String) -> String {
+        let sanitized = label
+            .lowercased()
+            .replacingOccurrences(
+                of: "[^a-z0-9]+",
+                with: ".",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+
+        return "ui.\(sanitized)"
     }
 }

@@ -83,6 +83,7 @@ struct MultiplayerLobbyView: View {
                         .foregroundColor(Design.Colors.brandGold)
                 }
                 .accessibilityLabel("Leave game")
+                .automationID("multiplayer.lobby.close")
             }
         }
         .alert("Are you sure you want to end the game?", isPresented: $showingLeaveConfirmation) {
@@ -221,6 +222,7 @@ struct MultiplayerLobbyView: View {
                                 .cornerRadius(Design.Radii.medium)
                             }
                             .disabled(!canStart || isStarting)
+                            .automationID("multiplayer.lobby.startGame")
 
                             // Validation messages
                             VStack(spacing: 8) {
@@ -252,6 +254,7 @@ struct MultiplayerLobbyView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                     }
+                    .automationID("multiplayer.lobby.leave")
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 20)

@@ -115,6 +115,7 @@ struct MultiplayerVotingView: View {
                     .disabled(isSubmitting || selectedTargetId == nil)
                     .padding(.horizontal, 20)
                     .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
+                    .automationID("multiplayer.voting.submitVote")
 
                     if selectedTargetId == nil {
                         Text("Select a player to vote for")
@@ -192,6 +193,7 @@ struct MultiplayerVotingView: View {
                 }
                 .disabled(!multiplayerStore.isPhaseReadyToAdvance)
                 .padding(.bottom, 40)
+                .automationID("multiplayer.voting.endVoting")
             }
         }
     }

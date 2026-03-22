@@ -99,6 +99,7 @@ struct SetupView: View {
                                 )
                                 .accessibilityLabel("Player \(idx + 1) name")
                                 .accessibilityHint("Enter player name")
+                                .automationID("solo.setup.playerName.\(idx + 1)")
 
                                 if names.count > 1 {
                                     Button {
@@ -173,6 +174,7 @@ struct SetupView: View {
                         .disabled(names.count >= maxPlayers)
                         .accessibilityLabel("Add player")
                         .accessibilityHint("Adds a new player slot")
+                        .automationID("solo.setup.addPlayer")
 
                         Spacer()
 
@@ -235,6 +237,7 @@ struct SetupView: View {
                         .disabled(numberOfBots == 0)
                         .accessibilityLabel("Decrease bot count")
                         .accessibilityHint("Reduces bot players by one")
+                        .automationID("solo.setup.decreaseBotCount")
 
                         VStack(spacing: 4) {
                             Text("\(numberOfBots)")
@@ -265,6 +268,7 @@ struct SetupView: View {
                         .disabled((validInput.count + numberOfBots) >= maxPlayers)
                         .accessibilityLabel("Increase bot count")
                         .accessibilityHint("Adds one bot player")
+                        .automationID("solo.setup.increaseBotCount")
                     }
                     .padding(.vertical, 12)
                 }
@@ -373,6 +377,7 @@ struct SetupView: View {
                         .disabled(!isValid)
                         .accessibilityLabel("Continue to role assignment")
                         .accessibilityHint("Starts the game with \(validInput.count + numberOfBots) players")
+                        .automationID("solo.setup.continue")
                     }
                 } else {
                     // Enhanced non-authenticated users layout
@@ -391,6 +396,7 @@ struct SetupView: View {
                     .disabled(!isValid)
                     .accessibilityLabel("Continue to role assignment")
                     .accessibilityHint("Starts the game with \(validInput.count + numberOfBots) players")
+                    .automationID("solo.setup.continue")
                 }
             }
             .padding(.horizontal, Design.Spacing.lg)
