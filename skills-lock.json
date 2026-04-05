@@ -1,6 +1,16 @@
 {
   "version": 1,
   "skills": {
+    "swift-testing-pro": {
+      "source": "twostraws/swift-testing-agent-skill",
+      "sourceType": "github",
+      "computedHash": "90504b29146ccd7e88d8ba7244c6c4e4d2b410fb21bdd4ce578f10583b158481"
+    },
+    "swiftdata-pro": {
+      "source": "twostraws/swiftdata-agent-skill",
+      "sourceType": "github",
+      "computedHash": "2f979bad98ea3a6744084c5f93e27897f02e8d0ffe15dd03042e88aaae4da14c"
+    },
     "swiftui-pro": {
       "source": "twostraws/swiftui-agent-skill",
       "sourceType": "github",
