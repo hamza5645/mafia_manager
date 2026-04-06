@@ -14,4 +14,8 @@ Pods/
 docs/Vision.md
 
 # Sensitive configuration files - DO NOT COMMIT
-Core/Services/SupabaseConfig.swiftMakefile
+Core/Backend/SupabaseConfig.swift
+Makefile
+
+# Tuist generated artifacts
+Derived/
