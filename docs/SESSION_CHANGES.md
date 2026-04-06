@@ -109,6 +109,40 @@
 - This project’s Xcode navigator had path drift before the cleanup. Use Xcode-aware moves for source files so the project file stays consistent.
 - The repo still contains a duplicate on-disk `mafia_manager/Assets.xcassets` folder that was not touched in this session because the active target is already building successfully and that asset cleanup should be done as a separate verification pass.
 
+## Audio preloading via SoundManager
+
+### What Changed
+
+- Created `Core/Gameplay/Services/SoundManager.swift` — a `@MainActor` singleton that preloads all 4 `.wav` sound files (`mafia_gunshot`, `police_siren`, `doctor_ecg`, `wakeup_rooster`) at startup via an explicit `warmUp()` call.
+- `warmUp()` is called from `App/mafia_managerApp.swift` `.onAppear`, well before any sound is needed. Guarded by `hasWarmedUp` flag so repeat calls are free.
+- Audio session is re-configured defensively before each playback (`ensureAudioSession()`), with a cheap early-return when already active. Handles session deactivation after backgrounding.
+- Each sound file is preloaded independently — one missing/corrupt file does not break the others.
+- Removed all inline audio code from `NightWakeUpView.swift` (~45 lines) and `MorningSummaryView.swift` (~30 lines). Both now delegate to `SoundManager.shared`.
+- Removed duplicate `configureAudioSessionIfNeeded()` implementations from both views.
+- Added `SoundManager.shared.handleBackgrounding()` to the app's background lifecycle handler.
+
+### Why
+
+- Instruments Time Profiler showed `AVAudioPlayer.__allocating_init(contentsOf:)` costing 84ms+ on the main thread at each play site. Preloading eliminates this hitch entirely.
+- Audio code was duplicated across two views with no shared service.
+
+### Validation
+
+- Build succeeds (`Cmd+B`).
+- Solo night flow: mafia gunshot plays after 2s "Start Night" delay, inspector siren on inspector wake, doctor ECG on doctor wake — no perceptible delay.
+- Morning summary: rooster plays on appear.
+- Background/foreground: sounds still play after returning from background.
+
+### Rollback
+
+- Delete `Core/Gameplay/Services/SoundManager.swift`, revert `NightWakeUpView.swift`, `MorningSummaryView.swift`, and `App/mafia_managerApp.swift` to restore inline audio code.
+
+### Known Gotchas
+
+- `SoundManager.swift` must be added to the Xcode project manually (not auto-added via .pbxproj edit).
+- `MultiplayerVoteDeathRevealView.swift` uses `AudioServicesPlaySystemSound(1057)` — different mechanism, intentionally not touched.
+- Persistence main-thread work (`GameStore` → `Persistence.save`) is a separate perf concern for a future pass.
+
 ## MM-04 through MM-16 remediation pass
 
 ### What Changed

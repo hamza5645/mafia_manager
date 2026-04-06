@@ -1,5 +1,4 @@
 import SwiftUI
-import AVFoundation
 
 struct NightWakeUpView: View {
     @EnvironmentObject private var store: GameStore
@@ -11,9 +10,7 @@ struct NightWakeUpView: View {
     @State private var showInitialSleepScreen = true
     @State private var showStartNightTransition = false
     @State private var showEndGameConfirmation = false
-    @State private var wakeUpSoundPlayer: AVAudioPlayer?
     @State private var awaitingMafiaWakeCue = true
-    @State private var isAudioSessionConfigured = false
     @State private var showBotActing = false
     @State private var botActingRole: Role?
     @State private var isExecutingSilently = false
@@ -61,7 +58,6 @@ struct NightWakeUpView: View {
             Text("This will end the current game without determining a winner.")
         }
         .onAppear {
-            configureAudioSessionIfNeeded()
             isExecutingSilently = false
 
             // Show initial sleep screen when entering night for the first time
@@ -181,7 +177,7 @@ struct NightWakeUpView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     // Play mafia wake-up cue
                     awaitingMafiaWakeCue = false
-                    playWakeUpSound(for: .mafia)
+                    SoundManager.shared.playWakeUp(for: .mafia)
 
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showStartNightTransition = false
@@ -834,59 +830,14 @@ struct NightWakeUpView: View {
         }
     }
 
-    private func configureAudioSessionIfNeeded() {
-        guard !isAudioSessionConfigured else { return }
-
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
-            isAudioSessionConfigured = true
-        } catch {
-            print("Failed to configure audio session: \(error.localizedDescription)")
-        }
-    }
-
     private func maybePlayCurrentWakeUpSound() {
         guard case .nightWakeUp(let role) = store.state.currentPhase else { return }
 
         if role == .mafia && awaitingMafiaWakeCue {
-            // We're still showing the pre-night instructions, so wait for the host to start the night
             return
         }
 
-        playWakeUpSound(for: role)
-    }
-
-    private func playWakeUpSound(for role: Role) {
-        guard let fileName = wakeUpSoundFileName(for: role) else { return }
-        guard let url = Bundle.main.url(forResource: fileName, withExtension: "wav") else {
-            print("Missing wake-up sound file: \\(fileName).wav")
-            return
-        }
-
-        wakeUpSoundPlayer?.stop()
-
-        do {
-            wakeUpSoundPlayer = try AVAudioPlayer(contentsOf: url)
-            wakeUpSoundPlayer?.volume = 1.0
-            wakeUpSoundPlayer?.prepareToPlay()
-            wakeUpSoundPlayer?.play()
-        } catch {
-            print("Failed to play wake-up sound: \\(error.localizedDescription)")
-        }
-    }
-
-    private func wakeUpSoundFileName(for role: Role) -> String? {
-        switch role {
-        case .mafia:
-            return "mafia_gunshot"
-        case .inspector:
-            return "police_siren"
-        case .doctor:
-            return "doctor_ecg"
-        case .citizen:
-            return nil
-        }
+        SoundManager.shared.playWakeUp(for: role)
     }
 
     // MARK: - Bot Handling

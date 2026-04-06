@@ -31,12 +31,15 @@ struct mafia_managerApp: App {
                 .preferredColorScheme(.dark)
                 .onAppear {
                     gameStore.setAuthStore(authStore)
+                    SoundManager.shared.warmUp()
                 }
                 .onChange(of: scenePhase) { newPhase in
                     switch newPhase {
                     case .background, .inactive:
                         // Save game state immediately
                         try? Persistence.shared.saveImmediately(gameStore.state)
+                        // Reset audio session flag so it re-activates on return
+                        SoundManager.shared.handleBackgrounding()
                         // Notify multiplayer services to pause (save battery)
                         NotificationCenter.default.post(name: .appWillEnterBackground, object: nil)
                     case .active:

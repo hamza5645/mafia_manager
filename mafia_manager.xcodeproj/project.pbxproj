@@ -3,607 +3,707 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 55;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0BE60C3DAEC30B54849E843F /* CustomRolesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */; };
-		0ECA67702A1EE2E0FB10D789 /* PlayerGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */; };
-		10DAF7DE4AEC34822198C1AE /* VoteResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19330122242ADD89372639F0 /* VoteResultsView.swift */; };
-		289CD2C8F599CF39B1185E93 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */; };
-		291403FD0E26754FDC71DF76 /* NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */; };
-		2F01F3CD2EC0EEFD002EC6CD /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */; };
-		2F1E70072ED1BB19004366E6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2F1E70062ED1BB19004366E6 /* Assets.xcassets */; };
-		2F315FC92F164086005D282D /* RealtimeEventProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */; };
-		2F35621C2F15961B00A78B71 /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */; };
-		2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB552E68EF3A002C5B31 /* buildServer.json */; };
-		2F3DBB752E68EF3A002C5B31 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F3DBB712E68EF3A002C5B31 /* README.md */; };
-		2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB592E68EF3A002C5B31 /* Player.swift */; };
-		2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */; };
-		2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */; };
-		2F3DBB7A2E68EF3A002C5B31 /* GameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */; };
-		2F3DBB7B2E68EF3A002C5B31 /* NightPhaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */; };
-		2F3DBB7C2E68EF3A002C5B31 /* DayAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB562E68EF3A002C5B31 /* DayAction.swift */; };
-		2F3DBB7D2E68EF3A002C5B31 /* AssignmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */; };
-		2F3DBB7E2E68EF3A002C5B31 /* GameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */; };
-		2F3DBB7F2E68EF3A002C5B31 /* MorningSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */; };
-		2F3DBB802E68EF3A002C5B31 /* NightAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB582E68EF3A002C5B31 /* NightAction.swift */; };
-		2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5A2E68EF3A002C5B31 /* Role.swift */; };
-		2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */; };
-		2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3DBB572E68EF3A002C5B31 /* GameState.swift */; };
-		2F78C7752EAEC2BA004BC2A7 /* docs/Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 2F78C7742EAEC2B1004BC2A7 /* docs/Vision.md */; };
-		2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */; };
-		2F9C12BC2EC4F21300D06767 /* BotDecisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */; };
-		2FD6A3AA2EBB311100D43510 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3A92EBB311100D43510 /* Auth */; };
-		2FD6A3AC2EBB311100D43510 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AB2EBB311100D43510 /* Functions */; };
-		2FD6A3AE2EBB311100D43510 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AD2EBB311100D43510 /* PostgREST */; };
-		2FD6A3B02EBB311100D43510 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3AF2EBB311100D43510 /* Realtime */; };
-		2FD6A3B22EBB311100D43510 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3B12EBB311100D43510 /* Storage */; };
-		2FD6A3B42EBB311100D43510 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2FD6A3B32EBB311100D43510 /* Supabase */; };
-		2FE1416A2F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */; };
-		2f6f5287f79217 /* MultiplayerVotingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */; };
-		318FB23FEDA2B23E39B9D47E /* GameStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10136C942B87EC1F56431849 /* GameStoreTests.swift */; };
-		32A904FAF6CF1B8F4FE63FA0 /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FF17F2386FC18783995D1B /* SupabaseConfig.swift */; };
-		40C3A5D99E1C7068E07DA028 /* GuestNameInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFCAAB712B0B3CA1DCD9128 /* GuestNameInputView.swift */; };
-		456974ED74A7120F5989F957 /* JoinGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3630833E19A1FEC52C82BB7A /* JoinGameView.swift */; };
-		459D569816FBF5BC610D10E3 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */; };
-		45C4C5117873053DCE1B2DAC /* RealtimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D2DD545CD373564E027525 /* RealtimeService.swift */; };
-		4E733D4A63D5D7591864D960 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */; };
-		4F4E46B0C916E8916D77F815 /* MultiplayerMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */; };
-		54B8A8966BF3B9D082D0E4DC /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1709435DE4A42E7402F6A60 /* PlayerStats.swift */; };
-		650E154B6CD70025846E975D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3203E55E05959A3B5751E94 /* LoginView.swift */; };
-		67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */; };
-		69AF3A66B3BA49B605CDFE01 /* VotingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14862413A29957F28E086D12 /* VotingSession.swift */; };
-		69F628B35751454DDC5EABEC /* MultiplayerNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */; };
-		6D0DF051E56F80AA419BEAD4 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */; };
-		716500E245FDF0580C9B6EE1 /* CreateGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2607CD1D18895BC894B618 /* CreateGameView.swift */; };
-		76FFA3943815D71B00AFC552 /* RoleCardPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = F96A975EA673CBD0F8479E7B /* RoleCardPalette.swift */; };
-		779AC88B99B3F71ED5282E8C /* VotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6597710FF291702FBC0A4750 /* VotingView.swift */; };
-		7B3E887FC46C875E7F3DD91E /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582569330F61BF4D7DC63263 /* AuthStore.swift */; };
-		7E14C60FAC9686FE2E4AE201 /* GameAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B566F2D0BA02374F0EA21AD /* GameAction.swift */; };
-		7F663480AC89982C964BBEC8 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895520245FFCE2891105A416 /* ProfileView.swift */; };
-		8638D2DEBAEB0BB360F4EFFD /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */; };
-		8887C32EEDDA4E8EBE2A3A75 /* InputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */; };
-		8EC3587C2C8FF2AA68055283 /* SessionPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE756B643538C66E089F8E6C /* SessionPlayer.swift */; };
-		8F7BF14C95BEF8711634945D /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */; };
-		9226823934ABE5B71B14CD7E /* CustomRoleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */; };
-		972231365E4CC6A25C12E521 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8E9FFD598221E37F715D320 /* GameSession.swift */; };
-		9EA73543D2004D3AA739EE52 /* police_siren.wav in Resources */ = {isa = PBXBuildFile; fileRef = D21D488C56C94775B5A786B0 /* police_siren.wav */; };
-		A1AA07220B426B151121CE31 /* PlayerGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4499CE3EB8728265E3984899 /* PlayerGroup.swift */; };
-		A1E0F8FE2F4A4D0E00A5E3F1 /* NightOutcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */; };
-		A6F2EBA288006553601C428A /* MultiplayerLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184E9CF7F1C093EF1E8A2106 /* MultiplayerLobbyView.swift */; };
-		A73CA2BD45494EA3A36D7A53 /* mafia_gunshot.wav in Resources */ = {isa = PBXBuildFile; fileRef = 8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */; };
-		AA0000032E69000000000003 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000012E69000000000001 /* DesignSystem.swift */; };
-		AA0000062E69010000000006 /* RoleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000052E69010000000005 /* RoleStyle.swift */; };
-		AD435D79A2E82D29DBD0476B /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C2E67C3193BB6623D30344 /* SessionService.swift */; };
-		B2F8EDAC09AF2903C3554A43 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */; };
-		BF85DACFD73C4FDF56699A90 /* BotVotingRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C555B969C34DF85304449F7D /* BotVotingRevealView.swift */; };
-		C49D034AF71B89B3068D5C9F /* QuickStartSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D56F8B50DF3FF0F13CB9907 /* QuickStartSheet.swift */; };
-		CCA6AB8A5D9C4567B4A97AD0 /* doctor_ecg.wav in Resources */ = {isa = PBXBuildFile; fileRef = 733E894B28BB497697DE0ACD /* doctor_ecg.wav */; };
-		D4523CBB88B33CFDBB8226AE /* MultiplayerGameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */; };
-		D61D69ED1159583204730043 /* MultiplayerGameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */; };
-		D87243F14475380F8BAD8E48 /* GameModeSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */; };
-		E2F914A70BD661E561900644 /* PlayerStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */; };
-		E3D912E415B57775A9B43FFD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D9A8E34AE9B82AF17E09A4B4 /* Foundation.framework */; };
-		E8844B7EBF4F052A936F6EB9 /* PrivacyBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59F350DCAA6EDFB11650FED /* PrivacyBlurView.swift */; };
-		EF95ABA13104982424E31BEA /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2625D31F7758B229B06FC51C /* AuthService.swift */; };
-		FFAE676A5B9D8330894F3596 /* wakeup_rooster.wav in Resources */ = {isa = PBXBuildFile; fileRef = E0C90EBFF924E1F597649EEF /* wakeup_rooster.wav */; };
+		0156DFDA3556D4C1A57E57AB /* Realtime.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 092A56787FAFAFF12DA13112 /* Realtime.framework */; };
+		049431AEB405C8BB05E18224 /* IssueReporting.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC0A0CBF696B8A5F0B9306C9 /* IssueReporting.framework */; };
+		04E4D792A65C66A24D14B801 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9891637274E3D07ED977CEC5 /* UserProfile.swift */; };
+		06CB2D967565AE7F0AB362E8 /* Clocks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7501A5535A737C04C2CD1343 /* Clocks.framework */; };
+		0837AC63C3F82DFF3F92E1BA /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E8B0CF45973472B9361542E /* Persistence.swift */; };
+		0B14FA9099E8CAF1BC3BEF4A /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43174C0DC9E812D86F752F1 /* Role.swift */; };
+		11535EA64011F2FB0A9E35F3 /* RoleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C10CCC5F577743C7B6A6A29 /* RoleStyle.swift */; };
+		139CC9C753980BD67A93A8D4 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCF89E92637EE6E6DFA57C8 /* GameState.swift */; };
+		156180B7C9E1408A04654CDD /* NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A33149C57263B43F9D1B65B /* NightWakeUpView.swift */; };
+		235B362A9DB090FE0F43563E /* Auth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EE8D5242F80E343D782B5E42 /* Auth.framework */; };
+		245F9BA4FBA182015AF964AF /* MultiplayerVoteDeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FA3D5BA30123EDCCA333B5 /* MultiplayerVoteDeathRevealView.swift */; };
+		297B1AE7927DC4294BC4397F /* Functions.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A79ED2E55273676809CA4CD /* Functions.framework */; };
+		2CCA8E76A0D1B55045018BD5 /* MultiplayerMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0221E3D8F2B7BE09934D0F51 /* MultiplayerMenuView.swift */; };
+		2D580A095C0D6CC57E0C0D58 /* JoinGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE22A0634FE91E7CB2F991D /* JoinGameView.swift */; };
+		2F26C1EB6E25BDFB6E237684 /* BotDecisionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 194B9A47D46496648052422E /* BotDecisionService.swift */; };
+		2FDF41624966681C55F048BB /* GameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C9878B9BAA40647744BDC8 /* GameOverView.swift */; };
+		30A7AE600932A97270627241 /* GameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B069793449575B9C968837DE /* GameStore.swift */; };
+		3102B595E9507A3C96D86236 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36D02B805632EF47213380F7 /* Assets.xcassets */; };
+		313064B90424AAFF9A3DE068 /* AssignmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88168DA8618CC11B6B7384EC /* AssignmentsView.swift */; };
+		331020CC377FD3AF71B1EEC6 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0F6FB737236EE214C3CE0D /* AuthService.swift */; };
+		363E3E7B602285A6E3781B84 /* MultiplayerRoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF31B6F5DDC984F356695835 /* MultiplayerRoleRevealView.swift */; };
+		376D1A9BD056679FCBDDD002 /* VotingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675F15E4E35C4B0E173A3660 /* VotingSession.swift */; };
+		3C83257DD6DEE4A69068B72F /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881A74A000FDEB2E971418F1 /* ProfileView.swift */; };
+		3CB27754554CB43196F0F348 /* CustomRoleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B199AAC22DB1EEDA4B520168 /* CustomRoleConfig.swift */; };
+		4C3162B123466DC5D135783E /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A270561FA8F64DCC23FC730 /* KeychainHelper.swift */; };
+		4C7393FE0B54B9D0B823639D /* InputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE7E68ADB9B7F91D1E14789 /* InputValidator.swift */; };
+		4D3FAF1B36283DC21B7BA41F /* RoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A02C122A7E1DCCE4153DA90 /* RoleRevealView.swift */; };
+		4D56388561282EE98D29C484 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7F706932D21CC1B8FFCA9E /* SetupView.swift */; };
+		4EF20B8C4446D8F01CA6D2CC /* TuistAssets+MafiaManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41FBD3CF6BE4D89D7F7581A7 /* TuistAssets+MafiaManager.swift */; };
+		4FEF5FC475EE855125D72AD4 /* swift-crypto_Crypto.bundle in Resources */ = {isa = PBXBuildFile; fileRef = A20D869FF8CE084DFC279867 /* swift-crypto_Crypto.bundle */; };
+		514C218982C30EDB43D97286 /* DayAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2B7AA2163C4E31E817436A /* DayAction.swift */; };
+		530AC54E73D5587F77BC8679 /* NightOutcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F81B1598C46CD560343E4E /* NightOutcomeView.swift */; };
+		53327646E2CD9749F25499F6 /* MorningSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBB838310A369541CE74AF55 /* MorningSummaryView.swift */; };
+		5584929D80BDB6643EBA837C /* Supabase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1395F9B9985278978A7D505F /* Supabase.framework */; };
+		5B1D1D3456F7CA08560C6C2A /* VotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA58228924FC98692B63CE51 /* VotingView.swift */; };
+		5FF8B0BD3F82A25F6BC3F0E9 /* GuestNameInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505246F8352BA44A9D76696D /* GuestNameInputView.swift */; };
+		611BDDBC1D31698850EA0E97 /* MultiplayerVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97162209351EF554554CC159 /* MultiplayerVotingView.swift */; };
+		636196ED757F112DA940B40F /* PlayerStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A987066997CCA60B2B0F00C /* PlayerStatsView.swift */; };
+		66FF3C8E8E73AB00DD73698F /* Storage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1F5F6CEF21257D097D2420 /* Storage.framework */; };
+		68D06E389AD06FAF9574828E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6FEA6F261D60B4FC9F8E6B6B /* PrivacyInfo.xcprivacy */; };
+		6ADBA6DEFBEF5826E79CA270 /* PrivacyBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728D147A4E511CD5EDA1B63E /* PrivacyBlurView.swift */; };
+		6B367CDDFA0740AB91DAAA07 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31CFB762B61EF2BC84BDBEAF /* LoginView.swift */; };
+		6C7043C8973F448FDD64810C /* QuickStartSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12D65F2B24BB24EB844D7663 /* QuickStartSheet.swift */; };
+		6EAFB13A8178319479569611 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EE1E048F3249B4B22D1FFD /* AuthStore.swift */; };
+		6EFE21DB09C14411F829E7A4 /* XCTestDynamicOverlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3527B6A255E2386D367AE361 /* XCTestDynamicOverlay.framework */; };
+		6FB61EE236A1834BE78345CC /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9E164C8E21EFFD7CD0A61E /* SupabaseService.swift */; };
+		70828131B35C3A7070C2474B /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D0475004635445C3CF22A3 /* SessionService.swift */; };
+		75763BFC49D4E331209B7CC6 /* MultiplayerVotingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0028C6358D9D5D74A21BA47D /* MultiplayerVotingResultsView.swift */; };
+		79DFC56E5805A3FAEF697517 /* HTTPTypes.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 23A85A77752570C86910D3AA /* HTTPTypes.framework */; };
+		7ABC28DB953D897BD4B24860 /* PostgREST.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DA62F542E3CD299D0E5B71AB /* PostgREST.framework */; };
+		7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0342891BA342790B3D72E97 /* GameStoreTests.swift */; };
+		80C560C8F7FAB5279235818F /* GameModeSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915F85AC325F3EC3095C151D /* GameModeSelectionView.swift */; };
+		854B909A0224CF6D8B90AB9F /* SessionPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CBFE44727CFAE50FBA8E262 /* SessionPlayer.swift */; };
+		86317E2398CED68AB4DE27C5 /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 072C579CF296FDD11F76F28D /* SupabaseConfig.swift */; };
+		8B0804959399A8A22A92447E /* MultiplayerLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED6081D60851E8D250414119 /* MultiplayerLobbyView.swift */; };
+		8CFA7C0E1EEB1C21F2EC8E4C /* wakeup_rooster.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5AB96224DA99AF30E2981EEA /* wakeup_rooster.wav */; };
+		8EE0283423A9691F5BF0973A /* RoleCardPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB131BD1703DEE94813C53BD /* RoleCardPalette.swift */; };
+		9272DE22EC2BAF070A67763D /* DeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32039AD1B5151DCFE0D17531 /* DeathRevealView.swift */; };
+		947419F20D8B7FFA150CFD98 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47376DF130570A513F9830E8 /* DesignSystem.swift */; };
+		9BAE269051ACAD303F1F98B3 /* doctor_ecg.wav in Resources */ = {isa = PBXBuildFile; fileRef = 155E620D9A4BE2F71B1AA26D /* doctor_ecg.wav */; };
+		9CE5EE9A7CBE4FE44E17CA31 /* VoteResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EC9EEFB25DB528CC5555DF9 /* VoteResultsView.swift */; };
+		9FB2B67C7C377A94F8A3E56B /* TuistBundle+MafiaManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 610DF63A23B55FD8CFF93796 /* TuistBundle+MafiaManager.swift */; };
+		A15338C72F1DC085F341CC54 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296F7D5D5D82298EB4028369 /* IntroView.swift */; };
+		A4A19DB905BF3B6B918C7475 /* NightPhaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7345913C6CB1CF0CE87204C /* NightPhaseView.swift */; };
+		A9AFFE74FF17C85E80B9511E /* mafia_managerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32A359FCAA04633188D41D5 /* mafia_managerApp.swift */; };
+		AC5419012FDDBE7EF33DD152 /* NightAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 576EAE7CF078E8F967EA9051 /* NightAction.swift */; };
+		AF25EC67F87A8384BDA3ECDE /* BotVotingRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDB6FEF38DBAAD69D903FEE /* BotVotingRevealView.swift */; };
+		B07908C35C3CAC88AAEA6037 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D66741ED5970F59F8365E2E /* Player.swift */; };
+		B333DCD77DC8907AD2E2730C /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D6DD68E21901580152D205 /* DatabaseService.swift */; };
+		C00F253B9EB59251418EA344 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = C52CF4CB5D7EC9FF6D40F948 /* PlayerStats.swift */; };
+		C0CD25D5121EDDEE526A2A85 /* MultiplayerGameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CF0053C5073C789B5620F7 /* MultiplayerGameOverView.swift */; };
+		C707D045A2965A3BA3E4E8C8 /* PlayerGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBB631408218FDE10C9C983 /* PlayerGroup.swift */; };
+		C7B2708C755F2445217C42DB /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF2CB0CDBF86539051ADBF6 /* SoundManager.swift */; };
+		CDDFB33DFE553D9A46F62486 /* Crypto.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF349FF3212A24B9AD3799A1 /* Crypto.framework */; };
+		D4D413183F5E98752710A319 /* police_siren.wav in Resources */ = {isa = PBXBuildFile; fileRef = 075CC3468DFFD1E21D0DD58D /* police_siren.wav */; };
+		DD1B46FCC0BAE881F57CFE3E /* RealtimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C39FBD2C98B32B55890998 /* RealtimeService.swift */; };
+		DE14F4C36F14D19CE667D9C3 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD3E8154F690748433BC6F7 /* GameSession.swift */; };
+		DF5FEB68B0A0BEC029B46E6A /* MultiplayerGameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29033C3503B112D02AEEC0A /* MultiplayerGameStore.swift */; };
+		E03F00E3542505250BB85AD4 /* PlayerGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A921A20CB744B5A4585CAA /* PlayerGroupsView.swift */; };
+		E30749DC29F0FAF4CE745F17 /* CustomRolesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CCF5E9A1A563DD4506F0A35 /* CustomRolesView.swift */; };
+		E32006EE843DF0012DF169C0 /* IssueReportingPackageSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 93FBA63A834AB1A78182F10B /* IssueReportingPackageSupport.framework */; };
+		E75BA9933A8A112860BAAA3F /* mafia_gunshot.wav in Resources */ = {isa = PBXBuildFile; fileRef = C990D42FD4558C9A2EE8E3C3 /* mafia_gunshot.wav */; };
+		E7B1CFE0EFCAD5D1E0FF383F /* Helpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25B122549AABFBB20F2D67EA /* Helpers.framework */; };
+		EAA651F1E9998C20D06D3A04 /* MultiplayerNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */; };
+		ED58F26988C37B8E41ADB6F0 /* ConcurrencyExtras.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C910A4C82B6E17BE612A46A4 /* ConcurrencyExtras.framework */; };
+		EF6F2FA6D6F712F0A62194A1 /* RealtimeEventProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0582477D7FD79772923584 /* RealtimeEventProcessor.swift */; };
+		F022798F4DEA8B67EC479990 /* GameAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8580D88ADA64768D1776B6 /* GameAction.swift */; };
+		F60EC272F8B07D86BAD26405 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDC44BB42D2D503D48434C0 /* SettingsView.swift */; };
+		F62B9F7290CD03D3DB601A56 /* swift-crypto_Crypto.bundle in Dependencies */ = {isa = PBXBuildFile; fileRef = A20D869FF8CE084DFC279867 /* swift-crypto_Crypto.bundle */; };
+		F9A4647F261493B6A730BCDC /* CreateGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 378F9A5F5395A0E73FB54A72 /* CreateGameView.swift */; };
+		F9EB9A98FE2B92DE7DB3C415 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C772A8858E3A16248FF30D11 /* SignupView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		F61E50DC78FB13B0892B3ABC /* PBXContainerItemProxy */ = {
+		8FF5F3258130BBDB68BD67E4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 2FF7CF172E68E6E70023D42B /* Project object */;
+			containerPortal = 15E10EA86426C8B1692DD178 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 2FF7CF1E2E68E6E70023D42B;
+			remoteGlobalIDString = 4BCE0AA2F37AE4A3B0FFD8EA;
 			remoteInfo = mafia_manager;
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		4B5CB4223A23BF0D583966E6 /* Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 8;
+			dstSubfolderSpec = 16;
+			files = (
+				F62B9F7290CD03D3DB601A56 /* swift-crypto_Crypto.bundle in Dependencies */,
+			);
+			name = Dependencies;
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		6A5A53EB7CDB0EE9E4CCB3CC /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD39A486923BA7D7AADF8AEE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NightWakeUpView.swift; sourceTree = "<group>"; };
-		0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerGameOverView.swift; sourceTree = "<group>"; };
-		0FFCAAB712B0B3CA1DCD9128 /* GuestNameInputView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GuestNameInputView.swift; sourceTree = "<group>"; };
-		10136C942B87EC1F56431849 /* GameStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameStoreTests.swift; sourceTree = "<group>"; };
-		1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		14862413A29957F28E086D12 /* VotingSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VotingSession.swift; sourceTree = "<group>"; };
-		152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameModeSelectionView.swift; sourceTree = "<group>"; };
-		17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomRolesView.swift; sourceTree = "<group>"; };
-		184E9CF7F1C093EF1E8A2106 /* MultiplayerLobbyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerLobbyView.swift; sourceTree = "<group>"; };
-		19330122242ADD89372639F0 /* VoteResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoteResultsView.swift; sourceTree = "<group>"; };
-		1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGroupsView.swift; sourceTree = "<group>"; };
-		2625D31F7758B229B06FC51C /* AuthService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
-		27C2E67C3193BB6623D30344 /* SessionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
-		2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
-		2F1E70062ED1BB19004366E6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeEventProcessor.swift; sourceTree = "<group>"; };
-		2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingView.swift; sourceTree = "<group>"; };
-		2F3DBB552E68EF3A002C5B31 /* buildServer.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = buildServer.json; sourceTree = "<group>"; };
-		2F3DBB562E68EF3A002C5B31 /* DayAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAction.swift; sourceTree = "<group>"; };
-		2F3DBB572E68EF3A002C5B31 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
-		2F3DBB582E68EF3A002C5B31 /* NightAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightAction.swift; sourceTree = "<group>"; };
-		2F3DBB592E68EF3A002C5B31 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
-		2F3DBB5A2E68EF3A002C5B31 /* Role.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Role.swift; sourceTree = "<group>"; };
-		2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
-		2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStore.swift; sourceTree = "<group>"; };
-		2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentsView.swift; sourceTree = "<group>"; };
-		2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverView.swift; sourceTree = "<group>"; };
-		2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorningSummaryView.swift; sourceTree = "<group>"; };
-		2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightPhaseView.swift; sourceTree = "<group>"; };
-		2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
-		2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
-		2F3DBB712E68EF3A002C5B31 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		2F78C7742EAEC2B1004BC2A7 /* docs/Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = docs/Vision.md; sourceTree = "<group>"; };
-		2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathRevealView.swift; sourceTree = "<group>"; };
-		2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotDecisionService.swift; sourceTree = "<group>"; };
-		2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVoteDeathRevealView.swift; sourceTree = "<group>"; };
-		2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3630833E19A1FEC52C82BB7A /* JoinGameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JoinGameView.swift; sourceTree = "<group>"; };
-		4499CE3EB8728265E3984899 /* PlayerGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerGroup.swift; sourceTree = "<group>"; };
-		582569330F61BF4D7DC63263 /* AuthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
-		5B566F2D0BA02374F0EA21AD /* GameAction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameAction.swift; sourceTree = "<group>"; };
-		6597710FF291702FBC0A4750 /* VotingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VotingView.swift; sourceTree = "<group>"; };
-		733E894B28BB497697DE0ACD /* doctor_ecg.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = doctor_ecg.wav; sourceTree = "<group>"; };
-		73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerGameStore.swift; sourceTree = "<group>"; };
-		7D56F8B50DF3FF0F13CB9907 /* QuickStartSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickStartSheet.swift; sourceTree = "<group>"; };
-		7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoleRevealView.swift; sourceTree = "<group>"; };
-		7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
-		8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = mafia_gunshot.wav; sourceTree = "<group>"; };
-		889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomRoleConfig.swift; sourceTree = "<group>"; };
-		895520245FFCE2891105A416 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
-		8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerNightView.swift; sourceTree = "<group>"; };
-		958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
-		99FF17F2386FC18783995D1B /* SupabaseConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
-		9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerStatsView.swift; sourceTree = "<group>"; };
-		A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightOutcomeView.swift; sourceTree = "<group>"; };
-		AA0000012E69000000000001 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
-		AA0000052E69010000000005 /* RoleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleStyle.swift; sourceTree = "<group>"; };
-		AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerMenuView.swift; sourceTree = "<group>"; };
-		B13D884293DA6EB04377470C /* mafia_managerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mafia_managerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B1709435DE4A42E7402F6A60 /* PlayerStats.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerStats.swift; sourceTree = "<group>"; };
-		B3203E55E05959A3B5751E94 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
-		BE756B643538C66E089F8E6C /* SessionPlayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionPlayer.swift; sourceTree = "<group>"; };
-		BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerRoleRevealView.swift; sourceTree = "<group>"; };
-		C555B969C34DF85304449F7D /* BotVotingRevealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BotVotingRevealView.swift; sourceTree = "<group>"; };
-		CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
-		D21D488C56C94775B5A786B0 /* police_siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = police_siren.wav; sourceTree = "<group>"; };
-		D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
-		D59F350DCAA6EDFB11650FED /* PrivacyBlurView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrivacyBlurView.swift; sourceTree = "<group>"; };
-		D9A8E34AE9B82AF17E09A4B4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		DF2607CD1D18895BC894B618 /* CreateGameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CreateGameView.swift; sourceTree = "<group>"; };
-		E0C90EBFF924E1F597649EEF /* wakeup_rooster.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = wakeup_rooster.wav; sourceTree = "<group>"; };
-		E8E9FFD598221E37F715D320 /* GameSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
-		F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InputValidator.swift; sourceTree = "<group>"; };
-		F7D2DD545CD373564E027525 /* RealtimeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RealtimeService.swift; sourceTree = "<group>"; };
-		F96A975EA673CBD0F8479E7B /* RoleCardPalette.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoleCardPalette.swift; sourceTree = "<group>"; };
-		ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingResultsView.swift; sourceTree = "<group>"; };
+		0028C6358D9D5D74A21BA47D /* MultiplayerVotingResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingResultsView.swift; sourceTree = "<group>"; };
+		0221E3D8F2B7BE09934D0F51 /* MultiplayerMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerMenuView.swift; sourceTree = "<group>"; };
+		072C579CF296FDD11F76F28D /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
+		075CC3468DFFD1E21D0DD58D /* police_siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = police_siren.wav; sourceTree = "<group>"; };
+		092A56787FAFAFF12DA13112 /* Realtime.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Realtime.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A02C122A7E1DCCE4153DA90 /* RoleRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleRevealView.swift; sourceTree = "<group>"; };
+		0EC9EEFB25DB528CC5555DF9 /* VoteResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteResultsView.swift; sourceTree = "<group>"; };
+		12D65F2B24BB24EB844D7663 /* QuickStartSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickStartSheet.swift; sourceTree = "<group>"; };
+		1395F9B9985278978A7D505F /* Supabase.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Supabase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		155E620D9A4BE2F71B1AA26D /* doctor_ecg.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = doctor_ecg.wav; sourceTree = "<group>"; };
+		156E9A9BE55EC64AAFDE23C8 /* mafia_managerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mafia_managerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		194B9A47D46496648052422E /* BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotDecisionService.swift; sourceTree = "<group>"; };
+		1D66741ED5970F59F8365E2E /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		1D9E164C8E21EFFD7CD0A61E /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		1FBB631408218FDE10C9C983 /* PlayerGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerGroup.swift; sourceTree = "<group>"; };
+		23A85A77752570C86910D3AA /* HTTPTypes.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = HTTPTypes.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		25B122549AABFBB20F2D67EA /* Helpers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Helpers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		296F7D5D5D82298EB4028369 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
+		2A987066997CCA60B2B0F00C /* PlayerStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerStatsView.swift; sourceTree = "<group>"; };
+		2C0582477D7FD79772923584 /* RealtimeEventProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeEventProcessor.swift; sourceTree = "<group>"; };
+		31CFB762B61EF2BC84BDBEAF /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		32039AD1B5151DCFE0D17531 /* DeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeathRevealView.swift; sourceTree = "<group>"; };
+		3527B6A255E2386D367AE361 /* XCTestDynamicOverlay.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = XCTestDynamicOverlay.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		35A921A20CB744B5A4585CAA /* PlayerGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerGroupsView.swift; sourceTree = "<group>"; };
+		36D02B805632EF47213380F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		378F9A5F5395A0E73FB54A72 /* CreateGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGameView.swift; sourceTree = "<group>"; };
+		39C9878B9BAA40647744BDC8 /* GameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverView.swift; sourceTree = "<group>"; };
+		3A79ED2E55273676809CA4CD /* Functions.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Functions.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3C10CCC5F577743C7B6A6A29 /* RoleStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleStyle.swift; sourceTree = "<group>"; };
+		3CBFE44727CFAE50FBA8E262 /* SessionPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPlayer.swift; sourceTree = "<group>"; };
+		3F8580D88ADA64768D1776B6 /* GameAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameAction.swift; sourceTree = "<group>"; };
+		41FBD3CF6BE4D89D7F7581A7 /* TuistAssets+MafiaManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TuistAssets+MafiaManager.swift"; sourceTree = "<group>"; };
+		47376DF130570A513F9830E8 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		4A270561FA8F64DCC23FC730 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		4A33149C57263B43F9D1B65B /* NightWakeUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightWakeUpView.swift; sourceTree = "<group>"; };
+		4A570ED7606C854EE6D2F90E /* mafia_managerTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "mafia_managerTests-Info.plist"; sourceTree = "<group>"; };
+		4E2B7AA2163C4E31E817436A /* DayAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAction.swift; sourceTree = "<group>"; };
+		505246F8352BA44A9D76696D /* GuestNameInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestNameInputView.swift; sourceTree = "<group>"; };
+		54C39FBD2C98B32B55890998 /* RealtimeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeService.swift; sourceTree = "<group>"; };
+		576EAE7CF078E8F967EA9051 /* NightAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightAction.swift; sourceTree = "<group>"; };
+		57FA3D5BA30123EDCCA333B5 /* MultiplayerVoteDeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVoteDeathRevealView.swift; sourceTree = "<group>"; };
+		5AB96224DA99AF30E2981EEA /* wakeup_rooster.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = wakeup_rooster.wav; sourceTree = "<group>"; };
+		5FE7E68ADB9B7F91D1E14789 /* InputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputValidator.swift; sourceTree = "<group>"; };
+		610DF63A23B55FD8CFF93796 /* TuistBundle+MafiaManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TuistBundle+MafiaManager.swift"; sourceTree = "<group>"; };
+		63D6DD68E21901580152D205 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		675F15E4E35C4B0E173A3660 /* VotingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VotingSession.swift; sourceTree = "<group>"; };
+		6FDC44BB42D2D503D48434C0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		6FEA6F261D60B4FC9F8E6B6B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		728D147A4E511CD5EDA1B63E /* PrivacyBlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyBlurView.swift; sourceTree = "<group>"; };
+		7501A5535A737C04C2CD1343 /* Clocks.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Clocks.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerNightView.swift; sourceTree = "<group>"; };
+		7CDB6FEF38DBAAD69D903FEE /* BotVotingRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotVotingRevealView.swift; sourceTree = "<group>"; };
+		88168DA8618CC11B6B7384EC /* AssignmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentsView.swift; sourceTree = "<group>"; };
+		881A74A000FDEB2E971418F1 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		8E8B0CF45973472B9361542E /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		915F85AC325F3EC3095C151D /* GameModeSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameModeSelectionView.swift; sourceTree = "<group>"; };
+		93EE1E048F3249B4B22D1FFD /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
+		93FBA63A834AB1A78182F10B /* IssueReportingPackageSupport.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = IssueReportingPackageSupport.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		97162209351EF554554CC159 /* MultiplayerVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVotingView.swift; sourceTree = "<group>"; };
+		9891637274E3D07ED977CEC5 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		9AE22A0634FE91E7CB2F991D /* JoinGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinGameView.swift; sourceTree = "<group>"; };
+		9CCF5E9A1A563DD4506F0A35 /* CustomRolesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRolesView.swift; sourceTree = "<group>"; };
+		A0342891BA342790B3D72E97 /* GameStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStoreTests.swift; sourceTree = "<group>"; };
+		A20D869FF8CE084DFC279867 /* swift-crypto_Crypto.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "swift-crypto_Crypto.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6D0475004635445C3CF22A3 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
+		A6F81B1598C46CD560343E4E /* NightOutcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightOutcomeView.swift; sourceTree = "<group>"; };
+		AA1F5F6CEF21257D097D2420 /* Storage.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Storage.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE7F706932D21CC1B8FFCA9E /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		B069793449575B9C968837DE /* GameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStore.swift; sourceTree = "<group>"; };
+		B199AAC22DB1EEDA4B520168 /* CustomRoleConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRoleConfig.swift; sourceTree = "<group>"; };
+		B32A359FCAA04633188D41D5 /* mafia_managerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = mafia_managerApp.swift; sourceTree = "<group>"; };
+		BC0A0CBF696B8A5F0B9306C9 /* IssueReporting.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = IssueReporting.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		BF31B6F5DDC984F356695835 /* MultiplayerRoleRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerRoleRevealView.swift; sourceTree = "<group>"; };
+		C52CF4CB5D7EC9FF6D40F948 /* PlayerStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerStats.swift; sourceTree = "<group>"; };
+		C7345913C6CB1CF0CE87204C /* NightPhaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightPhaseView.swift; sourceTree = "<group>"; };
+		C772A8858E3A16248FF30D11 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
+		C910A4C82B6E17BE612A46A4 /* ConcurrencyExtras.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ConcurrencyExtras.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C990D42FD4558C9A2EE8E3C3 /* mafia_gunshot.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = mafia_gunshot.wav; sourceTree = "<group>"; };
+		CA58228924FC98692B63CE51 /* VotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VotingView.swift; sourceTree = "<group>"; };
+		CBB838310A369541CE74AF55 /* MorningSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorningSummaryView.swift; sourceTree = "<group>"; };
+		CF349FF3212A24B9AD3799A1 /* Crypto.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Crypto.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA62F542E3CD299D0E5B71AB /* PostgREST.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = PostgREST.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DF1BAC365672CD2459EC622D /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0CF0053C5073C789B5620F7 /* MultiplayerGameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerGameOverView.swift; sourceTree = "<group>"; };
+		E43174C0DC9E812D86F752F1 /* Role.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Role.swift; sourceTree = "<group>"; };
+		EB131BD1703DEE94813C53BD /* RoleCardPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleCardPalette.swift; sourceTree = "<group>"; };
+		ECD3E8154F690748433BC6F7 /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
+		ECF2CB0CDBF86539051ADBF6 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
+		ED6081D60851E8D250414119 /* MultiplayerLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerLobbyView.swift; sourceTree = "<group>"; };
+		EE8D5242F80E343D782B5E42 /* Auth.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Auth.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F29033C3503B112D02AEEC0A /* MultiplayerGameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerGameStore.swift; sourceTree = "<group>"; };
+		F39B0F450FF95FFD3BF194CD /* mafia_manager-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "mafia_manager-Info.plist"; sourceTree = "<group>"; };
+		FD0F6FB737236EE214C3CE0D /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		FFCF89E92637EE6E6DFA57C8 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		11808B2E186052FD479BCAC3 /* Frameworks */ = {
+		6D476131B415F54F1567836B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E3D912E415B57775A9B43FFD /* Foundation.framework in Frameworks */,
+				235B362A9DB090FE0F43563E /* Auth.framework in Frameworks */,
+				06CB2D967565AE7F0AB362E8 /* Clocks.framework in Frameworks */,
+				ED58F26988C37B8E41ADB6F0 /* ConcurrencyExtras.framework in Frameworks */,
+				CDDFB33DFE553D9A46F62486 /* Crypto.framework in Frameworks */,
+				297B1AE7927DC4294BC4397F /* Functions.framework in Frameworks */,
+				79DFC56E5805A3FAEF697517 /* HTTPTypes.framework in Frameworks */,
+				E7B1CFE0EFCAD5D1E0FF383F /* Helpers.framework in Frameworks */,
+				049431AEB405C8BB05E18224 /* IssueReporting.framework in Frameworks */,
+				E32006EE843DF0012DF169C0 /* IssueReportingPackageSupport.framework in Frameworks */,
+				7ABC28DB953D897BD4B24860 /* PostgREST.framework in Frameworks */,
+				0156DFDA3556D4C1A57E57AB /* Realtime.framework in Frameworks */,
+				66FF3C8E8E73AB00DD73698F /* Storage.framework in Frameworks */,
+				5584929D80BDB6643EBA837C /* Supabase.framework in Frameworks */,
+				6EFE21DB09C14411F829E7A4 /* XCTestDynamicOverlay.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		2FF7CF1C2E68E6E70023D42B /* Frameworks */ = {
+		C2399A1F55072F433DA51AB5 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2FD6A3AE2EBB311100D43510 /* PostgREST in Frameworks */,
-				2FD6A3AC2EBB311100D43510 /* Functions in Frameworks */,
-				2FD6A3B42EBB311100D43510 /* Supabase in Frameworks */,
-				2FD6A3AA2EBB311100D43510 /* Auth in Frameworks */,
-				2FD6A3B22EBB311100D43510 /* Storage in Frameworks */,
-				2FD6A3B02EBB311100D43510 /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		1D9B94195DE3779DEA0BA4F4 /* mafia_managerTests */ = {
+		008E0CB1FF7EFD80302D7E0E /* Setup */ = {
 			isa = PBXGroup;
 			children = (
-				10136C942B87EC1F56431849 /* GameStoreTests.swift */,
-			);
-			path = mafia_managerTests;
-			sourceTree = "<group>";
-		};
-		1DABB5C12B897C16999E186F /* iOS */ = {
-			isa = PBXGroup;
-			children = (
-				D9A8E34AE9B82AF17E09A4B4 /* Foundation.framework */,
-			);
-			name = iOS;
-			sourceTree = "<group>";
-		};
-		2D6E15484F7B54CFCB79994F /* Voting */ = {
-			isa = PBXGroup;
-			children = (
-				6597710FF291702FBC0A4750 /* VotingView.swift */,
-				19330122242ADD89372639F0 /* VoteResultsView.swift */,
-				C555B969C34DF85304449F7D /* BotVotingRevealView.swift */,
-			);
-			path = Voting;
-			sourceTree = "<group>";
-		};
-		2F01F3CC2EC0EEFD002EC6CD /* Intro */ = {
-			isa = PBXGroup;
-			children = (
-				2F01F3CB2EC0EEFD002EC6CD /* IntroView.swift */,
-			);
-			path = Intro;
-			sourceTree = "<group>";
-		};
-		2F3DBB612E68EF3A002C5B31 /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				AA0000022E69000000000002 /* UI */,
-				69E62B2722384CE701263572 /* Components */,
-				2FAA73FE2F6E12A100BB7792 /* Backend */,
-				2FAA73FF2F6E12A100BB7792 /* Support */,
-				2FAA74022F6E12A700BB7792 /* Gameplay */,
-				2FAA74032F6E12A700BB7792 /* Auth */,
-				2FAA74042F6E12A700BB7792 /* Multiplayer */,
-				2FAA74052F6E12A700BB7792 /* Stats */,
-			);
-			path = Core;
-			sourceTree = "<group>";
-		};
-		2F3DBB632E68EF3A002C5B31 /* Assignments */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB622E68EF3A002C5B31 /* AssignmentsView.swift */,
-				7DFFC96BA4E2CA17E8763495 /* RoleRevealView.swift */,
-			);
-			path = Assignments;
-			sourceTree = "<group>";
-		};
-		2F3DBB672E68EF3A002C5B31 /* GameOver */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB662E68EF3A002C5B31 /* GameOverView.swift */,
-			);
-			path = GameOver;
-			sourceTree = "<group>";
-		};
-		2F3DBB692E68EF3A002C5B31 /* Morning */ = {
-			isa = PBXGroup;
-			children = (
-				2F97D5F12EC1193B00DB7EBD /* DeathRevealView.swift */,
-				2F3DBB682E68EF3A002C5B31 /* MorningSummaryView.swift */,
-			);
-			path = Morning;
-			sourceTree = "<group>";
-		};
-		2F3DBB6B2E68EF3A002C5B31 /* Night */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB6A2E68EF3A002C5B31 /* NightPhaseView.swift */,
-				A1E0F8FD2F4A4D0E00A5E3F1 /* NightOutcomeView.swift */,
-				0B71A38E01278BB90A26CA5C /* NightWakeUpView.swift */,
-			);
-			path = Night;
-			sourceTree = "<group>";
-		};
-		2F3DBB6D2E68EF3A002C5B31 /* Setup */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB6C2E68EF3A002C5B31 /* SetupView.swift */,
+				AE7F706932D21CC1B8FFCA9E /* SetupView.swift */,
 			);
 			path = Setup;
 			sourceTree = "<group>";
 		};
-		2F3DBB6E2E68EF3A002C5B31 /* Features */ = {
+		10AB20A580E1A3FCEA9DA305 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				2F01F3CC2EC0EEFD002EC6CD /* Intro */,
-				2FD6A3C22EBB358900D43510 /* Auth */,
-				2FD6A3C42EBB358900D43510 /* Settings */,
-				2FD6A3C72EBB358900D43510 /* Stats */,
-				2F3DBB632E68EF3A002C5B31 /* Assignments */,
-				2F3DBB672E68EF3A002C5B31 /* GameOver */,
-				2F3DBB692E68EF3A002C5B31 /* Morning */,
-				2F3DBB6B2E68EF3A002C5B31 /* Night */,
-				2F3DBB6D2E68EF3A002C5B31 /* Setup */,
-				2D6E15484F7B54CFCB79994F /* Voting */,
-				5161D6F72CFF6B32C97E6F78 /* Multiplayer */,
-			);
-			path = Features;
-			sourceTree = "<group>";
-		};
-		2FAA73FD2F6E12A100BB7792 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB702E68EF3A002C5B31 /* mafia_managerApp.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		2FAA73FE2F6E12A100BB7792 /* Backend */ = {
-			isa = PBXGroup;
-			children = (
-				99FF17F2386FC18783995D1B /* SupabaseConfig.swift */,
-				D3A3DBAEC273A4C9EDDBEA59 /* DatabaseService.swift */,
-				7FCD8148E5BDBC9BE791D956 /* SupabaseService.swift */,
-			);
-			path = Backend;
-			sourceTree = "<group>";
-		};
-		2FAA73FF2F6E12A100BB7792 /* Support */ = {
-			isa = PBXGroup;
-			children = (
-				F5DC6A940C3BBA42E9D76CE3 /* InputValidator.swift */,
-			);
-			path = Support;
-			sourceTree = "<group>";
-		};
-		2FAA74002F6E12A100BB7792 /* Entry */ = {
-			isa = PBXGroup;
-			children = (
-				DF2607CD1D18895BC894B618 /* CreateGameView.swift */,
-				152AFC421714ABD6AF1C6A5C /* GameModeSelectionView.swift */,
-				3630833E19A1FEC52C82BB7A /* JoinGameView.swift */,
-				AB12908BB90C3028C5B7B53F /* MultiplayerMenuView.swift */,
-			);
-			path = Entry;
-			sourceTree = "<group>";
-		};
-		2FAA74012F6E12A100BB7792 /* Flow */ = {
-			isa = PBXGroup;
-			children = (
-				184E9CF7F1C093EF1E8A2106 /* MultiplayerLobbyView.swift */,
-				8B2B5BB0088A09F8365B5CEE /* MultiplayerNightView.swift */,
-				BF925CD05D0972F40EB2B909 /* MultiplayerRoleRevealView.swift */,
-				ad003bb1a38ea3 /* MultiplayerVotingResultsView.swift */,
-				2FE141692F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift */,
-				0BB6DD6D2EE9313D29B8259B /* MultiplayerGameOverView.swift */,
-				2F35621B2F15961B00A78B71 /* MultiplayerVotingView.swift */,
-			);
-			path = Flow;
-			sourceTree = "<group>";
-		};
-		2FAA74022F6E12A700BB7792 /* Gameplay */ = {
-			isa = PBXGroup;
-			children = (
-				2FAA74092F6E12B000BB7792 /* Models */,
-				2FAA740A2F6E12B000BB7792 /* Services */,
-				2FAA740B2F6E12B000BB7792 /* Store */,
-			);
-			path = Gameplay;
-			sourceTree = "<group>";
-		};
-		2FAA74032F6E12A700BB7792 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				2FAA74062F6E12B000BB7792 /* Services */,
-				2FAA74072F6E12B000BB7792 /* Models */,
-				2FAA74082F6E12B000BB7792 /* Store */,
+				505246F8352BA44A9D76696D /* GuestNameInputView.swift */,
+				31CFB762B61EF2BC84BDBEAF /* LoginView.swift */,
+				881A74A000FDEB2E971418F1 /* ProfileView.swift */,
+				12D65F2B24BB24EB844D7663 /* QuickStartSheet.swift */,
+				C772A8858E3A16248FF30D11 /* SignupView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
 		};
-		2FAA74042F6E12A700BB7792 /* Multiplayer */ = {
+		11F8467ACC3F42F0EB3E8BA1 /* Project */ = {
 			isa = PBXGroup;
 			children = (
-				2FAA740C2F6E12B000BB7792 /* Models */,
-				2FAA740D2F6E12B000BB7792 /* Services */,
-				2FAA740E2F6E12B000BB7792 /* Store */,
+				C7C6F4DD89D5C90EC779D429 /* App */,
+				683C0457DE23DB9640A2AD84 /* Core */,
+				30CF58D7CED7F4AEB81E79EF /* Derived */,
+				4098CF10A99F5CE73EA75DFE /* Features */,
+				AB2F704CACB0D5FBF7D5C688 /* mafia_managerTests */,
+				815AC9BDBC7464F70BF660D4 /* Resources */,
+				36D02B805632EF47213380F7 /* Assets.xcassets */,
+				6FEA6F261D60B4FC9F8E6B6B /* PrivacyInfo.xcprivacy */,
 			);
-			path = Multiplayer;
+			name = Project;
 			sourceTree = "<group>";
 		};
-		2FAA74052F6E12A700BB7792 /* Stats */ = {
+		16F4C070AA5DF684CC994509 /* UI */ = {
 			isa = PBXGroup;
 			children = (
-				2FAA740F2F6E12B000BB7792 /* Models */,
-			);
-			path = Stats;
-			sourceTree = "<group>";
-		};
-		2FAA74062F6E12B000BB7792 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				2625D31F7758B229B06FC51C /* AuthService.swift */,
-				CFCB1E79C513DA5FAAA40675 /* KeychainHelper.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		2FAA74072F6E12B000BB7792 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				958FF2E6AC5FFA5CB3FC5423 /* UserProfile.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		2FAA74082F6E12B000BB7792 /* Store */ = {
-			isa = PBXGroup;
-			children = (
-				582569330F61BF4D7DC63263 /* AuthStore.swift */,
-			);
-			path = Store;
-			sourceTree = "<group>";
-		};
-		2FAA74092F6E12B000BB7792 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB562E68EF3A002C5B31 /* DayAction.swift */,
-				2F3DBB572E68EF3A002C5B31 /* GameState.swift */,
-				2F3DBB582E68EF3A002C5B31 /* NightAction.swift */,
-				2F3DBB592E68EF3A002C5B31 /* Player.swift */,
-				2F3DBB5A2E68EF3A002C5B31 /* Role.swift */,
-				14862413A29957F28E086D12 /* VotingSession.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		2FAA740A2F6E12B000BB7792 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB5C2E68EF3A002C5B31 /* Persistence.swift */,
-				2F9C12BB2EC4F21300D06767 /* BotDecisionService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		2FAA740B2F6E12B000BB7792 /* Store */ = {
-			isa = PBXGroup;
-			children = (
-				2F3DBB5F2E68EF3A002C5B31 /* GameStore.swift */,
-			);
-			path = Store;
-			sourceTree = "<group>";
-		};
-		2FAA740C2F6E12B000BB7792 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				E8E9FFD598221E37F715D320 /* GameSession.swift */,
-				5B566F2D0BA02374F0EA21AD /* GameAction.swift */,
-				BE756B643538C66E089F8E6C /* SessionPlayer.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		2FAA740D2F6E12B000BB7792 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				2F315FC82F164086005D282D /* RealtimeEventProcessor.swift */,
-				F7D2DD545CD373564E027525 /* RealtimeService.swift */,
-				27C2E67C3193BB6623D30344 /* SessionService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		2FAA740E2F6E12B000BB7792 /* Store */ = {
-			isa = PBXGroup;
-			children = (
-				73B98502250CD4E91D82FF24 /* MultiplayerGameStore.swift */,
-			);
-			path = Store;
-			sourceTree = "<group>";
-		};
-		2FAA740F2F6E12B000BB7792 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				889B8CEA9184FE05B4C2E672 /* CustomRoleConfig.swift */,
-				B1709435DE4A42E7402F6A60 /* PlayerStats.swift */,
-				4499CE3EB8728265E3984899 /* PlayerGroup.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		2FD6A3C22EBB358900D43510 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				B3203E55E05959A3B5751E94 /* LoginView.swift */,
-				895520245FFCE2891105A416 /* ProfileView.swift */,
-				B7CEEC9DF1968D2D87E1A249 /* SignupView.swift */,
-				7D56F8B50DF3FF0F13CB9907 /* QuickStartSheet.swift */,
-				0FFCAAB712B0B3CA1DCD9128 /* GuestNameInputView.swift */,
-			);
-			path = Auth;
-			sourceTree = "<group>";
-		};
-		2FD6A3C42EBB358900D43510 /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				1270BF71EE85F9FE4ECC7D0E /* SettingsView.swift */,
-			);
-			path = Settings;
-			sourceTree = "<group>";
-		};
-		2FD6A3C72EBB358900D43510 /* Stats */ = {
-			isa = PBXGroup;
-			children = (
-				9CAE997A5B15DF63011EDE12 /* PlayerStatsView.swift */,
-				17785EAA3169B6D1EA36ED02 /* CustomRolesView.swift */,
-				1D144BD3022B9E017C2D07A4 /* PlayerGroupsView.swift */,
-			);
-			path = Stats;
-			sourceTree = "<group>";
-		};
-		2FF7CF162E68E6E70023D42B = {
-			isa = PBXGroup;
-			children = (
-				2F1E70062ED1BB19004366E6 /* Assets.xcassets */,
-				2F3DBB552E68EF3A002C5B31 /* buildServer.json */,
-				2F3DBB612E68EF3A002C5B31 /* Core */,
-				2F3DBB6E2E68EF3A002C5B31 /* Features */,
-				532A4160448E4D7897EE80A5 /* Resources */,
-				2F3DBB712E68EF3A002C5B31 /* README.md */,
-				2F78C7742EAEC2B1004BC2A7 /* docs/Vision.md */,
-				2FF7CF202E68E6E70023D42B /* Products */,
-				2FAA73FD2F6E12A100BB7792 /* App */,
-				37501C5D4CD6AA05A8DF5309 /* Frameworks */,
-				1D9B94195DE3779DEA0BA4F4 /* mafia_managerTests */,
-			);
-			sourceTree = "<group>";
-		};
-		2FF7CF202E68E6E70023D42B /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */,
-				B13D884293DA6EB04377470C /* mafia_managerTests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		37501C5D4CD6AA05A8DF5309 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				1DABB5C12B897C16999E186F /* iOS */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		5161D6F72CFF6B32C97E6F78 /* Multiplayer */ = {
-			isa = PBXGroup;
-			children = (
-				2FAA74002F6E12A100BB7792 /* Entry */,
-				2FAA74012F6E12A100BB7792 /* Flow */,
-			);
-			path = Multiplayer;
-			sourceTree = "<group>";
-		};
-		532A4160448E4D7897EE80A5 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				C2EB945FA9FE4AFBB354EA2A3B15A56F /* Sounds */,
-			);
-			path = Resources;
-			sourceTree = "<group>";
-		};
-		69E62B2722384CE701263572 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				D59F350DCAA6EDFB11650FED /* PrivacyBlurView.swift */,
-				F96A975EA673CBD0F8479E7B /* RoleCardPalette.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		AA0000022E69000000000002 /* UI */ = {
-			isa = PBXGroup;
-			children = (
-				AA0000012E69000000000001 /* DesignSystem.swift */,
-				AA0000052E69010000000005 /* RoleStyle.swift */,
+				47376DF130570A513F9830E8 /* DesignSystem.swift */,
+				3C10CCC5F577743C7B6A6A29 /* RoleStyle.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
 		};
-		C2EB945FA9FE4AFBB354EA2A3B15A56F /* Sounds */ = {
+		1A0900F26722FE202A73A61A /* Intro */ = {
 			isa = PBXGroup;
 			children = (
-				8268F39CB50A4C9DB34A62D3 /* mafia_gunshot.wav */,
-				D21D488C56C94775B5A786B0 /* police_siren.wav */,
-				733E894B28BB497697DE0ACD /* doctor_ecg.wav */,
-				E0C90EBFF924E1F597649EEF /* wakeup_rooster.wav */,
+				296F7D5D5D82298EB4028369 /* IntroView.swift */,
+			);
+			path = Intro;
+			sourceTree = "<group>";
+		};
+		1C50E085455BCDEA15B7F411 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				9891637274E3D07ED977CEC5 /* UserProfile.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		1F9F2B908403683540C6D8CB /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				194B9A47D46496648052422E /* BotDecisionService.swift */,
+				8E8B0CF45973472B9361542E /* Persistence.swift */,
+				ECF2CB0CDBF86539051ADBF6 /* SoundManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		24493E680924DCE02FF4AB4C /* Backend */ = {
+			isa = PBXGroup;
+			children = (
+				63D6DD68E21901580152D205 /* DatabaseService.swift */,
+				072C579CF296FDD11F76F28D /* SupabaseConfig.swift */,
+				1D9E164C8E21EFFD7CD0A61E /* SupabaseService.swift */,
+			);
+			path = Backend;
+			sourceTree = "<group>";
+		};
+		2C0DBED34BA0B8DA0C601708 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				728D147A4E511CD5EDA1B63E /* PrivacyBlurView.swift */,
+				EB131BD1703DEE94813C53BD /* RoleCardPalette.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		2F3EB12034434B9DECFDAB0B /* Stats */ = {
+			isa = PBXGroup;
+			children = (
+				9CCF5E9A1A563DD4506F0A35 /* CustomRolesView.swift */,
+				35A921A20CB744B5A4585CAA /* PlayerGroupsView.swift */,
+				2A987066997CCA60B2B0F00C /* PlayerStatsView.swift */,
+			);
+			path = Stats;
+			sourceTree = "<group>";
+		};
+		2FADB41DD3F98777E816A408 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B199AAC22DB1EEDA4B520168 /* CustomRoleConfig.swift */,
+				1FBB631408218FDE10C9C983 /* PlayerGroup.swift */,
+				C52CF4CB5D7EC9FF6D40F948 /* PlayerStats.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		30CF58D7CED7F4AEB81E79EF /* Derived */ = {
+			isa = PBXGroup;
+			children = (
+				9BB8E5DA6053061D47F21B78 /* InfoPlists */,
+				4B81DC7F023745C3A38EAE69 /* Sources */,
+			);
+			path = Derived;
+			sourceTree = "<group>";
+		};
+		379196597476057F108910BC /* Multiplayer */ = {
+			isa = PBXGroup;
+			children = (
+				E3C1AFF7A3F69D691104A076 /* Entry */,
+				7E2A3EAAF0C0DA084714371C /* Flow */,
+			);
+			path = Multiplayer;
+			sourceTree = "<group>";
+		};
+		3B6B2E3298B28666FAB56F6D /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				6FDC44BB42D2D503D48434C0 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		4098CF10A99F5CE73EA75DFE /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				C6BBC517D93B9929067B4D57 /* Assignments */,
+				10AB20A580E1A3FCEA9DA305 /* Auth */,
+				813DA8FAE07D334FE978FBA4 /* GameOver */,
+				1A0900F26722FE202A73A61A /* Intro */,
+				6BF878C54C1F561DF62E205B /* Morning */,
+				379196597476057F108910BC /* Multiplayer */,
+				BD8EB20208842E5DF04AD172 /* Night */,
+				3B6B2E3298B28666FAB56F6D /* Settings */,
+				008E0CB1FF7EFD80302D7E0E /* Setup */,
+				2F3EB12034434B9DECFDAB0B /* Stats */,
+				F67A93335FBB4E81E3D91B43 /* Voting */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		4B81DC7F023745C3A38EAE69 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				41FBD3CF6BE4D89D7F7581A7 /* TuistAssets+MafiaManager.swift */,
+				610DF63A23B55FD8CFF93796 /* TuistBundle+MafiaManager.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		5266F8EC260BD9E7F7649BE8 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				1C50E085455BCDEA15B7F411 /* Models */,
+				E026BB4978A4BF38CFC0720F /* Services */,
+				84DB4D84442D00F52CF5B7FE /* Store */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		683C0457DE23DB9640A2AD84 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				5266F8EC260BD9E7F7649BE8 /* Auth */,
+				24493E680924DCE02FF4AB4C /* Backend */,
+				2C0DBED34BA0B8DA0C601708 /* Components */,
+				A9FFB0B4D53088376A12B83E /* Gameplay */,
+				836B18A5656CE07810CD066A /* Multiplayer */,
+				AAE2C59DC227DAA2976D83CF /* Stats */,
+				B1D24D1F60A30A218E9BBE05 /* Support */,
+				16F4C070AA5DF684CC994509 /* UI */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		6BF878C54C1F561DF62E205B /* Morning */ = {
+			isa = PBXGroup;
+			children = (
+				32039AD1B5151DCFE0D17531 /* DeathRevealView.swift */,
+				CBB838310A369541CE74AF55 /* MorningSummaryView.swift */,
+			);
+			path = Morning;
+			sourceTree = "<group>";
+		};
+		7BE3F83F2942C81648199C3C /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2C0582477D7FD79772923584 /* RealtimeEventProcessor.swift */,
+				54C39FBD2C98B32B55890998 /* RealtimeService.swift */,
+				A6D0475004635445C3CF22A3 /* SessionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		7E2A3EAAF0C0DA084714371C /* Flow */ = {
+			isa = PBXGroup;
+			children = (
+				E0CF0053C5073C789B5620F7 /* MultiplayerGameOverView.swift */,
+				ED6081D60851E8D250414119 /* MultiplayerLobbyView.swift */,
+				79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */,
+				BF31B6F5DDC984F356695835 /* MultiplayerRoleRevealView.swift */,
+				57FA3D5BA30123EDCCA333B5 /* MultiplayerVoteDeathRevealView.swift */,
+				0028C6358D9D5D74A21BA47D /* MultiplayerVotingResultsView.swift */,
+				97162209351EF554554CC159 /* MultiplayerVotingView.swift */,
+			);
+			path = Flow;
+			sourceTree = "<group>";
+		};
+		813DA8FAE07D334FE978FBA4 /* GameOver */ = {
+			isa = PBXGroup;
+			children = (
+				39C9878B9BAA40647744BDC8 /* GameOverView.swift */,
+			);
+			path = GameOver;
+			sourceTree = "<group>";
+		};
+		815AC9BDBC7464F70BF660D4 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F7810EEACFD0164AC9E968A4 /* Sounds */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		836B18A5656CE07810CD066A /* Multiplayer */ = {
+			isa = PBXGroup;
+			children = (
+				AAD9FFB6C9087BF57192134B /* Models */,
+				7BE3F83F2942C81648199C3C /* Services */,
+				A29F3E3A4CDD21863ABAE930 /* Store */,
+			);
+			path = Multiplayer;
+			sourceTree = "<group>";
+		};
+		84DB4D84442D00F52CF5B7FE /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				93EE1E048F3249B4B22D1FFD /* AuthStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		9BB8E5DA6053061D47F21B78 /* InfoPlists */ = {
+			isa = PBXGroup;
+			children = (
+				F39B0F450FF95FFD3BF194CD /* mafia_manager-Info.plist */,
+				4A570ED7606C854EE6D2F90E /* mafia_managerTests-Info.plist */,
+			);
+			path = InfoPlists;
+			sourceTree = "<group>";
+		};
+		A29F3E3A4CDD21863ABAE930 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				F29033C3503B112D02AEEC0A /* MultiplayerGameStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		A9FFB0B4D53088376A12B83E /* Gameplay */ = {
+			isa = PBXGroup;
+			children = (
+				E0DB466154E0BFBF46C18D9B /* Models */,
+				1F9F2B908403683540C6D8CB /* Services */,
+				DE826E35F3C13A063B55EF64 /* Store */,
+			);
+			path = Gameplay;
+			sourceTree = "<group>";
+		};
+		AAD9FFB6C9087BF57192134B /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				3F8580D88ADA64768D1776B6 /* GameAction.swift */,
+				ECD3E8154F690748433BC6F7 /* GameSession.swift */,
+				3CBFE44727CFAE50FBA8E262 /* SessionPlayer.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AAE0CB484015BE44901A06DE = {
+			isa = PBXGroup;
+			children = (
+				DF1F71B86CF817FE7C8B5968 /* Products */,
+				11F8467ACC3F42F0EB3E8BA1 /* Project */,
+			);
+			sourceTree = "<group>";
+		};
+		AAE2C59DC227DAA2976D83CF /* Stats */ = {
+			isa = PBXGroup;
+			children = (
+				2FADB41DD3F98777E816A408 /* Models */,
+			);
+			path = Stats;
+			sourceTree = "<group>";
+		};
+		AB2F704CACB0D5FBF7D5C688 /* mafia_managerTests */ = {
+			isa = PBXGroup;
+			children = (
+				A0342891BA342790B3D72E97 /* GameStoreTests.swift */,
+			);
+			path = mafia_managerTests;
+			sourceTree = "<group>";
+		};
+		B1D24D1F60A30A218E9BBE05 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				5FE7E68ADB9B7F91D1E14789 /* InputValidator.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		BD8EB20208842E5DF04AD172 /* Night */ = {
+			isa = PBXGroup;
+			children = (
+				A6F81B1598C46CD560343E4E /* NightOutcomeView.swift */,
+				C7345913C6CB1CF0CE87204C /* NightPhaseView.swift */,
+				4A33149C57263B43F9D1B65B /* NightWakeUpView.swift */,
+			);
+			path = Night;
+			sourceTree = "<group>";
+		};
+		C6BBC517D93B9929067B4D57 /* Assignments */ = {
+			isa = PBXGroup;
+			children = (
+				88168DA8618CC11B6B7384EC /* AssignmentsView.swift */,
+				0A02C122A7E1DCCE4153DA90 /* RoleRevealView.swift */,
+			);
+			path = Assignments;
+			sourceTree = "<group>";
+		};
+		C7C6F4DD89D5C90EC779D429 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B32A359FCAA04633188D41D5 /* mafia_managerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		DE826E35F3C13A063B55EF64 /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				B069793449575B9C968837DE /* GameStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		DF1F71B86CF817FE7C8B5968 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				EE8D5242F80E343D782B5E42 /* Auth.framework */,
+				7501A5535A737C04C2CD1343 /* Clocks.framework */,
+				C910A4C82B6E17BE612A46A4 /* ConcurrencyExtras.framework */,
+				CF349FF3212A24B9AD3799A1 /* Crypto.framework */,
+				3A79ED2E55273676809CA4CD /* Functions.framework */,
+				25B122549AABFBB20F2D67EA /* Helpers.framework */,
+				23A85A77752570C86910D3AA /* HTTPTypes.framework */,
+				BC0A0CBF696B8A5F0B9306C9 /* IssueReporting.framework */,
+				93FBA63A834AB1A78182F10B /* IssueReportingPackageSupport.framework */,
+				DF1BAC365672CD2459EC622D /* mafia_manager.app */,
+				156E9A9BE55EC64AAFDE23C8 /* mafia_managerTests.xctest */,
+				DA62F542E3CD299D0E5B71AB /* PostgREST.framework */,
+				092A56787FAFAFF12DA13112 /* Realtime.framework */,
+				AA1F5F6CEF21257D097D2420 /* Storage.framework */,
+				1395F9B9985278978A7D505F /* Supabase.framework */,
+				A20D869FF8CE084DFC279867 /* swift-crypto_Crypto.bundle */,
+				3527B6A255E2386D367AE361 /* XCTestDynamicOverlay.framework */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E026BB4978A4BF38CFC0720F /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				FD0F6FB737236EE214C3CE0D /* AuthService.swift */,
+				4A270561FA8F64DCC23FC730 /* KeychainHelper.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		E0DB466154E0BFBF46C18D9B /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				4E2B7AA2163C4E31E817436A /* DayAction.swift */,
+				FFCF89E92637EE6E6DFA57C8 /* GameState.swift */,
+				576EAE7CF078E8F967EA9051 /* NightAction.swift */,
+				1D66741ED5970F59F8365E2E /* Player.swift */,
+				E43174C0DC9E812D86F752F1 /* Role.swift */,
+				675F15E4E35C4B0E173A3660 /* VotingSession.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		E3C1AFF7A3F69D691104A076 /* Entry */ = {
+			isa = PBXGroup;
+			children = (
+				378F9A5F5395A0E73FB54A72 /* CreateGameView.swift */,
+				915F85AC325F3EC3095C151D /* GameModeSelectionView.swift */,
+				9AE22A0634FE91E7CB2F991D /* JoinGameView.swift */,
+				0221E3D8F2B7BE09934D0F51 /* MultiplayerMenuView.swift */,
+			);
+			path = Entry;
+			sourceTree = "<group>";
+		};
+		F67A93335FBB4E81E3D91B43 /* Voting */ = {
+			isa = PBXGroup;
+			children = (
+				7CDB6FEF38DBAAD69D903FEE /* BotVotingRevealView.swift */,
+				0EC9EEFB25DB528CC5555DF9 /* VoteResultsView.swift */,
+				CA58228924FC98692B63CE51 /* VotingView.swift */,
+			);
+			path = Voting;
+			sourceTree = "<group>";
+		};
+		F7810EEACFD0164AC9E968A4 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				155E620D9A4BE2F71B1AA26D /* doctor_ecg.wav */,
+				C990D42FD4558C9A2EE8E3C3 /* mafia_gunshot.wav */,
+				075CC3468DFFD1E21D0DD58D /* police_siren.wav */,
+				5AB96224DA99AF30E2981EEA /* wakeup_rooster.wav */,
 			);
 			path = Sounds;
 			sourceTree = "<group>";
@@ -611,13 +711,15 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2FF7CF1E2E68E6E70023D42B /* mafia_manager */ = {
+		4BCE0AA2F37AE4A3B0FFD8EA /* mafia_manager */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2FF7CF2A2E68E6E80023D42B /* Build configuration list for PBXNativeTarget "mafia_manager" */;
+			buildConfigurationList = CC0FEA5D326FA62F5F8BFD26 /* Build configuration list for PBXNativeTarget "mafia_manager" */;
 			buildPhases = (
-				2FF7CF1B2E68E6E70023D42B /* Sources */,
-				2FF7CF1C2E68E6E70023D42B /* Frameworks */,
-				2FF7CF1D2E68E6E70023D42B /* Resources */,
+				3C178EA4127A84AD6E6C0269 /* Sources */,
+				1B6406029E85ACD417BD12C3 /* Resources */,
+				6D476131B415F54F1567836B /* Frameworks */,
+				FD39A486923BA7D7AADF8AEE /* Embed Frameworks */,
+				4B5CB4223A23BF0D583966E6 /* Dependencies */,
 			);
 			buildRules = (
 			);
@@ -625,90 +727,80 @@
 			);
 			name = mafia_manager;
 			packageProductDependencies = (
-				2FD6A3A92EBB311100D43510 /* Auth */,
-				2FD6A3AB2EBB311100D43510 /* Functions */,
-				2FD6A3AD2EBB311100D43510 /* PostgREST */,
-				2FD6A3AF2EBB311100D43510 /* Realtime */,
-				2FD6A3B12EBB311100D43510 /* Storage */,
-				2FD6A3B32EBB311100D43510 /* Supabase */,
 			);
 			productName = mafia_manager;
-			productReference = 2FF7CF1F2E68E6E70023D42B /* mafia_manager.app */;
+			productReference = DF1BAC365672CD2459EC622D /* mafia_manager.app */;
 			productType = "com.apple.product-type.application";
 		};
-		F6D0C7D2AC4EC4B03ACB25AD /* mafia_managerTests */ = {
+		64A58C8A53D161D0214B2BCC /* mafia_managerTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C276D743E9EB7C89FE098A8F /* Build configuration list for PBXNativeTarget "mafia_managerTests" */;
+			buildConfigurationList = 6521977376260E99C8563FED /* Build configuration list for PBXNativeTarget "mafia_managerTests" */;
 			buildPhases = (
-				607F1447347D0A19D8122216 /* Sources */,
-				11808B2E186052FD479BCAC3 /* Frameworks */,
-				CE0695C8CF9FFFC3583F7FAD /* Resources */,
+				1388D71B98471B769BD5537C /* Sources */,
+				786919568F70A8552C4C37DC /* Resources */,
+				C2399A1F55072F433DA51AB5 /* Frameworks */,
+				6A5A53EB7CDB0EE9E4CCB3CC /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				A81A70CDBAD878C6BDDC5752 /* PBXTargetDependency */,
+				5E5E6AF41DE9FD9934E42307 /* PBXTargetDependency */,
 			);
 			name = mafia_managerTests;
+			packageProductDependencies = (
+			);
 			productName = mafia_managerTests;
-			productReference = B13D884293DA6EB04377470C /* mafia_managerTests.xctest */;
+			productReference = 156E9A9BE55EC64AAFDE23C8 /* mafia_managerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2FF7CF172E68E6E70023D42B /* Project object */ = {
+		15E10EA86426C8B1692DD178 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
-				LastUpgradeCheck = 2600;
+				BuildIndependentTargetsInParallel = YES;
 				TargetAttributes = {
-					2FF7CF1E2E68E6E70023D42B = {
-						CreatedOnToolsVersion = 26.0;
+					64A58C8A53D161D0214B2BCC = {
+						TestTargetID = 4BCE0AA2F37AE4A3B0FFD8EA;
 					};
 				};
 			};
-			buildConfigurationList = 2FF7CF1A2E68E6E70023D42B /* Build configuration list for PBXProject "mafia_manager" */;
+			buildConfigurationList = 156203DDC740912E6BC22577 /* Build configuration list for PBXProject "mafia_manager" */;
+			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				en,
 				Base,
+				en,
 			);
-			mainGroup = 2FF7CF162E68E6E70023D42B;
-			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */,
-			);
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 2FF7CF202E68E6E70023D42B /* Products */;
+			mainGroup = AAE0CB484015BE44901A06DE;
+			productRefGroup = DF1F71B86CF817FE7C8B5968 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2FF7CF1E2E68E6E70023D42B /* mafia_manager */,
-				F6D0C7D2AC4EC4B03ACB25AD /* mafia_managerTests */,
+				4BCE0AA2F37AE4A3B0FFD8EA /* mafia_manager */,
+				64A58C8A53D161D0214B2BCC /* mafia_managerTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		2FF7CF1D2E68E6E70023D42B /* Resources */ = {
+		1B6406029E85ACD417BD12C3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2F78C7752EAEC2BA004BC2A7 /* docs/Vision.md in Resources */,
-				2F3DBB742E68EF3A002C5B31 /* buildServer.json in Resources */,
-				2F3DBB752E68EF3A002C5B31 /* README.md in Resources */,
-				A73CA2BD45494EA3A36D7A53 /* mafia_gunshot.wav in Resources */,
-				9EA73543D2004D3AA739EE52 /* police_siren.wav in Resources */,
-				CCA6AB8A5D9C4567B4A97AD0 /* doctor_ecg.wav in Resources */,
-				2F1E70072ED1BB19004366E6 /* Assets.xcassets in Resources */,
-				FFAE676A5B9D8330894F3596 /* wakeup_rooster.wav in Resources */,
+				3102B595E9507A3C96D86236 /* Assets.xcassets in Resources */,
+				68D06E389AD06FAF9574828E /* PrivacyInfo.xcprivacy in Resources */,
+				9BAE269051ACAD303F1F98B3 /* doctor_ecg.wav in Resources */,
+				E75BA9933A8A112860BAAA3F /* mafia_gunshot.wav in Resources */,
+				D4D413183F5E98752710A319 /* police_siren.wav in Resources */,
+				8CFA7C0E1EEB1C21F2EC8E4C /* wakeup_rooster.wav in Resources */,
+				4FEF5FC475EE855125D72AD4 /* swift-crypto_Crypto.bundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CE0695C8CF9FFFC3583F7FAD /* Resources */ = {
+		786919568F70A8552C4C37DC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -718,106 +810,140 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2FF7CF1B2E68E6E70023D42B /* Sources */ = {
+		1388D71B98471B769BD5537C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2F315FC92F164086005D282D /* RealtimeEventProcessor.swift in Sources */,
-				2F3DBB762E68EF3A002C5B31 /* Player.swift in Sources */,
-				2F3DBB772E68EF3A002C5B31 /* SetupView.swift in Sources */,
-				2F3DBB782E68EF3A002C5B31 /* mafia_managerApp.swift in Sources */,
-				2F3DBB7A2E68EF3A002C5B31 /* GameOverView.swift in Sources */,
-				2F3DBB7B2E68EF3A002C5B31 /* NightPhaseView.swift in Sources */,
-				2F3DBB7C2E68EF3A002C5B31 /* DayAction.swift in Sources */,
-				2F3DBB7D2E68EF3A002C5B31 /* AssignmentsView.swift in Sources */,
-				2F3DBB7E2E68EF3A002C5B31 /* GameStore.swift in Sources */,
-				2F3DBB7F2E68EF3A002C5B31 /* MorningSummaryView.swift in Sources */,
-				2F3DBB802E68EF3A002C5B31 /* NightAction.swift in Sources */,
-				2F3DBB812E68EF3A002C5B31 /* Role.swift in Sources */,
-				2F3DBB822E68EF3A002C5B31 /* Persistence.swift in Sources */,
-				2F3DBB842E68EF3A002C5B31 /* GameState.swift in Sources */,
-				A1E0F8FE2F4A4D0E00A5E3F1 /* NightOutcomeView.swift in Sources */,
-				AA0000032E69000000000003 /* DesignSystem.swift in Sources */,
-				AA0000062E69010000000006 /* RoleStyle.swift in Sources */,
-				2F01F3CD2EC0EEFD002EC6CD /* IntroView.swift in Sources */,
-				6D0DF051E56F80AA419BEAD4 /* UserProfile.swift in Sources */,
-				54B8A8966BF3B9D082D0E4DC /* PlayerStats.swift in Sources */,
-				9226823934ABE5B71B14CD7E /* CustomRoleConfig.swift in Sources */,
-				EF95ABA13104982424E31BEA /* AuthService.swift in Sources */,
-				32A904FAF6CF1B8F4FE63FA0 /* SupabaseConfig.swift in Sources */,
-				4E733D4A63D5D7591864D960 /* SupabaseService.swift in Sources */,
-				7B3E887FC46C875E7F3DD91E /* AuthStore.swift in Sources */,
-				650E154B6CD70025846E975D /* LoginView.swift in Sources */,
-				7F663480AC89982C964BBEC8 /* ProfileView.swift in Sources */,
-				289CD2C8F599CF39B1185E93 /* SignupView.swift in Sources */,
-				2F35621C2F15961B00A78B71 /* MultiplayerVotingView.swift in Sources */,
-				E2F914A70BD661E561900644 /* PlayerStatsView.swift in Sources */,
-				0BE60C3DAEC30B54849E843F /* CustomRolesView.swift in Sources */,
-				B2F8EDAC09AF2903C3554A43 /* SettingsView.swift in Sources */,
-				A1AA07220B426B151121CE31 /* PlayerGroup.swift in Sources */,
-				2F97D5F22EC1193B00DB7EBD /* DeathRevealView.swift in Sources */,
-				0ECA67702A1EE2E0FB10D789 /* PlayerGroupsView.swift in Sources */,
-				291403FD0E26754FDC71DF76 /* NightWakeUpView.swift in Sources */,
-				2F9C12BC2EC4F21300D06767 /* BotDecisionService.swift in Sources */,
-				8887C32EEDDA4E8EBE2A3A75 /* InputValidator.swift in Sources */,
-				8F7BF14C95BEF8711634945D /* KeychainHelper.swift in Sources */,
-				2FE1416A2F046AA600DB53C5 /* MultiplayerVoteDeathRevealView.swift in Sources */,
-				459D569816FBF5BC610D10E3 /* DatabaseService.swift in Sources */,
-				8638D2DEBAEB0BB360F4EFFD /* RoleRevealView.swift in Sources */,
-				E8844B7EBF4F052A936F6EB9 /* PrivacyBlurView.swift in Sources */,
-				779AC88B99B3F71ED5282E8C /* VotingView.swift in Sources */,
-				10DAF7DE4AEC34822198C1AE /* VoteResultsView.swift in Sources */,
-				69AF3A66B3BA49B605CDFE01 /* VotingSession.swift in Sources */,
-				BF85DACFD73C4FDF56699A90 /* BotVotingRevealView.swift in Sources */,
-				7E14C60FAC9686FE2E4AE201 /* GameAction.swift in Sources */,
-				972231365E4CC6A25C12E521 /* GameSession.swift in Sources */,
-				8EC3587C2C8FF2AA68055283 /* SessionPlayer.swift in Sources */,
-				45C4C5117873053DCE1B2DAC /* RealtimeService.swift in Sources */,
-				AD435D79A2E82D29DBD0476B /* SessionService.swift in Sources */,
-				D4523CBB88B33CFDBB8226AE /* MultiplayerGameStore.swift in Sources */,
-				716500E245FDF0580C9B6EE1 /* CreateGameView.swift in Sources */,
-				D87243F14475380F8BAD8E48 /* GameModeSelectionView.swift in Sources */,
-				456974ED74A7120F5989F957 /* JoinGameView.swift in Sources */,
-				A6F2EBA288006553601C428A /* MultiplayerLobbyView.swift in Sources */,
-				4F4E46B0C916E8916D77F815 /* MultiplayerMenuView.swift in Sources */,
-				69F628B35751454DDC5EABEC /* MultiplayerNightView.swift in Sources */,
-				2f6f5287f79217 /* MultiplayerVotingResultsView.swift in Sources */,
-				67C57EC8212C20E6F9277909 /* MultiplayerRoleRevealView.swift in Sources */,
-				C49D034AF71B89B3068D5C9F /* QuickStartSheet.swift in Sources */,
-				40C3A5D99E1C7068E07DA028 /* GuestNameInputView.swift in Sources */,
-				D61D69ED1159583204730043 /* MultiplayerGameOverView.swift in Sources */,
-				76FFA3943815D71B00AFC552 /* RoleCardPalette.swift in Sources */,
+				7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		607F1447347D0A19D8122216 /* Sources */ = {
+		3C178EA4127A84AD6E6C0269 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				318FB23FEDA2B23E39B9D47E /* GameStoreTests.swift in Sources */,
+				A9AFFE74FF17C85E80B9511E /* mafia_managerApp.swift in Sources */,
+				04E4D792A65C66A24D14B801 /* UserProfile.swift in Sources */,
+				331020CC377FD3AF71B1EEC6 /* AuthService.swift in Sources */,
+				4C3162B123466DC5D135783E /* KeychainHelper.swift in Sources */,
+				6EAFB13A8178319479569611 /* AuthStore.swift in Sources */,
+				B333DCD77DC8907AD2E2730C /* DatabaseService.swift in Sources */,
+				86317E2398CED68AB4DE27C5 /* SupabaseConfig.swift in Sources */,
+				6FB61EE236A1834BE78345CC /* SupabaseService.swift in Sources */,
+				6ADBA6DEFBEF5826E79CA270 /* PrivacyBlurView.swift in Sources */,
+				8EE0283423A9691F5BF0973A /* RoleCardPalette.swift in Sources */,
+				514C218982C30EDB43D97286 /* DayAction.swift in Sources */,
+				139CC9C753980BD67A93A8D4 /* GameState.swift in Sources */,
+				AC5419012FDDBE7EF33DD152 /* NightAction.swift in Sources */,
+				B07908C35C3CAC88AAEA6037 /* Player.swift in Sources */,
+				0B14FA9099E8CAF1BC3BEF4A /* Role.swift in Sources */,
+				376D1A9BD056679FCBDDD002 /* VotingSession.swift in Sources */,
+				2F26C1EB6E25BDFB6E237684 /* BotDecisionService.swift in Sources */,
+				0837AC63C3F82DFF3F92E1BA /* Persistence.swift in Sources */,
+				C7B2708C755F2445217C42DB /* SoundManager.swift in Sources */,
+				30A7AE600932A97270627241 /* GameStore.swift in Sources */,
+				F022798F4DEA8B67EC479990 /* GameAction.swift in Sources */,
+				DE14F4C36F14D19CE667D9C3 /* GameSession.swift in Sources */,
+				854B909A0224CF6D8B90AB9F /* SessionPlayer.swift in Sources */,
+				EF6F2FA6D6F712F0A62194A1 /* RealtimeEventProcessor.swift in Sources */,
+				DD1B46FCC0BAE881F57CFE3E /* RealtimeService.swift in Sources */,
+				70828131B35C3A7070C2474B /* SessionService.swift in Sources */,
+				DF5FEB68B0A0BEC029B46E6A /* MultiplayerGameStore.swift in Sources */,
+				3CB27754554CB43196F0F348 /* CustomRoleConfig.swift in Sources */,
+				C707D045A2965A3BA3E4E8C8 /* PlayerGroup.swift in Sources */,
+				C00F253B9EB59251418EA344 /* PlayerStats.swift in Sources */,
+				4C7393FE0B54B9D0B823639D /* InputValidator.swift in Sources */,
+				947419F20D8B7FFA150CFD98 /* DesignSystem.swift in Sources */,
+				11535EA64011F2FB0A9E35F3 /* RoleStyle.swift in Sources */,
+				4EF20B8C4446D8F01CA6D2CC /* TuistAssets+MafiaManager.swift in Sources */,
+				9FB2B67C7C377A94F8A3E56B /* TuistBundle+MafiaManager.swift in Sources */,
+				313064B90424AAFF9A3DE068 /* AssignmentsView.swift in Sources */,
+				4D3FAF1B36283DC21B7BA41F /* RoleRevealView.swift in Sources */,
+				5FF8B0BD3F82A25F6BC3F0E9 /* GuestNameInputView.swift in Sources */,
+				6B367CDDFA0740AB91DAAA07 /* LoginView.swift in Sources */,
+				3C83257DD6DEE4A69068B72F /* ProfileView.swift in Sources */,
+				6C7043C8973F448FDD64810C /* QuickStartSheet.swift in Sources */,
+				F9EB9A98FE2B92DE7DB3C415 /* SignupView.swift in Sources */,
+				2FDF41624966681C55F048BB /* GameOverView.swift in Sources */,
+				A15338C72F1DC085F341CC54 /* IntroView.swift in Sources */,
+				9272DE22EC2BAF070A67763D /* DeathRevealView.swift in Sources */,
+				53327646E2CD9749F25499F6 /* MorningSummaryView.swift in Sources */,
+				F9A4647F261493B6A730BCDC /* CreateGameView.swift in Sources */,
+				80C560C8F7FAB5279235818F /* GameModeSelectionView.swift in Sources */,
+				2D580A095C0D6CC57E0C0D58 /* JoinGameView.swift in Sources */,
+				2CCA8E76A0D1B55045018BD5 /* MultiplayerMenuView.swift in Sources */,
+				C0CD25D5121EDDEE526A2A85 /* MultiplayerGameOverView.swift in Sources */,
+				8B0804959399A8A22A92447E /* MultiplayerLobbyView.swift in Sources */,
+				EAA651F1E9998C20D06D3A04 /* MultiplayerNightView.swift in Sources */,
+				363E3E7B602285A6E3781B84 /* MultiplayerRoleRevealView.swift in Sources */,
+				245F9BA4FBA182015AF964AF /* MultiplayerVoteDeathRevealView.swift in Sources */,
+				75763BFC49D4E331209B7CC6 /* MultiplayerVotingResultsView.swift in Sources */,
+				611BDDBC1D31698850EA0E97 /* MultiplayerVotingView.swift in Sources */,
+				530AC54E73D5587F77BC8679 /* NightOutcomeView.swift in Sources */,
+				A4A19DB905BF3B6B918C7475 /* NightPhaseView.swift in Sources */,
+				156180B7C9E1408A04654CDD /* NightWakeUpView.swift in Sources */,
+				F60EC272F8B07D86BAD26405 /* SettingsView.swift in Sources */,
+				4D56388561282EE98D29C484 /* SetupView.swift in Sources */,
+				E30749DC29F0FAF4CE745F17 /* CustomRolesView.swift in Sources */,
+				E03F00E3542505250BB85AD4 /* PlayerGroupsView.swift in Sources */,
+				636196ED757F112DA940B40F /* PlayerStatsView.swift in Sources */,
+				AF25EC67F87A8384BDA3ECDE /* BotVotingRevealView.swift in Sources */,
+				9CE5EE9A7CBE4FE44E17CA31 /* VoteResultsView.swift in Sources */,
+				5B1D1D3456F7CA08560C6C2A /* VotingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A81A70CDBAD878C6BDDC5752 /* PBXTargetDependency */ = {
+		5E5E6AF41DE9FD9934E42307 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = mafia_manager;
-			target = 2FF7CF1E2E68E6E70023D42B /* mafia_manager */;
-			targetProxy = F61E50DC78FB13B0892B3ABC /* PBXContainerItemProxy */;
+			target = 4BCE0AA2F37AE4A3B0FFD8EA /* mafia_manager */;
+			targetProxy = 8FF5F3258130BBDB68BD67E4 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		2FF7CF282E68E6E80023D42B /* Debug */ = {
+		06BF6FBC5A94A2CCAB58E442 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = "Derived/InfoPlists/mafia_manager-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafia;
+				PRODUCT_NAME = mafia_manager;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		72042B9E993BF28CBD1FB749 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -843,13 +969,15 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 10;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 55L48W2DHK;
+				DEVELOPMENT_TEAM = 5GH22BAXAU;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -863,25 +991,91 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
+				MARKETING_VERSION = 5.0;
+				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 			};
 			name = Debug;
 		};
-		2FF7CF292E68E6E80023D42B /* Release */ = {
+		A7C5A411D39DF82AE16CC827 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "Derived/InfoPlists/mafia_managerTests-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafiaTests;
+				PRODUCT_NAME = mafia_managerTests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mafia_manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mafia_manager";
+				TEST_TARGET_NAME = mafia_manager;
+			};
+			name = Release;
+		};
+		A7FC7D091C966D3C7099161B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = "Derived/InfoPlists/mafia_manager-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafia;
+				PRODUCT_NAME = mafia_manager;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					DEBUG,
+				);
+				SWIFT_COMPILATION_MODE = singlefile;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ACCEF5866E2243A72AF214EE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -907,13 +1101,15 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 10;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 55L48W2DHK;
+				DEVELOPMENT_TEAM = 5GH22BAXAU;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -921,206 +1117,83 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		2FF7CF2B2E68E6E80023D42B /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
-				DEVELOPMENT_TEAM = 5GH22BAXAU;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Mafia;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafia;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		2FF7CF2C2E68E6E80023D42B /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
-				DEVELOPMENT_TEAM = 5GH22BAXAU;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Mafia;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafia;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		313602B1D727E4A08C8E9949 /* Debug */ = {
+		F5BCC4C831009831CA210D4E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 5GH22BAXAU;
-				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "Derived/InfoPlists/mafia_managerTests-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafiaTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mafia_manager.app/mafia_manager";
-			};
-			name = Debug;
-		};
-		8F57B418D4D4C1088336EA4E /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 5GH22BAXAU;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
+				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.hamza5645.mafiaTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = mafia_managerTests;
 				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					DEBUG,
+				);
+				SWIFT_COMPILATION_MODE = singlefile;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mafia_manager.app/mafia_manager";
-				VALIDATE_PRODUCT = YES;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mafia_manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mafia_manager";
+				TEST_TARGET_NAME = mafia_manager;
 			};
-			name = Release;
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2FF7CF1A2E68E6E70023D42B /* Build configuration list for PBXProject "mafia_manager" */ = {
+		156203DDC740912E6BC22577 /* Build configuration list for PBXProject "mafia_manager" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2FF7CF282E68E6E80023D42B /* Debug */,
-				2FF7CF292E68E6E80023D42B /* Release */,
+				72042B9E993BF28CBD1FB749 /* Debug */,
+				ACCEF5866E2243A72AF214EE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2FF7CF2A2E68E6E80023D42B /* Build configuration list for PBXNativeTarget "mafia_manager" */ = {
+		6521977376260E99C8563FED /* Build configuration list for PBXNativeTarget "mafia_managerTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2FF7CF2B2E68E6E80023D42B /* Debug */,
-				2FF7CF2C2E68E6E80023D42B /* Release */,
+				F5BCC4C831009831CA210D4E /* Debug */,
+				A7C5A411D39DF82AE16CC827 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C276D743E9EB7C89FE098A8F /* Build configuration list for PBXNativeTarget "mafia_managerTests" */ = {
+		CC0FEA5D326FA62F5F8BFD26 /* Build configuration list for PBXNativeTarget "mafia_manager" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8F57B418D4D4C1088336EA4E /* Release */,
-				313602B1D727E4A08C8E9949 /* Debug */,
+				A7FC7D091C966D3C7099161B /* Debug */,
+				06BF6FBC5A94A2CCAB58E442 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/supabase/supabase-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.5.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		2FD6A3A92EBB311100D43510 /* Auth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = Auth;
-		};
-		2FD6A3AB2EBB311100D43510 /* Functions */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = Functions;
-		};
-		2FD6A3AD2EBB311100D43510 /* PostgREST */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = PostgREST;
-		};
-		2FD6A3AF2EBB311100D43510 /* Realtime */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = Realtime;
-		};
-		2FD6A3B12EBB311100D43510 /* Storage */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = Storage;
-		};
-		2FD6A3B32EBB311100D43510 /* Supabase */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2FD6A3A82EBB311100D43510 /* XCRemoteSwiftPackageReference "supabase-swift" */;
-			productName = Supabase;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = 2FF7CF172E68E6E70023D42B /* Project object */;
+	rootObject = 15E10EA86426C8B1692DD178 /* Project object */;
 }

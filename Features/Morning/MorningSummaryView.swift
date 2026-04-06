@@ -1,11 +1,8 @@
 import SwiftUI
-import AVFoundation
 
 struct MorningSummaryView: View {
     @EnvironmentObject private var store: GameStore
     @State private var showEndGameConfirmation = false
-    @State private var wakeUpSoundPlayer: AVAudioPlayer?
-    @State private var isAudioSessionConfigured = false
 
     private var lastNight: NightAction? { store.state.nightHistory.last }
 
@@ -57,8 +54,7 @@ struct MorningSummaryView: View {
             Text("This will end the current game without determining a winner.")
         }
         .onAppear {
-            configureAudioSessionIfNeeded()
-            playMorningWakeUpSound()
+            SoundManager.shared.play(.wakeupRooster)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
@@ -166,33 +162,4 @@ private extension MorningSummaryView {
         return doctorLabel
     }
 
-    func configureAudioSessionIfNeeded() {
-        guard !isAudioSessionConfigured else { return }
-
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
-            isAudioSessionConfigured = true
-        } catch {
-            print("Failed to configure audio session: \(error.localizedDescription)")
-        }
-    }
-
-    func playMorningWakeUpSound() {
-        guard let url = Bundle.main.url(forResource: "wakeup_rooster", withExtension: "wav") else {
-            print("Missing morning wake-up sound file: wakeup_rooster.wav")
-            return
-        }
-
-        wakeUpSoundPlayer?.stop()
-
-        do {
-            wakeUpSoundPlayer = try AVAudioPlayer(contentsOf: url)
-            wakeUpSoundPlayer?.volume = 1.0
-            wakeUpSoundPlayer?.prepareToPlay()
-            wakeUpSoundPlayer?.play()
-        } catch {
-            print("Failed to play morning wake-up sound: \(error.localizedDescription)")
-        }
-    }
 }
