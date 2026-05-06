@@ -4,6 +4,17 @@
       "type": "http",
       "url": "https://mcp.supabase.com/mcp"
     },
+    "convex": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "convex@latest",
+        "mcp",
+        "start"
+      ],
+      "env": {}
+    },
     "XcodeBuildMCP": {
       "type": "stdio",
       "command": "npx",

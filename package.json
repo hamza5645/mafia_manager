@@ -1,0 +1,12 @@
+{
+  "name": "mafia-manager-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
+  },
+  "devDependencies": {
+    "convex": "^1.37.0"
+  }
+}

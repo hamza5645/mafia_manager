@@ -9,6 +9,8 @@ DerivedData/
 build/
 .build/
 node_modules/
+.env.local
+.env.*.local
 Pods/
 *.log
 docs/Vision.md
