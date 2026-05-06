@@ -8,7 +8,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 - **Solo mode**: Pass-and-play on single device with optional AI bots (fully offline)
 - **Multiplayer mode**: Multi-device gameplay via Supabase Realtime with room codes
 
-**Tech Stack**: SwiftUI + MVVM, iOS 16+, zero dependencies (native Swift/SwiftUI only)
+**Tech Stack**: SwiftUI + MVVM, iOS 16+, Tuist-managed Xcode project, zero dependencies (native Swift/SwiftUI only)
 **Key Architecture Pattern**: GameStore as single source of truth, phase-based routing (no NavigationLinks), two-phase night resolution
 **Game Features**: 4-19 players, 4 roles (Mafia, Police/Inspector, Doctor, Citizen), voting elimination, win conditions
 
@@ -66,7 +66,7 @@ xcodebuild -project mafia_manager.xcodeproj -scheme mafia_manager clean
 
 ## Codebase Overview
 
-**Tech stack**: SwiftUI + MVVM, iOS 16+, no third-party dependencies, local JSON + optional Supabase.
+**Tech stack**: SwiftUI + MVVM, iOS 16+, Tuist-managed Xcode project, no third-party dependencies, local JSON + optional Supabase.
 
 **Two game modes**:
 1. **Solo mode** (original): Pass-and-play on single device, all state in GameStore
@@ -291,7 +291,7 @@ Solo mode works fully offline without Supabase. Authentication is optional (only
 
 ## Essential Rules for iOS Work with Codex
 
-1. **Never modify .pbxproj files** — I will create files via Codex and you add them manually in Xcode. One corrupted project file wastes hours. If a .pbxproj edit is unavoidable, ask first.
+1. **Use Tuist for project changes; never modify .pbxproj files directly** — This project is managed by Tuist. Add targets, files, resources, settings, and generated project structure through Tuist manifests/configuration, then regenerate the Xcode project with Tuist. Do not hand-edit `.pbxproj` files; one corrupted project file wastes hours. If a direct `.pbxproj` edit seems unavoidable, ask first.
 
 2. **Document platform gotchas immediately** — Hit an iOS API issue? Add it to this AGENTS.md that session. Platform-specific workarounds become tribal knowledge and prevent repeated mistakes.
 
