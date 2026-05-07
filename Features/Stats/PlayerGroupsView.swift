@@ -77,8 +77,6 @@ struct PlayerGroupsView: View {
         errorMessage = nil
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             playerGroups = try await databaseService.getPlayerGroups(userId: userId)
         } catch {
             errorMessage = error.localizedDescription
@@ -94,8 +92,6 @@ struct PlayerGroupsView: View {
         }
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             try await databaseService.deletePlayerGroup(id: group.id)
             await loadGroups()
         } catch {
@@ -379,8 +375,6 @@ struct AddPlayerGroupView: View {
         )
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             try await databaseService.createPlayerGroup(newGroup)
             await onSave()
             dismiss()
@@ -561,8 +555,6 @@ struct EditPlayerGroupView: View {
         updatedGroup.updatedAt = Date()
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             try await databaseService.updatePlayerGroup(updatedGroup)
             await onSave()
             dismiss()

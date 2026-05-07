@@ -1,338 +1,182 @@
 import Foundation
-import Supabase
+import ConvexMobile
 
 @MainActor
 final class DatabaseService {
-    private let supabase = SupabaseService.shared.client
-
-    // WORKAROUND: Access token to manually attach to requests
-    var accessToken: String?
+    private let convex = ConvexService.shared
 
     // MARK: - Player Stats
 
     func getPlayerStats(userId: UUID) async throws -> [PlayerStats] {
-        let response: [PlayerStats] = try await supabase
-            .from("player_stats")
-            .select()
-            .eq("user_id", value: userId.uuidString.lowercased())
-            .order("player_name")
-            .execute()
-            .value
-
-        return response
+        let stats: [PlayerStats] = try await convex.query(
+            "stats:listPlayerStats",
+            with: ["user_id": userId.uuidString.lowercased()]
+        )
+        return stats.sorted { $0.playerName.localizedCaseInsensitiveCompare($1.playerName) == .orderedAscending }
     }
 
     func getPlayerStat(userId: UUID, playerName: String) async throws -> PlayerStats? {
-        let response: [PlayerStats] = try await supabase
-            .from("player_stats")
-            .select()
-            .eq("user_id", value: userId.uuidString.lowercased())
-            .eq("player_name", value: playerName)
-            .execute()
-            .value
-
-        return response.first
+        try await convex.query(
+            "stats:getPlayerStat",
+            with: [
+                "user_id": userId.uuidString.lowercased(),
+                "player_name": playerName,
+            ],
+            as: PlayerStats?.self
+        )
     }
 
     func createPlayerStat(_ stat: PlayerStats) async throws {
-        try await supabase
-            .from("player_stats")
-            .insert(stat)
-            .execute()
+        let _: PlayerStats = try await convex.mutation(
+            "stats:createPlayerStat",
+            with: [
+                "id": stat.id.uuidString.lowercased(),
+                "user_id": stat.userId.uuidString.lowercased(),
+                "player_name": stat.playerName,
+                "games_played": Double(stat.gamesPlayed),
+                "games_won": Double(stat.gamesWon),
+                "games_lost": Double(stat.gamesLost),
+                "total_kills": Double(stat.totalKills),
+                "times_mafia": Double(stat.timesMafia),
+                "times_doctor": Double(stat.timesDoctor),
+                "times_inspector": Double(stat.timesInspector),
+                "times_citizen": Double(stat.timesCitizen),
+            ]
+        )
     }
 
     func updatePlayerStat(_ stat: PlayerStats) async throws {
-        struct UpdateData: Encodable {
-            let gamesPlayed: Int
-            let gamesWon: Int
-            let gamesLost: Int
-            let totalKills: Int
-            let timesMafia: Int
-            let timesDoctor: Int
-            let timesInspector: Int
-            let timesCitizen: Int
-            let updatedAt: Date
-
-            enum CodingKeys: String, CodingKey {
-                case gamesPlayed = "games_played"
-                case gamesWon = "games_won"
-                case gamesLost = "games_lost"
-                case totalKills = "total_kills"
-                case timesMafia = "times_mafia"
-                case timesDoctor = "times_doctor"
-                case timesInspector = "times_inspector"
-                case timesCitizen = "times_citizen"
-                case updatedAt = "updated_at"
-            }
-        }
-
-        let updateData = UpdateData(
-            gamesPlayed: stat.gamesPlayed,
-            gamesWon: stat.gamesWon,
-            gamesLost: stat.gamesLost,
-            totalKills: stat.totalKills,
-            timesMafia: stat.timesMafia,
-            timesDoctor: stat.timesDoctor,
-            timesInspector: stat.timesInspector,
-            timesCitizen: stat.timesCitizen,
-            updatedAt: Date()
+        let _: PlayerStats = try await convex.mutation(
+            "stats:updatePlayerStat",
+            with: [
+                "id": stat.id.uuidString.lowercased(),
+                "games_played": Double(stat.gamesPlayed),
+                "games_won": Double(stat.gamesWon),
+                "games_lost": Double(stat.gamesLost),
+                "total_kills": Double(stat.totalKills),
+                "times_mafia": Double(stat.timesMafia),
+                "times_doctor": Double(stat.timesDoctor),
+                "times_inspector": Double(stat.timesInspector),
+                "times_citizen": Double(stat.timesCitizen),
+            ]
         )
-
-        try await supabase
-            .from("player_stats")
-            .update(updateData)
-            .eq("id", value: stat.id.uuidString.lowercased())
-            .execute()
     }
 
     func deletePlayerStat(id: UUID) async throws {
-        try await supabase
-            .from("player_stats")
-            .delete()
-            .eq("id", value: id.uuidString.lowercased())
-            .execute()
+        try await convex.mutation("stats:deletePlayerStat", with: ["id": id.uuidString.lowercased()])
     }
 
-    // Upsert player stats (create if not exists, update if exists)
     func upsertPlayerStat(userId: UUID, playerName: String, role: Role, won: Bool, kills: Int) async throws {
-        if let existingStat = try await getPlayerStat(userId: userId, playerName: playerName) {
-            // Update existing stat
-            var updatedStat = existingStat
-            updatedStat.gamesPlayed += 1
-            if won {
-                updatedStat.gamesWon += 1
-            } else {
-                updatedStat.gamesLost += 1
-            }
-            updatedStat.totalKills += kills
-
-            switch role {
-            case .mafia:
-                updatedStat.timesMafia += 1
-            case .doctor:
-                updatedStat.timesDoctor += 1
-            case .inspector:
-                updatedStat.timesInspector += 1
-            case .citizen:
-                updatedStat.timesCitizen += 1
-            }
-
-            try await updatePlayerStat(updatedStat)
-        } else {
-            // Create new stat
-            let newStat = PlayerStats(
-                id: UUID(),
-                userId: userId,
-                playerName: playerName,
-                gamesPlayed: 1,
-                gamesWon: won ? 1 : 0,
-                gamesLost: won ? 0 : 1,
-                totalKills: kills,
-                timesMafia: role == .mafia ? 1 : 0,
-                timesDoctor: role == .doctor ? 1 : 0,
-                timesInspector: role == .inspector ? 1 : 0,
-                timesCitizen: role == .citizen ? 1 : 0,
-                createdAt: Date(),
-                updatedAt: Date()
-            )
-
-            try await createPlayerStat(newStat)
-        }
+        let _: PlayerStats = try await convex.mutation(
+            "stats:upsertPlayerStat",
+            with: [
+                "user_id": userId.uuidString.lowercased(),
+                "player_name": playerName,
+                "role": role.rawValue,
+                "won": won,
+                "kills": Double(kills),
+            ]
+        )
     }
 
     // MARK: - Custom Role Configs
 
     func getCustomRoleConfigs(userId: UUID) async throws -> [CustomRoleConfig] {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("custom_roles_configs")
-            .select()
-            .eq("user_id", value: userId.uuidString.lowercased())
-            .order("config_name")
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        let response: [CustomRoleConfig] = try await request
-            .execute()
-            .value
-
-        return response
+        let configs: [CustomRoleConfig] = try await convex.query(
+            "stats:listCustomRoleConfigs",
+            with: ["user_id": userId.uuidString.lowercased()]
+        )
+        return configs.sorted { $0.configName.localizedCaseInsensitiveCompare($1.configName) == .orderedAscending }
     }
 
     func getCustomRoleConfig(id: UUID) async throws -> CustomRoleConfig? {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("custom_roles_configs")
-            .select()
-            .eq("id", value: id.uuidString.lowercased())
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        let response: [CustomRoleConfig] = try await request
-            .execute()
-            .value
-
-        return response.first
+        try await convex.query(
+            "stats:getCustomRoleConfig",
+            with: ["id": id.uuidString.lowercased()],
+            as: CustomRoleConfig?.self
+        )
     }
 
     func createCustomRoleConfig(_ config: CustomRoleConfig) async throws {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("custom_roles_configs")
-            .insert(config)
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        try await request.execute()
+        let _: CustomRoleConfig = try await convex.mutation(
+            "stats:createCustomRoleConfig",
+            with: [
+                "id": config.id.uuidString.lowercased(),
+                "user_id": config.userId.uuidString.lowercased(),
+                "config_name": config.configName,
+                "role_distribution": roleDistributionArgs(config.roleDistribution),
+            ]
+        )
     }
 
     func updateCustomRoleConfig(_ config: CustomRoleConfig) async throws {
-        struct UpdateData: Encodable {
-            let configName: String
-            let roleDistribution: CustomRoleConfig.RoleDistribution
-            let updatedAt: Date
-
-            enum CodingKeys: String, CodingKey {
-                case configName = "config_name"
-                case roleDistribution = "role_distribution"
-                case updatedAt = "updated_at"
-            }
-        }
-
-        let updateData = UpdateData(
-            configName: config.configName,
-            roleDistribution: config.roleDistribution,
-            updatedAt: Date()
+        let _: CustomRoleConfig = try await convex.mutation(
+            "stats:updateCustomRoleConfig",
+            with: [
+                "id": config.id.uuidString.lowercased(),
+                "config_name": config.configName,
+                "role_distribution": roleDistributionArgs(config.roleDistribution),
+            ]
         )
-
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("custom_roles_configs")
-            .update(updateData)
-            .eq("id", value: config.id.uuidString.lowercased())
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        try await request.execute()
     }
 
     func deleteCustomRoleConfig(id: UUID) async throws {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("custom_roles_configs")
-            .delete()
-            .eq("id", value: id.uuidString.lowercased())
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        try await request.execute()
+        try await convex.mutation("stats:deleteCustomRoleConfig", with: ["id": id.uuidString.lowercased()])
     }
 
     // MARK: - Player Groups
 
     func getPlayerGroups(userId: UUID) async throws -> [PlayerGroup] {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("player_groups")
-            .select()
-            .eq("user_id", value: userId.uuidString.lowercased())
-            .order("group_name")
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        let response: [PlayerGroup] = try await request
-            .execute()
-            .value
-
-        return response
+        let groups: [PlayerGroup] = try await convex.query(
+            "stats:listPlayerGroups",
+            with: ["user_id": userId.uuidString.lowercased()]
+        )
+        return groups.sorted { $0.groupName.localizedCaseInsensitiveCompare($1.groupName) == .orderedAscending }
     }
 
     func getPlayerGroup(id: UUID) async throws -> PlayerGroup? {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("player_groups")
-            .select()
-            .eq("id", value: id.uuidString.lowercased())
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        let response: [PlayerGroup] = try await request
-            .execute()
-            .value
-
-        return response.first
+        try await convex.query(
+            "stats:getPlayerGroup",
+            with: ["id": id.uuidString.lowercased()],
+            as: PlayerGroup?.self
+        )
     }
 
     func createPlayerGroup(_ group: PlayerGroup) async throws {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("player_groups")
-            .insert(group)
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        try await request.execute()
+        let _: PlayerGroup = try await convex.mutation(
+            "stats:createPlayerGroup",
+            with: [
+                "id": group.id.uuidString.lowercased(),
+                "user_id": group.userId.uuidString.lowercased(),
+                "group_name": group.groupName,
+                "player_names": group.playerNames.map { $0 as ConvexEncodable? },
+            ]
+        )
     }
 
     func updatePlayerGroup(_ group: PlayerGroup) async throws {
-        struct UpdateData: Encodable {
-            let groupName: String
-            let playerNames: [String]
-            let updatedAt: Date
-
-            enum CodingKeys: String, CodingKey {
-                case groupName = "group_name"
-                case playerNames = "player_names"
-                case updatedAt = "updated_at"
-            }
-        }
-
-        let updateData = UpdateData(
-            groupName: group.groupName,
-            playerNames: group.playerNames,
-            updatedAt: Date()
+        let _: PlayerGroup = try await convex.mutation(
+            "stats:updatePlayerGroup",
+            with: [
+                "id": group.id.uuidString.lowercased(),
+                "group_name": group.groupName,
+                "player_names": group.playerNames.map { $0 as ConvexEncodable? },
+            ]
         )
-
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("player_groups")
-            .update(updateData)
-            .eq("id", value: group.id.uuidString.lowercased())
-
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        try await request.execute()
     }
 
     func deletePlayerGroup(id: UUID) async throws {
-        // WORKAROUND: Manually attach auth token to request
-        var request = try supabase
-            .from("player_groups")
-            .delete()
-            .eq("id", value: id.uuidString.lowercased())
+        try await convex.mutation("stats:deletePlayerGroup", with: ["id": id.uuidString.lowercased()])
+    }
 
-        if let token = accessToken {
-            request = request.setHeader(name: "Authorization", value: "Bearer \(token)")
-        }
-
-        try await request.execute()
+    private func roleDistributionArgs(_ distribution: CustomRoleConfig.RoleDistribution) -> [String: ConvexEncodable?] {
+        [
+            "mafia_count": Double(distribution.mafiaCount),
+            "doctor_count": Double(distribution.doctorCount),
+            "inspector_count": Double(distribution.inspectorCount),
+            "citizen_count": Double(distribution.citizenCount),
+            "total_players": Double(distribution.totalPlayers),
+        ]
     }
 }
+

@@ -77,8 +77,6 @@ struct CustomRolesView: View {
         errorMessage = nil
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             customConfigs = try await databaseService.getCustomRoleConfigs(userId: userId)
         } catch {
             errorMessage = error.localizedDescription
@@ -94,8 +92,6 @@ struct CustomRolesView: View {
         }
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             try await databaseService.deleteCustomRoleConfig(id: config.id)
             await loadConfigs()
         } catch {
@@ -351,8 +347,6 @@ struct AddCustomRoleConfigView: View {
         )
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             try await databaseService.createCustomRoleConfig(newConfig)
             await onSave()
             dismiss()
@@ -488,8 +482,6 @@ struct EditCustomRoleConfigView: View {
         updatedConfig.updatedAt = Date()
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             try await databaseService.updateCustomRoleConfig(updatedConfig)
             await onSave()
             dismiss()

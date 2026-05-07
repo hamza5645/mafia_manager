@@ -683,7 +683,7 @@ struct MultiplayerDeathRevealView: View {
             return .citizen
         }
 
-        // Try to get role from session player first (if RLS allows)
+        // Try to get role from session player first when the backend returned it
         if let sessionPlayer = multiplayerStore.allPlayers.first(where: { $0.playerId == player.playerId }),
            let role = sessionPlayer.role {
             return role

@@ -1,219 +1,160 @@
 import Foundation
-import Supabase
-import Auth
+import ClerkKit
+import ConvexMobile
 
 @MainActor
 final class AuthService {
-    private let supabase = SupabaseService.shared.client
+    private let convex = ConvexService.shared
 
-    // MARK: - Authentication State
-
-    var currentUser: User? {
+    var currentUser: UserProfile? {
         get async {
-            try? await supabase.auth.session.user
+            if ConvexConfig.hasConfiguredClerkKey, Clerk.shared.user != nil {
+                return try? await ensureClerkUser()
+            }
+            if ConvexConfig.hasConfiguredClerkKey {
+                try? await Clerk.shared.refreshClient()
+                if Clerk.shared.user != nil {
+                    return try? await ensureClerkUser()
+                }
+            }
+            return nil
         }
     }
 
-    var currentSession: Session? {
-        get async {
-            try? await supabase.auth.session
+    func signUp(email: String, password: String, displayName: String) async throws -> UserProfile {
+        guard ConvexConfig.hasConfiguredClerkKey else {
+            throw AuthError.providerNotConfigured
         }
-    }
 
-    // MARK: - Sign Up
-
-    func signUp(email: String, password: String, displayName: String) async throws -> User {
-        // Pass display_name in user metadata
-        // The database trigger will automatically create the profile and confirm email
-        let response = try await supabase.auth.signUp(
-            email: email,
+        let signUp = try await Clerk.shared.auth.signUp(
+            emailAddress: email,
             password: password,
-            data: ["display_name": .string(displayName)]
+            firstName: displayName
         )
 
-        return response.user
+        if let sessionId = signUp.createdSessionId {
+            try await Clerk.shared.auth.setActive(sessionId: sessionId)
+            return try await ensureClerkUser(displayName: displayName)
+        }
+
+        throw AuthError.verificationRequired
     }
 
-    // MARK: - Anonymous Sign In
+    func signIn(email: String, password: String) async throws -> UserProfile {
+        guard ConvexConfig.hasConfiguredClerkKey else {
+            throw AuthError.providerNotConfigured
+        }
 
-    func signInAnonymously() async throws -> Session {
-        let session = try await supabase.auth.signInAnonymously()
-
-        // WORKAROUND: Manually set the session to ensure persistence
-        try await supabase.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
-
-        return session
-    }
-
-    // MARK: - Link Identity (Upgrade Anonymous to Permanent)
-
-    func linkEmailIdentity(email: String, password: String, displayName: String) async throws {
-        // Update the anonymous user with email and password
-        // This preserves the user_id (UUID stays the same)
-        try await supabase.auth.update(
-            user: UserAttributes(
-                email: email,
-                password: password,
-                data: ["display_name": .string(displayName)]
-            )
-        )
-    }
-
-    // MARK: - Sign In
-
-    func signIn(email: String, password: String) async throws -> Session {
-        let session = try await supabase.auth.signIn(
-            email: email,
+        let signIn = try await Clerk.shared.auth.signInWithPassword(
+            identifier: email,
             password: password
         )
 
-        // WORKAROUND: Manually set the session to ensure persistence
-        // The Supabase Swift SDK has a known issue where sessions aren't persisted automatically
-        try await supabase.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+        if let sessionId = signIn.createdSessionId {
+            try await Clerk.shared.auth.setActive(sessionId: sessionId)
+        }
 
-        return session
+        return try await ensureClerkUser()
     }
-
-    // MARK: - Sign Out
 
     func signOut() async throws {
-        try await supabase.auth.signOut()
+        if ConvexConfig.hasConfiguredClerkKey {
+            try await Clerk.shared.auth.signOut()
+        }
+        await convex.logout()
     }
-
-    // MARK: - Password Reset
 
     func resetPassword(email: String) async throws {
-        try await supabase.auth.resetPasswordForEmail(email)
-    }
-
-    // MARK: - Session Management
-
-    func getSession() async throws -> Session {
-        try await supabase.auth.session
-    }
-
-    func restoreSession(accessToken: String, refreshToken: String) async throws {
-        try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
-    }
-
-    // Listen to auth state changes
-    func onAuthStateChange(_ handler: @escaping (AuthChangeEvent, Session?) -> Void) -> Task<Void, Never> {
-        Task {
-            for await state in supabase.auth.authStateChanges {
-                handler(state.event, state.session)
-            }
+        guard ConvexConfig.hasConfiguredClerkKey else {
+            throw AuthError.providerNotConfigured
         }
+
+        _ = try await Clerk.shared.auth.signIn(email)
+        guard let signIn = Clerk.shared.auth.currentSignIn else {
+            throw AuthError.unknown
+        }
+        _ = try await signIn.sendResetPasswordEmailCode()
     }
 
-    // MARK: - Profile Management
-
-    // Note: Profile creation is now handled by a database trigger
-    // when a new user signs up. See supabase/alternative_trigger_approach.sql
-
-    /// HAMZA-FIX: Added retry logic to handle Supabase session propagation timing issues
-    /// After login/signup, REST API calls may fail with 406 if the session isn't fully propagated
     func getUserProfile(userId: UUID) async throws -> UserProfile {
-        let maxRetries = 3
-        var lastError: Error?
+        let profile: UserProfile? = try await convex.query(
+            "users:getUserProfile",
+            with: ["user_id": userId.uuidString.lowercased()],
+            as: UserProfile?.self
+        )
 
-        for attempt in 0..<maxRetries {
-            do {
-                // Small delay before retry to allow session propagation
-                if attempt > 0 {
-                    try await Task.sleep(nanoseconds: UInt64(300_000_000 * attempt)) // 300ms * attempt
-                }
-
-                let response: UserProfile = try await supabase
-                    .from("profiles")
-                    .select()
-                    .eq("id", value: userId.uuidString.lowercased())
-                    .single()
-                    .execute()
-                    .value
-
-                return response
-            } catch {
-                lastError = error
-                // Continue to next retry
-            }
+        guard let profile else {
+            throw AuthError.userNotFound
         }
 
-        // All retries failed, throw the last error
-        throw lastError ?? NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch profile after \(maxRetries) attempts"])
+        return profile
     }
 
     func updateUserProfile(userId: UUID, displayName: String) async throws {
-        struct UpdateData: Encodable {
-            let displayName: String
-            let updatedAt: Date
-
-            enum CodingKeys: String, CodingKey {
-                case displayName = "display_name"
-                case updatedAt = "updated_at"
-            }
-        }
-
-        let updateData = UpdateData(displayName: displayName, updatedAt: Date())
-
-        try await supabase
-            .from("profiles")
-            .update(updateData)
-            .eq("id", value: userId.uuidString.lowercased())
-            .execute()
+        let _: UserProfile = try await convex.mutation(
+            "users:updateProfile",
+            with: [
+                "user_id": userId.uuidString.lowercased(),
+                "display_name": displayName,
+            ]
+        )
     }
 
     func updateGuestProfile(userId: UUID, displayName: String, isAnonymous: Bool) async throws {
-        struct UpdateData: Encodable {
-            let displayName: String
-            let isAnonymous: Bool
-            let updatedAt: Date
-
-            enum CodingKeys: String, CodingKey {
-                case displayName = "display_name"
-                case isAnonymous = "is_anonymous"
-                case updatedAt = "updated_at"
-            }
-        }
-
-        let updateData = UpdateData(displayName: displayName, isAnonymous: isAnonymous, updatedAt: Date())
-
-        try await supabase
-            .from("profiles")
-            .update(updateData)
-            .eq("id", value: userId.uuidString.lowercased())
-            .execute()
+        let _: UserProfile = try await convex.mutation(
+            "users:updateProfile",
+            with: [
+                "user_id": userId.uuidString.lowercased(),
+                "display_name": displayName,
+                "is_anonymous": isAnonymous,
+            ]
+        )
     }
 
-    // MARK: - Merge Anonymous Stats
-
-    struct MergeStatsResult: Decodable {
-        let success: Bool
-        let error: String?
-        let mergedCount: Int?
-        let transferredCount: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case success
-            case error
-            case mergedCount = "merged_count"
-            case transferredCount = "transferred_count"
-        }
+    func signInAsGuest(displayName: String, guestSecretHash: String) async throws -> UserProfile {
+        try await convex.mutation(
+            "users:createOrRestoreGuest",
+            with: [
+                "display_name": displayName,
+                "guest_secret_hash": guestSecretHash,
+            ]
+        )
     }
 
     func mergeAnonymousStats(anonymousUserId: UUID, targetUserId: UUID) async throws -> MergeStatsResult {
-        let result: MergeStatsResult = try await supabase
-            .rpc("merge_anonymous_stats", params: [
-                "p_anonymous_user_id": anonymousUserId.uuidString.lowercased(),
-                "p_target_user_id": targetUserId.uuidString.lowercased()
-            ])
-            .execute()
-            .value
+        try await convex.mutation(
+            "users:mergeGuestIntoAccount",
+            with: [
+                "guest_user_id": anonymousUserId.uuidString.lowercased(),
+                "target_user_id": targetUserId.uuidString.lowercased(),
+            ]
+        )
+    }
 
-        return result
+    @discardableResult
+    func ensureClerkUser(displayName: String? = nil) async throws -> UserProfile {
+        try await convex.mutation(
+            "users:ensureUser",
+            with: [
+                "display_name": displayName,
+            ]
+        )
     }
 }
 
-// MARK: - Auth Errors
+struct MergeStatsResult: Decodable, Sendable {
+    let success: Bool
+    let error: String?
+    let mergedCount: Int?
+    let transferredCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case error
+        case mergedCount = "merged_count"
+        case transferredCount = "transferred_count"
+    }
+}
 
 enum AuthError: LocalizedError {
     case userNotFound
@@ -221,6 +162,8 @@ enum AuthError: LocalizedError {
     case emailAlreadyInUse
     case weakPassword
     case networkError
+    case providerNotConfigured
+    case verificationRequired
     case unknown
 
     var errorDescription: String? {
@@ -232,9 +175,13 @@ enum AuthError: LocalizedError {
         case .emailAlreadyInUse:
             return "Email already in use"
         case .weakPassword:
-            return "Password is too weak. Must be at least 6 characters"
+            return "Password is too weak"
         case .networkError:
             return "Network error. Please check your connection"
+        case .providerNotConfigured:
+            return "Clerk is not configured yet. Add your Clerk publishable key in ConvexConfig.swift."
+        case .verificationRequired:
+            return "Check your email to finish account verification."
         case .unknown:
             return "An unknown error occurred"
         }

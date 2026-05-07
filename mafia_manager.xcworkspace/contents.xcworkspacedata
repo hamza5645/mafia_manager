@@ -8,22 +8,19 @@
       location = "container:"
       name = "Dependencies">
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/swift-clocks/swift-clocks.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/swift-concurrency-extras/swift-concurrency-extras.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/swift-crypto/swift-crypto.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/Nuke/Nuke.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/swift-http-types/swift-http-types.xcodeproj">
-      </FileRef>
-      <FileRef
-         location = "group:Tuist/.build/tuist-derived/xctest-dynamic-overlay/xctest-dynamic-overlay.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/PhoneNumberKit/PhoneNumberKit.xcodeproj">
       </FileRef>
    </Group>
 </Workspace>

@@ -51,7 +51,10 @@ let project = Project(
                 "PrivacyInfo.xcprivacy",
             ],
             dependencies: [
-                .external(name: "Supabase"),
+                .external(name: "ConvexMobile"),
+                .external(name: "ClerkKit"),
+                .external(name: "ClerkKitUI"),
+                .external(name: "ClerkConvex"),
             ],
             settings: .settings(
                 base: [

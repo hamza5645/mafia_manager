@@ -1,5 +1,36 @@
 # Session Changes
 
+## Backend migration: Convex + Clerk
+
+### What Changed
+
+- Replaced the active backend dependency and service layer with Convex + Clerk.
+- Added Convex schema/functions for users, stats, saved setup data, multiplayer sessions, players, actions, tentative selections, and atomic night resolution.
+- Replaced account auth with Clerk-backed `AuthService` while preserving guest quick-play through Convex guest profiles.
+- Replaced multiplayer realtime with Convex reactive query subscriptions.
+- Removed legacy backend setup SQL, obsolete auth workaround docs, and old Xcode mutation scripts.
+- Updated active docs and privacy copy to describe Convex + Clerk.
+- Configured Clerk with the real publishable key and Convex Frontend API URL for the dev deployment.
+
+### Validation
+
+- `npx convex env list` shows `CLERK_FRONTEND_API_URL=https://striking-elf-22.clerk.accounts.dev` on the dev deployment.
+- `npx convex dev --once` succeeded with Clerk auth config.
+- Convex MCP `health.js:check` returned `{ ok: true, backend: "convex", version: "convex-clerk-v1" }`.
+- `tuist generate` succeeded after the Tuist dependency/project changes.
+- `tuist build mafia_manager` succeeded.
+- `tuist xcodebuild test -workspace mafia_manager.xcworkspace -scheme mafia_manager -destination 'platform=iOS Simulator,name=iPhone 17 Pro'` succeeded with 22 tests and 0 failures.
+
+### Rollback
+
+- Reverting this migration requires restoring the deleted legacy backend files, the previous Swift service implementations, and the previous Tuist dependency graph.
+- Do not attempt rollback by hand-editing `.pbxproj`; use Tuist manifests and regenerate.
+
+### Known Gotchas
+
+- Account auth now initializes against Clerk project `striking-elf-22`.
+- Guest multiplayer role visibility depends on passing the current Convex app user ID to `sessions:getSessionPlayers`.
+
 ## MM-17: Solo vote elimination reveal
 
 ### What Changed

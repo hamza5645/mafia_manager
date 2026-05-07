@@ -1,137 +1,121 @@
 # Architecture Deep Dive
 
-## GameStore Pattern
+## Solo GameStore Pattern
 
-**Single source of truth**: All game state lives in `GameStore` (`@MainActor`, `@Published`). Views are read-only subscriptions.
+`GameStore` is the single source of truth for solo mode. It is `@MainActor`, publishes game state, and owns all mutations. Views subscribe to state and call store methods; they should not mutate models directly.
 
-**Key methods**:
-- `assignNumbersAndRoles(names:)` — Setup phase: generates unique numbers, distributes roles
-- `endNight(mafiaTargetID, inspectorCheckedID, doctorProtectedID)` — Records night WITHOUT deaths
-- `resolveNightOutcome(targetWasSaved:)` — Applies death (or save), checks win conditions
-- `applyDayRemovals(removed:, notes:)` — Marks players dead, checks win conditions
-- `syncPlayerStatsToCloud()` — Pushes stats to Supabase (game over only)
+Key solo methods:
+- `assignNumbersAndRoles(names:)` - setup, number assignment, and role distribution.
+- `endNight(mafiaTargetID:inspectorCheckedID:doctorProtectedID:)` - records night actions without applying deaths.
+- `resolveNightOutcome(targetWasSaved:)` - applies the night outcome and checks win conditions.
+- `applyDayRemovals(removed:notes:)` - marks players dead and checks win conditions.
+- `syncPlayerStatsToCloud()` - syncs completed-game stats through `DatabaseService`.
 
-## Night Resolution (Critical!)
+## Night Resolution
 
-**Two-phase system**:
-1. `NightPhaseView` → user selects actions → `store.endNight()` (creates NightAction, NO deaths)
-2. `NightOutcomeView` → user confirms saved/died → `store.resolveNightOutcome()` (applies death, evaluates winners)
+Night resolution must remain two-phase.
 
-**Why?** Allows UI to ask if Doctor saved target before committing the death.
+1. `NightPhaseView` / `NightWakeUpView` collects role actions and calls `endNight()`.
+2. The outcome UI asks whether the Doctor save worked.
+3. `resolveNightOutcome()` applies death/save state and marks the night as resolved.
 
-## Win Conditions
+Multiplayer mirrors this pattern:
+- action submission writes `game_actions` documents in Convex;
+- host review records the unresolved night result;
+- `sessions:resolveNightAtomic` applies deaths and the next phase in one Convex mutation.
 
-- **Citizens win**: No alive Mafia (checked after night resolution)
-- **Mafia win**: Alive Mafia >= Alive Non-Mafia (checked at day start AND after day removals)
+## Backend Stack
 
-## Role Distribution
+The backend is Convex + Clerk.
 
-Hardcoded in `GameStore.roleDistribution()`:
-```
-4-5:   1 Mafia, 0-1 Doctor, 1 Police
-6-8:   2 Mafia, 1 Doctor, 1 Police
-9-14:  4 Mafia, 1 Doctor, 2 Police
-15-19: 5 Mafia, 2 Doctors, 2 Police
-```
+- `Core/Backend/ConvexService.swift` owns the Convex Swift client.
+- `Core/Backend/ConvexConfig.swift` stores the Convex deployment URL and Clerk publishable key.
+- `Core/Auth/Services/AuthService.swift` wraps Clerk sign-up/sign-in/reset flows and creates/restores Convex user documents.
+- `Core/Auth/Store/AuthStore.swift` is the UI-facing auth facade, including guest mode.
+- `Core/Backend/DatabaseService.swift` handles stats, custom role configs, and player groups via Convex.
+- `Core/Multiplayer/Services/SessionService.swift` calls Convex multiplayer mutations/queries.
+- `Core/Multiplayer/Services/RealtimeService.swift` subscribes to Convex reactive queries for sessions, players, actions, and tentative selections.
 
-## Inspector Logic
+Convex backend files:
+- `convex/schema.ts` - declared schema and indexes.
+- `convex/users.ts` - Clerk/guest profile functions.
+- `convex/stats.ts` - stats/custom role/player group CRUD.
+- `convex/sessions.ts` - rooms, players, actions, phase updates, tentative selections, and atomic night resolution.
+- `convex/health.ts` - deployment health check.
 
-- Cannot check other inspectors (targeting rule)
-- Solo mode stores the full role locally only for valid non-inspector checks
-- Multiplayer returns `mafia`, `not_mafia`, or `blocked`
-- Stores both `inspectorResultIsMafia: Bool?` and `inspectorResultRole: Role?`
+## Identity Model
 
-## Service Layer
+Swift-facing user IDs remain UUID strings for compatibility with the existing app models. Convex stores these IDs in each document's `id` field and indexes them with `by_app_id`.
 
-**Persistence** (`Core/Gameplay/Services/Persistence.swift`):
-- Singleton, thread-safe (`@unchecked Sendable`)
-- JSON to Application Support: `save(GameState)`, `load()`, `reset()`
-- Atomic writes, pretty-printed, silent failures
+Account users:
+- Clerk authenticates the user.
+- Convex validates the Clerk JWT and maps `identity.subject` to a `users.auth_subject`.
 
-**AuthService** (`@MainActor`):
-- Wraps Supabase Auth: `signUp`, `signIn`, `signOut`, `onAuthStateChange` (async stream)
-- Profile auto-created via DB trigger (no manual creation)
+Guest users:
+- The app stores a local random secret in Keychain.
+- A SHA-256 hash of that secret restores a Convex guest user document.
+- Guest IDs are still UUID strings and can be used for multiplayer/session ownership.
 
-**DatabaseService** (`@MainActor`):
-- PostgREST CRUD for `player_stats`, `custom_roles_configs`
-- `upsertPlayerStat()` — create or increment existing
-- Snake_case ↔ CamelCase via `CodingKeys`
+## Multiplayer Model
+
+Convex tables:
+- `users`
+- `player_stats`
+- `custom_roles_configs`
+- `player_groups`
+- `game_sessions`
+- `session_players`
+- `game_actions`
+- `tentative_selections`
+
+Core session rules:
+- room codes are generated server-side;
+- host user ID is stored on `game_sessions`;
+- player rows hold public metadata plus private role/number data;
+- action rows are keyed by session, round ID, action type, phase index, and actor;
+- `current_round_id` isolates night/voting actions and prevents action replay;
+- `phase_sequence` increments on server-side state changes so clients can detect missed updates.
+
+Role privacy is enforced in the Convex `sessions:getSessionPlayers` query:
+- players can see their own role;
+- Mafia can see Mafia teammates;
+- the host can see all roles;
+- everyone can see final roles after game over.
 
 ## Data Flow
 
-```
-User action → View calls GameStore method → GameStore mutates state →
-  → Persistence.save() → @Published triggers view refresh
-```
-
-On game completion:
-```
-GameOverView.task → store.syncPlayerStatsToCloud() →
-  → DatabaseService.upsertPlayerStat() for each player
+Solo:
+```text
+View action -> GameStore method -> GameState mutation -> Persistence.save() -> SwiftUI refresh
 ```
 
-## Models Hierarchy
-
-```
-GameState (root, Codable)
-├── players: [Player] (id, number, name, role, alive, removalNote)
-├── nightHistory: [NightAction] (targets, results, deaths, mafiaNumbers snapshot)
-├── dayHistory: [DayAction] (removedPlayerIDs)
-├── dayIndex, isGameOver, winner
-
-AuthStore (parallel)
-├── isAuthenticated, currentUserId, userProfile
+Cloud stats:
+```text
+GameOverView.task -> GameStore.syncPlayerStatsToCloud() -> DatabaseService -> Convex stats mutation
 ```
 
-## Supabase Schema
-
-**Tables**: `profiles`, `player_stats`, `custom_roles_configs`
-
-**RLS pattern** (all tables):
-```sql
-FOR SELECT USING (user_id = auth.uid());
-FOR INSERT WITH CHECK (user_id = auth.uid());
+Multiplayer:
+```text
+View action -> MultiplayerGameStore -> SessionService -> Convex mutation
+Convex query subscription -> RealtimeService -> MultiplayerGameStore -> SwiftUI refresh
 ```
 
-**Trigger**: `handle_new_user()` fires on signup → auto-creates profile row with display_name from metadata.
+## Win Conditions
 
-## Kill Attribution
+- Citizens win when no Mafia are alive.
+- Mafia win when alive Mafia are greater than or equal to alive non-Mafia.
+- Checks happen after night resolution and after day eliminations.
 
-Kills credited by scanning `nightHistory`:
-- Find nights where `resultingDeaths.count > 0`
-- Find all alive Mafia during that night
-- Increment `totalKills` for each
+## Tuist
 
-All Mafia share credit for each kill.
+The Xcode project is generated by Tuist.
 
-## Adding New Roles
+Use:
+```bash
+tuist install
+tuist generate
+tuist build mafia_manager
+tuist test mafia_manager
+```
 
-1. Add case to `Role` enum
-2. Add `displayName`, `accentColor` (RoleStyle), `symbolName`
-3. Update `roleDistribution()` in GameStore
-4. Update targeting filters in `NightPhaseView`
-5. Update win condition logic if needed
-
-## Navigation Flow
-
-`RootView` decides based on GameStore state:
-- `isFreshSetup == true` → SetupView
-- `isGameOver == true` → GameOverView
-- Otherwise → AssignmentsView → Night/Day loop
-
-`flowID` (UUID) changes on `resetAll()` to force NavigationStack reset.
-
-## Design System
-
-**Dark mode only** (`preferredColorScheme(.dark)`).
-
-**Colors**: `surface0/1/2`, `textPrimary/Secondary`, `accent`, role-specific (mafiaRed, doctorGreen, policeBlue, citizenGray)
-
-**Card modifier**: `.designCard` applies surface1 background, border, shadow, 16pt radius.
-
-## Testing Without Supabase
-
-App works fully offline:
-- Skip login
-- All game features work via local JSON
-- GameOverView won't sync stats (silent no-op if not authenticated)
+Edit `Project.swift` and `Tuist/Package.swift` for project/dependency changes. Do not hand-edit `.pbxproj`.

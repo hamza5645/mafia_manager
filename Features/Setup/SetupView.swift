@@ -495,8 +495,6 @@ struct SetupView: View {
         isLoadingGroups = true
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             playerGroups = try await databaseService.getPlayerGroups(userId: userId)
         } catch {
             // Silent fail - user can try again
@@ -540,8 +538,6 @@ struct SetupView: View {
         isLoadingConfigs = true
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
             customRoleConfigs = try await databaseService.getCustomRoleConfigs(userId: userId)
         } catch {
             // Silent fail - user can try again

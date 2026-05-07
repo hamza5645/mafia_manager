@@ -14,10 +14,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4D962F34F4D1674437DB86EA"
-               BuildableName = "Auth.framework"
-               BlueprintName = "Auth"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
+               BlueprintIdentifier = "4C2707005805DC22C55BCD26"
+               BuildableName = "ClerkConvex.framework"
+               BlueprintName = "ClerkConvex"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -28,10 +28,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A1DFC045089F7370FF821C6F"
-               BuildableName = "Clocks.framework"
-               BlueprintName = "Clocks"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/swift-clocks/swift-clocks.xcodeproj">
+               BlueprintIdentifier = "1FC263ABF632A82C109B399C"
+               BuildableName = "ClerkKit.framework"
+               BlueprintName = "ClerkKit"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -42,10 +42,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FB5353CF964F76EE56056930"
-               BuildableName = "ConcurrencyExtras.framework"
-               BlueprintName = "ConcurrencyExtras"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/swift-concurrency-extras/swift-concurrency-extras.xcodeproj">
+               BlueprintIdentifier = "0A989CEFD1EF89E4FEBB5341"
+               BuildableName = "ClerkKitUI.framework"
+               BlueprintName = "ClerkKitUI"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -56,10 +56,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "EFE8F0C7C1D24E25CAA7F815"
-               BuildableName = "Crypto.framework"
-               BlueprintName = "Crypto"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/swift-crypto/swift-crypto.xcodeproj">
+               BlueprintIdentifier = "30F69CFC41D5C0F6A0508CF2"
+               BuildableName = "Clerk_ClerkKitUI.bundle"
+               BlueprintName = "Clerk_ClerkKitUI"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -70,10 +70,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "66537B1437625BC59ED5CDB0"
-               BuildableName = "Functions.framework"
-               BlueprintName = "Functions"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
+               BlueprintIdentifier = "F4586D8802454FD886B4F47D"
+               BuildableName = "ConvexMobile.framework"
+               BlueprintName = "ConvexMobile"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -84,10 +84,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "9636ED511F55237CEB6C6C72"
-               BuildableName = "HTTPTypes.framework"
-               BlueprintName = "HTTPTypes"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/swift-http-types/swift-http-types.xcodeproj">
+               BlueprintIdentifier = "C9E0BC78A0E529700E4AF196"
+               BuildableName = "Nuke.framework"
+               BlueprintName = "Nuke"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Nuke/Nuke.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -98,10 +98,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "91712BE8A995C0B6C2496CD9"
-               BuildableName = "Helpers.framework"
-               BlueprintName = "Helpers"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
+               BlueprintIdentifier = "A8A0A0E9D5BA015F142C1008"
+               BuildableName = "NukeUI.framework"
+               BlueprintName = "NukeUI"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Nuke/Nuke.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -112,10 +112,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "310D0AA95300B4409ADF885D"
-               BuildableName = "IssueReporting.framework"
-               BlueprintName = "IssueReporting"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/xctest-dynamic-overlay/xctest-dynamic-overlay.xcodeproj">
+               BlueprintIdentifier = "1741F01BD3237B2ED5E79CAA"
+               BuildableName = "PhoneNumberKit.framework"
+               BlueprintName = "PhoneNumberKit"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/PhoneNumberKit/PhoneNumberKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -126,10 +126,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "1918E6267DCA4B8A806076DD"
-               BuildableName = "IssueReportingPackageSupport.framework"
-               BlueprintName = "IssueReportingPackageSupport"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/xctest-dynamic-overlay/xctest-dynamic-overlay.xcodeproj">
+               BlueprintIdentifier = "83598B6BD92316243CB15C1F"
+               BuildableName = "PhoneNumberKit_PhoneNumberKit.bundle"
+               BlueprintName = "PhoneNumberKit_PhoneNumberKit"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/PhoneNumberKit/PhoneNumberKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -140,66 +140,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B23FD9A4173BFBC5D74E0207"
-               BuildableName = "PostgREST.framework"
-               BlueprintName = "PostgREST"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "C4AA4701F8EC11F6EFD3A712"
-               BuildableName = "Realtime.framework"
-               BlueprintName = "Realtime"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "86C5788074073A97A03386CD"
-               BuildableName = "Storage.framework"
-               BlueprintName = "Storage"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "D2EB5E97F64D2433C466971F"
-               BuildableName = "Supabase.framework"
-               BlueprintName = "Supabase"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "6D1BFFAE456610AE81A4206D"
-               BuildableName = "XCTestDynamicOverlay.framework"
-               BlueprintName = "XCTestDynamicOverlay"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/xctest-dynamic-overlay/xctest-dynamic-overlay.xcodeproj">
+               BlueprintIdentifier = "82F3CF71D9D833799B7DCF51"
+               BuildableName = "UniFFI.framework"
+               BlueprintName = "UniFFI"
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -228,20 +172,6 @@
                BuildableName = "mafia_managerTests.xctest"
                BlueprintName = "mafia_managerTests"
                ReferencedContainer = "container:mafia_manager.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "80768BF23537BC72995D780E"
-               BuildableName = "swift-crypto_Crypto.bundle"
-               BlueprintName = "swift-crypto_Crypto"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/swift-crypto/swift-crypto.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -278,10 +208,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4D962F34F4D1674437DB86EA"
-            BuildableName = "Auth.framework"
-            BlueprintName = "Auth"
-            ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
+            BlueprintIdentifier = "4C2707005805DC22C55BCD26"
+            BuildableName = "ClerkConvex.framework"
+            BlueprintName = "ClerkConvex"
+            ReferencedContainer = "container:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </LaunchAction>
@@ -294,10 +224,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4D962F34F4D1674437DB86EA"
-            BuildableName = "Auth.framework"
-            BlueprintName = "Auth"
-            ReferencedContainer = "container:Tuist/.build/tuist-derived/Supabase/Supabase.xcodeproj">
+            BlueprintIdentifier = "4C2707005805DC22C55BCD26"
+            BuildableName = "ClerkConvex.framework"
+            BlueprintName = "ClerkConvex"
+            ReferencedContainer = "container:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

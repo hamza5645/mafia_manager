@@ -125,7 +125,7 @@ final class MultiplayerGameStore: ObservableObject {
             return try await provider(sessionId)
         }
 #endif
-        return try await sessionService.getSessionPlayers(sessionId: sessionId)
+        return try await sessionService.getSessionPlayers(sessionId: sessionId, viewerUserId: currentUserId())
     }
 
 #if DEBUG
@@ -603,6 +603,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await realtimeService.subscribeToSession(
             sessionId: sessionId,
+            viewerUserId: currentUserId(),
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
@@ -657,6 +658,7 @@ final class MultiplayerGameStore: ObservableObject {
         // Use RealtimeService's exponential backoff recovery
         realtimeService.attemptResubscribe(
             sessionId: sessionId,
+            viewerUserId: currentUserId(),
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
@@ -1586,8 +1588,9 @@ final class MultiplayerGameStore: ObservableObject {
         await authStore?.ensureValidSession()
 
         // 2. Force reconnect Realtime (don't trust stale WebSocket connection)
-        await realtimeService.forceReconnect(
+        try? await realtimeService.forceReconnect(
             sessionId: sessionId,
+            viewerUserId: currentUserId(),
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     self?.handleSessionUpdate(session)
@@ -1600,7 +1603,7 @@ final class MultiplayerGameStore: ObservableObject {
             },
             onActionUpdate: { [weak self] action in
                 Task { @MainActor in
-                    await self?.handleActionUpdate(action)
+                    self?.handleActionUpdate(action)
                 }
             },
             onTentativeSelection: { [weak self] selection in
@@ -2014,7 +2017,7 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
-    /// Resilient action fetch that won't block readiness checks if Supabase temporarily fails
+    /// Resilient action fetch that won't block readiness checks if the backend temporarily fails
     private func loadActionsSafely(
         sessionId: UUID,
         actionType: ActionType,
@@ -3396,8 +3399,8 @@ final class MultiplayerGameStore: ObservableObject {
             return "Network error. Please check your internet connection."
         }
 
-        // 3. Extract and map Supabase/PostgREST errors
-        if let message = extractSupabaseMessage(from: nsError) {
+        // 3. Extract and map backend errors
+        if let message = extractBackendMessage(from: nsError) {
             let normalized = message.lowercased()
 
             if normalized.contains("jwt expired") || normalized.contains("token expired") {
@@ -3406,10 +3409,10 @@ final class MultiplayerGameStore: ObservableObject {
             if normalized.contains("not found") || normalized.contains("does not exist") {
                 return "Game session not found. It may have ended."
             }
-            if normalized.contains("connection refused") || normalized.contains("pgrst") {
+            if normalized.contains("connection refused") || normalized.contains("server error") {
                 return "Unable to connect to game server. Please try again."
             }
-            if normalized.contains("permission denied") || normalized.contains("rls") {
+            if normalized.contains("permission denied") || normalized.contains("authentication required") {
                 return "You don't have permission to perform this action."
             }
             if normalized.contains("duplicate") || normalized.contains("unique") {
@@ -3421,9 +3424,9 @@ final class MultiplayerGameStore: ObservableObject {
         return "Connection error. Please check your internet and try again."
     }
 
-    /// Extracts Supabase error messages from NSError userInfo
-    private func extractSupabaseMessage(from error: NSError) -> String? {
-        // Check various NSError userInfo locations for Supabase messages
+    /// Extracts backend error messages from NSError userInfo
+    private func extractBackendMessage(from error: NSError) -> String? {
+        // Check common NSError userInfo locations for backend messages
         if let message = error.userInfo["error_description"] as? String, !message.isEmpty {
             return message
         }

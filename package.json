@@ -4,9 +4,14 @@
   "type": "module",
   "scripts": {
     "convex:dev": "convex dev",
-    "convex:deploy": "convex deploy"
+    "convex:deploy": "convex deploy",
+    "migrate:export": "node scripts/migration/export.mjs",
+    "migrate:ingest": "node scripts/migration/ingest.mjs",
+    "migrate:verify": "node scripts/migration/verify.mjs"
   },
   "devDependencies": {
-    "convex": "^1.37.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "convex": "^1.37.0",
+    "dotenv": "^16.4.0"
   }
 }
