@@ -2,6 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:../clerk-convex-swift/ClerkConvex.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:mafia_manager.xcodeproj">
    </FileRef>
    <Group
@@ -9,9 +12,6 @@
       name = "Dependencies">
       <FileRef
          location = "group:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
-      </FileRef>
-      <FileRef
-         location = "group:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
       </FileRef>
       <FileRef
          location = "group:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">

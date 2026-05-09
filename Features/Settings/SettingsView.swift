@@ -5,6 +5,7 @@ struct SettingsView: View {
     @State private var showingLogin = false
     @State private var showingIntro = false
     @State private var showingUpgrade = false
+    @State private var showingClearGuestConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -126,6 +127,19 @@ struct SettingsView: View {
                                         .cornerRadius(Design.Radii.small)
                                     }
                                 }
+
+                                // Clear Guest Data button
+                                Button {
+                                    showingClearGuestConfirmation = true
+                                } label: {
+                                    Text("Clear Guest Data")
+                                        .font(Design.Typography.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(Design.Colors.dangerRed)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                }
+                                .accessibilityHint("Sign out of your guest session and delete saved guest progress")
                             }
                         } else {
                             // Show login button when not authenticated at all
@@ -253,6 +267,18 @@ struct SettingsView: View {
             .sheet(isPresented: $showingUpgrade) {
                 SignupView(isUpgrading: true)
                     .environmentObject(authStore)
+            }
+            .confirmationDialog(
+                "Clear Guest Data",
+                isPresented: $showingClearGuestConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear Guest Data", role: .destructive) {
+                    Task { await authStore.signOut() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will delete your guest account and saved progress on this device. To keep your stats, sign up first.")
             }
         }
     }

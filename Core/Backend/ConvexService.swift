@@ -17,11 +17,14 @@ final class ConvexService {
         if ConvexConfig.hasConfiguredClerkKey {
             Clerk.configure(publishableKey: ConvexConfig.clerkPublishableKey)
             let provider = ClerkConvexAuthProvider()
+            // ConvexClientWithAuth(deploymentUrl:authProvider:) calls
+            // provider.bind(client: self) inside its convenience init
+            // (ConvexClientWithAuth+Clerk.swift), so a second bind here
+            // would just cancel and restart the session-sync task.
             let authenticatedClient = ConvexClientWithAuth(
                 deploymentUrl: ConvexConfig.deploymentURL,
                 authProvider: provider
             )
-            provider.bind(client: authenticatedClient)
             self.authProvider = provider
             self.client = authenticatedClient
             self.signOutHandler = { [weak authenticatedClient] in
@@ -78,6 +81,28 @@ final class ConvexService {
 
     func logout() async {
         await signOutHandler?()
+    }
+
+    /// Force-installs the Convex FFI auth callback against the current Clerk
+    /// session. Required after a fresh sign-up verification or password
+    /// reset: those flows emit `.signUpCompleted` / `.signInCompleted`, which
+    /// the patched `ClerkConvexAuthProvider` handles asynchronously on its
+    /// own session-sync task. If we fire the next Convex mutation from the
+    /// call-site task before that task runs, the mutation hangs in the Rust
+    /// FFI layer waiting for an auth token. Calling `loginFromCache()` here
+    /// installs the callback synchronously on the call-site task; the SDK
+    /// task's later run is a redundant no-op.
+    func refreshAuthFromClerk() async throws {
+        guard let authed = client as? ConvexClientWithAuth<String> else { return }
+        // setActive() doesn't synchronously flip Clerk.session.status to
+        // .active; refreshClient() does. On a slow network the flip can lag
+        // a few hundred ms, so poll briefly with a hard ceiling before
+        // calling loginFromCache (which throws noActiveSession otherwise).
+        let deadline = Date().addingTimeInterval(5.0)
+        while Clerk.shared.session?.status != .active && Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        _ = try await authed.loginFromCache().get()
     }
 }
 

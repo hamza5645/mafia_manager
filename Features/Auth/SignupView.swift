@@ -11,6 +11,7 @@ struct SignupView: View {
     @State private var validationError: String?
     @State private var showingEmailConflict = false
     @State private var conflictAnonymousUserId: UUID?
+    @State private var showVerification = false
 
     // Upgrade mode: When true, this is upgrading a guest account to permanent
     var isUpgrading: Bool = false
@@ -155,6 +156,10 @@ struct SignupView: View {
                                         await MainActor.run {
                                             dismiss()
                                         }
+                                    case .needsEmailVerification:
+                                        await MainActor.run {
+                                            showVerification = true
+                                        }
                                     case .emailAlreadyExists(let anonymousUserId):
                                         await MainActor.run {
                                             conflictAnonymousUserId = anonymousUserId
@@ -166,15 +171,22 @@ struct SignupView: View {
                                     }
                                 } else {
                                     // Regular new signup
-                                    let success = await authStore.signUp(
+                                    let step = await authStore.startSignUp(
                                         email: sanitizedEmail,
                                         password: sanitizedPassword,
                                         displayName: sanitizedDisplayName
                                     )
-                                    if success {
+                                    switch step {
+                                    case .authenticated:
                                         await MainActor.run {
                                             dismiss()
                                         }
+                                    case .needsEmailCode:
+                                        await MainActor.run {
+                                            showVerification = true
+                                        }
+                                    case .failure:
+                                        break
                                     }
                                 }
                             }
@@ -196,7 +208,7 @@ struct SignupView: View {
                         .cornerRadius(Design.Radii.button)
                         .shadow(color: Design.Colors.actionBlue.opacity(0.3), radius: 16, y: 8)
                     }
-                    .disabled(authStore.isLoading || !isFormFilled)
+                    .disabled(authStore.isLoading || !isFormValid)
                     .padding(.horizontal, 32)
 
                     // Password Requirements
@@ -271,6 +283,20 @@ struct SignupView: View {
                 displayName = guestName
             }
         }
+        .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated && !authStore.isAnonymous {
+                dismiss()
+            }
+        }
+        .onChange(of: authStore.isAnonymous) { _, isAnonymous in
+            if !isAnonymous && authStore.isAuthenticated {
+                dismiss()
+            }
+        }
+        .sheet(isPresented: $showVerification) {
+            SignupVerificationView()
+                .environmentObject(authStore)
+        }
         .alert("Email Already Registered", isPresented: $showingEmailConflict) {
             Button("Sign In & Merge Stats") {
                 // User wants to sign into existing account and merge stats
@@ -297,6 +323,17 @@ struct SignupView: View {
 
     private var isFormFilled: Bool {
         !sanitizedEmail.isEmpty && !sanitizedPassword.isEmpty && !sanitizedConfirmPassword.isEmpty && !sanitizedDisplayName.isEmpty
+    }
+
+    private var isFormValid: Bool {
+        isFormFilled
+            && sanitizedDisplayName.count >= 2
+            && sanitizedDisplayName.count <= 50
+            && sanitizedPassword.count >= 6
+            && sanitizedPassword.count <= 72
+            && passwordsMatch
+            && isValidEmail(sanitizedEmail)
+            && sanitizedEmail.count <= 255
     }
 
     private func validateForm() -> Bool {

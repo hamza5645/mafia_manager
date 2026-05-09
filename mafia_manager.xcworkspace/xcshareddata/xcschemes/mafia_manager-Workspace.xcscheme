@@ -17,7 +17,7 @@
                BlueprintIdentifier = "4C2707005805DC22C55BCD26"
                BuildableName = "ClerkConvex.framework"
                BlueprintName = "ClerkConvex"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
+               ReferencedContainer = "container:../clerk-convex-swift/ClerkConvex.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -211,7 +211,7 @@
             BlueprintIdentifier = "4C2707005805DC22C55BCD26"
             BuildableName = "ClerkConvex.framework"
             BlueprintName = "ClerkConvex"
-            ReferencedContainer = "container:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
+            ReferencedContainer = "container:../clerk-convex-swift/ClerkConvex.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </LaunchAction>
@@ -227,7 +227,7 @@
             BlueprintIdentifier = "4C2707005805DC22C55BCD26"
             BuildableName = "ClerkConvex.framework"
             BlueprintName = "ClerkConvex"
-            ReferencedContainer = "container:Tuist/.build/tuist-derived/ClerkConvex/ClerkConvex.xcodeproj">
+            ReferencedContainer = "container:../clerk-convex-swift/ClerkConvex.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

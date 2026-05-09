@@ -117,6 +117,7 @@ struct GuestNameInputView: View {
                 }
             }
             .onAppear {
+                authStore.clearError()
                 isNameFieldFocused = true
             }
         }

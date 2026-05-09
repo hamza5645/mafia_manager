@@ -26,8 +26,15 @@ final class AuthStore: ObservableObject {
 
     enum LinkResult {
         case success
+        case needsEmailVerification
         case emailAlreadyExists(anonymousUserId: UUID)
         case failure(String)
+    }
+
+    enum SignUpStepResult {
+        case authenticated
+        case needsEmailCode
+        case failure
     }
 
     private let authService = AuthService()
@@ -36,6 +43,11 @@ final class AuthStore: ObservableObject {
 
     private enum KeychainKeys {
         static let guestSecret = "convex_guest_secret"
+    }
+
+    private enum DefaultsKeys {
+        static let pendingSignUpDisplayName = "pending_signup_display_name"
+        static let pendingMergeFromAnonymousId = "pending_merge_from_anonymous_id"
     }
 
     init() {
@@ -75,24 +87,86 @@ final class AuthStore: ObservableObject {
         await restoreSession()
     }
 
-    func signUp(email: String, password: String, displayName: String) async -> Bool {
+    func startSignUp(email: String, password: String, displayName: String) async -> SignUpStepResult {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
+        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+
         do {
-            let profile = try await authService.signUp(
+            let result = try await authService.startSignUp(
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines),
                 password: password,
-                displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                displayName: trimmedDisplayName
             )
+            switch result {
+            case .completed(let profile):
+                clearPendingSignUpState()
+                applyAuthenticatedProfile(profile)
+                clearGuestSecret()
+                return .authenticated
+            case .needsEmailCode:
+                UserDefaults.standard.set(trimmedDisplayName, forKey: DefaultsKeys.pendingSignUpDisplayName)
+                return .needsEmailCode
+            }
+        } catch {
+            clearPendingSignUpState()
+            errorMessage = mapAuthError(error)
+            return .failure
+        }
+    }
+
+    func verifySignUpEmailCode(_ code: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        let displayName = UserDefaults.standard.string(forKey: DefaultsKeys.pendingSignUpDisplayName) ?? ""
+        let mergeAnonymousId = UserDefaults.standard.string(forKey: DefaultsKeys.pendingMergeFromAnonymousId)
+            .flatMap(UUID.init(uuidString:))
+
+        do {
+            let profile = try await authService.verifySignUpEmailCode(code, displayName: displayName)
             applyAuthenticatedProfile(profile)
             clearGuestSecret()
+
+            if let anonymousId = mergeAnonymousId, anonymousId != profile.id {
+                _ = try? await authService.mergeAnonymousStats(
+                    anonymousUserId: anonymousId,
+                    targetUserId: profile.id
+                )
+                isAnonymous = false
+                userProfile?.isAnonymous = false
+                guestDisplayName = nil
+            }
+
+            clearPendingSignUpState()
             return true
         } catch {
             errorMessage = mapAuthError(error)
             return false
         }
+    }
+
+    func resendSignUpEmailCode() async -> Bool {
+        errorMessage = nil
+        do {
+            try await authService.resendSignUpEmailCode()
+            return true
+        } catch {
+            errorMessage = mapAuthError(error)
+            return false
+        }
+    }
+
+    func cancelPendingSignUp() {
+        clearPendingSignUpState()
+    }
+
+    private func clearPendingSignUpState() {
+        UserDefaults.standard.removeObject(forKey: DefaultsKeys.pendingSignUpDisplayName)
+        UserDefaults.standard.removeObject(forKey: DefaultsKeys.pendingMergeFromAnonymousId)
     }
 
     func signIn(email: String, password: String) async {
@@ -127,13 +201,29 @@ final class AuthStore: ObservableObject {
         clearGuestSecret()
     }
 
-    func resetPassword(email: String) async -> Bool {
+    func startPasswordReset(email: String) async -> Bool {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            try await authService.resetPassword(email: email.trimmingCharacters(in: .whitespacesAndNewlines))
+            try await authService.startPasswordReset(email: email.trimmingCharacters(in: .whitespacesAndNewlines))
+            return true
+        } catch {
+            errorMessage = mapAuthError(error)
+            return false
+        }
+    }
+
+    func confirmPasswordReset(code: String, newPassword: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let profile = try await authService.confirmPasswordReset(code: code, newPassword: newPassword)
+            applyAuthenticatedProfile(profile)
+            clearGuestSecret()
             return true
         } catch {
             errorMessage = mapAuthError(error)
@@ -182,23 +272,37 @@ final class AuthStore: ObservableObject {
             return .failure("No guest account to link")
         }
 
-        let signedUp = await signUp(email: email, password: password, displayName: displayName)
-        guard signedUp, let targetUserId = currentUserId else {
-            return .failure(errorMessage ?? "Could not create account")
-        }
+        UserDefaults.standard.set(
+            anonymousUserId.uuidString,
+            forKey: DefaultsKeys.pendingMergeFromAnonymousId
+        )
 
-        do {
-            _ = try await authService.mergeAnonymousStats(
-                anonymousUserId: anonymousUserId,
-                targetUserId: targetUserId
-            )
-            isAnonymous = false
-            userProfile?.isAnonymous = false
-            guestDisplayName = nil
-            clearGuestSecret()
-            return .success
-        } catch {
-            return .failure(mapAuthError(error))
+        let step = await startSignUp(email: email, password: password, displayName: displayName)
+        switch step {
+        case .authenticated:
+            guard let targetUserId = currentUserId else {
+                return .failure(errorMessage ?? "Could not create account")
+            }
+            do {
+                _ = try await authService.mergeAnonymousStats(
+                    anonymousUserId: anonymousUserId,
+                    targetUserId: targetUserId
+                )
+                isAnonymous = false
+                userProfile?.isAnonymous = false
+                guestDisplayName = nil
+                clearGuestSecret()
+                clearPendingSignUpState()
+                return .success
+            } catch {
+                clearPendingSignUpState()
+                return .failure(mapAuthError(error))
+            }
+        case .needsEmailCode:
+            return .needsEmailVerification
+        case .failure:
+            clearPendingSignUpState()
+            return .failure(errorMessage ?? "Could not create account")
         }
     }
 

@@ -14,6 +14,6 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/get-convex/convex-swift", from: "0.8.0"),
         .package(url: "https://github.com/clerk/clerk-ios", from: "1.0.0"),
-        .package(url: "https://github.com/clerk/clerk-convex-swift", from: "0.1.0"),
+        .package(path: "../../clerk-convex-swift"),
     ]
 )
