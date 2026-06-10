@@ -6,15 +6,16 @@ import {
   sessionStatusValidator,
 } from "./validators";
 import {
+  filterActionForViewer,
   listSessionPlayers,
   nextPhaseSequence,
   nowAppleEpochSeconds,
   requireActionActorIfAuthenticated,
   requireDocByAppId,
   requirePlayerOwnerIfAuthenticated,
-  requireSessionHostIfAuthenticated,
   requireSessionHostStrict,
   resolveCaller,
+  resolveViewer,
   transferHostIfNeeded,
   uuid,
   visiblePlayerForViewer,
@@ -135,13 +136,13 @@ export const leaveSession = mutation({
 });
 
 export const removePlayer = mutation({
-  args: { player_id: v.string() },
+  args: { player_id: v.string(), caller_user_id: v.string() },
   handler: async (ctx, args) => {
     const target = await getPlayer(ctx, args.player_id);
     if (!target) {
       throw new ConvexError("Player not found");
     }
-    await requireSessionHostIfAuthenticated(ctx, target.session_id);
+    await requireSessionHostStrict(ctx, target.session_id, args.caller_user_id);
     return await removePlayerImpl(ctx, args.player_id);
   },
 });
@@ -172,9 +173,13 @@ export const getSessionByRoomCode = query({
 });
 
 export const updateSessionStatus = mutation({
-  args: { session_id: v.string(), status: sessionStatusValidator },
+  args: {
+    session_id: v.string(),
+    status: sessionStatusValidator,
+    caller_user_id: v.string(),
+  },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
     await ctx.db.patch(session._id, {
       status: args.status,
@@ -185,10 +190,26 @@ export const updateSessionStatus = mutation({
 });
 
 export const updateSessionHost = mutation({
-  args: { session_id: v.string(), new_host_user_id: v.string() },
+  args: {
+    session_id: v.string(),
+    new_host_user_id: v.string(),
+    caller_user_id: v.string(),
+  },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    // This mutation is the host-transfer / host-claim path, used when the
+    // current host has gone offline or been eliminated. Therefore we cannot
+    // require caller_user_id === host_user_id; the caller is claiming
+    // *because* the host is no longer responsive. We do enforce:
+    //   1. caller_user_id matches Clerk identity if the caller is Clerk-authed
+    //      (resolveCaller), so non-host Clerk users can't impersonate someone.
+    //   2. The new host is actually a player in this session.
+    //   3. If the current host is still considered online (recent heartbeat),
+    //      only the current host themselves may transfer.
+    // Guest-vs-guest takeover is still possible without auth, which matches the
+    // codebase's documented guest auth posture.
+    const caller = await resolveCaller(ctx, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+
     const target = await ctx.db
       .query("session_players")
       .withIndex("by_session_user", (q) =>
@@ -198,6 +219,38 @@ export const updateSessionHost = mutation({
     if (!target) {
       throw new ConvexError("New host is not in this session");
     }
+    const callerPlayer = await ctx.db
+      .query("session_players")
+      .withIndex("by_session_user", (q) =>
+        q.eq("session_id", args.session_id).eq("user_id", caller.id),
+      )
+      .first();
+    if (!callerPlayer) {
+      throw new ConvexError("Caller is not in this session");
+    }
+
+    // Host-stale guard: if the current host has a recent heartbeat, only they
+    // may transfer (a true voluntary transfer). Stale heartbeats unblock the
+    // takeover path for a session player to claim host for themselves.
+    const HEARTBEAT_STALE_SECONDS = 15;
+    const currentHostPlayer = await ctx.db
+      .query("session_players")
+      .withIndex("by_session_user", (q) =>
+        q.eq("session_id", args.session_id).eq("user_id", session.host_user_id),
+      )
+      .first();
+    const lastHeartbeat = currentHostPlayer?.last_heartbeat ?? 0;
+    const hostIsFresh =
+      currentHostPlayer !== null &&
+      currentHostPlayer !== undefined &&
+      nowAppleEpochSeconds() - lastHeartbeat < HEARTBEAT_STALE_SECONDS;
+    if (hostIsFresh && caller.id !== session.host_user_id) {
+      throw new ConvexError("Current host is still active");
+    }
+    if (caller.id !== session.host_user_id && args.new_host_user_id !== caller.id) {
+      throw new ConvexError("Stale host takeover must claim the caller as host");
+    }
+
     await ctx.db.patch(session._id, {
       host_user_id: args.new_host_user_id,
       updated_at: nowAppleEpochSeconds(),
@@ -211,9 +264,10 @@ export const updateSessionPhase = mutation({
     session_id: v.string(),
     current_phase: v.string(),
     current_phase_data: v.optional(v.any()),
+    caller_user_id: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
     await ctx.db.patch(session._id, {
       current_phase: args.current_phase,
@@ -238,9 +292,10 @@ export const updateSessionState = mutation({
     day_history: v.optional(v.array(v.any())),
     is_game_over: v.optional(v.boolean()),
     winner: v.optional(roleValidator),
+    caller_user_id: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
     const patch: any = {
       updated_at: nowAppleEpochSeconds(),
@@ -279,9 +334,10 @@ export const resolveNightAtomic = mutation({
     next_phase_data: v.any(),
     is_game_over: v.optional(v.boolean()),
     winner: v.optional(roleValidator),
+    caller_user_id: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
     for (const playerId of args.eliminated_player_ids) {
       const player = await ctx.db
@@ -334,28 +390,14 @@ export const getSessionPlayers = query({
       return [];
     }
     const players = await listSessionPlayers(ctx, args.session_id);
-    const viewer = args.viewer_user_id
-      ? await ctx.db
-          .query("users")
-          .withIndex("by_app_id", (q) => q.eq("id", args.viewer_user_id!))
-          .first()
-      : await currentViewer(ctx);
+    // Strict for Clerk users (ignores spoofed viewer_user_id); falls back to
+    // the asserted id for guest play. See resolveViewer in lib.ts.
+    const viewer = await resolveViewer(ctx, args.viewer_user_id);
     return players
       .map((player) => visiblePlayerForViewer(player, session, viewer, players))
       .sort((a, b) => a.joined_at - b.joined_at);
   },
 });
-
-async function currentViewer(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    return null;
-  }
-  return await ctx.db
-    .query("users")
-    .withIndex("by_auth_subject", (q: any) => q.eq("auth_subject", identity.subject))
-    .first();
-}
 
 async function addPlayerImpl(
   ctx: any,
@@ -390,12 +432,43 @@ export const addPlayer = mutation({
     user_id: v.optional(v.string()),
     player_name: v.string(),
     is_bot: v.boolean(),
+    caller_user_id: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.is_bot) {
-      await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    if (session.status !== "waiting") {
+      throw new ConvexError("Players can only be added while waiting");
     }
-    return await addPlayerImpl(ctx, args);
+
+    const existingPlayers = await listSessionPlayers(ctx, args.session_id);
+    if (existingPlayers.length >= session.max_players) {
+      throw new ConvexError("Game session is full");
+    }
+
+    if (args.is_bot) {
+      if (!args.caller_user_id) {
+        throw new ConvexError("caller_user_id required for bot adds");
+      }
+      await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
+    } else {
+      if (!args.user_id || !args.caller_user_id) {
+        throw new ConvexError("user_id and caller_user_id required for player adds");
+      }
+      const caller = await requireSessionHostStrict(
+        ctx,
+        args.session_id,
+        args.caller_user_id,
+      );
+      if (args.user_id !== caller.id) {
+        throw new ConvexError("Hosts can only add themselves directly");
+      }
+      if (existingPlayers.some((player) => player.user_id === args.user_id)) {
+        throw new ConvexError("You are already in this session");
+      }
+    }
+    // Strip caller_user_id from the row payload (it's auth metadata, not row data).
+    const { caller_user_id: _ignored, ...payload } = args;
+    return await addPlayerImpl(ctx, payload);
   },
 });
 
@@ -410,9 +483,9 @@ export const updatePlayerReady = mutation({
 });
 
 export const resetAllPlayersReady = mutation({
-  args: { session_id: v.string() },
+  args: { session_id: v.string(), caller_user_id: v.string() },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const players = await listSessionPlayers(ctx, args.session_id);
     for (const player of players) {
       if (!player.is_bot) {
@@ -427,11 +500,12 @@ export const updatePlayerLifeStatus = mutation({
     record_id: v.string(),
     is_alive: v.boolean(),
     removal_note: v.optional(v.string()),
+    caller_user_id: v.string(),
   },
   handler: async (ctx, args) => {
     const player = await getPlayer(ctx, args.record_id);
     if (!player) throw new ConvexError("Player not found");
-    await requireSessionHostIfAuthenticated(ctx, player.session_id);
+    await requireSessionHostStrict(ctx, player.session_id, args.caller_user_id);
     await ctx.db.patch(player._id, {
       is_alive: args.is_alive,
       removal_note: args.removal_note,
@@ -462,9 +536,10 @@ export const assignRolesAndNumbers = mutation({
         number: v.number(),
       }),
     ),
+    caller_user_id: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
     for (const assignment of args.assignments) {
       const player = await ctx.db
@@ -503,6 +578,15 @@ export const submitAction = mutation({
   handler: async (ctx, args) => {
     await requireActionActorIfAuthenticated(ctx, args.session_id, args.actor_player_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+
+    // Reject stale rounds: the client must submit against the session's
+    // current round. Previously the handler accepted any round_id and wrote
+    // session.current_round_id into the payload, silently promoting stale
+    // actions into the current round and defeating replay protection.
+    if (!session.current_round_id || args.round_id !== session.current_round_id) {
+      throw new ConvexError("Stale round");
+    }
+
     const players = await listSessionPlayers(ctx, args.session_id);
     const actor = players.find((player) => player.player_id === args.actor_player_id);
     if (!actor) {
@@ -534,7 +618,7 @@ export const submitAction = mutation({
 
     const payload = {
       session_id: args.session_id,
-      round_id: session.current_round_id ?? args.round_id,
+      round_id: args.round_id,
       action_type: args.action_type,
       phase_index: args.phase_index,
       actor_player_id: args.actor_player_id,
@@ -563,6 +647,7 @@ export const getActionsForPhase = query({
     action_types: v.optional(v.array(actionTypeValidator)),
     phase_index: v.number(),
     round_id: v.optional(v.string()),
+    viewer_user_id: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const types = args.action_types ?? (args.action_type ? [args.action_type] : null);
@@ -594,19 +679,33 @@ export const getActionsForPhase = query({
           .then((rows) =>
             rows.filter((row) => types.includes(row.action_type as any)),
           );
-    return baseRows.sort((a, b) => a.created_at - b.created_at);
+    const sorted = baseRows.sort((a, b) => a.created_at - b.created_at);
+    const session = await getSession(ctx, args.session_id);
+    if (!session) return sorted;
+    const viewer = await resolveViewer(ctx, args.viewer_user_id);
+    const players = await listSessionPlayers(ctx, args.session_id);
+    return sorted.map((row) => filterActionForViewer(row, session, viewer, players));
   },
 });
 
 export const getAllActions = query({
-  args: { session_id: v.string() },
-  handler: async (ctx, args) =>
-    (
+  args: {
+    session_id: v.string(),
+    viewer_user_id: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const rows = (
       await ctx.db
         .query("game_actions")
         .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
         .collect()
-    ).sort((a, b) => a.created_at - b.created_at),
+    ).sort((a, b) => a.created_at - b.created_at);
+    const session = await getSession(ctx, args.session_id);
+    if (!session) return rows;
+    const viewer = await resolveViewer(ctx, args.viewer_user_id);
+    const players = await listSessionPlayers(ctx, args.session_id);
+    return rows.map((row) => filterActionForViewer(row, session, viewer, players));
+  },
 });
 
 export const returnToLobby = mutation({
@@ -617,8 +716,21 @@ export const returnToLobby = mutation({
     original_host_user_id: v.string(),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.player_user_id);
+    const caller = await resolveCaller(ctx, args.player_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    const player = await getPlayer(ctx, args.player_id);
+    if (!player || player.session_id !== args.session_id) {
+      throw new ConvexError("Player is not in this session");
+    }
+    if (player.user_id !== caller.id) {
+      throw new ConvexError("Caller is not this player");
+    }
+    const isGameOver =
+      session.is_game_over || session.current_phase === "game_over";
+    if (session.current_phase !== "lobby" && !isGameOver) {
+      throw new ConvexError("Cannot return to lobby before game over");
+    }
+
     if (session.current_phase !== "lobby") {
       await ctx.db.patch(session._id, {
         host_user_id: args.player_user_id,
@@ -658,7 +770,6 @@ export const returnToLobby = mutation({
       });
     }
 
-    const player = await getPlayer(ctx, args.player_id);
     if (player) {
       await ctx.db.patch(player._id, { is_ready: true });
     }
@@ -761,9 +872,9 @@ export const allRoleActionsSubmitted = query({
 });
 
 export const executeRematch = mutation({
-  args: { session_id: v.string() },
+  args: { session_id: v.string(), caller_user_id: v.string() },
   handler: async (ctx, args) => {
-    await requireSessionHostIfAuthenticated(ctx, args.session_id);
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id);
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
 
     const players = await listSessionPlayers(ctx, args.session_id);

@@ -1,6 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getCurrentUser, nowAppleEpochSeconds, uuid } from "./lib";
+import {
+  getCurrentUser,
+  nowAppleEpochSeconds,
+  requireCurrentUser,
+  resolveCaller,
+  uuid,
+} from "./lib";
 
 function displayNameFromIdentity(identity: any) {
   const name = identity.name ?? identity.nickname ?? identity.email;
@@ -133,11 +139,13 @@ export const getMe = query({
 
 export const getUserProfile = query({
   args: { user_id: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
+    return await ctx.db
       .query("users")
       .withIndex("by_app_id", (q) => q.eq("id", args.user_id))
-      .unique(),
+      .unique();
+  },
 });
 
 export const updateProfile = mutation({
@@ -147,6 +155,7 @@ export const updateProfile = mutation({
     is_anonymous: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
     const user = await ctx.db
       .query("users")
       .withIndex("by_app_id", (q) => q.eq("id", args.user_id))
@@ -169,8 +178,21 @@ export const mergeGuestIntoAccount = mutation({
   args: {
     guest_user_id: v.string(),
     target_user_id: v.string(),
+    // Proof that the caller controls the guest account. Required: the caller
+    // must hold the guest's secret in their keychain (hash returned by the
+    // client's sha256(secret)). Without this, any signed-in user could merge
+    // an arbitrary guest's stats into their account and delete the guest row.
+    guest_secret_hash: v.string(),
   },
   handler: async (ctx, args) => {
+    // Caller must be Clerk-authenticated AND must match target_user_id.
+    // Guests cannot merge — merging is by definition "claim guest data into
+    // a real account", so the target side must be a real authenticated user.
+    const caller = await requireCurrentUser(ctx);
+    if (caller.id !== args.target_user_id) {
+      throw new ConvexError("target_user_id must match authenticated caller");
+    }
+
     const guest = await ctx.db
       .query("users")
       .withIndex("by_app_id", (q) => q.eq("id", args.guest_user_id))
@@ -182,6 +204,12 @@ export const mergeGuestIntoAccount = mutation({
 
     if (!guest || !target) {
       throw new ConvexError("User not found");
+    }
+    if (!guest.is_anonymous || guest.auth_subject) {
+      throw new ConvexError("guest_user_id does not reference a guest account");
+    }
+    if (!guest.guest_secret_hash || guest.guest_secret_hash !== args.guest_secret_hash) {
+      throw new ConvexError("Invalid guest credentials");
     }
 
     let transferredCount = 0;

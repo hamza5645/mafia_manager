@@ -1,27 +1,50 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { roleDistributionValidator, roleValidator } from "./validators";
-import { nowAppleEpochSeconds, uuid } from "./lib";
+import { nowAppleEpochSeconds, resolveCaller, uuid } from "./lib";
+
+// Helper: look up a row by app id, then enforce caller ownership.
+// For Clerk users this strictly verifies caller.id === row.user_id.
+// For guests it falls back to trust-the-args (consistent with resolveCaller's
+// documented posture; we cannot do better without threading guest secret).
+async function requireOwnerOfRow(
+  ctx: any,
+  table: "player_stats" | "custom_roles_configs" | "player_groups",
+  rowAppId: string,
+  notFoundMessage: string,
+) {
+  const row = await ctx.db
+    .query(table)
+    .withIndex("by_app_id", (q: any) => q.eq("id", rowAppId))
+    .unique();
+  if (!row) throw new ConvexError(notFoundMessage);
+  await resolveCaller(ctx, row.user_id);
+  return row;
+}
 
 export const listPlayerStats = query({
   args: { user_id: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
+    return await ctx.db
       .query("player_stats")
       .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
       .order("asc")
-      .collect(),
+      .collect();
+  },
 });
 
 export const getPlayerStat = query({
   args: { user_id: v.string(), player_name: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
+    return await ctx.db
       .query("player_stats")
       .withIndex("by_user_player", (q) =>
         q.eq("user_id", args.user_id).eq("player_name", args.player_name),
       )
-      .unique(),
+      .unique();
+  },
 });
 
 export const createPlayerStat = mutation({
@@ -39,6 +62,7 @@ export const createPlayerStat = mutation({
     times_citizen: v.number(),
   },
   handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
     const timestamp = nowAppleEpochSeconds();
     const doc = {
       ...args,
@@ -64,14 +88,23 @@ export const updatePlayerStat = mutation({
     times_citizen: v.number(),
   },
   handler: async (ctx, args) => {
-    const stat = await ctx.db
-      .query("player_stats")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!stat) {
-      throw new ConvexError("Player stat not found");
-    }
-    const patch = { ...args, updated_at: nowAppleEpochSeconds() };
+    const stat = await requireOwnerOfRow(
+      ctx,
+      "player_stats",
+      args.id,
+      "Player stat not found",
+    );
+    const patch = {
+      games_played: args.games_played,
+      games_won: args.games_won,
+      games_lost: args.games_lost,
+      total_kills: args.total_kills,
+      times_mafia: args.times_mafia,
+      times_doctor: args.times_doctor,
+      times_inspector: args.times_inspector,
+      times_citizen: args.times_citizen,
+      updated_at: nowAppleEpochSeconds(),
+    };
     await ctx.db.patch(stat._id, patch);
     return { ...stat, ...patch };
   },
@@ -84,9 +117,9 @@ export const deletePlayerStat = mutation({
       .query("player_stats")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
-    if (stat) {
-      await ctx.db.delete(stat._id);
-    }
+    if (!stat) return;
+    await resolveCaller(ctx, stat.user_id);
+    await ctx.db.delete(stat._id);
   },
 });
 
@@ -99,6 +132,7 @@ export const upsertPlayerStat = mutation({
     kills: v.number(),
   },
   handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
     const existing = await ctx.db
       .query("player_stats")
       .withIndex("by_user_player", (q) =>
@@ -149,20 +183,26 @@ export const upsertPlayerStat = mutation({
 
 export const listCustomRoleConfigs = query({
   args: { user_id: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
+    return await ctx.db
       .query("custom_roles_configs")
       .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
-      .collect(),
+      .collect();
+  },
 });
 
 export const getCustomRoleConfig = query({
   args: { id: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    const config = await ctx.db
       .query("custom_roles_configs")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique(),
+      .unique();
+    if (!config) return null;
+    await resolveCaller(ctx, config.user_id);
+    return config;
+  },
 });
 
 export const createCustomRoleConfig = mutation({
@@ -173,6 +213,7 @@ export const createCustomRoleConfig = mutation({
     role_distribution: roleDistributionValidator,
   },
   handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
     const timestamp = nowAppleEpochSeconds();
     const doc = {
       ...args,
@@ -192,13 +233,12 @@ export const updateCustomRoleConfig = mutation({
     role_distribution: roleDistributionValidator,
   },
   handler: async (ctx, args) => {
-    const config = await ctx.db
-      .query("custom_roles_configs")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!config) {
-      throw new ConvexError("Custom role config not found");
-    }
+    const config = await requireOwnerOfRow(
+      ctx,
+      "custom_roles_configs",
+      args.id,
+      "Custom role config not found",
+    );
     const patch = {
       config_name: args.config_name,
       role_distribution: args.role_distribution,
@@ -216,28 +256,34 @@ export const deleteCustomRoleConfig = mutation({
       .query("custom_roles_configs")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
-    if (config) {
-      await ctx.db.delete(config._id);
-    }
+    if (!config) return;
+    await resolveCaller(ctx, config.user_id);
+    await ctx.db.delete(config._id);
   },
 });
 
 export const listPlayerGroups = query({
   args: { user_id: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
+    return await ctx.db
       .query("player_groups")
       .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
-      .collect(),
+      .collect();
+  },
 });
 
 export const getPlayerGroup = query({
   args: { id: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    const group = await ctx.db
       .query("player_groups")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique(),
+      .unique();
+    if (!group) return null;
+    await resolveCaller(ctx, group.user_id);
+    return group;
+  },
 });
 
 export const createPlayerGroup = mutation({
@@ -248,6 +294,7 @@ export const createPlayerGroup = mutation({
     player_names: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    await resolveCaller(ctx, args.user_id);
     const timestamp = nowAppleEpochSeconds();
     const doc = {
       ...args,
@@ -267,13 +314,12 @@ export const updatePlayerGroup = mutation({
     player_names: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const group = await ctx.db
-      .query("player_groups")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!group) {
-      throw new ConvexError("Player group not found");
-    }
+    const group = await requireOwnerOfRow(
+      ctx,
+      "player_groups",
+      args.id,
+      "Player group not found",
+    );
     const patch = {
       group_name: args.group_name,
       player_names: args.player_names,
@@ -291,8 +337,8 @@ export const deletePlayerGroup = mutation({
       .query("player_groups")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
-    if (group) {
-      await ctx.db.delete(group._id);
-    }
+    if (!group) return;
+    await resolveCaller(ctx, group.user_id);
+    await ctx.db.delete(group._id);
   },
 });

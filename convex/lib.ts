@@ -88,22 +88,6 @@ export async function userIsSessionHost(
   return session.host_user_id === userId;
 }
 
-// Host-only guard. If Clerk auth is present, enforces strictly. If absent
-// (guest caller), this is a no-op — equivalent to current pre-hardening
-// behavior. Use only on mutations whose Swift call sites cannot easily pass
-// the caller's user_id; for the rest prefer requireSessionHostStrict.
-export async function requireSessionHostIfAuthenticated(
-  ctx: Ctx,
-  sessionId: string,
-) {
-  const clerkUser = await getCurrentUser(ctx);
-  if (!clerkUser) return null;
-  if (!(await userIsSessionHost(ctx, sessionId, clerkUser.id))) {
-    throw new ConvexError("Only the host can perform this action");
-  }
-  return clerkUser;
-}
-
 // Strict host guard taking an asserted user_id (which must match Clerk auth
 // if present). For host-only mutations whose call sites pass caller user_id.
 export async function requireSessionHostStrict(
@@ -204,13 +188,55 @@ export function visiblePlayerForViewer(
   const canSeeRole =
     session.is_game_over ||
     session.current_phase === "game_over" ||
-    session.host_user_id === viewer?.id ||
     player.user_id === viewer?.id ||
     (viewerPlayer?.role === "mafia" && player.role === "mafia");
 
   return {
     ...player,
     role: canSeeRole ? player.role : undefined,
+  };
+}
+
+// Resolves the viewer for role-visibility / action-visibility filtering.
+// When Clerk auth is present, ignore the client-supplied `assertedViewerAppId`
+// to prevent spoofing — pass through the authenticated user's record only.
+// When Clerk auth is absent (guest play), fall back to the asserted id; guest
+// play has no server-verified identity, so this is the same weak-auth posture
+// `resolveCaller` documents.
+export async function resolveViewer(
+  ctx: Ctx,
+  assertedViewerAppId?: string,
+) {
+  const clerkViewer = await getCurrentUser(ctx);
+  if (clerkViewer) return clerkViewer;
+  if (!assertedViewerAppId) return null;
+  return await ctx.db
+    .query("users")
+    .withIndex("by_app_id", (q) => q.eq("id", assertedViewerAppId))
+    .unique();
+}
+
+// Strips `inspector_result` from an action row when the viewer should not
+// see it. Visible to: the inspector actor themselves and everyone after
+// game_over. Citizens/Mafia/Doctors never see other inspectors' results.
+export function filterActionForViewer(
+  row: any,
+  session: any,
+  viewer: any | null,
+  players: any[],
+) {
+  if (!row.action_data?.inspector_result) return row;
+  const viewerPlayer = viewer
+    ? players.find((candidate) => candidate.user_id === viewer.id)
+    : null;
+  const isActor = !!viewerPlayer && viewerPlayer.player_id === row.actor_player_id;
+  const isGameOver =
+    session.is_game_over || session.current_phase === "game_over";
+  if (isActor || isGameOver) return row;
+  const { inspector_result, ...rest } = row.action_data;
+  return {
+    ...row,
+    action_data: Object.keys(rest).length > 0 ? rest : undefined,
   };
 }
 

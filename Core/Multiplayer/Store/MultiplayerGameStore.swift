@@ -365,7 +365,8 @@ final class MultiplayerGameStore: ObservableObject {
                 sessionId: session.id,
                 userId: userId,
                 playerName: playerName,
-                isBot: false
+                isBot: false,
+                callerUserId: userId
             )
 
             // Add bots
@@ -375,7 +376,8 @@ final class MultiplayerGameStore: ObservableObject {
                         sessionId: session.id,
                         userId: nil,
                         playerName: "Bot \(i)",
-                        isBot: true
+                        isBot: true,
+                        callerUserId: userId
                     )
                 }
             }
@@ -464,7 +466,8 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Leave the current session
     func leaveSession() async throws {
-        guard let playerId = myPlayer?.id else {
+        guard let player = myPlayer,
+              let sessionId = currentSession?.id else {
             throw SessionError.playerNotFound
         }
 
@@ -477,8 +480,11 @@ final class MultiplayerGameStore: ObservableObject {
         stopConsistencyCheckTimer()
         await realtimeService.unsubscribeAll()
 
-        // Remove player directly by their session player ID (works for both authenticated and unauthenticated users)
-        try await sessionService.removePlayer(playerId: playerId)
+        // Self-leave uses sessions:leaveSession (caller-owned) rather than the
+        // host-only sessions:removePlayer mutation.
+        if let userId = player.userId {
+            try await sessionService.leaveSession(sessionId: sessionId, userId: userId)
+        }
 
         // Clear local state
         currentSession = nil
@@ -546,36 +552,16 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Remove a player from the session (Host only)
     func removePlayer(withId playerId: UUID) async throws {
-        guard isHost, let sessionId = currentSession?.id else { return }
-        guard let player = allPlayers.first(where: { $0.id == playerId }) else { return }
-        
-        // If removing a bot, we just delete the record
-        // If removing a human, same thing, they will get disconnected
-        
-        // Using sessionService directly to delete the player record
-        // Note: We're using the player.id (UUID) which is the primary key of session_players
-        // The SessionService.leaveSession uses userId, but we might want to remove by player ID
-        
-        // We'll assume we can use the same mechanism as leaveSession if we have userId
-        if let userId = player.userId {
-            try await sessionService.leaveSession(sessionId: sessionId, userId: userId)
-        } else {
-            // For bots or if we need to remove by player ID directly...
-            // Since SessionService.leaveSession takes userId, let's add a specific removePlayer method to SessionService later if needed.
-            // For now, I'll check if I can use the existing leaveSession or if I need to extend it.
-            // The existing leaveSession selects by userId. Bots don't have userId.
-            
-            // Workaround: Since I can't easily add to SessionService without editing it (which I should avoid if possible or do in a separate step), 
-            // I will rely on the fact that I'm the host and I can probably delete the record.
-            // But wait, I can edit SessionService. The plan says "Ensure sessionService has removePlayer".
-            
-            // Let's skip the implementation details here and assume I'll add `removePlayer(playerId:)` to SessionService.
-            // Wait, I previously used try await sessionService.removePlayer(playerId: player.id)
-            // But I didn't add it to SessionService yet.
-            
-            // I will add it to SessionService in the next step.
-             try await sessionService.removePlayer(playerId: player.id)
+        guard isHost, currentSession?.id != nil else { return }
+        guard let callerUserId = currentUserId() else {
+            throw SessionError.notHost
         }
+        guard let player = allPlayers.first(where: { $0.id == playerId }) else { return }
+
+        try await sessionService.removePlayer(
+            playerId: player.id,
+            callerUserId: callerUserId
+        )
         
         // Local cleanup will happen via real-time update, but we can do it optimistically
         handlePlayerRemoval(playerId: player.id)
@@ -1237,7 +1223,8 @@ final class MultiplayerGameStore: ObservableObject {
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "night",
-            phaseData: .night(nightIndex: 0, activeRole: nil)
+            phaseData: .night(nightIndex: 0, activeRole: nil),
+            callerUserId: currentUserId() ?? UUID()
         )
         
         // 2. Reset ready status for all players (background task)
@@ -1274,11 +1261,16 @@ final class MultiplayerGameStore: ObservableObject {
         // Update database with assignments
         try await sessionService.assignRolesAndNumbers(
             sessionId: session.id,
-            assignments: assignments
+            assignments: assignments,
+            callerUserId: currentUserId() ?? UUID()
         )
 
         // Update session status and phase
-        try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress)
+        try await sessionService.updateSessionStatus(
+            sessionId: session.id,
+            status: .inProgress,
+            callerUserId: currentUserId() ?? UUID()
+        )
 
         // Reset readiness before role reveal so hosts can't advance until everyone confirms
         await resetAllPlayersReady()
@@ -1286,7 +1278,8 @@ final class MultiplayerGameStore: ObservableObject {
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "role_reveal",
-            phaseData: .roleReveal(currentPlayerIndex: 0)
+            phaseData: .roleReveal(currentPlayerIndex: 0),
+            callerUserId: currentUserId() ?? UUID()
         )
 
         // Refresh local state
@@ -1335,7 +1328,8 @@ final class MultiplayerGameStore: ObservableObject {
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: phase,
-            phaseData: phaseData
+            phaseData: phaseData,
+            callerUserId: currentUserId() ?? UUID()
         )
     }
 
@@ -1762,7 +1756,11 @@ final class MultiplayerGameStore: ObservableObject {
         print("🔄 [MultiplayerGameStore] Initiating host transfer to next eligible player")
 
         do {
-            try await sessionService.updateSessionHost(sessionId: session.id, newHostUserId: newHostUserId)
+            try await sessionService.updateSessionHost(
+                sessionId: session.id,
+                newHostUserId: newHostUserId,
+                callerUserId: currentUserId() ?? UUID()
+            )
             // Realtime should sync the change to all clients, but also refresh locally in case it was missed
             try? await refreshSession()
             print("✅ [MultiplayerGameStore] Host transfer initiated successfully")
@@ -1849,7 +1847,10 @@ final class MultiplayerGameStore: ObservableObject {
 
         do {
             // Single RPC call instead of N sequential updates
-            try await sessionService.resetAllPlayersReady(sessionId: session.id)
+            try await sessionService.resetAllPlayersReady(
+                sessionId: session.id,
+                callerUserId: currentUserId() ?? UUID()
+            )
 
             // Update local state for immediate UI feedback
             for index in allPlayers.indices where !allPlayers[index].isBot {
@@ -2029,7 +2030,8 @@ final class MultiplayerGameStore: ObservableObject {
                 sessionId: sessionId,
                 actionType: actionType,
                 phaseIndex: phaseIndex,
-                roundId: roundId
+                roundId: roundId,
+                viewerUserId: currentUserId()
             )
         } catch {
             print("⚠️ [MultiplayerGameStore] Failed to load actions for \(actionType.rawValue) @ phase \(phaseIndex): \(error)")
@@ -2068,19 +2070,22 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             actionType: .mafiaTarget,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId()
         )
         let doctorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .doctorProtect,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId()
         )
         let inspectorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .inspectorCheck,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId()
         )
 
         // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
@@ -2145,6 +2150,7 @@ final class MultiplayerGameStore: ObservableObject {
         // Update ONLY night_history, don't touch players or phase
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             nightHistory: updatedHistory
         )
     }
@@ -2222,6 +2228,7 @@ final class MultiplayerGameStore: ObservableObject {
             eliminatedPlayerIds: resultingDeaths,
             nextPhase: nextPhaseName,
             nextPhaseData: nextPhaseData,
+            callerUserId: currentUserId() ?? UUID(),
             isGameOver: winnerCheck.isGameOver ? true : nil,
             winner: winnerCheck.winner
         )
@@ -2305,19 +2312,22 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             actionType: .mafiaTarget,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId()
         )
         let doctorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .doctorProtect,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId()
         )
         let inspectorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .inspectorCheck,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId()
         )
 
         // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
@@ -2403,6 +2413,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: nextPhaseName,
             phaseData: nextPhaseData,
             nightHistory: updatedHistory,
@@ -2548,6 +2559,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "voting_results",
             phaseData: nextPhaseData,
             dayIndex: session.dayIndex,
@@ -2598,6 +2610,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "vote_death_reveal",
             phaseData: revealPhaseData,
             dayIndex: session.dayIndex,
@@ -2663,6 +2676,7 @@ final class MultiplayerGameStore: ObservableObject {
         // Update session - phase and history changes
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: nextPhaseName,
             phaseData: nextPhaseData,
             dayIndex: newDayIndex,
@@ -2749,6 +2763,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: nextPhaseName,
             phaseData: nextPhaseData,
             dayIndex: newDayIndex,
@@ -2852,7 +2867,8 @@ final class MultiplayerGameStore: ObservableObject {
             try await sessionService.updatePlayerLifeStatus(
                 recordId: updatedPlayer.id,
                 isAlive: false,
-                removalNote: reason
+                removalNote: reason,
+                callerUserId: currentUserId() ?? UUID()
             )
         }
 
@@ -2872,7 +2888,11 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         do {
-            try await sessionService.updateSessionHost(sessionId: session.id, newHostUserId: newHostUserId)
+            try await sessionService.updateSessionHost(
+                sessionId: session.id,
+                newHostUserId: newHostUserId,
+                callerUserId: currentUserId() ?? UUID()
+            )
             try? await refreshSession()
         } catch {
             print("❌ [MultiplayerGameStore] Failed to transfer host after elimination: \(error)")
@@ -3006,6 +3026,7 @@ final class MultiplayerGameStore: ObservableObject {
         guard let session = currentSession, !session.isGameOver else { return }
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "death_reveal",
             phaseData: .deathReveal(nightIndex: nightIndex)
         )
@@ -3016,6 +3037,7 @@ final class MultiplayerGameStore: ObservableObject {
         let dayIndex = session.dayIndex
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "voting",
             phaseData: .voting(dayIndex: dayIndex)
         )

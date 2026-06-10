@@ -44,8 +44,14 @@ final class SessionService {
         )
     }
 
-    func removePlayer(playerId: UUID) async throws {
-        try await convex.mutation("sessions:removePlayer", with: ["player_id": playerId.uuidString.lowercased()])
+    func removePlayer(playerId: UUID, callerUserId: UUID) async throws {
+        try await convex.mutation(
+            "sessions:removePlayer",
+            with: [
+                "player_id": playerId.uuidString.lowercased(),
+                "caller_user_id": callerUserId.uuidString.lowercased(),
+            ]
+        )
     }
 
     func getSession(sessionId: UUID) async throws -> GameSession? {
@@ -64,22 +70,24 @@ final class SessionService {
         )
     }
 
-    func updateSessionStatus(sessionId: UUID, status: SessionStatus) async throws {
+    func updateSessionStatus(sessionId: UUID, status: SessionStatus, callerUserId: UUID) async throws {
         try await convex.mutation(
             "sessions:updateSessionStatus",
             with: [
                 "session_id": sessionId.uuidString.lowercased(),
                 "status": status.rawValue,
+                "caller_user_id": callerUserId.uuidString.lowercased(),
             ]
         )
     }
 
-    func updateSessionHost(sessionId: UUID, newHostUserId: UUID) async throws {
+    func updateSessionHost(sessionId: UUID, newHostUserId: UUID, callerUserId: UUID) async throws {
         try await convex.mutation(
             "sessions:updateSessionHost",
             with: [
                 "session_id": sessionId.uuidString.lowercased(),
                 "new_host_user_id": newHostUserId.uuidString.lowercased(),
+                "caller_user_id": callerUserId.uuidString.lowercased(),
             ]
         )
     }
@@ -87,7 +95,8 @@ final class SessionService {
     func updateSessionPhase(
         sessionId: UUID,
         currentPhase: String,
-        phaseData: PhaseData?
+        phaseData: PhaseData?,
+        callerUserId: UUID
     ) async throws {
         try await convex.mutation(
             "sessions:updateSessionPhase",
@@ -95,12 +104,14 @@ final class SessionService {
                 "session_id": sessionId.uuidString.lowercased(),
                 "current_phase": currentPhase,
                 "current_phase_data": try phaseData.map { try raw($0) },
+                "caller_user_id": callerUserId.uuidString.lowercased(),
             ]
         )
     }
 
     func updateSessionState(
         sessionId: UUID,
+        callerUserId: UUID,
         currentPhase: String? = nil,
         phaseData: PhaseData? = nil,
         dayIndex: Int? = nil,
@@ -111,6 +122,7 @@ final class SessionService {
     ) async throws {
         var args: [String: ConvexEncodable?] = [
             "session_id": sessionId.uuidString.lowercased(),
+            "caller_user_id": callerUserId.uuidString.lowercased(),
             "current_phase": currentPhase,
             "day_index": dayIndex.map(Double.init),
             "is_game_over": isGameOver,
@@ -134,6 +146,7 @@ final class SessionService {
         eliminatedPlayerIds: [UUID],
         nextPhase: String,
         nextPhaseData: PhaseData,
+        callerUserId: UUID,
         isGameOver: Bool? = nil,
         winner: Role? = nil
     ) async throws -> Bool {
@@ -147,6 +160,7 @@ final class SessionService {
                 "next_phase_data": try raw(nextPhaseData),
                 "is_game_over": isGameOver,
                 "winner": winner?.rawValue,
+                "caller_user_id": callerUserId.uuidString.lowercased(),
             ],
             as: Bool.self
         )
@@ -168,7 +182,8 @@ final class SessionService {
         sessionId: UUID,
         userId: UUID?,
         playerName: String,
-        isBot: Bool
+        isBot: Bool,
+        callerUserId: UUID? = nil
     ) async throws -> SessionPlayer {
         try await convex.mutation(
             "sessions:addPlayer",
@@ -177,6 +192,7 @@ final class SessionService {
                 "user_id": userId?.uuidString.lowercased(),
                 "player_name": playerName,
                 "is_bot": isBot,
+                "caller_user_id": callerUserId?.uuidString.lowercased(),
             ]
         )
     }
@@ -191,17 +207,21 @@ final class SessionService {
         )
     }
 
-    func resetAllPlayersReady(sessionId: UUID) async throws {
+    func resetAllPlayersReady(sessionId: UUID, callerUserId: UUID) async throws {
         try await convex.mutation(
             "sessions:resetAllPlayersReady",
-            with: ["session_id": sessionId.uuidString.lowercased()]
+            with: [
+                "session_id": sessionId.uuidString.lowercased(),
+                "caller_user_id": callerUserId.uuidString.lowercased(),
+            ]
         )
     }
 
     func updatePlayerLifeStatus(
         recordId: UUID,
         isAlive: Bool,
-        removalNote: String?
+        removalNote: String?,
+        callerUserId: UUID
     ) async throws {
         try await convex.mutation(
             "sessions:updatePlayerLifeStatus",
@@ -209,6 +229,7 @@ final class SessionService {
                 "record_id": recordId.uuidString.lowercased(),
                 "is_alive": isAlive,
                 "removal_note": removalNote,
+                "caller_user_id": callerUserId.uuidString.lowercased(),
             ]
         )
     }
@@ -222,7 +243,8 @@ final class SessionService {
 
     func assignRolesAndNumbers(
         sessionId: UUID,
-        assignments: [(playerId: UUID, role: Role, number: Int)]
+        assignments: [(playerId: UUID, role: Role, number: Int)],
+        callerUserId: UUID
     ) async throws {
         let payload: [[String: ConvexEncodable?]] = assignments.map {
             [
@@ -237,6 +259,7 @@ final class SessionService {
             with: [
                 "session_id": sessionId.uuidString.lowercased(),
                 "assignments": payload.map { $0 as ConvexEncodable? },
+                "caller_user_id": callerUserId.uuidString.lowercased(),
             ]
         )
     }
@@ -262,13 +285,15 @@ final class SessionService {
         sessionId: UUID,
         actionType: ActionType,
         phaseIndex: Int,
-        roundId: UUID? = nil
+        roundId: UUID? = nil,
+        viewerUserId: UUID? = nil
     ) async throws -> [GameAction] {
         try await getActionsForPhase(
             sessionId: sessionId,
             actionTypes: [actionType],
             phaseIndex: phaseIndex,
-            roundId: roundId
+            roundId: roundId,
+            viewerUserId: viewerUserId
         )
     }
 
@@ -276,7 +301,8 @@ final class SessionService {
         sessionId: UUID,
         actionTypes: [ActionType],
         phaseIndex: Int,
-        roundId: UUID? = nil
+        roundId: UUID? = nil,
+        viewerUserId: UUID? = nil
     ) async throws -> [GameAction] {
         try await convex.query(
             "sessions:getActionsForPhase",
@@ -285,14 +311,18 @@ final class SessionService {
                 "action_types": actionTypes.map(\.rawValue),
                 "phase_index": Double(phaseIndex),
                 "round_id": roundId?.uuidString.lowercased(),
+                "viewer_user_id": viewerUserId?.uuidString.lowercased(),
             ]
         )
     }
 
-    func getAllActions(sessionId: UUID) async throws -> [GameAction] {
+    func getAllActions(sessionId: UUID, viewerUserId: UUID? = nil) async throws -> [GameAction] {
         try await convex.query(
             "sessions:getAllActions",
-            with: ["session_id": sessionId.uuidString.lowercased()]
+            with: [
+                "session_id": sessionId.uuidString.lowercased(),
+                "viewer_user_id": viewerUserId?.uuidString.lowercased(),
+            ]
         )
     }
 

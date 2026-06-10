@@ -125,22 +125,28 @@ final class AuthStore: ObservableObject {
         let displayName = UserDefaults.standard.string(forKey: DefaultsKeys.pendingSignUpDisplayName) ?? ""
         let mergeAnonymousId = UserDefaults.standard.string(forKey: DefaultsKeys.pendingMergeFromAnonymousId)
             .flatMap(UUID.init(uuidString:))
+        // Capture guest credential proof *before* clearing the keychain — the
+        // server-side merge now requires the original guest's secret hash.
+        let guestSecretHash = currentGuestSecretHash()
 
         do {
             let profile = try await authService.verifySignUpEmailCode(code, displayName: displayName)
             applyAuthenticatedProfile(profile)
-            clearGuestSecret()
 
-            if let anonymousId = mergeAnonymousId, anonymousId != profile.id {
+            if let anonymousId = mergeAnonymousId,
+               anonymousId != profile.id,
+               let guestSecretHash {
                 _ = try? await authService.mergeAnonymousStats(
                     anonymousUserId: anonymousId,
-                    targetUserId: profile.id
+                    targetUserId: profile.id,
+                    guestSecretHash: guestSecretHash
                 )
                 isAnonymous = false
                 userProfile?.isAnonymous = false
                 guestDisplayName = nil
             }
 
+            clearGuestSecret()
             clearPendingSignUpState()
             return true
         } catch {
@@ -277,6 +283,13 @@ final class AuthStore: ObservableObject {
             forKey: DefaultsKeys.pendingMergeFromAnonymousId
         )
 
+        // Capture guest credential proof *before* startSignUp — the
+        // .authenticated branch of startSignUp clears the keychain.
+        guard let guestSecretHash = currentGuestSecretHash() else {
+            clearPendingSignUpState()
+            return .failure("Missing guest credentials for merge")
+        }
+
         let step = await startSignUp(email: email, password: password, displayName: displayName)
         switch step {
         case .authenticated:
@@ -286,7 +299,8 @@ final class AuthStore: ObservableObject {
             do {
                 _ = try await authService.mergeAnonymousStats(
                     anonymousUserId: anonymousUserId,
-                    targetUserId: targetUserId
+                    targetUserId: targetUserId,
+                    guestSecretHash: guestSecretHash
                 )
                 isAnonymous = false
                 userProfile?.isAnonymous = false
@@ -311,11 +325,18 @@ final class AuthStore: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
 
+        // Capture guest credential proof before signing into the real account.
+        guard let guestSecretHash = currentGuestSecretHash() else {
+            errorMessage = "Missing guest credentials for merge"
+            return false
+        }
+
         do {
             let profile = try await authService.signIn(email: email, password: password)
             _ = try await authService.mergeAnonymousStats(
                 anonymousUserId: anonymousUserId,
-                targetUserId: profile.id
+                targetUserId: profile.id,
+                guestSecretHash: guestSecretHash
             )
             applyAuthenticatedProfile(profile)
             clearGuestSecret()
@@ -352,6 +373,13 @@ final class AuthStore: ObservableObject {
         let secret = UUID().uuidString + "-" + UUID().uuidString
         try keychain.save(secret, forKey: KeychainKeys.guestSecret)
         return secret
+    }
+
+    private func currentGuestSecretHash() -> String? {
+        guard let secret = try? keychain.load(forKey: KeychainKeys.guestSecret) else {
+            return nil
+        }
+        return hash(secret)
     }
 
     private func clearGuestSecret() {

@@ -1,5 +1,28 @@
 # Session Changes
 
+## Multiplayer Convex authorization hardening
+
+### What Changed
+
+- Restricted exported Convex player insertion so direct human adds require the session host to add only themselves while the session is waiting, with duplicate and capacity checks preserved.
+- Routed host kicks through the host-only `sessions:removePlayer` mutation for both human players and bots.
+- Tightened lobby reset so `sessions:returnToLobby` verifies the caller owns the player record in the session and only resets after game over.
+- Removed host status as a role/action visibility override so active host players do not receive secret roles or other inspectors' results before game over.
+
+### Validation
+
+- `tuist build mafia_manager` succeeded after the security fixes.
+- `tuist test mafia_manager` succeeded with 22 tests and 0 failures.
+- `npx convex dev --once` and local `convex codegen --dry-run --typecheck enable` could not run here because the Convex CLI attempted external network authorization/telemetry and network access was blocked.
+
+### Rollback
+
+- Revert the `convex/sessions.ts`, `convex/lib.ts`, and `Core/Multiplayer/Store/MultiplayerGameStore.swift` changes if this hardening must be backed out.
+
+### Known Gotchas
+
+- Guest quick-play still uses the existing asserted app user ID model; these fixes prevent the reviewed regressions without replacing guest identity verification.
+
 ## Backend migration: Convex + Clerk
 
 ### What Changed

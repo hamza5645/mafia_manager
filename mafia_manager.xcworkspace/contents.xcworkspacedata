@@ -2,11 +2,15 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:../clerk-convex-swift/ClerkConvex.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "group:mafia_manager.xcodeproj">
    </FileRef>
+   <Group
+      location = "group:Vendor"
+      name = "Vendor">
+      <FileRef
+         location = "group:clerk-convex-swift/ClerkConvex.xcodeproj">
+      </FileRef>
+   </Group>
    <Group
       location = "container:"
       name = "Dependencies">

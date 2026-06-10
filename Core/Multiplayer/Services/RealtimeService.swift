@@ -70,7 +70,7 @@ final class RealtimeService: ObservableObject {
 
         cancellables["\(sessionKey):actions"] = convex.subscribe(
             "sessions:getAllActions",
-            with: sessionArgs,
+            with: playerArgs,
             as: [GameAction].self
         )
         .receive(on: DispatchQueue.main)

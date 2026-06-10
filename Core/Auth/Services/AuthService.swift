@@ -222,12 +222,17 @@ final class AuthService {
         )
     }
 
-    func mergeAnonymousStats(anonymousUserId: UUID, targetUserId: UUID) async throws -> MergeStatsResult {
+    func mergeAnonymousStats(
+        anonymousUserId: UUID,
+        targetUserId: UUID,
+        guestSecretHash: String
+    ) async throws -> MergeStatsResult {
         try await convex.mutation(
             "users:mergeGuestIntoAccount",
             with: [
                 "guest_user_id": anonymousUserId.uuidString.lowercased(),
                 "target_user_id": targetUserId.uuidString.lowercased(),
+                "guest_secret_hash": guestSecretHash,
             ]
         )
     }
