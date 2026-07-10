@@ -1,5 +1,55 @@
 # Session Changes
 
+## Authentication, realtime, and migration regression fixes
+
+### What Changed
+
+- Protected Convex profile, stats, setup-data, player, session, action, and
+  tentative-selection APIs now require either a matching Clerk identity or the
+  anonymous row's `guest_secret_hash`. Human actions require player ownership;
+  bot actions require the proven session host. Sensitive action/readiness data
+  requires proven session membership, while room-code discovery stays public.
+- Clerk token refresh events now fetch the `convex` JWT template and retain the
+  last valid Convex token if refresh fails. Verification-free signup performs
+  the same Clerk/Convex synchronization as verified signup, and Clerk's typed
+  existing-email error routes into the existing-account merge flow.
+- Guest upgrades persist pending merge work and Keychain proof until the merge
+  succeeds. Failed merges expose Retry saving progress and Finish later, and an
+  active account retries pending work during session restoration.
+- Realtime player snapshots emit removals before replacing their cache. Other
+  players disappear immediately; local removal clears player/role/number state,
+  stops the session connection, sets `isInSession = false`, and marks the kick.
+- Migration parity now counts every row with `legacy_supabase_user_id`, including
+  Clerk-claimed rows. `listLegacyOrphans` remains the unclaimed-user report only.
+
+### Validation
+
+- Added XCTest coverage for Clerk error/token handling, verification-free auth
+  synchronization, pending merge persistence/retry/cleanup, snapshot insertion,
+  update and one-shot deletion, and local/remote player removal behavior.
+- `node --check scripts/migration/verify.mjs` passed.
+- `npx convex codegen --dry-run --typecheck enable` passed after adding the
+  standard Convex TypeScript configuration and development compiler dependency.
+- `tuist generate` and `tuist build mafia_manager` passed.
+- `tuist test mafia_manager` passed 30 local tests; 5 live Convex security and
+  integration scenarios were skipped behind `CONVEX_INTEGRATION=1` as intended.
+
+### Rollback
+
+- Roll back the fixed app and Convex functions together. Revert the guest-proof
+  arguments and strict guards only with the matching Swift service/realtime
+  changes; reverting one side alone breaks guest multiplayer and cloud data.
+- Pending merge state is backward-compatible local data. A rollback may leave
+  the Keychain secret and pending anonymous ID in place; do not delete them
+  unless guest data has been merged or intentionally abandoned.
+
+### Guest API Compatibility
+
+- Existing account clients remain compatible because Clerk calls omit the
+  optional guest hash. Older guest clients do not send proof and cannot use the
+  newly protected endpoints. Production Convex and the fixed app must therefore
+  ship as a coordinated rollout; do not deploy this backend ahead of the app.
+
 ## Multiplayer Convex authorization hardening
 
 ### What Changed

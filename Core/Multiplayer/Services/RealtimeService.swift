@@ -22,19 +22,23 @@ final class RealtimeService: ObservableObject {
     func subscribeToSession(
         sessionId: UUID,
         viewerUserId: UUID?,
+        guestSecretHash: String? = nil,
+        preserveSnapshotCache: Bool = false,
         onSessionUpdate: @escaping (GameSession) -> Void,
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
+        onPlayerRemoved: @escaping (UUID) -> Void = { _ in },
         onActionUpdate: @escaping (GameAction) -> Void,
         onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in },
         onDecodeError: @escaping (Error, String) -> Void = { _, _ in }
     ) async throws {
-        await unsubscribeAll()
+        await unsubscribeAll(preserveSnapshotCache: preserveSnapshotCache)
 
         let sessionKey = "session:\(sessionId.uuidString)"
         let sessionArgs: [String: ConvexEncodable?] = ["session_id": sessionId.uuidString.lowercased()]
         let playerArgs: [String: ConvexEncodable?] = [
             "session_id": sessionId.uuidString.lowercased(),
             "viewer_user_id": viewerUserId?.uuidString.lowercased(),
+            "guest_secret_hash": guestSecretHash,
         ]
 
         cancellables["\(sessionKey):session"] = convex.subscribe(
@@ -64,7 +68,11 @@ final class RealtimeService: ObservableObject {
                 self?.handleCompletion(completion, sessionId: sessionId, table: "session_players", onDecodeError: onDecodeError)
             },
             receiveValue: { [weak self] players in
-                self?.handlePlayersSnapshot(players, onPlayerUpdate: onPlayerUpdate)
+                self?.handlePlayersSnapshot(
+                    players,
+                    onPlayerUpdate: onPlayerUpdate,
+                    onPlayerRemoved: onPlayerRemoved
+                )
             }
         )
 
@@ -85,7 +93,7 @@ final class RealtimeService: ObservableObject {
 
         cancellables["\(sessionKey):tentative"] = convex.subscribe(
             "sessions:listTentativeSelectionsForSession",
-            with: sessionArgs,
+            with: playerArgs,
             as: [TentativeSelection].self
         )
         .receive(on: DispatchQueue.main)
@@ -106,7 +114,9 @@ final class RealtimeService: ObservableObject {
     func broadcastMessage(
         sessionId: UUID,
         event: String,
-        payload: TentativeSelection
+        payload: TentativeSelection,
+        callerUserId: UUID? = nil,
+        guestSecretHash: String? = nil
     ) async throws {
         guard event == "tentative_selection" else {
             return
@@ -120,6 +130,8 @@ final class RealtimeService: ObservableObject {
                 "target_player_id": payload.targetPlayerId?.uuidString.lowercased(),
                 "action_type": payload.actionType.rawValue,
                 "phase_index": Double(payload.phaseIndex),
+                "caller_user_id": callerUserId?.uuidString.lowercased(),
+                "guest_secret_hash": guestSecretHash,
             ]
         )
     }
@@ -133,20 +145,24 @@ final class RealtimeService: ObservableObject {
         isConnected = !cancellables.isEmpty
     }
 
-    func unsubscribeAll() async {
+    func unsubscribeAll(preserveSnapshotCache: Bool = false) async {
         cancellables.values.forEach { $0.cancel() }
         cancellables.removeAll()
-        lastPlayersById.removeAll()
-        lastActionsById.removeAll()
-        lastTentativeByKey.removeAll()
+        if !preserveSnapshotCache {
+            lastPlayersById.removeAll()
+            lastActionsById.removeAll()
+            lastTentativeByKey.removeAll()
+        }
         isConnected = false
     }
 
     func attemptResubscribe(
         sessionId: UUID,
         viewerUserId: UUID?,
+        guestSecretHash: String? = nil,
         onSessionUpdate: @escaping (GameSession) -> Void,
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
+        onPlayerRemoved: @escaping (UUID) -> Void = { _ in },
         onActionUpdate: @escaping (GameAction) -> Void,
         onDecodeError: @escaping (Error, String) -> Void = { _, _ in },
         onReconnected: @escaping () async -> Void = {}
@@ -158,8 +174,11 @@ final class RealtimeService: ObservableObject {
                 try await subscribeToSession(
                     sessionId: sessionId,
                     viewerUserId: viewerUserId,
+                    guestSecretHash: guestSecretHash,
+                    preserveSnapshotCache: true,
                     onSessionUpdate: onSessionUpdate,
                     onPlayerUpdate: onPlayerUpdate,
+                    onPlayerRemoved: onPlayerRemoved,
                     onActionUpdate: onActionUpdate,
                     onDecodeError: onDecodeError
                 )
@@ -176,8 +195,10 @@ final class RealtimeService: ObservableObject {
     func forceReconnect(
         sessionId: UUID,
         viewerUserId: UUID?,
+        guestSecretHash: String? = nil,
         onSessionUpdate: @escaping (GameSession) -> Void,
         onPlayerUpdate: @escaping (SessionPlayer) -> Void,
+        onPlayerRemoved: @escaping (UUID) -> Void = { _ in },
         onActionUpdate: @escaping (GameAction) -> Void,
         onTentativeSelection: @escaping (TentativeSelection) -> Void = { _ in },
         onDecodeError: @escaping (Error, String) -> Void = { _, _ in },
@@ -186,8 +207,11 @@ final class RealtimeService: ObservableObject {
         try await subscribeToSession(
             sessionId: sessionId,
             viewerUserId: viewerUserId,
+            guestSecretHash: guestSecretHash,
+            preserveSnapshotCache: true,
             onSessionUpdate: onSessionUpdate,
             onPlayerUpdate: onPlayerUpdate,
+            onPlayerRemoved: onPlayerRemoved,
             onActionUpdate: onActionUpdate,
             onTentativeSelection: onTentativeSelection,
             onDecodeError: onDecodeError
@@ -209,11 +233,16 @@ final class RealtimeService: ObservableObject {
         }
     }
 
-    private func handlePlayersSnapshot(
+    func handlePlayersSnapshot(
         _ players: [SessionPlayer],
-        onPlayerUpdate: @escaping (SessionPlayer) -> Void
+        onPlayerUpdate: @escaping (SessionPlayer) -> Void,
+        onPlayerRemoved: @escaping (UUID) -> Void
     ) {
         let incoming = Dictionary(uniqueKeysWithValues: players.map { ($0.id, $0) })
+        let removedIds = Set(lastPlayersById.keys).subtracting(incoming.keys)
+        for playerId in removedIds.sorted(by: { $0.uuidString < $1.uuidString }) {
+            onPlayerRemoved(playerId)
+        }
         for player in players {
             if let previous = lastPlayersById[player.id] {
                 if !previous.displayPropertiesEqual(to: player)

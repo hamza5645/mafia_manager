@@ -7,6 +7,10 @@ struct SignupVerificationView: View {
     @State private var resendInfoMessage: String?
     @FocusState private var codeFieldFocused: Bool
 
+    private var shouldRetryMerge: Bool {
+        authStore.hasPendingGuestMerge && !authStore.isAnonymous
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0
@@ -14,36 +18,40 @@ struct SignupVerificationView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    Text("Verify your email")
+                    Text(shouldRetryMerge ? "Save your progress" : "Verify your email")
                         .font(Design.Typography.title1)
                         .foregroundColor(Design.Colors.textPrimary)
                         .padding(.top, 40)
                         .accessibilityAddTraits(.isHeader)
 
-                    Text("Enter the 6-digit code we sent to your email to finish creating your account.")
+                    Text(shouldRetryMerge
+                         ? "Your account is verified. Retry saving your guest progress to finish the upgrade."
+                         : "Enter the 6-digit code we sent to your email to finish creating your account.")
                         .font(Design.Typography.subheadline)
                         .foregroundColor(Design.Colors.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
 
-                    TextField("123456", text: Binding(
-                        get: { code },
-                        set: { code = String($0.filter(\.isNumber).prefix(6)) }
-                    ))
-                    .textContentType(.oneTimeCode)
-                    .keyboardType(.numberPad)
-                    .font(Design.Typography.title2)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                    .background(Design.Colors.surface1)
-                    .foregroundColor(Design.Colors.textPrimary)
-                    .cornerRadius(Design.Radii.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Design.Radii.card)
-                            .stroke(Design.Colors.stroke, lineWidth: 1)
-                    )
-                    .focused($codeFieldFocused)
-                    .padding(.horizontal, 32)
+                    if !shouldRetryMerge {
+                        TextField("123456", text: Binding(
+                            get: { code },
+                            set: { code = String($0.filter(\.isNumber).prefix(6)) }
+                        ))
+                        .textContentType(.oneTimeCode)
+                        .keyboardType(.numberPad)
+                        .font(Design.Typography.title2)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .background(Design.Colors.surface1)
+                        .foregroundColor(Design.Colors.textPrimary)
+                        .cornerRadius(Design.Radii.card)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Design.Radii.card)
+                                .stroke(Design.Colors.stroke, lineWidth: 1)
+                        )
+                        .focused($codeFieldFocused)
+                        .padding(.horizontal, 32)
+                    }
 
                     if let resendInfoMessage {
                         Text(resendInfoMessage)
@@ -61,7 +69,17 @@ struct SignupVerificationView: View {
                     Button {
                         Task {
                             resendInfoMessage = nil
-                            let success = await authStore.verifySignUpEmailCode(code)
+                            let success: Bool
+                            if shouldRetryMerge {
+                                success = await authStore.retryPendingGuestMerge()
+                            } else {
+                                switch await authStore.verifySignUpEmailCode(code) {
+                                case .success:
+                                    success = true
+                                case .verificationFailed, .retryableMergeFailure:
+                                    success = false
+                                }
+                            }
                             if success {
                                 await MainActor.run { dismiss() }
                             }
@@ -72,7 +90,7 @@ struct SignupVerificationView: View {
                                 ProgressView()
                                     .tint(Design.Colors.textPrimary)
                             } else {
-                                Text("Verify")
+                                Text(shouldRetryMerge ? "Retry saving progress" : "Verify")
                                     .font(Design.Typography.headline)
                             }
                         }
@@ -82,23 +100,25 @@ struct SignupVerificationView: View {
                         .foregroundColor(Design.Colors.textPrimary)
                         .cornerRadius(Design.Radii.card)
                     }
-                    .disabled(authStore.isLoading || code.count != 6)
+                    .disabled(authStore.isLoading || (!shouldRetryMerge && code.count != 6))
                     .padding(.horizontal, 32)
 
-                    Button {
-                        Task {
-                            authStore.clearError()
-                            let sent = await authStore.resendSignUpEmailCode()
-                            if sent {
-                                resendInfoMessage = "A new code has been sent."
+                    if !shouldRetryMerge {
+                        Button {
+                            Task {
+                                authStore.clearError()
+                                let sent = await authStore.resendSignUpEmailCode()
+                                if sent {
+                                    resendInfoMessage = "A new code has been sent."
+                                }
                             }
+                        } label: {
+                            Text("Resend code")
+                                .font(Design.Typography.subheadline)
+                                .foregroundColor(Design.Colors.brandGold)
                         }
-                    } label: {
-                        Text("Resend code")
-                            .font(Design.Typography.subheadline)
-                            .foregroundColor(Design.Colors.brandGold)
+                        .disabled(authStore.isLoading)
                     }
-                    .disabled(authStore.isLoading)
 
                     Spacer()
 
@@ -106,7 +126,7 @@ struct SignupVerificationView: View {
                         authStore.cancelPendingSignUp()
                         dismiss()
                     } label: {
-                        Text("Cancel")
+                        Text(shouldRetryMerge ? "Finish later" : "Cancel")
                             .font(Design.Typography.subheadline)
                             .foregroundColor(Design.Colors.textSecondary)
                     }
@@ -116,7 +136,7 @@ struct SignupVerificationView: View {
         }
         .onAppear {
             authStore.clearError()
-            codeFieldFocused = true
+            codeFieldFocused = !shouldRetryMerge
         }
     }
 }

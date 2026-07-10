@@ -52,13 +52,14 @@ export async function requireCurrentUser(ctx: Ctx) {
   return user;
 }
 
-// Resolves the caller's user record. Prefers Clerk identity; if absent (guest),
-// looks up the asserted user_id arg. When Clerk identity IS present, the
-// asserted user_id must match it (strict). For guests, the asserted id is
-// trusted. Net effect: Clerk users are strictly authenticated; guest users
-// remain at the prior weak (trust-the-args) level — no regression for guests
-// who do not have Clerk auth, real protection for users who do.
-export async function resolveCaller(ctx: Ctx, assertedUserAppId?: string) {
+// Resolves the caller's user record. Clerk identities must match any asserted
+// app user id. Unauthenticated callers may resolve only anonymous rows and
+// must present the matching high-entropy guest secret hash.
+export async function resolveCaller(
+  ctx: Ctx,
+  assertedUserAppId?: string,
+  guestSecretHash?: string,
+) {
   const clerkUser = await getCurrentUser(ctx);
   if (clerkUser) {
     if (assertedUserAppId && clerkUser.id !== assertedUserAppId) {
@@ -75,6 +76,12 @@ export async function resolveCaller(ctx: Ctx, assertedUserAppId?: string) {
     .unique();
   if (!asserted) {
     throw new ConvexError("User not found");
+  }
+  if (!asserted.is_anonymous || asserted.auth_subject) {
+    throw new ConvexError("Authentication required");
+  }
+  if (!guestSecretHash || asserted.guest_secret_hash !== guestSecretHash) {
+    throw new ConvexError("Invalid guest credentials");
   }
   return asserted;
 }
@@ -94,20 +101,39 @@ export async function requireSessionHostStrict(
   ctx: Ctx,
   sessionId: string,
   assertedUserAppId: string,
+  guestSecretHash?: string,
 ) {
-  const caller = await resolveCaller(ctx, assertedUserAppId);
+  const caller = await resolveCaller(ctx, assertedUserAppId, guestSecretHash);
   if (!(await userIsSessionHost(ctx, sessionId, caller.id))) {
     throw new ConvexError("Only the host can perform this action");
   }
   return caller;
 }
 
-export async function requirePlayerOwnerIfAuthenticated(
+export async function requireSessionMember(
+  ctx: Ctx,
+  sessionId: string,
+  assertedUserAppId: string,
+  guestSecretHash?: string,
+) {
+  const caller = await resolveCaller(ctx, assertedUserAppId, guestSecretHash);
+  const player = await ctx.db
+    .query("session_players")
+    .withIndex("by_session_user", (q) =>
+      q.eq("session_id", sessionId).eq("user_id", caller.id),
+    )
+    .first();
+  if (!player) {
+    throw new ConvexError("Caller is not in this session");
+  }
+  return { caller, player };
+}
+
+export async function requirePlayerOwner(
   ctx: Ctx,
   playerAppId: string,
+  guestSecretHash?: string,
 ) {
-  const clerkUser = await getCurrentUser(ctx);
-  if (!clerkUser) return null;
   const player = await ctx.db
     .query("session_players")
     .withIndex("by_app_id", (q) => q.eq("id", playerAppId))
@@ -115,19 +141,23 @@ export async function requirePlayerOwnerIfAuthenticated(
   if (!player) {
     throw new ConvexError("Player not found");
   }
-  if (player.user_id !== clerkUser.id) {
+  if (!player.user_id) {
+    throw new ConvexError("Player has no owner");
+  }
+  const caller = await resolveCaller(ctx, player.user_id, guestSecretHash);
+  if (player.user_id !== caller.id) {
     throw new ConvexError("Caller is not this player");
   }
-  return clerkUser;
+  return caller;
 }
 
-export async function requireActionActorIfAuthenticated(
+export async function requireActionActor(
   ctx: Ctx,
   sessionId: string,
   actorPlayerId: string,
+  callerUserAppId?: string,
+  guestSecretHash?: string,
 ) {
-  const clerkUser = await getCurrentUser(ctx);
-  if (!clerkUser) return null;
   const actor = await ctx.db
     .query("session_players")
     .withIndex("by_session_player", (q) =>
@@ -137,10 +167,25 @@ export async function requireActionActorIfAuthenticated(
   if (!actor) {
     throw new ConvexError("Actor is not in this session");
   }
-  if (actor.user_id !== clerkUser.id) {
+  if (actor.is_bot) {
+    if (!callerUserAppId) {
+      throw new ConvexError("caller_user_id required for bot actions");
+    }
+    return await requireSessionHostStrict(
+      ctx,
+      sessionId,
+      callerUserAppId,
+      guestSecretHash,
+    );
+  }
+  if (!actor.user_id) {
+    throw new ConvexError("Actor has no owner");
+  }
+  const caller = await resolveCaller(ctx, actor.user_id, guestSecretHash);
+  if (actor.user_id !== caller.id) {
     throw new ConvexError("Caller does not control this actor");
   }
-  return clerkUser;
+  return caller;
 }
 
 export async function transferHostIfNeeded(
@@ -185,10 +230,15 @@ export function visiblePlayerForViewer(
   const viewerPlayer = viewer
     ? players.find((candidate) => candidate.user_id === viewer.id)
     : null;
+  // The host sees all roles: the host client is the authoritative game
+  // master — it drives bot actions, evaluates win conditions (alive mafia
+  // count), and records revealed death roles. Hiding roles from the host
+  // breaks all three. This matches the Supabase get_visible_role contract.
   const canSeeRole =
     session.is_game_over ||
     session.current_phase === "game_over" ||
     player.user_id === viewer?.id ||
+    (viewer != null && session.host_user_id === viewer.id) ||
     (viewerPlayer?.role === "mafia" && player.role === "mafia");
 
   return {
@@ -200,20 +250,16 @@ export function visiblePlayerForViewer(
 // Resolves the viewer for role-visibility / action-visibility filtering.
 // When Clerk auth is present, ignore the client-supplied `assertedViewerAppId`
 // to prevent spoofing — pass through the authenticated user's record only.
-// When Clerk auth is absent (guest play), fall back to the asserted id; guest
-// play has no server-verified identity, so this is the same weak-auth posture
-// `resolveCaller` documents.
+// Guests must prove control of the asserted anonymous row through resolveCaller.
 export async function resolveViewer(
   ctx: Ctx,
   assertedViewerAppId?: string,
+  guestSecretHash?: string,
 ) {
   const clerkViewer = await getCurrentUser(ctx);
   if (clerkViewer) return clerkViewer;
   if (!assertedViewerAppId) return null;
-  return await ctx.db
-    .query("users")
-    .withIndex("by_app_id", (q) => q.eq("id", assertedViewerAppId))
-    .unique();
+  return await resolveCaller(ctx, assertedViewerAppId, guestSecretHash);
 }
 
 // Strips `inspector_result` from an action row when the viewer should not

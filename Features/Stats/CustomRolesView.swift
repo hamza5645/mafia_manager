@@ -77,7 +77,10 @@ struct CustomRolesView: View {
         errorMessage = nil
 
         do {
-            customConfigs = try await databaseService.getCustomRoleConfigs(userId: userId)
+            customConfigs = try await databaseService.getCustomRoleConfigs(
+                userId: userId,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -92,7 +95,10 @@ struct CustomRolesView: View {
         }
 
         do {
-            try await databaseService.deleteCustomRoleConfig(id: config.id)
+            try await databaseService.deleteCustomRoleConfig(
+                id: config.id,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await loadConfigs()
         } catch {
             errorMessage = error.localizedDescription
@@ -347,7 +353,10 @@ struct AddCustomRoleConfigView: View {
         )
 
         do {
-            try await databaseService.createCustomRoleConfig(newConfig)
+            try await databaseService.createCustomRoleConfig(
+                newConfig,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {
@@ -482,7 +491,10 @@ struct EditCustomRoleConfigView: View {
         updatedConfig.updatedAt = Date()
 
         do {
-            try await databaseService.updateCustomRoleConfig(updatedConfig)
+            try await databaseService.updateCustomRoleConfig(
+                updatedConfig,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {

@@ -3,29 +3,30 @@ import { mutation, query } from "./_generated/server";
 import { roleDistributionValidator, roleValidator } from "./validators";
 import { nowAppleEpochSeconds, resolveCaller, uuid } from "./lib";
 
-// Helper: look up a row by app id, then enforce caller ownership.
-// For Clerk users this strictly verifies caller.id === row.user_id.
-// For guests it falls back to trust-the-args (consistent with resolveCaller's
-// documented posture; we cannot do better without threading guest secret).
+// Look up a row by app id, then enforce account or guest ownership.
 async function requireOwnerOfRow(
   ctx: any,
   table: "player_stats" | "custom_roles_configs" | "player_groups",
   rowAppId: string,
   notFoundMessage: string,
+  guestSecretHash?: string,
 ) {
   const row = await ctx.db
     .query(table)
     .withIndex("by_app_id", (q: any) => q.eq("id", rowAppId))
     .unique();
   if (!row) throw new ConvexError(notFoundMessage);
-  await resolveCaller(ctx, row.user_id);
+  await resolveCaller(ctx, row.user_id, guestSecretHash);
   return row;
 }
 
 export const listPlayerStats = query({
-  args: { user_id: v.string() },
+  args: {
+    user_id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     return await ctx.db
       .query("player_stats")
       .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
@@ -35,9 +36,13 @@ export const listPlayerStats = query({
 });
 
 export const getPlayerStat = query({
-  args: { user_id: v.string(), player_name: v.string() },
+  args: {
+    user_id: v.string(),
+    player_name: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     return await ctx.db
       .query("player_stats")
       .withIndex("by_user_player", (q) =>
@@ -60,12 +65,14 @@ export const createPlayerStat = mutation({
     times_doctor: v.number(),
     times_inspector: v.number(),
     times_citizen: v.number(),
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     const timestamp = nowAppleEpochSeconds();
+    const { guest_secret_hash: _guestSecretHash, ...values } = args;
     const doc = {
-      ...args,
+      ...values,
       id: args.id ?? uuid(),
       created_at: timestamp,
       updated_at: timestamp,
@@ -86,6 +93,7 @@ export const updatePlayerStat = mutation({
     times_doctor: v.number(),
     times_inspector: v.number(),
     times_citizen: v.number(),
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const stat = await requireOwnerOfRow(
@@ -93,6 +101,7 @@ export const updatePlayerStat = mutation({
       "player_stats",
       args.id,
       "Player stat not found",
+      args.guest_secret_hash,
     );
     const patch = {
       games_played: args.games_played,
@@ -111,14 +120,17 @@ export const updatePlayerStat = mutation({
 });
 
 export const deletePlayerStat = mutation({
-  args: { id: v.string() },
+  args: {
+    id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const stat = await ctx.db
       .query("player_stats")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
     if (!stat) return;
-    await resolveCaller(ctx, stat.user_id);
+    await resolveCaller(ctx, stat.user_id, args.guest_secret_hash);
     await ctx.db.delete(stat._id);
   },
 });
@@ -130,9 +142,10 @@ export const upsertPlayerStat = mutation({
     role: roleValidator,
     won: v.boolean(),
     kills: v.number(),
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     const existing = await ctx.db
       .query("player_stats")
       .withIndex("by_user_player", (q) =>
@@ -182,9 +195,12 @@ export const upsertPlayerStat = mutation({
 });
 
 export const listCustomRoleConfigs = query({
-  args: { user_id: v.string() },
+  args: {
+    user_id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     return await ctx.db
       .query("custom_roles_configs")
       .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
@@ -193,14 +209,17 @@ export const listCustomRoleConfigs = query({
 });
 
 export const getCustomRoleConfig = query({
-  args: { id: v.string() },
+  args: {
+    id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const config = await ctx.db
       .query("custom_roles_configs")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
     if (!config) return null;
-    await resolveCaller(ctx, config.user_id);
+    await resolveCaller(ctx, config.user_id, args.guest_secret_hash);
     return config;
   },
 });
@@ -211,12 +230,14 @@ export const createCustomRoleConfig = mutation({
     user_id: v.string(),
     config_name: v.string(),
     role_distribution: roleDistributionValidator,
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     const timestamp = nowAppleEpochSeconds();
+    const { guest_secret_hash: _guestSecretHash, ...values } = args;
     const doc = {
-      ...args,
+      ...values,
       id: args.id ?? uuid(),
       created_at: timestamp,
       updated_at: timestamp,
@@ -231,6 +252,7 @@ export const updateCustomRoleConfig = mutation({
     id: v.string(),
     config_name: v.string(),
     role_distribution: roleDistributionValidator,
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const config = await requireOwnerOfRow(
@@ -238,6 +260,7 @@ export const updateCustomRoleConfig = mutation({
       "custom_roles_configs",
       args.id,
       "Custom role config not found",
+      args.guest_secret_hash,
     );
     const patch = {
       config_name: args.config_name,
@@ -250,22 +273,28 @@ export const updateCustomRoleConfig = mutation({
 });
 
 export const deleteCustomRoleConfig = mutation({
-  args: { id: v.string() },
+  args: {
+    id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const config = await ctx.db
       .query("custom_roles_configs")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
     if (!config) return;
-    await resolveCaller(ctx, config.user_id);
+    await resolveCaller(ctx, config.user_id, args.guest_secret_hash);
     await ctx.db.delete(config._id);
   },
 });
 
 export const listPlayerGroups = query({
-  args: { user_id: v.string() },
+  args: {
+    user_id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     return await ctx.db
       .query("player_groups")
       .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
@@ -274,14 +303,17 @@ export const listPlayerGroups = query({
 });
 
 export const getPlayerGroup = query({
-  args: { id: v.string() },
+  args: {
+    id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const group = await ctx.db
       .query("player_groups")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
     if (!group) return null;
-    await resolveCaller(ctx, group.user_id);
+    await resolveCaller(ctx, group.user_id, args.guest_secret_hash);
     return group;
   },
 });
@@ -292,12 +324,14 @@ export const createPlayerGroup = mutation({
     user_id: v.string(),
     group_name: v.string(),
     player_names: v.array(v.string()),
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     const timestamp = nowAppleEpochSeconds();
+    const { guest_secret_hash: _guestSecretHash, ...values } = args;
     const doc = {
-      ...args,
+      ...values,
       id: args.id ?? uuid(),
       created_at: timestamp,
       updated_at: timestamp,
@@ -312,6 +346,7 @@ export const updatePlayerGroup = mutation({
     id: v.string(),
     group_name: v.string(),
     player_names: v.array(v.string()),
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const group = await requireOwnerOfRow(
@@ -319,6 +354,7 @@ export const updatePlayerGroup = mutation({
       "player_groups",
       args.id,
       "Player group not found",
+      args.guest_secret_hash,
     );
     const patch = {
       group_name: args.group_name,
@@ -331,14 +367,17 @@ export const updatePlayerGroup = mutation({
 });
 
 export const deletePlayerGroup = mutation({
-  args: { id: v.string() },
+  args: {
+    id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const group = await ctx.db
       .query("player_groups")
       .withIndex("by_app_id", (q) => q.eq("id", args.id))
       .unique();
     if (!group) return;
-    await resolveCaller(ctx, group.user_id);
+    await resolveCaller(ctx, group.user_id, args.guest_secret_hash);
     await ctx.db.delete(group._id);
   },
 });

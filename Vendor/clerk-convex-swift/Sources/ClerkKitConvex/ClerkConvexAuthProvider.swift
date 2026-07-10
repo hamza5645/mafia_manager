@@ -158,13 +158,24 @@ public final class ClerkConvexAuthProvider: AuthProvider {
         guard !Task.isCancelled else { break }
 
         switch event {
-        case .tokenRefreshed(let token):
-          onIdToken?(token)
+        case .tokenRefreshed:
+          // Clerk's event carries its general session token. Convex requires
+          // the JWT minted from the "convex" template, so fetch that token
+          // explicitly and leave the last valid Convex JWT in place on error.
+          if let token = await Self.refreshedConvexToken(fetch: fetchToken) {
+            onIdToken?(token)
+          }
         default:
           break
         }
       }
     }
+  }
+
+  static func refreshedConvexToken(
+    fetch: () async throws -> String
+  ) async -> String? {
+    try? await fetch()
   }
 
   /// Starts syncing Clerk session state with the bound Convex client.

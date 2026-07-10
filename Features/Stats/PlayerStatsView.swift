@@ -45,7 +45,10 @@ struct PlayerStatsView: View {
         errorMessage = nil
 
         do {
-            playerStats = try await databaseService.getPlayerStats(userId: userId)
+            playerStats = try await databaseService.getPlayerStats(
+                userId: userId,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
         } catch {
             errorMessage = error.localizedDescription
         }

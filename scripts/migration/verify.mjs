@@ -70,7 +70,7 @@ const supaGroups = await supaCount("player_groups");
 console.log("[verify] counting Convex rows...");
 const convexCounts = await convex.query("migration:countByTable", {});
 const orphans = await convex.query("migration:listLegacyOrphans", {});
-const legacyConvexCount = orphans.length; // all rows with legacy_supabase_user_id and no auth_subject yet
+const legacyConvexCount = convexCounts.legacy_users;
 
 console.log("[verify] count comparison:");
 console.log(`  legacy users:          supabase=${supaUsers} convex=${legacyConvexCount} (total convex users incl. fresh: ${convexCounts.users})`);

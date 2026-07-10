@@ -138,9 +138,12 @@ export const getMe = query({
 });
 
 export const getUserProfile = query({
-  args: { user_id: v.string() },
+  args: {
+    user_id: v.string(),
+    guest_secret_hash: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     return await ctx.db
       .query("users")
       .withIndex("by_app_id", (q) => q.eq("id", args.user_id))
@@ -153,9 +156,10 @@ export const updateProfile = mutation({
     user_id: v.string(),
     display_name: v.string(),
     is_anonymous: v.optional(v.boolean()),
+    guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id);
+    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     const user = await ctx.db
       .query("users")
       .withIndex("by_app_id", (q) => q.eq("id", args.user_id))

@@ -1,6 +1,12 @@
 import Foundation
 import Security
 
+protocol KeychainStoring: AnyObject {
+    func save(_ value: String, forKey key: String) throws
+    func load(forKey key: String) throws -> String
+    func delete(forKey key: String) throws
+}
+
 /// Secure storage for sensitive data using iOS Keychain
 final class KeychainHelper {
     static let shared = KeychainHelper()
@@ -98,3 +104,5 @@ final class KeychainHelper {
         }
     }
 }
+
+extension KeychainHelper: KeychainStoring {}

@@ -160,6 +160,10 @@ struct SignupView: View {
                                         await MainActor.run {
                                             showVerification = true
                                         }
+                                    case .retryableMergeFailure:
+                                        await MainActor.run {
+                                            showVerification = true
+                                        }
                                     case .emailAlreadyExists(let anonymousUserId):
                                         await MainActor.run {
                                             conflictAnonymousUserId = anonymousUserId
@@ -185,6 +189,8 @@ struct SignupView: View {
                                         await MainActor.run {
                                             showVerification = true
                                         }
+                                    case .emailAlreadyExists:
+                                        break
                                     case .failure:
                                         break
                                     }

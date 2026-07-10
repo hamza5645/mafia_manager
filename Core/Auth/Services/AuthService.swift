@@ -3,6 +3,21 @@ import ClerkKit
 import ConvexMobile
 
 @MainActor
+protocol AuthServicing: AnyObject {
+    var currentUser: UserProfile? { get async }
+    func startSignUp(email: String, password: String, displayName: String) async throws -> AuthService.SignUpStartResult
+    func verifySignUpEmailCode(_ code: String, displayName: String) async throws -> UserProfile
+    func resendSignUpEmailCode() async throws
+    func signIn(email: String, password: String) async throws -> UserProfile
+    func signOut() async throws
+    func startPasswordReset(email: String) async throws
+    func confirmPasswordReset(code: String, newPassword: String) async throws -> UserProfile
+    func updateUserProfile(userId: UUID, displayName: String, guestSecretHash: String?) async throws
+    func signInAsGuest(displayName: String, guestSecretHash: String) async throws -> UserProfile
+    func mergeAnonymousStats(anonymousUserId: UUID, targetUserId: UUID, guestSecretHash: String) async throws -> MergeStatsResult
+}
+
+@MainActor
 final class AuthService {
     private let convex = ConvexService.shared
 
@@ -12,7 +27,7 @@ final class AuthService {
                 return try? await ensureClerkUser()
             }
             if ConvexConfig.hasConfiguredClerkKey {
-                try? await Clerk.shared.refreshClient()
+                _ = try? await Clerk.shared.refreshClient()
                 if Clerk.shared.user != nil {
                     return try? await ensureClerkUser()
                 }
@@ -31,16 +46,25 @@ final class AuthService {
             throw AuthError.providerNotConfigured
         }
 
-        let signUp = try await Clerk.shared.auth.signUp(
-            emailAddress: email,
-            password: password,
-            firstName: displayName
-        )
+        let signUp: SignUp
+        do {
+            signUp = try await Clerk.shared.auth.signUp(
+                emailAddress: email,
+                password: password,
+                firstName: displayName
+            )
+        } catch {
+            throw Self.mapSignUpError(error)
+        }
 
         if signUp.status == .complete {
             if let sessionId = signUp.createdSessionId {
                 try await Clerk.shared.auth.setActive(sessionId: sessionId)
             }
+            try await Self.synchronizeCompletedSignUp(
+                refreshClient: { _ = try? await Clerk.shared.refreshClient() },
+                refreshConvexAuth: { try await self.convex.refreshAuthFromClerk() }
+            )
             return .completed(try await ensureClerkUser(displayName: displayName))
         }
 
@@ -177,10 +201,13 @@ final class AuthService {
         return try await ensureClerkUser()
     }
 
-    func getUserProfile(userId: UUID) async throws -> UserProfile {
+    func getUserProfile(userId: UUID, guestSecretHash: String? = nil) async throws -> UserProfile {
         let profile: UserProfile? = try await convex.query(
             "users:getUserProfile",
-            with: ["user_id": userId.uuidString.lowercased()],
+            with: [
+                "user_id": userId.uuidString.lowercased(),
+                "guest_secret_hash": guestSecretHash,
+            ],
             as: UserProfile?.self
         )
 
@@ -191,23 +218,34 @@ final class AuthService {
         return profile
     }
 
-    func updateUserProfile(userId: UUID, displayName: String) async throws {
+    func updateUserProfile(
+        userId: UUID,
+        displayName: String,
+        guestSecretHash: String? = nil
+    ) async throws {
         let _: UserProfile = try await convex.mutation(
             "users:updateProfile",
             with: [
                 "user_id": userId.uuidString.lowercased(),
                 "display_name": displayName,
+                "guest_secret_hash": guestSecretHash,
             ]
         )
     }
 
-    func updateGuestProfile(userId: UUID, displayName: String, isAnonymous: Bool) async throws {
+    func updateGuestProfile(
+        userId: UUID,
+        displayName: String,
+        isAnonymous: Bool,
+        guestSecretHash: String
+    ) async throws {
         let _: UserProfile = try await convex.mutation(
             "users:updateProfile",
             with: [
                 "user_id": userId.uuidString.lowercased(),
                 "display_name": displayName,
                 "is_anonymous": isAnonymous,
+                "guest_secret_hash": guestSecretHash,
             ]
         )
     }
@@ -247,7 +285,29 @@ final class AuthService {
         )
     }
 
+    static func mapSignUpError(_ error: Error) -> Error {
+        if let clerkError = error as? ClerkAPIError,
+           let mapped = signUpError(forClerkCode: clerkError.code) {
+            return mapped
+        }
+        return error
+    }
+
+    static func signUpError(forClerkCode code: String) -> AuthError? {
+        code == "form_identifier_exists" ? .emailAlreadyInUse : nil
+    }
+
+    static func synchronizeCompletedSignUp(
+        refreshClient: () async -> Void,
+        refreshConvexAuth: () async throws -> Void
+    ) async throws {
+        await refreshClient()
+        try await refreshConvexAuth()
+    }
+
 }
+
+extension AuthService: AuthServicing {}
 
 struct MergeStatsResult: Decodable, Sendable {
     let success: Bool

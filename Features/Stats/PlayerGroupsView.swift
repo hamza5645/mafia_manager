@@ -77,7 +77,10 @@ struct PlayerGroupsView: View {
         errorMessage = nil
 
         do {
-            playerGroups = try await databaseService.getPlayerGroups(userId: userId)
+            playerGroups = try await databaseService.getPlayerGroups(
+                userId: userId,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -92,7 +95,10 @@ struct PlayerGroupsView: View {
         }
 
         do {
-            try await databaseService.deletePlayerGroup(id: group.id)
+            try await databaseService.deletePlayerGroup(
+                id: group.id,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await loadGroups()
         } catch {
             errorMessage = error.localizedDescription
@@ -375,7 +381,10 @@ struct AddPlayerGroupView: View {
         )
 
         do {
-            try await databaseService.createPlayerGroup(newGroup)
+            try await databaseService.createPlayerGroup(
+                newGroup,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {
@@ -555,7 +564,10 @@ struct EditPlayerGroupView: View {
         updatedGroup.updatedAt = Date()
 
         do {
-            try await databaseService.updatePlayerGroup(updatedGroup)
+            try await databaseService.updatePlayerGroup(
+                updatedGroup,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {

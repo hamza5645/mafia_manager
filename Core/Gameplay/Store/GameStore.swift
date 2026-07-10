@@ -713,7 +713,10 @@ final class GameStore: ObservableObject {
                     playerName: player.name,
                     role: player.role,
                     won: playerWon,
-                    kills: kills
+                    kills: kills,
+                    guestSecretHash: authStore?.isAnonymous == true
+                        ? authStore?.currentGuestSecretHash
+                        : nil
                 )
             } catch {
                 // Continue with other players even if one fails

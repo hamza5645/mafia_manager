@@ -228,6 +228,9 @@ export const countByTable = query({
     ]);
     return {
       users: users.length,
+      legacy_users: users.filter(
+        (row) => row.legacy_supabase_user_id !== undefined,
+      ).length,
       player_stats: stats.length,
       custom_roles_configs: configs.length,
       player_groups: groups.length,
