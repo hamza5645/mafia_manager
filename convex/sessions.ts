@@ -877,6 +877,27 @@ export const returnToLobby = mutation({
           removal_note: undefined,
         });
       }
+
+      // Clear the previous game's actions and tentative selections, matching
+      // the Supabase reset_session_to_lobby contract. Stale rows share
+      // phase_index values with the next game and would leak into readiness
+      // checks and bot coordination that don't filter by round_id.
+      const staleActions = await ctx.db
+        .query("game_actions")
+        .withIndex("by_session", (q) => q.eq("session_id", args.session_id))
+        .collect();
+      for (const action of staleActions) {
+        await ctx.db.delete(action._id);
+      }
+      const staleTentatives = await ctx.db
+        .query("tentative_selections")
+        .withIndex("by_session_phase_type", (q) =>
+          q.eq("session_id", args.session_id),
+        )
+        .collect();
+      for (const tentative of staleTentatives) {
+        await ctx.db.delete(tentative._id);
+      }
     } else if (
       args.player_user_id === args.original_host_user_id &&
       session.host_user_id !== args.original_host_user_id

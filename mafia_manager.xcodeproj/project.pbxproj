@@ -12,10 +12,10 @@
 		0837AC63C3F82DFF3F92E1BA /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E8B0CF45973472B9361542E /* Persistence.swift */; };
 		0B14FA9099E8CAF1BC3BEF4A /* Role.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43174C0DC9E812D86F752F1 /* Role.swift */; };
 		11535EA64011F2FB0A9E35F3 /* RoleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C10CCC5F577743C7B6A6A29 /* RoleStyle.swift */; };
-		117E861DB46734468703AE6B /* ClerkConvex.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57A863A38BD0B44BCCF6CFBE /* ClerkConvex.framework */; };
 		139CC9C753980BD67A93A8D4 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCF89E92637EE6E6DFA57C8 /* GameState.swift */; };
 		156180B7C9E1408A04654CDD /* NightWakeUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A33149C57263B43F9D1B65B /* NightWakeUpView.swift */; };
 		1911BB54982E53C33FCF1D55 /* NukeUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A9D67BB1A0399BED77A3EDE /* NukeUI.framework */; };
+		1FE4DB73AF79FA7379741E5A /* RealtimeRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EA5E2A08DAAE015F76409 /* RealtimeRegressionTests.swift */; };
 		2166B81EC218083D2E3897C3 /* PhoneNumberKit_PhoneNumberKit.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 67017A4D1045DB0001CDAA48 /* PhoneNumberKit_PhoneNumberKit.bundle */; };
 		245F9BA4FBA182015AF964AF /* MultiplayerVoteDeathRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FA3D5BA30123EDCCA333B5 /* MultiplayerVoteDeathRevealView.swift */; };
 		2CCA8E76A0D1B55045018BD5 /* MultiplayerMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0221E3D8F2B7BE09934D0F51 /* MultiplayerMenuView.swift */; };
@@ -28,6 +28,7 @@
 		331020CC377FD3AF71B1EEC6 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0F6FB737236EE214C3CE0D /* AuthService.swift */; };
 		363E3E7B602285A6E3781B84 /* MultiplayerRoleRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF31B6F5DDC984F356695835 /* MultiplayerRoleRevealView.swift */; };
 		376D1A9BD056679FCBDDD002 /* VotingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675F15E4E35C4B0E173A3660 /* VotingSession.swift */; };
+		3973D178FCDB3484DB928C90 /* ConvexIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0B6901DF574ABB253D29A5 /* ConvexIntegrationTests.swift */; };
 		3C83257DD6DEE4A69068B72F /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881A74A000FDEB2E971418F1 /* ProfileView.swift */; };
 		3CB27754554CB43196F0F348 /* CustomRoleConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B199AAC22DB1EEDA4B520168 /* CustomRoleConfig.swift */; };
 		3FFA6C2484F8607A011B1E37 /* ClerkKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E2932FB21B3780D4C417D92 /* ClerkKitUI.framework */; };
@@ -40,6 +41,7 @@
 		514C218982C30EDB43D97286 /* DayAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2B7AA2163C4E31E817436A /* DayAction.swift */; };
 		530AC54E73D5587F77BC8679 /* NightOutcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F81B1598C46CD560343E4E /* NightOutcomeView.swift */; };
 		53327646E2CD9749F25499F6 /* MorningSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBB838310A369541CE74AF55 /* MorningSummaryView.swift */; };
+		546D302E8C75C2F9F96043B4 /* ConvexClientWithAuth+Clerk.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1E69B071548B79A44F4290 /* ConvexClientWithAuth+Clerk.swift */; };
 		5B1D1D3456F7CA08560C6C2A /* VotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA58228924FC98692B63CE51 /* VotingView.swift */; };
 		5FF8B0BD3F82A25F6BC3F0E9 /* GuestNameInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505246F8352BA44A9D76696D /* GuestNameInputView.swift */; };
 		602CB5498C6326B83015E9CD /* ConvexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0207A94C03D3E15390DBF017 /* ConvexService.swift */; };
@@ -54,6 +56,7 @@
 		730A63AE7951CBA1103F4D16 /* Clerk_ClerkKitUI.bundle in Dependencies */ = {isa = PBXBuildFile; fileRef = 235911560BC05DFA440783E5 /* Clerk_ClerkKitUI.bundle */; };
 		75763BFC49D4E331209B7CC6 /* MultiplayerVotingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0028C6358D9D5D74A21BA47D /* MultiplayerVotingResultsView.swift */; };
 		7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0342891BA342790B3D72E97 /* GameStoreTests.swift */; };
+		800E424F4372CA2DB1D1CBF3 /* AuthRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */; };
 		80C560C8F7FAB5279235818F /* GameModeSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915F85AC325F3EC3095C151D /* GameModeSelectionView.swift */; };
 		854B909A0224CF6D8B90AB9F /* SessionPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CBFE44727CFAE50FBA8E262 /* SessionPlayer.swift */; };
 		8A3C605203D85A61C88D0FB9 /* PhoneNumberKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0DED44968DC5183C7D49FEF0 /* PhoneNumberKit.framework */; };
@@ -80,6 +83,8 @@
 		C00F253B9EB59251418EA344 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = C52CF4CB5D7EC9FF6D40F948 /* PlayerStats.swift */; };
 		C0CD25D5121EDDEE526A2A85 /* MultiplayerGameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CF0053C5073C789B5620F7 /* MultiplayerGameOverView.swift */; };
 		C252926FA0D460872C90F48E /* ConvexMobile.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BE0E02693EA882B608863FB /* ConvexMobile.framework */; };
+		C2C691950F0B9963C00B71D5 /* ClerkConvexAuthError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5826F488440B4C010BF8CDED /* ClerkConvexAuthError.swift */; };
+		C49B7F57028767847215AD37 /* ClerkConvexAuthProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E74F40941C85FCB6A339F9 /* ClerkConvexAuthProvider.swift */; };
 		C707D045A2965A3BA3E4E8C8 /* PlayerGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBB631408218FDE10C9C983 /* PlayerGroup.swift */; };
 		C7B2708C755F2445217C42DB /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF2CB0CDBF86539051ADBF6 /* SoundManager.swift */; };
 		D4D413183F5E98752710A319 /* police_siren.wav in Resources */ = {isa = PBXBuildFile; fileRef = 075CC3468DFFD1E21D0DD58D /* police_siren.wav */; };
@@ -156,6 +161,7 @@
 		194B9A47D46496648052422E /* BotDecisionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotDecisionService.swift; sourceTree = "<group>"; };
 		1D66741ED5970F59F8365E2E /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		1FBB631408218FDE10C9C983 /* PlayerGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerGroup.swift; sourceTree = "<group>"; };
+		21E74F40941C85FCB6A339F9 /* ClerkConvexAuthProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkConvexAuthProvider.swift; sourceTree = "<group>"; };
 		235911560BC05DFA440783E5 /* Clerk_ClerkKitUI.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Clerk_ClerkKitUI.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		296F7D5D5D82298EB4028369 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		2A987066997CCA60B2B0F00C /* PlayerStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerStatsView.swift; sourceTree = "<group>"; };
@@ -177,11 +183,12 @@
 		4A570ED7606C854EE6D2F90E /* mafia_managerTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "mafia_managerTests-Info.plist"; sourceTree = "<group>"; };
 		4BC88ABCA453C522E916F2D5 /* Nuke.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Nuke.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E2B7AA2163C4E31E817436A /* DayAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAction.swift; sourceTree = "<group>"; };
+		504EA5E2A08DAAE015F76409 /* RealtimeRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeRegressionTests.swift; sourceTree = "<group>"; };
 		505246F8352BA44A9D76696D /* GuestNameInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestNameInputView.swift; sourceTree = "<group>"; };
 		54C39FBD2C98B32B55890998 /* RealtimeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeService.swift; sourceTree = "<group>"; };
 		576EAE7CF078E8F967EA9051 /* NightAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightAction.swift; sourceTree = "<group>"; };
-		57A863A38BD0B44BCCF6CFBE /* ClerkConvex.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ClerkConvex.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		57FA3D5BA30123EDCCA333B5 /* MultiplayerVoteDeathRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerVoteDeathRevealView.swift; sourceTree = "<group>"; };
+		5826F488440B4C010BF8CDED /* ClerkConvexAuthError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkConvexAuthError.swift; sourceTree = "<group>"; };
 		5AB96224DA99AF30E2981EEA /* wakeup_rooster.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = wakeup_rooster.wav; sourceTree = "<group>"; };
 		5E2932FB21B3780D4C417D92 /* ClerkKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ClerkKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		5FE7E68ADB9B7F91D1E14789 /* InputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputValidator.swift; sourceTree = "<group>"; };
@@ -221,7 +228,10 @@
 		C990D42FD4558C9A2EE8E3C3 /* mafia_gunshot.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = mafia_gunshot.wav; sourceTree = "<group>"; };
 		CA58228924FC98692B63CE51 /* VotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VotingView.swift; sourceTree = "<group>"; };
 		CBB838310A369541CE74AF55 /* MorningSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorningSummaryView.swift; sourceTree = "<group>"; };
+		CF1E69B071548B79A44F4290 /* ConvexClientWithAuth+Clerk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConvexClientWithAuth+Clerk.swift"; sourceTree = "<group>"; };
+		DC0B6901DF574ABB253D29A5 /* ConvexIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvexIntegrationTests.swift; sourceTree = "<group>"; };
 		DF1BAC365672CD2459EC622D /* mafia_manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mafia_manager.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthRegressionTests.swift; sourceTree = "<group>"; };
 		E0CF0053C5073C789B5620F7 /* MultiplayerGameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerGameOverView.swift; sourceTree = "<group>"; };
 		E43174C0DC9E812D86F752F1 /* Role.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Role.swift; sourceTree = "<group>"; };
 		E9BA1619BAFA031D7400FF68 /* ClerkKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ClerkKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -241,7 +251,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				117E861DB46734468703AE6B /* ClerkConvex.framework in Frameworks */,
 				8A9E4ABE842DA25C61CA2894 /* ClerkKit.framework in Frameworks */,
 				3FFA6C2484F8607A011B1E37 /* ClerkKitUI.framework in Frameworks */,
 				C252926FA0D460872C90F48E /* ConvexMobile.framework in Frameworks */,
@@ -271,6 +280,14 @@
 			path = Setup;
 			sourceTree = "<group>";
 		};
+		0DD21CC8AB391B57FDD3F488 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				26C57C47B1C6F6AD965FA04C /* ClerkKitConvex */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
 		10AB20A580E1A3FCEA9DA305 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
@@ -293,6 +310,7 @@
 				4098CF10A99F5CE73EA75DFE /* Features */,
 				AB2F704CACB0D5FBF7D5C688 /* mafia_managerTests */,
 				815AC9BDBC7464F70BF660D4 /* Resources */,
+				BD2E3251CDCA5A62EF30281E /* Vendor */,
 				36D02B805632EF47213380F7 /* Assets.xcassets */,
 				6FEA6F261D60B4FC9F8E6B6B /* PrivacyInfo.xcprivacy */,
 			);
@@ -342,6 +360,16 @@
 				63D6DD68E21901580152D205 /* DatabaseService.swift */,
 			);
 			path = Backend;
+			sourceTree = "<group>";
+		};
+		26C57C47B1C6F6AD965FA04C /* ClerkKitConvex */ = {
+			isa = PBXGroup;
+			children = (
+				5826F488440B4C010BF8CDED /* ClerkConvexAuthError.swift */,
+				21E74F40941C85FCB6A339F9 /* ClerkConvexAuthProvider.swift */,
+				CF1E69B071548B79A44F4290 /* ConvexClientWithAuth+Clerk.swift */,
+			);
+			path = ClerkKitConvex;
 			sourceTree = "<group>";
 		};
 		2C0DBED34BA0B8DA0C601708 /* Components */ = {
@@ -535,6 +563,14 @@
 			path = InfoPlists;
 			sourceTree = "<group>";
 		};
+		A0B49D55234F9C483611935C /* clerk-convex-swift */ = {
+			isa = PBXGroup;
+			children = (
+				0DD21CC8AB391B57FDD3F488 /* Sources */,
+			);
+			path = "clerk-convex-swift";
+			sourceTree = "<group>";
+		};
 		A29F3E3A4CDD21863ABAE930 /* Store */ = {
 			isa = PBXGroup;
 			children = (
@@ -583,7 +619,10 @@
 		AB2F704CACB0D5FBF7D5C688 /* mafia_managerTests */ = {
 			isa = PBXGroup;
 			children = (
+				E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */,
+				DC0B6901DF574ABB253D29A5 /* ConvexIntegrationTests.swift */,
 				A0342891BA342790B3D72E97 /* GameStoreTests.swift */,
+				504EA5E2A08DAAE015F76409 /* RealtimeRegressionTests.swift */,
 			);
 			path = mafia_managerTests;
 			sourceTree = "<group>";
@@ -594,6 +633,14 @@
 				5FE7E68ADB9B7F91D1E14789 /* InputValidator.swift */,
 			);
 			path = Support;
+			sourceTree = "<group>";
+		};
+		BD2E3251CDCA5A62EF30281E /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				A0B49D55234F9C483611935C /* clerk-convex-swift */,
+			);
+			path = Vendor;
 			sourceTree = "<group>";
 		};
 		BD8EB20208842E5DF04AD172 /* Night */ = {
@@ -635,7 +682,6 @@
 			isa = PBXGroup;
 			children = (
 				235911560BC05DFA440783E5 /* Clerk_ClerkKitUI.bundle */,
-				57A863A38BD0B44BCCF6CFBE /* ClerkConvex.framework */,
 				E9BA1619BAFA031D7400FF68 /* ClerkKit.framework */,
 				5E2932FB21B3780D4C417D92 /* ClerkKitUI.framework */,
 				8BE0E02693EA882B608863FB /* ConvexMobile.framework */,
@@ -811,7 +857,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				800E424F4372CA2DB1D1CBF3 /* AuthRegressionTests.swift in Sources */,
+				3973D178FCDB3484DB928C90 /* ConvexIntegrationTests.swift in Sources */,
 				7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */,
+				1FE4DB73AF79FA7379741E5A /* RealtimeRegressionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -888,6 +937,9 @@
 				AF25EC67F87A8384BDA3ECDE /* BotVotingRevealView.swift in Sources */,
 				9CE5EE9A7CBE4FE44E17CA31 /* VoteResultsView.swift in Sources */,
 				5B1D1D3456F7CA08560C6C2A /* VotingView.swift in Sources */,
+				C2C691950F0B9963C00B71D5 /* ClerkConvexAuthError.swift in Sources */,
+				C49B7F57028767847215AD37 /* ClerkConvexAuthProvider.swift in Sources */,
+				546D302E8C75C2F9F96043B4 /* ConvexClientWithAuth+Clerk.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -932,7 +984,7 @@
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -973,7 +1025,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5GH22BAXAU;
@@ -1028,7 +1080,7 @@
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mafia_manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mafia_manager";
 				TEST_TARGET_NAME = mafia_manager;
@@ -1068,7 +1120,7 @@
 				);
 				SWIFT_COMPILATION_MODE = singlefile;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -1109,7 +1161,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5GH22BAXAU;
@@ -1162,7 +1214,7 @@
 				);
 				SWIFT_COMPILATION_MODE = singlefile;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mafia_manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mafia_manager";
 				TEST_TARGET_NAME = mafia_manager;

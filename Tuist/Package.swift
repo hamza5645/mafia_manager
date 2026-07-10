@@ -5,7 +5,12 @@ import PackageDescription
 import ProjectDescription
 
 let packageSettings = PackageSettings(
-    productTypes: [:]
+    productTypes: [:],
+    targetSettings: [
+        // Tuist renames this product to ConvexMobileWrapper.framework while the
+        // module inside stays ConvexMobile, which breaks `import ConvexMobile`.
+        "ConvexMobile": .settings(base: ["PRODUCT_NAME": "ConvexMobile"]),
+    ]
 )
 #endif
 
@@ -14,6 +19,5 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/get-convex/convex-swift", from: "0.8.0"),
         .package(url: "https://github.com/clerk/clerk-ios", from: "1.0.0"),
-        .package(path: "../Vendor/clerk-convex-swift"),
     ]
 )

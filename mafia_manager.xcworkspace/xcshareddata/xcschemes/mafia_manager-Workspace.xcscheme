@@ -14,24 +14,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4C2707005805DC22C55BCD26"
-               BuildableName = "ClerkConvex.framework"
-               BlueprintName = "ClerkConvex"
-               ReferencedContainer = "container:Vendor/clerk-convex-swift/ClerkConvex.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "1FC263ABF632A82C109B399C"
                BuildableName = "ClerkKit.framework"
                BlueprintName = "ClerkKit"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Clerk/Clerk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -45,7 +31,7 @@
                BlueprintIdentifier = "0A989CEFD1EF89E4FEBB5341"
                BuildableName = "ClerkKitUI.framework"
                BlueprintName = "ClerkKitUI"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Clerk/Clerk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -59,7 +45,7 @@
                BlueprintIdentifier = "30F69CFC41D5C0F6A0508CF2"
                BuildableName = "Clerk_ClerkKitUI.bundle"
                BlueprintName = "Clerk_ClerkKitUI"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Clerk/Clerk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -73,7 +59,7 @@
                BlueprintIdentifier = "F4586D8802454FD886B4F47D"
                BuildableName = "ConvexMobile.framework"
                BlueprintName = "ConvexMobile"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/ConvexMobile/ConvexMobile.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -87,7 +73,7 @@
                BlueprintIdentifier = "C9E0BC78A0E529700E4AF196"
                BuildableName = "Nuke.framework"
                BlueprintName = "Nuke"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Nuke/Nuke.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Nuke/Nuke.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -101,7 +87,7 @@
                BlueprintIdentifier = "A8A0A0E9D5BA015F142C1008"
                BuildableName = "NukeUI.framework"
                BlueprintName = "NukeUI"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/Nuke/Nuke.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Nuke/Nuke.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -115,7 +101,7 @@
                BlueprintIdentifier = "1741F01BD3237B2ED5E79CAA"
                BuildableName = "PhoneNumberKit.framework"
                BlueprintName = "PhoneNumberKit"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/PhoneNumberKit/PhoneNumberKit.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/PhoneNumberKit/PhoneNumberKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -129,7 +115,7 @@
                BlueprintIdentifier = "83598B6BD92316243CB15C1F"
                BuildableName = "PhoneNumberKit_PhoneNumberKit.bundle"
                BlueprintName = "PhoneNumberKit_PhoneNumberKit"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/PhoneNumberKit/PhoneNumberKit.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/PhoneNumberKit/PhoneNumberKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -143,7 +129,7 @@
                BlueprintIdentifier = "82F3CF71D9D833799B7DCF51"
                BuildableName = "UniFFI.framework"
                BlueprintName = "UniFFI"
-               ReferencedContainer = "container:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">
+               ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/ConvexMobile/ConvexMobile.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -208,10 +194,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4C2707005805DC22C55BCD26"
-            BuildableName = "ClerkConvex.framework"
-            BlueprintName = "ClerkConvex"
-            ReferencedContainer = "container:Vendor/clerk-convex-swift/ClerkConvex.xcodeproj">
+            BlueprintIdentifier = "1FC263ABF632A82C109B399C"
+            BuildableName = "ClerkKit.framework"
+            BlueprintName = "ClerkKit"
+            ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Clerk/Clerk.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </LaunchAction>
@@ -224,10 +210,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4C2707005805DC22C55BCD26"
-            BuildableName = "ClerkConvex.framework"
-            BlueprintName = "ClerkConvex"
-            ReferencedContainer = "container:Vendor/clerk-convex-swift/ClerkConvex.xcodeproj">
+            BlueprintIdentifier = "1FC263ABF632A82C109B399C"
+            BuildableName = "ClerkKit.framework"
+            BlueprintName = "ClerkKit"
+            ReferencedContainer = "container:Tuist/.build/tuist-derived/Projects/Clerk/Clerk.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

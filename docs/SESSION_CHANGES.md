@@ -50,6 +50,105 @@
   newly protected endpoints. Production Convex and the fixed app must therefore
   ship as a coordinated rollout; do not deploy this backend ahead of the app.
 
+## Final pre-App-Store revision: auth-config hardening, build bump, ETL verification
+
+### What Changed
+
+- `convex/auth.config.ts` now throws at deploy time when `CLERK_FRONTEND_API_URL`
+  is unset instead of silently degrading to `providers: []`. Previously a prod
+  deploy without the env var would ship a backend where Clerk sign-in silently
+  authenticates nobody; now `npx convex deploy` fails with instructions.
+- Bumped `CURRENT_PROJECT_VERSION` 10 → 11 in `Project.swift`. Both branches sat
+  at 5.0 (10); App Store Connect rejects an upload reusing the live build number.
+  Bumping `MARKETING_VERSION` (5.0 → 5.1?) is a product call left to the owner.
+
+### Validation
+
+- `npx convex dev --once` green after the auth.config change (dev has the var set).
+- Post-regenerate: 26 unit tests (4 gated skips) 0 failures; live integration
+  tests 4/4 against dev; Release **device** build (`-destination generic/platform=iOS`,
+  the archive path) succeeds.
+- Release build for `generic/platform=iOS Simulator` fails to link **x86_64**:
+  upstream `convex-swift` ships `libconvexmobile.a` with an arm64-only simulator
+  slice. Irrelevant to App Store archives (device arm64) and Apple-Silicon
+  simulators; only Release-config runs on Intel-Mac simulators are affected.
+- ETL verified complete against the live legacy database: restored the paused
+  Supabase project `mafia-manager` (it was INACTIVE — the shipped app's backend
+  was down) and compared counts: 86 auth users / 48 player_stats / 6
+  custom_roles_configs / 2 player_groups exactly match the
+  `legacy_supabase_user_id`-tagged rows already ingested in the dev deployment;
+  row-level spot check of the heaviest user matched field-for-field. The
+  Supabase project was left ACTIVE so the legacy app keeps working during rollout.
+
+### Known Gotchas
+
+- `tuist test` uses selective testing: with unchanged inputs it regenerates a
+  pruned "for testing" project whose scheme has **no test action**, breaking
+  subsequent `xcodebuild test` until `tuist generate` runs again. Drive tests via
+  `xcodebuild test` after a plain `tuist generate` when you need a real run.
+
+## Migration production-readiness review: build fix, backend fixes, live integration tests
+
+### What Changed
+
+- Fixed the broken build under Xcode 27 beta: Tuist maps the `convex-swift` package's
+  `ConvexMobile` target to a product named `ConvexMobileWrapper.framework` while the
+  module inside stays `ConvexMobile`, so `import ConvexMobile` failed module resolution.
+  Added a `PackageSettings.targetSettings` override in `Tuist/Package.swift` forcing
+  `PRODUCT_NAME=ConvexMobile`.
+- Restored host role visibility in `convex/lib.ts` (`visiblePlayerForViewer`). The
+  prior authorization-hardening pass hid all roles from the host, but the host client
+  is the authoritative game master: it drives bot actions (`processBotActions`),
+  evaluates win conditions (`evaluateWinners` counts alive mafia), and records
+  revealed death roles. With roles hidden, a non-mafia host ended every game as
+  "citizens win" after the first night and role-holding bots never acted. This
+  matches the Supabase `get_visible_role` contract on main.
+- `sessions:returnToLobby` now deletes the previous game's `game_actions` and
+  `tentative_selections` (parity with Supabase `reset_session_to_lobby`). Without
+  this, a Play Again game shared `phase_index` values with stale rows, which leak
+  into `checkNightPhaseReadiness` (loads actions without `round_id`) and bot
+  coordination.
+- `migration:countByTable` and `migration:listLegacyOrphans` are now
+  `internalQuery`. `listLegacyOrphans` returned legacy users' emails to any
+  unauthenticated client. The migration scripts use `setAdminAuth`, so they can
+  still call internal functions.
+- Added `mafia_managerTests/ConvexIntegrationTests.swift`: live integration tests
+  against the dev deployment through the real client stack (ConvexMobile FFI,
+  arg encoding, model/date decoding, reactive subscriptions). Skipped unless the
+  runner env sets `CONVEX_INTEGRATION=1`
+  (`TEST_RUNNER_CONVEX_INTEGRATION=1 xcodebuild test ...`).
+
+### Validation
+
+- `tuist build mafia_manager` succeeded (Xcode 27 beta).
+- `tuist test mafia_manager`: 22 unit tests passed, 4 integration tests skipped by default.
+- `TEST_RUNNER_CONVEX_INTEGRATION=1 xcodebuild test -only-testing:mafia_managerTests/ConvexIntegrationTests`:
+  4/4 passed against dev (health, guest restore idempotency, full multiplayer
+  lifecycle incl. stale-round rejection and `resolveNightAtomic`, live subscription
+  delivering phase updates).
+- Backend functional campaign over `mcp__convex__run` (15 scenario groups): role
+  privacy per viewer, save-beats-kill, inspector mafia/not_mafia/blocked, stale
+  round rejection, non-host resolve/kick/life-status rejections, host transfer on
+  leave + heartbeat-guarded host claim, voting upsert + game over, returnToLobby
+  reset with action cleanup, executeRematch, stats upsert increments, health checks.
+- `npx convex dev --once` pushed all changes to the dev deployment.
+
+### Rollback
+
+- Revert `Tuist/Package.swift` (build fix), `convex/lib.ts`, `convex/sessions.ts`,
+  `convex/migration.ts`, and delete `mafia_managerTests/ConvexIntegrationTests.swift`.
+
+### Known Gotchas
+
+- Xcode 27 beta replaced Simulator.app with DeviceHub and moved SimulatorKit to
+  `Contents/SharedFrameworks`; simulator HID automation (idb/XcodeBuildMCP/Xcode
+  device interaction) is currently broken, so UI-level E2E remains manual. A
+  symlink was added at
+  `Xcode-beta.app/Contents/Developer/Library/PrivateFrameworks/SimulatorKit.framework`
+  to restore idb screenshots/accessibility (taps still no-op on this beta).
+- The prod Convex deployment (`handsome-tiger-460`) has never been pushed and the
+  app still hardcodes the dev URL + `pk_test_` Clerk key in `ConvexConfig.swift`.
+
 ## Multiplayer Convex authorization hardening
 
 ### What Changed

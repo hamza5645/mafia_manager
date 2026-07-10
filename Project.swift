@@ -7,7 +7,7 @@ let project = Project(
             "DEVELOPMENT_TEAM": "5GH22BAXAU",
             "CODE_SIGN_STYLE": "Automatic",
             "MARKETING_VERSION": "5.0",
-            "CURRENT_PROJECT_VERSION": "10",
+            "CURRENT_PROJECT_VERSION": "11",
             "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
             "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
             "STRING_CATALOG_GENERATE_SYMBOLS": "NO",
@@ -44,6 +44,7 @@ let project = Project(
                 "App/**",
                 "Core/**",
                 "Features/**",
+                "Vendor/clerk-convex-swift/Sources/ClerkKitConvex/**",
             ],
             resources: [
                 "Assets.xcassets",
@@ -54,7 +55,6 @@ let project = Project(
                 .external(name: "ConvexMobile"),
                 .external(name: "ClerkKit"),
                 .external(name: "ClerkKitUI"),
-                .external(name: "ClerkConvex"),
             ],
             settings: .settings(
                 base: [

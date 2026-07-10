@@ -5,26 +5,19 @@
       location = "group:mafia_manager.xcodeproj">
    </FileRef>
    <Group
-      location = "group:Vendor"
-      name = "Vendor">
-      <FileRef
-         location = "group:clerk-convex-swift/ClerkConvex.xcodeproj">
-      </FileRef>
-   </Group>
-   <Group
       location = "container:"
       name = "Dependencies">
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/Clerk/Clerk.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/Projects/Clerk/Clerk.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/ConvexMobile/ConvexMobile.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/Projects/ConvexMobile/ConvexMobile.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/Nuke/Nuke.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/Projects/Nuke/Nuke.xcodeproj">
       </FileRef>
       <FileRef
-         location = "group:Tuist/.build/tuist-derived/PhoneNumberKit/PhoneNumberKit.xcodeproj">
+         location = "group:Tuist/.build/tuist-derived/Projects/PhoneNumberKit/PhoneNumberKit.xcodeproj">
       </FileRef>
    </Group>
 </Workspace>

@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { roleDistributionValidator } from "./validators";
 import { nowAppleEpochSeconds, uuid } from "./lib";
 
@@ -217,7 +217,7 @@ export const ingestPlayerGroups = internalMutation({
     })),
 });
 
-export const countByTable = query({
+export const countByTable = internalQuery({
   args: {},
   handler: async (ctx) => {
     const [users, stats, configs, groups] = await Promise.all([
@@ -265,7 +265,7 @@ export const linkLegacyByAdmin = internalMutation({
   },
 });
 
-export const listLegacyOrphans = query({
+export const listLegacyOrphans = internalQuery({
   args: {},
   handler: async (ctx) => {
     const users = await ctx.db.query("users").collect();
