@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-10: Collision-safe guest stats merge
+
+- Guest stats merge transactionally by account/player name, sum all eight
+  counters, retain the stable account row (preferring legacy lineage), and delete
+  source/duplicate rows. Earlier duplicate account rows are consolidated when
+  that player is merged. Noncolliding rows transfer intact.
+- Validation: 18/18 backend regressions passed, including preexisting duplicates
+  and future upserts. Native Clerk/Convex account lifecycle passed (1/1) with
+  real guest/account stats merge, combined counters, increment, and cleanup.
+- Rollback: revert merge logic; already-combined counters cannot be separated
+  by a code rollback. Keep pre-merge exports if a data rollback is needed.
+
 ### E2E-09: Rematch state guard
 
 - Rematch requires `completed` status, the game-over phase, and a final game.

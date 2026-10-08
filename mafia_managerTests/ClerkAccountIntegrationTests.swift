@@ -19,6 +19,14 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         print("QA ACCOUNT: \(email)")
 
         try await service.signOut()
+        let database = DatabaseService()
+        let guestHash = "qa-native-merge-\(UUID().uuidString)"
+        let guest = try await service.signInAsGuest(displayName: "QA Native Merge", guestSecretHash: guestHash)
+        let statName = "QA Native Collision"
+        try await database.upsertPlayerStat(
+            userId: guest.id, playerName: statName, role: .doctor, won: false, kills: 1,
+            guestSecretHash: guestHash
+        )
         print("QA STAGE: native signup")
         let signup = try await service.startSignUp(
             email: email,
@@ -37,6 +45,34 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         print("QA STAGE: native profile restoration")
         let restored = await service.currentUser
         XCTAssertEqual(restored?.id, account.id)
+
+        print("QA STAGE: native guest stats merge")
+        try await database.upsertPlayerStat(userId: account.id, playerName: statName, role: .mafia, won: true, kills: 2)
+        do {
+            let merge = try await service.mergeAnonymousStats(
+                anonymousUserId: guest.id, targetUserId: account.id, guestSecretHash: guestHash
+            )
+            XCTAssertTrue(merge.success)
+            let rows = try await database.getPlayerStats(userId: account.id)
+            XCTAssertEqual(rows.filter { $0.playerName == statName }.count, 1)
+            let combined = try await database.getPlayerStat(userId: account.id, playerName: statName)
+            XCTAssertEqual(combined?.gamesPlayed, 2)
+            XCTAssertEqual(combined?.gamesWon, 1)
+            XCTAssertEqual(combined?.gamesLost, 1)
+            XCTAssertEqual(combined?.totalKills, 3)
+            try await database.upsertPlayerStat(userId: account.id, playerName: statName, role: .citizen, won: true, kills: 0)
+            let incremented = try await database.getPlayerStat(userId: account.id, playerName: statName)
+            XCTAssertEqual(incremented?.gamesPlayed, 3)
+        } catch {
+            for row in (try? await database.getPlayerStats(userId: account.id)) ?? [] where row.playerName == statName {
+                try? await database.deletePlayerStat(id: row.id)
+            }
+            try? await service.signOut()
+            throw error
+        }
+        for row in try await database.getPlayerStats(userId: account.id) where row.playerName == statName {
+            try await database.deletePlayerStat(id: row.id)
+        }
 
         try await service.signOut()
         print("QA STAGE: native password sign-in")

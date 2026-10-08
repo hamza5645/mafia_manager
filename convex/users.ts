@@ -217,7 +217,34 @@ export const mergeGuestIntoAccount = mutation({
     }
 
     let transferredCount = 0;
-    for (const table of ["player_stats", "custom_roles_configs", "player_groups"] as const) {
+    const guestStats = await ctx.db.query("player_stats")
+      .withIndex("by_user", q => q.eq("user_id", guest.id)).collect();
+    for (const source of guestStats) {
+      const targets = await ctx.db.query("player_stats")
+        .withIndex("by_user_player", q => q.eq("user_id", target.id).eq("player_name", source.player_name))
+        .collect();
+      if (targets.length === 0) {
+        await ctx.db.patch(source._id, { user_id: target.id, updated_at: nowAppleEpochSeconds() });
+      } else {
+        // Keep the stable account row, preferring legacy lineage when present.
+        // Collect also repairs collisions left by an earlier buggy merge.
+        targets.sort((a, b) => Number(!a.legacy_supabase_id) - Number(!b.legacy_supabase_id) ||
+          a.created_at - b.created_at || a.id.localeCompare(b.id));
+        const canonical = targets[0];
+        const counters = {
+          games_played: 0, games_won: 0, games_lost: 0, total_kills: 0,
+          times_mafia: 0, times_doctor: 0, times_inspector: 0, times_citizen: 0,
+        };
+        for (const row of [...targets, source]) {
+          for (const key of Object.keys(counters) as (keyof typeof counters)[]) counters[key] += row[key];
+        }
+        await ctx.db.patch(canonical._id, { ...counters, updated_at: nowAppleEpochSeconds() });
+        for (const duplicate of targets.slice(1)) await ctx.db.delete(duplicate._id);
+        await ctx.db.delete(source._id);
+      }
+      transferredCount += 1;
+    }
+    for (const table of ["custom_roles_configs", "player_groups"] as const) {
       const docs = await ctx.db
         .query(table)
         .withIndex("by_user", (q) => q.eq("user_id", args.guest_user_id))
