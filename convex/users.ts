@@ -6,6 +6,7 @@ import {
   requireCurrentUser,
   resolveCaller,
   uuid,
+  nextPhaseSequence,
 } from "./lib";
 
 function displayNameFromIdentity(identity: any) {
@@ -216,6 +217,16 @@ export const mergeGuestIntoAccount = mutation({
       throw new ConvexError("Invalid guest credentials");
     }
 
+    const memberships = await ctx.db.query("session_players")
+      .withIndex("by_user", q => q.eq("user_id", guest.id)).collect();
+    for (const member of memberships) {
+      const existingSeat = await ctx.db.query("session_players")
+        .withIndex("by_session_user", q => q.eq("session_id", member.session_id).eq("user_id", target.id)).first();
+      if (existingSeat) {
+        throw new ConvexError("Leave the account's existing seat in this room before upgrading the guest");
+      }
+    }
+
     let transferredCount = 0;
     const guestStats = await ctx.db.query("player_stats")
       .withIndex("by_user", q => q.eq("user_id", guest.id)).collect();
@@ -258,6 +269,21 @@ export const mergeGuestIntoAccount = mutation({
       }
     }
 
+    // Preserve player IDs/roles/actions while switching the proven owner. Every
+    // reference is transferred in this transaction before the guest is deleted.
+    for (const member of memberships) await ctx.db.patch(member._id, { user_id: target.id });
+    const hostedRooms = await ctx.db.query("game_sessions")
+      .withIndex("by_host", q => q.eq("host_user_id", guest.id)).collect();
+    for (const room of hostedRooms) {
+      await ctx.db.patch(room._id, {
+        host_user_id: target.id, updated_at: nowAppleEpochSeconds(), phase_sequence: nextPhaseSequence(room),
+      });
+    }
+    const originalRooms = await ctx.db.query("game_sessions")
+      .withIndex("by_original_host", q => q.eq("original_host_user_id", guest.id)).collect();
+    for (const room of originalRooms) {
+      await ctx.db.patch(room._id, { original_host_user_id: target.id, updated_at: nowAppleEpochSeconds() });
+    }
     await ctx.db.delete(guest._id);
     return {
       success: true,

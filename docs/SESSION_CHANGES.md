@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-11: Active room upgrade
+
+- Guest merge transfers seat ownership, current host, and stored original host
+  before deleting the guest. Player IDs/roles/actions stay intact. A conflicting
+  account seat aborts the whole transaction with an actionable error. Snapshot
+  comparison now propagates ownership-only changes into the local player.
+- Validation: 20/20 backend regressions and 5/5 Swift tests passed, including
+  native Clerk room upgrade/leave and ownership-only snapshot handling.
+  Signed build and development typecheck passed. Audit reads now use account auth.
+- Rollback: revert backend and client ownership handling together. Transferred
+  references cannot be reversed after the guest is deleted without a data backup.
+
 ### E2E-10: Collision-safe guest stats merge
 
 - Guest stats merge transactionally by account/player name, sum all eight

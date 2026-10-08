@@ -22,6 +22,12 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         let database = DatabaseService()
         let guestHash = "qa-native-merge-\(UUID().uuidString)"
         let guest = try await service.signInAsGuest(displayName: "QA Native Merge", guestSecretHash: guestHash)
+        let sessions = SessionService()
+        let guestRoom = try await sessions.createSession(hostUserId: guest.id, guestSecretHash: guestHash)
+        let guestPlayer = try await sessions.addPlayer(
+            sessionId: guestRoom.id, userId: guest.id, playerName: guest.displayName,
+            isBot: false, callerUserId: guest.id, guestSecretHash: guestHash
+        )
         let statName = "QA Native Collision"
         try await database.upsertPlayerStat(
             userId: guest.id, playerName: statName, role: .doctor, won: false, kills: 1,
@@ -53,6 +59,16 @@ final class ClerkAccountIntegrationTests: XCTestCase {
                 anonymousUserId: guest.id, targetUserId: account.id, guestSecretHash: guestHash
             )
             XCTAssertTrue(merge.success)
+            print("QA STAGE: native active room upgrade")
+            let upgradedRoom = try await sessions.getSession(sessionId: guestRoom.id, viewerUserId: account.id)
+            XCTAssertEqual(upgradedRoom?.hostUserId, account.id)
+            let seats = try await sessions.getSessionPlayers(sessionId: guestRoom.id, viewerUserId: account.id)
+            XCTAssertEqual(seats.first(where: { $0.id == guestPlayer.id })?.userId, account.id)
+            XCTAssertEqual(seats.first(where: { $0.id == guestPlayer.id })?.playerId, guestPlayer.playerId)
+            try await sessions.updateSessionStatus(sessionId: guestRoom.id, status: .cancelled, callerUserId: account.id)
+            try await sessions.leaveSession(sessionId: guestRoom.id, userId: account.id)
+            let afterLeave = try await sessions.getSessionPlayers(sessionId: guestRoom.id, viewerUserId: account.id)
+            XCTAssertTrue(afterLeave.isEmpty)
             let rows = try await database.getPlayerStats(userId: account.id)
             XCTAssertEqual(rows.filter { $0.playerName == statName }.count, 1)
             let combined = try await database.getPlayerStat(userId: account.id, playerName: statName)
@@ -64,10 +80,14 @@ final class ClerkAccountIntegrationTests: XCTestCase {
             let incremented = try await database.getPlayerStat(userId: account.id, playerName: statName)
             XCTAssertEqual(incremented?.gamesPlayed, 3)
         } catch {
+            try? await sessions.updateSessionStatus(sessionId: guestRoom.id, status: .cancelled, callerUserId: account.id)
+            try? await sessions.leaveSession(sessionId: guestRoom.id, userId: account.id)
             for row in (try? await database.getPlayerStats(userId: account.id)) ?? [] where row.playerName == statName {
                 try? await database.deletePlayerStat(id: row.id)
             }
             try? await service.signOut()
+            try? await sessions.updateSessionStatus(sessionId: guestRoom.id, status: .cancelled, callerUserId: guest.id, guestSecretHash: guestHash)
+            try? await sessions.leaveSession(sessionId: guestRoom.id, userId: guest.id, guestSecretHash: guestHash)
             throw error
         }
         for row in try await database.getPlayerStats(userId: account.id) where row.playerName == statName {

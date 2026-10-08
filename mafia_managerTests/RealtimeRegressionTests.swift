@@ -43,6 +43,31 @@ final class RealtimeRegressionTests: XCTestCase {
         XCTAssertEqual(removals, [second.id])
     }
 
+    func testOwnershipOnlySnapshotUpdatesLocalPlayerAfterGuestUpgrade() {
+        let realtime = RealtimeService()
+        let store = MultiplayerGameStore()
+        let local = makePlayer(name: "Upgrading guest")
+        store.myPlayer = local
+        store.allPlayers = [local]
+        store.isInSession = true
+        realtime.handlePlayersSnapshot([local], onPlayerUpdate: { _ in }, onPlayerRemoved: { _ in })
+        let accountPlayer = SessionPlayer(
+            id: local.id, sessionId: local.sessionId, userId: UUID(), playerId: local.playerId,
+            playerName: local.playerName, playerNumber: local.playerNumber, role: local.role,
+            isBot: local.isBot, isAlive: local.isAlive, isOnline: local.isOnline,
+            isReady: local.isReady, lastHeartbeat: local.lastHeartbeat,
+            joinedAt: local.joinedAt, removalNote: local.removalNote
+        )
+        realtime.handlePlayersSnapshot(
+            [accountPlayer], onPlayerUpdate: { store.testHandlePlayerUpdate($0) },
+            onPlayerRemoved: { _ in XCTFail("Ownership transfer must preserve the seat") }
+        )
+        XCTAssertEqual(store.myPlayer?.userId, accountPlayer.userId)
+        XCTAssertEqual(store.allPlayers.first?.userId, accountPlayer.userId)
+        XCTAssertTrue(store.isInSession)
+        XCTAssertFalse(store.wasKicked)
+    }
+
     func testOtherPlayerRemovalKeepsLocalMembership() {
         let store = MultiplayerGameStore()
         let local = makePlayer(name: "Local", role: .citizen, number: 1)

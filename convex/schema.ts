@@ -128,6 +128,7 @@ export default defineSchema({
     .index("by_app_id", ["id"])
     .index("by_room_code", ["room_code"])
     .index("by_host", ["host_user_id"])
+    .index("by_original_host", ["original_host_user_id"])
     .index("by_status", ["status"]),
 
   session_players: defineTable({
