@@ -55,6 +55,7 @@
 		70828131B35C3A7070C2474B /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D0475004635445C3CF22A3 /* SessionService.swift */; };
 		730A63AE7951CBA1103F4D16 /* Clerk_ClerkKitUI.bundle in Dependencies */ = {isa = PBXBuildFile; fileRef = 235911560BC05DFA440783E5 /* Clerk_ClerkKitUI.bundle */; };
 		75763BFC49D4E331209B7CC6 /* MultiplayerVotingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0028C6358D9D5D74A21BA47D /* MultiplayerVotingResultsView.swift */; };
+		75AAEA726C608069CC57F0B1 /* ClerkAccountIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769D43B5F59FB28DF8F37D6B /* ClerkAccountIntegrationTests.swift */; };
 		7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0342891BA342790B3D72E97 /* GameStoreTests.swift */; };
 		800E424F4372CA2DB1D1CBF3 /* AuthRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */; };
 		80C560C8F7FAB5279235818F /* GameModeSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 915F85AC325F3EC3095C151D /* GameModeSelectionView.swift */; };
@@ -199,6 +200,7 @@
 		6FDC44BB42D2D503D48434C0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6FEA6F261D60B4FC9F8E6B6B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		728D147A4E511CD5EDA1B63E /* PrivacyBlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyBlurView.swift; sourceTree = "<group>"; };
+		769D43B5F59FB28DF8F37D6B /* ClerkAccountIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkAccountIntegrationTests.swift; sourceTree = "<group>"; };
 		79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerNightView.swift; sourceTree = "<group>"; };
 		7A9D67BB1A0399BED77A3EDE /* NukeUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NukeUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7CDB6FEF38DBAAD69D903FEE /* BotVotingRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotVotingRevealView.swift; sourceTree = "<group>"; };
@@ -620,6 +622,7 @@
 			isa = PBXGroup;
 			children = (
 				E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */,
+				769D43B5F59FB28DF8F37D6B /* ClerkAccountIntegrationTests.swift */,
 				DC0B6901DF574ABB253D29A5 /* ConvexIntegrationTests.swift */,
 				A0342891BA342790B3D72E97 /* GameStoreTests.swift */,
 				504EA5E2A08DAAE015F76409 /* RealtimeRegressionTests.swift */,
@@ -858,6 +861,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				800E424F4372CA2DB1D1CBF3 /* AuthRegressionTests.swift in Sources */,
+				75AAEA726C608069CC57F0B1 /* ClerkAccountIntegrationTests.swift in Sources */,
 				3973D178FCDB3484DB928C90 /* ConvexIntegrationTests.swift in Sources */,
 				7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */,
 				1FE4DB73AF79FA7379741E5A /* RealtimeRegressionTests.swift in Sources */,

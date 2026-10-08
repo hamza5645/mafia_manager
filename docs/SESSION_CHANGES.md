@@ -1,5 +1,68 @@
 # Session Changes
 
+## Extensive Convex migration E2E audit — 2026-10-08
+
+### What Changed
+
+- Added `docs/CONVEX_MIGRATION_E2E_REPORT.md`: 14 confirmed issues and 3
+  source-review findings, with severity, reproductions, affected code, evidence,
+  coverage limits, and test-data cleanup notes. No app/backend fixes were made.
+- Added development-only public-client audit scripts for multiplayer/privacy/
+  authorization/cloud data and Clerk account/merge/reset flows, plus a read-only
+  saved-export parity checker. Sanitized evidence is under
+  `docs/e2e-evidence/2026-10-08`.
+- Added opt-in `ClerkAccountIntegrationTests.swift` for the actual native
+  ClerkKit → ConvexMobile account lifecycle. `tuist generate --no-open`
+  regenerated the project to include the source; the project file was not
+  edited manually.
+- Synchronized the existing branch's Convex functions to the configured
+  development deployment. Initially its older API rejected the app's guest
+  proof arguments. Production was not deployed or modified.
+
+### Validation
+
+- Normal signed Debug simulator build passed. Existing Swift tests passed
+  35/35 after backend sync, including all 5 live Convex tests. The added native
+  Clerk signup/verification/sign-in/restoration/reset test passed 1/1.
+- Expanded backend audit: 49 assertions, 35 passed and 14 failed. Account/merge
+  audit: 20 assertions, 15 passed and 5 failed. Password-reset audit: 5/5 passed.
+  Failures are intentionally reported as unresolved product issues.
+- Two-device guest UI covered creation, joining, realtime roster changes,
+  kicking, roles, bot night actions, morning/death reveal, and voting. Kicking
+  left the removed device stale; voting could not advance to results.
+- Completed a full solo game, restored its completed state after relaunch,
+  used Play Again, and verified cloud stats. Created/restored a guest player
+  group.
+- Every row in the saved legacy export matched current Convex legacy data:
+  86 users / 48 stats / 6 role configs / 2 groups, including owner mappings.
+  Live Supabase parity was blocked by `ENOTFOUND` for the configured source.
+
+### Rollback
+
+- Remove the new report/evidence, `scripts/e2e`, and the new Clerk test source,
+  then run `tuist generate --no-open` to regenerate the project.
+- Development backend sync deployed existing branch code, not a new fix.
+  Reverting that deployment independently restores the app/API mismatch;
+  coordinate any backend rollback with its client version.
+- QA rooms and saved-data fixtures were cleaned as documented in the report.
+  Guest profiles and two development Clerk accounts remain. The intentionally
+  orphaned merge fixture was removed with a temporary internal mutation scoped
+  to that exact QA fixture; the function was then removed and undeployed.
+
+### Known Gotchas
+
+- Full multiplayer UI game-over/rematch validation is blocked by the voting
+  issue. Production configuration and a real legacy account claim remain
+  unverified. The report separates API/native-service tests from visible UI
+  journeys and lists other runtime/network/device limits.
+- Xcode 27 beta AutoFill/system sheets interfered with UI account automation.
+  The native Swift SDK test completed all account stages successfully.
+- `CODE_SIGNING_ALLOWED=NO` builds could not store Keychain data on this
+  runtime (`-34018`). Use a normal signed simulator build for guest/account UI.
+- Audit scripts create isolated development data. Raw snapshots, credentials,
+  and session tokens stay outside the repository; committed evidence is
+  sanitized. Do not run fixture campaigns against production.
+
 ## Authentication, realtime, and migration regression fixes
 
 ### What Changed

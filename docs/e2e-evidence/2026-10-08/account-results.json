@@ -1,0 +1,132 @@
+{
+  "email": "mafia-qa-1791472654898+clerk_test@example.com",
+  "accountId": "48825ce1-254d-4eb1-a850-ed88612b7d91",
+  "timestamp": "2026-10-08T15:17:44.650Z",
+  "results": [
+    {
+      "name": "Signup requests email verification",
+      "status": "PASS",
+      "evidence": {
+        "status": "missing_requirements"
+      }
+    },
+    {
+      "name": "Signup rejects invalid verification code",
+      "status": "PASS",
+      "evidence": "[{\"message\":\"is incorrect\",\"long_message\":\"Incorrect code\",\"code\":\"form_code_incorrect\",\"meta\":{\"param_name\":\"code\"}}]"
+    },
+    {
+      "name": "Signup verification creates active session",
+      "status": "PASS",
+      "evidence": {
+        "status": "complete"
+      }
+    },
+    {
+      "name": "Convex JWT includes verified account email",
+      "status": "PASS",
+      "evidence": {
+        "audience": "convex",
+        "emailPresent": true
+      }
+    },
+    {
+      "name": "Authenticated signup creates nonanonymous Convex profile",
+      "status": "PASS",
+      "evidence": {
+        "id": "48825ce1-254d-4eb1-a850-ed88612b7d91",
+        "isAnonymous": false
+      }
+    },
+    {
+      "name": "Account restoration preserves profile UUID",
+      "status": "PASS",
+      "evidence": "same UUID"
+    },
+    {
+      "name": "Account profile update persists",
+      "status": "PASS",
+      "evidence": "edited name restored"
+    },
+    {
+      "name": "Account refresh preserves edited profile name",
+      "status": "FAIL",
+      "evidence": "\"edited profile name retained\""
+    },
+    {
+      "name": "Merge rejects invalid guest proof",
+      "status": "PASS",
+      "evidence": "[Request ID: 8896660b5bcf16de] Server Error\nUncaught ConvexError: Invalid guest credentials\n    at handler (../convex/users.ts:218:27)\n"
+    },
+    {
+      "name": "Guest merge succeeds",
+      "status": "PASS",
+      "evidence": {
+        "transferred": 1
+      }
+    },
+    {
+      "name": "Merge combines same-name player stats into one row",
+      "status": "FAIL",
+      "evidence": "[{\"id\":\"73ad7f76-14fa-4d89-9dcb-66d96fe53ba9\",\"name\":\"QA Merge Collision\",\"played\":1},{\"id\":\"54a41d71-f7d2-4f3c-889b-7e9ff11c16f9\",\"name\":\"QA Merge Collision\",\"played\":1}]"
+    },
+    {
+      "name": "Merged stats remain readable and incrementable",
+      "status": "FAIL",
+      "evidence": "[Request ID: 81301eaf49d0e951] Server Error\nUncaught Error: unique() query returned more than one result from table player_stats:\n [jn759308dzvg898s2gyyg05pzs8fxbkd, jn72w8fw2psgffxwtjtgrk6jex8fxw5n, ...]\n    at async handler (../convex/stats.ts:47:17)\n"
+    },
+    {
+      "name": "Guest upgrade preserves active room membership and ownership",
+      "status": "FAIL",
+      "evidence": "{\"oldGuestId\":\"e65ffc19-1df8-4ffd-ad6a-18921c668a8c\",\"accountId\":\"48825ce1-254d-4eb1-a850-ed88612b7d91\",\"hostId\":\"e65ffc19-1df8-4ffd-ad6a-18921c668a8c\",\"playerOwnerId\":\"e65ffc19-1df8-4ffd-ad6a-18921c668a8c\"}"
+    },
+    {
+      "name": "Upgraded account can leave its guest room",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "Merged room has no orphaned membership",
+      "status": "FAIL",
+      "evidence": "\"no players remain\""
+    },
+    {
+      "name": "Unauthenticated account reads fail",
+      "status": "PASS",
+      "evidence": "[Request ID: c17e4a7ca7695ac7] Server Error\nUncaught ConvexError: Authentication required\n    at resolveCaller (../../convex/lib.ts:82:7)\n    at async handler (../convex/users.ts:153:38)\n"
+    },
+    {
+      "name": "Sign-in rejects wrong password",
+      "status": "PASS",
+      "evidence": "[{\"message\":\"Password is incorrect. Try again, or use another method.\",\"long_message\":\"Password is incorrect. Try again, or use another method.\",\"code\":\"form_password_incorrect\",\"meta\":{\"param_name\":\"password\"}}]"
+    },
+    {
+      "name": "Password sign-in restores original Convex account",
+      "status": "PASS",
+      "evidence": "same UUID"
+    },
+    {
+      "name": "Cleanup QA stats",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "Cleanup QA stats",
+      "status": "PASS",
+      "evidence": null
+    }
+  ],
+  "fixtures": {
+    "guests": [
+      "e65ffc19-1df8-4ffd-ad6a-18921c668a8c"
+    ],
+    "rooms": [
+      "14c4d8e6-7d46-4313-a187-d148a9084887"
+    ],
+    "stats": [
+      "73ad7f76-14fa-4d89-9dcb-66d96fe53ba9",
+      "54a41d71-f7d2-4f3c-889b-7e9ff11c16f9"
+    ]
+  },
+  "harness_note": "Initial reset attempt omitted email_address_id; corrected and passed separately in password-reset-results.json."
+}
