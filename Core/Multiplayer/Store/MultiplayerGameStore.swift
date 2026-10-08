@@ -43,9 +43,6 @@ final class MultiplayerGameStore: ObservableObject {
     // Kick detection
     @Published var wasKicked: Bool = false
 
-    // Stores original host ID for Play Again host reclaim logic
-    private var originalHostUserId: UUID?
-
     // Heartbeat timer
     private var heartbeatTimer: Timer?
     private var playerRefreshTimer: Timer?
@@ -547,15 +544,11 @@ final class MultiplayerGameStore: ObservableObject {
             throw SessionError.noActiveSession
         }
 
-        // Store original host for reclaim logic (first time entering game_over)
-        let originalHost = originalHostUserId ?? currentSession?.hostUserId ?? playerUserId
-
         // Reset session to lobby state via service
         try await sessionService.returnToLobby(
             sessionId: sessionId,
             playerId: playerId,
             playerUserId: playerUserId,
-            originalHostUserId: originalHost,
             guestSecretHash: guestSecretHash
         )
 
@@ -575,8 +568,6 @@ final class MultiplayerGameStore: ObservableObject {
         resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
         isPhaseReadyToAdvance = false
-        // Clear so it gets recaptured when new game starts
-        originalHostUserId = nil
     }
 
     /// Remove a player from the session (Host only)
@@ -732,11 +723,6 @@ final class MultiplayerGameStore: ObservableObject {
         // New session or a full lobby reset (e.g., Play Again) -> clear bot/night caches
         if session.id != previousSessionId || isFreshLobbyState(session) {
             resetPhaseProcessingState()
-        }
-
-        // Store original host ID when game starts (for Play Again host reclaim)
-        if previousPhaseData == .lobby && session.currentPhaseData != .lobby {
-            originalHostUserId = session.hostUserId
         }
 
         currentSession = session

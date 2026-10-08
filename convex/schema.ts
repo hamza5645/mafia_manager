@@ -102,6 +102,7 @@ export default defineSchema({
     id: v.string(),
     room_code: v.string(),
     host_user_id: v.string(),
+    original_host_user_id: v.optional(v.string()),
     status: sessionStatus,
     created_at: v.number(),
     started_at: v.optional(v.number()),

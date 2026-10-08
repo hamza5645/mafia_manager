@@ -70,6 +70,7 @@ export const createSession = mutation({
       id: uuid(),
       room_code: await generateRoomCode(ctx),
       host_user_id: args.host_user_id,
+      original_host_user_id: args.host_user_id,
       status: "waiting" as const,
       created_at: timestamp,
       max_players: args.max_players,
@@ -687,6 +688,7 @@ export const assignRolesAndNumbers = mutation({
       }
     }
     await ctx.db.patch(session._id, {
+      original_host_user_id: session.host_user_id,
       assigned_numbers: args.assignments.map((assignment) => ({
         player_id: assignment.player_id,
         number: assignment.number,
@@ -871,7 +873,7 @@ export const returnToLobby = mutation({
     session_id: v.string(),
     player_id: v.string(),
     player_user_id: v.string(),
-    original_host_user_id: v.string(),
+    original_host_user_id: v.optional(v.string()),
     guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -881,6 +883,10 @@ export const returnToLobby = mutation({
       args.guest_secret_hash,
     );
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    const originalHostId = session.original_host_user_id ?? session.host_user_id;
+    if (args.original_host_user_id && args.original_host_user_id !== originalHostId) {
+      throw new ConvexError("Original host does not match session owner");
+    }
     const player = await getPlayer(ctx, args.player_id);
     if (!player || player.session_id !== args.session_id) {
       throw new ConvexError("Player is not in this session");
@@ -897,6 +903,7 @@ export const returnToLobby = mutation({
     if (session.current_phase !== "lobby") {
       await ctx.db.patch(session._id, {
         host_user_id: args.player_user_id,
+        original_host_user_id: originalHostId,
         status: "waiting",
         current_phase: "lobby",
         current_phase_data: { type: "lobby" },
@@ -945,11 +952,11 @@ export const returnToLobby = mutation({
         await ctx.db.delete(tentative._id);
       }
     } else if (
-      args.player_user_id === args.original_host_user_id &&
-      session.host_user_id !== args.original_host_user_id
+      caller.id === originalHostId &&
+      session.host_user_id !== originalHostId
     ) {
       await ctx.db.patch(session._id, {
-        host_user_id: args.original_host_user_id,
+        host_user_id: originalHostId,
         updated_at: nowAppleEpochSeconds(),
         phase_sequence: nextPhaseSequence(session),
       });

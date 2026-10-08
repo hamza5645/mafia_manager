@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-08: Trusted original host ownership
+
+- Convex stores the original host at room creation/game assignment. Play Again
+  reclamation uses that stored identity and rejects spoofed legacy assertions.
+  Swift no longer supplies or caches an authoritative original-host argument.
+- Validation: 15/15 backend regressions passed; live Swift full lifecycle passed
+  (1/1), including member-first lobby return and genuine host reclamation.
+  Development typecheck and signed build passed.
+- Rollback: optional stored ownership is backward compatible; revert server and
+  Swift argument changes together. Old sessions safely default to their current
+  host until the next game assigns the stored original host.
+
 ### E2E-07: Conditional atomic night resolution
 
 - Atomic resolution requires the expected round, active night/index, valid

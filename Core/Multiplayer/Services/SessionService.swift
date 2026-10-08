@@ -407,7 +407,6 @@ final class SessionService {
         sessionId: UUID,
         playerId: UUID,
         playerUserId: UUID,
-        originalHostUserId: UUID,
         guestSecretHash: String? = nil
     ) async throws {
         try await convex.mutation(
@@ -416,7 +415,6 @@ final class SessionService {
                 "session_id": sessionId.uuidString.lowercased(),
                 "player_id": playerId.uuidString.lowercased(),
                 "player_user_id": playerUserId.uuidString.lowercased(),
-                "original_host_user_id": originalHostUserId.uuidString.lowercased(),
                 "guest_secret_hash": guestSecretHash,
             ]
         )

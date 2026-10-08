@@ -377,6 +377,20 @@ final class ConvexIntegrationTests: XCTestCase {
             finalPlayers.compactMap(\.role).count, 2,
             "All roles must be revealed at game over"
         )
+        try await sessionService.returnToLobby(
+            sessionId: session.id, playerId: joinerPlayer.id, playerUserId: joiner.id,
+            guestSecretHash: joinerHash
+        )
+        try await sessionService.returnToLobby(
+            sessionId: session.id, playerId: hostPlayer.id, playerUserId: host.id,
+            guestSecretHash: hostHash
+        )
+        let lobby = try await sessionService.getSession(
+            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
+        )
+        XCTAssertEqual(lobby?.hostUserId, host.id)
+        XCTAssertEqual(lobby?.currentPhase, "lobby")
+        XCTAssertTrue(lobby?.nightHistory.isEmpty == true)
     }
 
     func testGuestAuthorizationAndMembershipBoundaries() async throws {
