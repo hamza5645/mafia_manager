@@ -157,6 +157,7 @@ async function ingestChildBatch<R extends { legacy_supabase_id: string; legacy_s
       await ctx.db.patch(existing._id, {
         ...payload,
         user_id: owner.id,
+        created_at: payload.created_at ?? existing.created_at ?? fallback,
         updated_at: payload.updated_at ?? fallback,
       });
       patched += 1;
@@ -166,9 +167,9 @@ async function ingestChildBatch<R extends { legacy_supabase_id: string; legacy_s
         legacy_supabase_id: row.legacy_supabase_id,
         legacy_supabase_user_id: row.legacy_supabase_user_id,
         user_id: owner.id,
+        ...payload,
         created_at: payload.created_at ?? fallback,
         updated_at: payload.updated_at ?? fallback,
-        ...payload,
       });
       inserted += 1;
     }

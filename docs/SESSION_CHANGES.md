@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-01: Missing migration timestamps
+
+- New regression fixtures exposed a preexisting valid-input failure: optional
+  child timestamps were spread over required defaults; retries could also delete
+  an existing creation timestamp. Insert defaults now take precedence and
+  updates preserve the original creation date when it is omitted.
+- Validation: all 6 timestamp regressions failed before the fix, then 36/36
+  backend/migration regressions passed after it. Development typecheck passed.
+  Tests cover stats, role configs, and groups, including idempotent retry identity.
+- Rollback: revert timestamp ordering; missing-date imports will fail again.
+  No production or legacy data was changed by these isolated tests.
+
 ### REVIEW-03: Guest-to-account form dismissal
 
 - Login/password-reset forms observe authenticated account identity instead of
