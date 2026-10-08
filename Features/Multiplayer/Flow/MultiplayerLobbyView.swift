@@ -9,6 +9,8 @@ struct MultiplayerLobbyView: View {
     @State private var isStarting = false
     @State private var hasLeftSession = false
     @State private var startGameError: String?
+    @State private var leaveGameError: String?
+    @State private var showingLeaveError = false
 
     /// The session player ID of the host (found by matching userId to session.hostUserId)
     private var hostSessionPlayerId: UUID? {
@@ -86,13 +88,20 @@ struct MultiplayerLobbyView: View {
                 .automationID("multiplayer.lobby.close")
             }
         }
-        .alert("Are you sure you want to end the game?", isPresented: $showingLeaveConfirmation) {
-            Button("End Game", role: .destructive) {
+        .alert(multiplayerStore.isHost ? "End this game for everyone?" : "Leave this game?", isPresented: $showingLeaveConfirmation) {
+            Button(multiplayerStore.isHost ? "End Game" : "Leave Game", role: .destructive) {
                 leaveGame()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will end the current game without determining a winner.")
+            Text(multiplayerStore.isHost
+                 ? "This will end the current game for everyone without determining a winner."
+                 : "You will leave the room. The other players can continue.")
+        }
+        .alert("Could Not Leave Game", isPresented: $showingLeaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(leaveGameError ?? "Please try again.")
         }
         .onChange(of: multiplayerStore.wasKicked) { _, wasKicked in
             if wasKicked {
@@ -331,9 +340,17 @@ struct MultiplayerLobbyView: View {
         guard !hasLeftSession else { return }
         hasLeftSession = true
         Task {
-            try? await multiplayerStore.leaveSession()
-            await MainActor.run {
+            do {
+                if multiplayerStore.isHost {
+                    try await multiplayerStore.endSession()
+                } else {
+                    try await multiplayerStore.leaveSession()
+                }
                 dismiss()
+            } catch {
+                hasLeftSession = false
+                leaveGameError = error.localizedDescription
+                showingLeaveError = true
             }
         }
     }

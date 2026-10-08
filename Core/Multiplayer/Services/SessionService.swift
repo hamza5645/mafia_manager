@@ -53,6 +53,14 @@ final class SessionService {
         )
     }
 
+    func cancelSession(sessionId: UUID, callerUserId: UUID, guestSecretHash: String? = nil) async throws {
+        try await convex.mutation("sessions:cancelSession", with: [
+            "session_id": sessionId.uuidString.lowercased(),
+            "caller_user_id": callerUserId.uuidString.lowercased(),
+            "guest_secret_hash": guestSecretHash,
+        ])
+    }
+
     func removePlayer(playerId: UUID, callerUserId: UUID, guestSecretHash: String? = nil) async throws {
         try await convex.mutation(
             "sessions:removePlayer",

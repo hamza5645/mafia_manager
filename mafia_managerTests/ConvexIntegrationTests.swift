@@ -192,6 +192,35 @@ final class ConvexIntegrationTests: XCTestCase {
         }
     }
 
+    func testHostEndGameCancelsRoomAndClearsStore() async throws {
+        let hash = "qa-end-room-\(UUID().uuidString)"
+        let host = try await makeGuest(name: "QA End Room", hash: hash)
+        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hash)
+        let player = try await sessionService.addPlayer(
+            sessionId: session.id, userId: host.id, playerName: host.displayName,
+            isBot: false, callerUserId: host.id, guestSecretHash: hash
+        )
+        _ = try await sessionService.addPlayer(
+            sessionId: session.id, userId: nil, playerName: "QA End Bot",
+            isBot: true, callerUserId: host.id, guestSecretHash: hash
+        )
+        let store = MultiplayerGameStore()
+        store.testCurrentUserIdProvider = { host.id }
+        store.testGuestSecretHashProvider = { hash }
+        store.currentSession = session
+        store.myPlayer = player
+        store.isHost = true
+        store.isInSession = true
+        try await store.endSession()
+        XCTAssertNil(store.currentSession)
+        XCTAssertNil(store.myPlayer)
+        XCTAssertFalse(store.isInSession)
+        let ended = try await sessionService.getSession(sessionId: session.id)
+        XCTAssertEqual(ended?.status, .cancelled)
+        let roster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
+        XCTAssertTrue(roster.isEmpty)
+    }
+
     func testGuestCreateAndRestoreIsIdempotent() async throws {
         let hash = "qa-swift-int-guest"
         let first = try await makeGuest(name: "QA Swift Guest", hash: hash)

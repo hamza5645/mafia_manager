@@ -485,38 +485,40 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
-    /// Leave the current session
+    /// Leave this seat; the backend transfers host or cancels an empty room.
     func leaveSession() async throws {
-        guard let player = myPlayer,
-              let sessionId = currentSession?.id else {
-            throw SessionError.playerNotFound
-        }
+        guard let player = myPlayer, let userId = player.userId,
+              let sessionId = currentSession?.id else { throw SessionError.playerNotFound }
+        // Keep the connection/timers intact if the network request fails, so
+        // the user can retry without being stranded in a disconnected lobby.
+        try await sessionService.leaveSession(sessionId: sessionId, userId: userId, guestSecretHash: guestSecretHash)
+        await clearLocalSession()
+    }
 
+    /// The host's End Game action cancels the room for every participant.
+    func endSession() async throws {
+        guard isHost, let sessionId = currentSession?.id,
+              let userId = currentUserId() else { throw SessionError.notHost }
+        try await sessionService.cancelSession(sessionId: sessionId, callerUserId: userId, guestSecretHash: guestSecretHash)
+        await clearLocalSession()
+    }
+
+    private func clearLocalSession() async {
         resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
-
         stopHeartbeat()
-        stopHostMonitorTimer() // HAMZA-165: Stop monitoring host
+        stopHostMonitorTimer()
         stopPlayerRefreshTimer()
         stopConsistencyCheckTimer()
         await realtimeService.unsubscribeAll()
-
-        // Self-leave uses sessions:leaveSession (caller-owned) rather than the
-        // host-only sessions:removePlayer mutation.
-        if let userId = player.userId {
-            try await sessionService.leaveSession(
-                sessionId: sessionId,
-                userId: userId,
-                guestSecretHash: guestSecretHash
-            )
-        }
-
-        // Clear local state
+        currentSessionId = nil
         currentSession = nil
         myPlayer = nil
         allPlayers = []
         isHost = false
         isInSession = false
+        wasKicked = false
+        isRealtimeConnected = false
         visiblePlayers = []
         myRole = nil
         myNumber = nil

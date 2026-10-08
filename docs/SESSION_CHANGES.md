@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-14: End Game and empty-room cancellation
+
+- Host End Game cancels the entire room and removes seats/actions/selections.
+  Nonhosts leave their own seat. Last-human departure cancels bot-only/empty
+  rooms, including creators whose seat creation failed. Completed outcomes are
+  retained. Failed leave requests keep local connections intact for retry.
+- Validation: 25/25 backend regressions and all 9 live Swift integration tests
+  passed, including store-level End Game, empty roster, lifecycle, and kicking.
+  Development typecheck and signed build passed; UI messages/actions reviewed.
+- Rollback: revert cancellation mutation, auto-cancellation, and host UI action
+  together. Deleted QA/game seats/actions cannot be restored by code rollback.
+
 ### E2E-13: Readable backend errors
 
 - Convex query/mutation errors become safe localized messages at the service

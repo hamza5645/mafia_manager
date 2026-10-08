@@ -205,7 +205,10 @@ export async function transferHostIfNeeded(
   const nextHost = remaining
     .filter((candidate) => !candidate.is_bot && candidate.user_id)
     .sort((a, b) => a.joined_at - b.joined_at)[0];
-  if (!nextHost?.user_id) return;
+  if (!nextHost?.user_id) {
+    await cancelSessionAndRemovePlayers(ctx, session);
+    return;
+  }
 
   await ctx.db.patch(session._id, {
     host_user_id: nextHost.user_id,
@@ -373,4 +376,24 @@ export function validateGameAction(session: any, players: any[], args: {
     throw new ConvexError("Inspector cannot inspect themselves");
   }
   return actor;
+}
+
+
+export async function cancelSessionAndRemovePlayers(ctx: MutationCtx, session: any) {
+  const players = await listSessionPlayers(ctx, session.id);
+  if (players.length === 0 && ["cancelled", "completed"].includes(session.status)) return;
+  const completed = session.status === "completed";
+  await ctx.db.patch(session._id, {
+    status: completed ? "completed" : "cancelled",
+    current_phase: completed ? session.current_phase : "cancelled",
+    current_phase_data: completed ? session.current_phase_data : undefined,
+    current_round_id: undefined, night_resolution: undefined, rematch_deadline: undefined,
+    completed_at: session.completed_at ?? nowAppleEpochSeconds(),
+    updated_at: nowAppleEpochSeconds(), phase_sequence: nextPhaseSequence(session),
+  });
+  for (const player of players) await ctx.db.delete(player._id);
+  const actions = await ctx.db.query("game_actions").withIndex("by_session", q => q.eq("session_id", session.id)).collect();
+  for (const action of actions) await ctx.db.delete(action._id);
+  const selections = await ctx.db.query("tentative_selections").withIndex("by_session_phase_type", q => q.eq("session_id", session.id)).collect();
+  for (const selection of selections) await ctx.db.delete(selection._id);
 }

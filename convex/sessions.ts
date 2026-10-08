@@ -7,6 +7,7 @@ import {
 } from "./validators";
 import {
   filterActionForViewer,
+  cancelSessionAndRemovePlayers,
   listSessionPlayers,
   nextPhaseSequence,
   nowAppleEpochSeconds,
@@ -141,7 +142,19 @@ export const leaveSession = mutation({
       .first();
     if (player) {
       await removePlayerImpl(ctx, player.id);
+    } else {
+      // A creator may leave after room creation failed before adding their seat.
+      await transferHostIfNeeded(ctx, args.session_id, args.user_id);
     }
+  },
+});
+
+export const cancelSession = mutation({
+  args: { session_id: v.string(), caller_user_id: v.string(), guest_secret_hash: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await requireSessionHostStrict(ctx, args.session_id, args.caller_user_id, args.guest_secret_hash);
+    const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    await cancelSessionAndRemovePlayers(ctx, session);
   },
 });
 
