@@ -433,16 +433,13 @@ export const getSessionPlayers = query({
       return [];
     }
     const players = await listSessionPlayers(ctx, args.session_id);
-    const viewer = args.viewer_user_id
-      ? (
-          await requireSessionMember(
-            ctx,
-            args.session_id,
-            args.viewer_user_id,
-            args.guest_secret_hash,
-          )
-        ).caller
-      : await resolveViewer(ctx);
+    const viewer = await resolveViewer(ctx, args.viewer_user_id, args.guest_secret_hash);
+    // A proven caller who is no longer a member must receive a definitive empty
+    // snapshot. Throwing here terminates the roster subscription before the
+    // client can observe its own removal. Never expose the roster to outsiders.
+    if (!viewer || !players.some((player) => player.user_id === viewer.id)) {
+      return [];
+    }
     return players
       .map((player) => visiblePlayerForViewer(player, session, viewer, players))
       .sort((a, b) => a.joined_at - b.joined_at);

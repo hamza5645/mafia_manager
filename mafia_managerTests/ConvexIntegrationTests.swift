@@ -121,6 +121,59 @@ final class ConvexIntegrationTests: XCTestCase {
         await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
     }
 
+    func testKickedGuestReceivesRemovalFromLiveSubscription() async throws {
+        let hostHash = "qa-kick-host-\(UUID().uuidString)"
+        let memberHash = "qa-kick-member-\(UUID().uuidString)"
+        let host = try await makeGuest(name: "QA Kick Host", hash: hostHash)
+        let member = try await makeGuest(name: "QA Kick Member", hash: memberHash)
+        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hostHash)
+        _ = try await sessionService.addPlayer(
+            sessionId: session.id, userId: host.id, playerName: host.displayName,
+            isBot: false, callerUserId: host.id, guestSecretHash: hostHash
+        )
+        let (_, local) = try await sessionService.joinSession(
+            roomCode: session.roomCode, userId: member.id, playerName: member.displayName,
+            guestSecretHash: memberHash
+        )
+        let store = MultiplayerGameStore()
+        store.myPlayer = local
+        store.isInSession = true
+        store.allPlayers = [local]
+        let realtime = RealtimeService()
+        let joined = expectation(description: "Live subscription contains local player")
+        let removed = expectation(description: "Live subscription observes local removal")
+        do {
+            try await realtime.subscribeToSession(
+                sessionId: session.id, viewerUserId: member.id, guestSecretHash: memberHash,
+                onSessionUpdate: { _ in },
+                onPlayerUpdate: { player in
+                    if player.id == local.id { joined.fulfill() }
+                },
+                onPlayerRemoved: { id in
+                    store.testHandlePlayerRemoval(id)
+                    if id == local.id { removed.fulfill() }
+                },
+                onActionUpdate: { _ in }
+            )
+            await fulfillment(of: [joined], timeout: 15)
+            try await sessionService.removePlayer(
+                playerId: local.id, callerUserId: host.id, guestSecretHash: hostHash
+            )
+            await fulfillment(of: [removed], timeout: 15)
+            XCTAssertTrue(store.wasKicked)
+            XCTAssertFalse(store.isInSession)
+            XCTAssertNil(store.myPlayer)
+        } catch {
+            await realtime.unsubscribeAll()
+            await tearDownSession(session, hostUserId: host.id, hostHash: hostHash,
+                                  users: [(host.id, hostHash), (member.id, memberHash)])
+            throw error
+        }
+        await realtime.unsubscribeAll()
+        await tearDownSession(session, hostUserId: host.id, hostHash: hostHash,
+                              users: [(host.id, hostHash), (member.id, memberHash)])
+    }
+
     func testGuestCreateAndRestoreIsIdempotent() async throws {
         let hash = "qa-swift-int-guest"
         let first = try await makeGuest(name: "QA Swift Guest", hash: hash)

@@ -5,6 +5,15 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-03: Kicked-player subscriptions
+
+- Proven former members receive an empty roster, so the existing snapshot diff
+  clears membership and dismisses the lobby. Outsiders receive no roster; invalid
+  guest proofs still fail. Convex CLI regenerated server helpers for the SDK.
+- Validation: 2/2 isolated backend regressions and the live Swift subscription
+  removal test passed (1/1), including `wasKicked` and cleared player state.
+- Rollback: revert the roster behavior; this restores the kick-detection defect.
+
 ### E2E-02: Voting advancement
 
 - `showVotingResults` passes the viewer ID and guest proof. The voting alert now
