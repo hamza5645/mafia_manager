@@ -336,3 +336,41 @@ export function sessionForViewer(session: any, viewer: any | null, players: any[
     phase_sequence: session.phase_sequence, updated_at: session.updated_at,
   };
 }
+
+export function validateGameAction(session: any, players: any[], args: {
+  actor_player_id: string; target_player_id?: string; action_type: string; phase_index: number;
+}) {
+  if (session.status !== "in_progress" || session.is_game_over) {
+    throw new ConvexError("Game is not active");
+  }
+  const isVote = args.action_type === "vote";
+  const expectedPhase = isVote ? "voting" : "night";
+  if (session.current_phase !== expectedPhase) {
+    throw new ConvexError("Action is not allowed in this phase");
+  }
+  const data = session.current_phase_data;
+  const activeIndex = isVote ? data?.dayIndex : data?.nightIndex;
+  if (!Number.isInteger(activeIndex) || args.phase_index !== activeIndex) {
+    throw new ConvexError("Stale phase index");
+  }
+  const actor = players.find(player => player.player_id === args.actor_player_id);
+  if (!actor || !actor.is_alive) throw new ConvexError("Actor is not alive in this session");
+  const actionRole: Record<string, string> = {
+    mafia_target: "mafia", doctor_protect: "doctor", inspector_check: "inspector",
+  };
+  if (!isVote && actor.role !== actionRole[args.action_type]) {
+    throw new ConvexError("Action is not allowed for this role");
+  }
+  // No target represents abstention/no eligible target, or clearing a tentative
+  // selection. It never computes an inspector result.
+  if (!args.target_player_id) return actor;
+  const target = players.find(player => player.player_id === args.target_player_id);
+  if (!target || !target.is_alive) throw new ConvexError("Target is not alive in this session");
+  if (args.action_type === "mafia_target" && target.role === "mafia") {
+    throw new ConvexError("Mafia cannot target a teammate");
+  }
+  if (args.action_type === "inspector_check" && target.player_id === actor.player_id) {
+    throw new ConvexError("Inspector cannot inspect themselves");
+  }
+  return actor;
+}

@@ -36,7 +36,7 @@ async function room(host, members, max = 8) {
   return { s, ps };
 }
 async function phase(s, host, name, index = 0) {
-  await m('sessions:updateSessionPhase', { ...hostArgs(s, host), current_phase: name, current_phase_data: { type: name, [name === 'night' ? 'night_index' : 'day_index']: index } });
+  await m('sessions:updateSessionPhase', { ...hostArgs(s, host), current_phase: name, current_phase_data: { type: name, [name === 'night' ? 'nightIndex' : 'dayIndex']: index } });
   return q('sessions:getSessionById', viewerArgs(s, host));
 }
 try {

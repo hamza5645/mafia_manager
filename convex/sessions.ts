@@ -20,6 +20,7 @@ import {
   sessionForViewer,
   transferHostIfNeeded,
   uuid,
+  validateGameAction,
   visiblePlayerForViewer,
 } from "./lib";
 
@@ -694,10 +695,7 @@ export const submitAction = mutation({
     }
 
     const players = await listSessionPlayers(ctx, args.session_id);
-    const actor = players.find((player) => player.player_id === args.actor_player_id);
-    if (!actor) {
-      throw new ConvexError("Actor is not in this session");
-    }
+    validateGameAction(session, players, args);
 
     const actionData: any = {};
     if (args.action_type === "inspector_check" && args.target_player_id) {
@@ -948,6 +946,8 @@ export const setTentativeSelection = mutation({
       args.caller_user_id,
       args.guest_secret_hash,
     );
+    const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    validateGameAction(session, await listSessionPlayers(ctx, args.session_id), args);
     const existing = await ctx.db
       .query("tentative_selections")
       .withIndex("by_actor", (q) =>
@@ -1054,6 +1054,8 @@ export const allRoleActionsSubmitted = query({
       args.viewer_user_id,
       args.guest_secret_hash,
     );
+    const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    if (!session.current_round_id) return false;
     const players = await listSessionPlayers(ctx, args.session_id);
     const aliveOfRole = players.filter(
       (player) => player.is_alive && player.role === args.role,
@@ -1067,6 +1069,7 @@ export const allRoleActionsSubmitted = query({
         q.and(
           q.eq(q.field("action_type"), args.action_type),
           q.eq(q.field("phase_index"), args.phase_index),
+          q.eq(q.field("round_id"), session.current_round_id),
         ),
       )
       .collect();

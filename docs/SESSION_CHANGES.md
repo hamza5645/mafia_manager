@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-06: Server-side game action rules
+
+- Submitted actions and tentative selections validate game status, current
+  phase/index, actor life/role, and live session targets. Mafia cannot target
+  teammates and inspectors cannot inspect themselves. Doctor self-protection,
+  abstention/no-target actions, and current-round upserts remain supported.
+  Role-readiness queries now count only the active round.
+- Validation: 12/12 backend regressions and all 7 live Swift integration tests
+  passed; development typecheck passed. Reviewed host/bot and human action paths.
+- Rollback: revert action checks, restoring acceptance of invalid role/phase/
+  target requests. Do not revert solely to work around a stale client snapshot.
+
 ### E2E-05: Private session history
 
 - Room discovery returns a safe projection with no history, phase payload,
