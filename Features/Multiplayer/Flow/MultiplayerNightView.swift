@@ -9,6 +9,8 @@ struct MultiplayerNightView: View {
     @State private var autoReadyApplied = false
     @State private var inspectorResult: String? // Stores the investigation result
     @State private var isRecording = false // Phase 1 in progress
+    @State private var showingCompletionError = false
+    @State private var completionError: String?
     @State private var submitError: String? // Error message for failed submissions
 
     var nightIndex: Int {
@@ -216,6 +218,11 @@ struct MultiplayerNightView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .alert("Could Not Finish Night", isPresented: $showingCompletionError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(completionError ?? "Please try again.")
+        }
         .task {
             await autoReadyIfPassive()
         }
@@ -241,11 +248,7 @@ struct MultiplayerNightView: View {
 
         Task {
             do {
-                // Call the new two-phase method: Phase 1
-                try await multiplayerStore.recordNightActions(nightIndex: nightIndex)
-
-                // Phase 2: Immediately resolve outcome without showing results sheet
-                try await multiplayerStore.resolveNightOutcome(nightIndex: nightIndex)
+                try await multiplayerStore.completeNightPhase()
 
                 await MainActor.run {
                     isRecording = false
@@ -253,7 +256,8 @@ struct MultiplayerNightView: View {
             } catch {
                 await MainActor.run {
                     isRecording = false
-                    print("Failed to complete night phase: \(error.localizedDescription)")
+                    completionError = error.localizedDescription
+                    showingCompletionError = true
                 }
             }
         }

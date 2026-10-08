@@ -5,6 +5,21 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-03: Consolidate manual night completion
+
+- Live store regression exposed the legacy `completeNightPhase` entry point:
+  it wrote deaths/session state separately and left the record unresolved.
+  Removed that path. Both the UI and manual entry point now use record-then-
+  atomic-resolution, serialize concurrent completion, and show completion errors.
+- Validation: regression failed before the fix and passed after it (1/1), with
+  resolved history, the expected death, and morning transition. Signed build and
+  source review passed. Visible voting/results/game-over/Play Again also passed.
+- The earlier first UI tap stayed in night; retry advanced. Current UI source
+  already used two-phase methods, so the specific first-tap cause was not proven
+  by logs. Consolidation/error presentation improves verification and diagnosis.
+- Rollback: revert the unified entry point/UI delegation. This restores the
+  unsafe legacy path. Completed room `912498` was ended and cleaned in the UI.
+
 ### Retest tooling and fresh automated pass
 
 - Audit campaigns now exit nonzero on failed assertions, use valid Swift

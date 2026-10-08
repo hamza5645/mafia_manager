@@ -221,6 +221,51 @@ final class ConvexIntegrationTests: XCTestCase {
         XCTAssertTrue(roster.isEmpty)
     }
 
+    func testManualNightCompletionPublishesResolvedAtomicOutcome() async throws {
+        let hash = "qa-manual-night-\(UUID().uuidString)"
+        let host = try await makeGuest(name: "QA Manual Night", hash: hash)
+        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hash)
+        var players: [SessionPlayer] = []
+        for index in 0..<4 {
+            players.append(try await sessionService.addPlayer(
+                sessionId: session.id, userId: index == 0 ? host.id : nil,
+                playerName: "QA Night \(index)", isBot: index != 0,
+                callerUserId: host.id, guestSecretHash: hash
+            ))
+        }
+        do {
+            try await sessionService.assignRolesAndNumbers(
+                sessionId: session.id,
+                assignments: [(players[0].playerId, .mafia, 1), (players[1].playerId, .doctor, 2),
+                              (players[2].playerId, .inspector, 3), (players[3].playerId, .citizen, 4)],
+                callerUserId: host.id, guestSecretHash: hash
+            )
+            try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress, callerUserId: host.id, guestSecretHash: hash)
+            try await sessionService.updateSessionPhase(sessionId: session.id, currentPhase: "night", phaseData: .night(nightIndex: 0, activeRole: nil), callerUserId: host.id, guestSecretHash: hash)
+            let snapshot = try await sessionService.getSession(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
+            let active = try XCTUnwrap(snapshot)
+            let round = try XCTUnwrap(active.currentRoundId)
+            _ = try await sessionService.submitAction(.mafiaAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[0].playerId, targetPlayerId: players[3].playerId), guestSecretHash: hash)
+            _ = try await sessionService.submitAction(.doctorAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[1].playerId, targetPlayerId: players[1].playerId), callerUserId: host.id, guestSecretHash: hash)
+            let store = MultiplayerGameStore()
+            store.testCurrentUserIdProvider = { host.id }
+            store.testGuestSecretHashProvider = { hash }
+            store.currentSession = active
+            store.isHost = true
+            store.myPlayer = players[0]
+            try await store.completeNightPhase()
+            let result = try await sessionService.getSession(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
+            XCTAssertEqual(result?.currentPhase, "morning")
+            XCTAssertTrue(result?.nightHistory.first?.isResolved == true, "Manual finish must use the atomic outcome path")
+            let roster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
+            XCTAssertFalse(roster.first(where: { $0.playerId == players[3].playerId })!.isAlive)
+        } catch {
+            await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
+            throw error
+        }
+        await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
+    }
+
     func testGuestCreateAndRestoreIsIdempotent() async throws {
         let hash = "qa-swift-int-guest"
         let first = try await makeGuest(name: "QA Swift Guest", hash: hash)

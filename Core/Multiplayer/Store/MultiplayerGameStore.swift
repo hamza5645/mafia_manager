@@ -598,12 +598,14 @@ final class MultiplayerGameStore: ObservableObject {
     
     /// Manually complete the night phase (Host only)
     func completeNightPhase() async throws {
-        guard isHost, 
+        guard isHost, !isResolvingPhase,
               case .night(let nightIndex, _) = currentSession?.currentPhaseData else { return }
-        
-        try await resolveNightPhase(nightIndex: nightIndex)
+        isResolvingPhase = true
+        defer { isResolvingPhase = false }
+        try await recordNightActions(nightIndex: nightIndex)
+        try await resolveNightOutcome(nightIndex: nightIndex)
     }
-    
+
     // MARK: - Real-time Subscriptions
 
     private func subscribeToSession(sessionId: UUID) async throws {
@@ -2381,139 +2383,6 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Legacy single-phase resolution (DEPRECATED - kept for backwards compatibility, will be removed)
-    private func resolveNightPhase(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
-              activeNightIndex == nightIndex else {
-            return
-        }
-        guard let session = currentSession else { return }
-
-        // FIX: Refresh players from database to ensure we have latest playerNumber values
-        try await refreshPlayers()
-        updateVisiblePlayers()
-
-        // Re-fetch actions to ensure we have latest state (filtered by round_id to prevent action replay)
-        let mafiaActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .mafiaTarget,
-            phaseIndex: nightIndex,
-            roundId: session.currentRoundId,
-            viewerUserId: currentUserId(),
-            guestSecretHash: guestSecretHash
-        )
-        let doctorActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .doctorProtect,
-            phaseIndex: nightIndex,
-            roundId: session.currentRoundId,
-            viewerUserId: currentUserId(),
-            guestSecretHash: guestSecretHash
-        )
-        let inspectorActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .inspectorCheck,
-            phaseIndex: nightIndex,
-            roundId: session.currentRoundId,
-            viewerUserId: currentUserId(),
-            guestSecretHash: guestSecretHash
-        )
-
-        // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
-        let alivePlayers = allPlayers.filter { $0.isAlive }
-        let validMafiaTargets = alivePlayers.filter { $0.role != .mafia }.map { $0.playerId }
-        let validInspectorTargets = alivePlayers.filter { $0.role != .inspector }.map { $0.playerId }
-        let validDoctorTargets = alivePlayers.map { $0.playerId }
-
-        // HAMZA-FIX: Use new determineMajorityTarget with tie-breakers
-        let mafiaTargetId = determineMajorityTarget(from: mafiaActions, validTargets: validMafiaTargets)
-        let doctorTargetId = determineMajorityTarget(from: doctorActions, validTargets: validDoctorTargets)
-        let _ = determineMajorityTarget(from: inspectorActions, validTargets: validInspectorTargets)  // Inspector result logged
-
-        let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
-        let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
-        let doctorProtectedId = targetWasSaved ? mafiaTargetId : (doctorTargetId ?? doctorProtectionIds.first)
-
-        var resultingDeaths: [UUID] = []
-        var hostEliminated = false
-        if let targetId = mafiaTargetId, !targetWasSaved {
-            resultingDeaths = [targetId]
-            hostEliminated = try await applyEliminations(resultingDeaths, reason: "Eliminated at night")
-        }
-
-        // Build lookup from visiblePlayers (same source that works for target resolution)
-        let playerNumberLookup = Dictionary(uniqueKeysWithValues:
-            visiblePlayers.map { ($0.playerId, $0.playerNumber) }
-        )
-
-        // Get player numbers from who submitted each action type
-        let mafiaPlayerNumbers = mafiaActions
-            .compactMap { playerNumberLookup[$0.actorPlayerId] }
-            .compactMap { $0 }
-            .sorted()
-        let doctorPlayerNumbers = doctorActions
-            .compactMap { playerNumberLookup[$0.actorPlayerId] }
-            .compactMap { $0 }
-            .sorted()
-        let inspectorPlayerNumbers = inspectorActions
-            .compactMap { playerNumberLookup[$0.actorPlayerId] }
-            .compactMap { $0 }
-            .sorted()
-
-        // Inspector checked ID can be public (but result stays private)
-        let inspectorCheckedId = inspectorActions.first?.targetPlayerId
-
-        let nightRecord = NightActionRecord(
-            nightIndex: nightIndex,
-            mafiaTargetId: mafiaTargetId,
-            inspectorCheckedId: inspectorCheckedId, // Public: Who was checked
-            inspectorResult: nil, // Private: Result stays hidden
-            doctorProtectedId: doctorProtectedId,
-            targetWasSaved: targetWasSaved,
-            resultingDeaths: resultingDeaths,
-            revealedDeathRoles: revealedDeathRoles(for: resultingDeaths),
-            mafiaPlayerNumbers: mafiaPlayerNumbers,
-            doctorPlayerNumbers: doctorPlayerNumbers,
-            inspectorPlayerNumbers: inspectorPlayerNumbers,
-            timestamp: Date()
-        )
-
-        var updatedHistory = session.nightHistory.filter { $0.nightIndex != nightIndex }
-        updatedHistory.append(nightRecord)
-        updatedHistory.sort { $0.nightIndex < $1.nightIndex }
-        currentSession?.nightHistory = updatedHistory
-
-        let winnerCheck = evaluateWinners(startOfDay: true)
-        let nextPhaseName: String
-        let nextPhaseData: PhaseData
-
-        if winnerCheck.isGameOver {
-            nextPhaseName = "game_over"
-            nextPhaseData = .gameOver(winner: winnerCheck.winner?.rawValue)
-        } else {
-            nextPhaseName = "morning"
-            nextPhaseData = .morning(nightIndex: nightIndex)
-        }
-        
-        // Reset readiness flag
-        await MainActor.run {
-            self.isPhaseReadyToAdvance = false
-        }
-
-        try await sessionService.updateSessionState(
-            sessionId: session.id,
-            callerUserId: currentUserId() ?? UUID(),
-            currentPhase: nextPhaseName,
-            phaseData: nextPhaseData,
-            nightHistory: updatedHistory,
-            isGameOver: winnerCheck.isGameOver ? true : nil,
-            winner: winnerCheck.winner,
-            guestSecretHash: guestSecretHash
-        )
-
-        await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
-    }
-
     private func checkVotingPhaseReadiness(dayIndex: Int) async throws {
         guard isHost else { return }
         guard case .voting(let activeDayIndex) = currentSession?.currentPhaseData,
