@@ -299,3 +299,40 @@ export function ensureUuid(value: string, field: string) {
     throw new ConvexError(`${field} must be a UUID string`);
   }
 }
+
+// Public discovery never returns game records or arbitrary phase payloads.
+// Members receive published outcomes; only the authoritative host (or members
+// after game over) receive the private night record used for resolution/replay.
+export function sessionForViewer(session: any, viewer: any | null, players: any[]) {
+  const isMember = !!viewer && players.some(player => player.user_id === viewer.id);
+  if (isMember && (session.host_user_id === viewer.id || session.is_game_over || session.current_phase === "game_over")) {
+    return session;
+  }
+  const phase = session.current_phase_data;
+  const phaseFields: Record<string, string[]> = {
+    lobby: [], roleReveal: ["currentPlayerIndex"], night: ["nightIndex", "activeRole"],
+    morning: ["nightIndex"], deathReveal: ["nightIndex"], voting: ["dayIndex"],
+    votingResults: ["dayIndex", "voteCounts", "eliminatedPlayerId"],
+    voteDeathReveal: ["dayIndex", "eliminatedPlayerId", "eliminatedPlayerName", "eliminatedPlayerNumber", "eliminatedPlayerRole", "voteCount"],
+    gameOver: ["winner"],
+  };
+  const safePhase = isMember && phase && phaseFields[phase.type]
+    ? Object.fromEntries(["type", ...phaseFields[phase.type]].filter(key => phase[key] !== undefined).map(key => [key, phase[key]]))
+    : undefined;
+  return {
+    id: session.id, room_code: session.room_code, host_user_id: session.host_user_id,
+    status: session.status, created_at: session.created_at, started_at: session.started_at,
+    completed_at: session.completed_at, max_players: session.max_players, bot_count: session.bot_count,
+    current_phase: session.current_phase, current_phase_data: safePhase, day_index: session.day_index,
+    is_game_over: session.is_game_over, winner: session.winner,
+    assigned_numbers: isMember ? session.assigned_numbers.map((row: any) => ({ player_id: row.player_id, number: row.number })) : [],
+    night_history: isMember ? session.night_history.filter((row: any) => row.is_resolved === true).map((row: any) => ({
+      night_index: row.night_index, is_resolved: true, resulting_deaths: row.resulting_deaths,
+      revealed_death_roles: row.revealed_death_roles, timestamp: row.timestamp,
+    })) : [],
+    day_history: isMember ? session.day_history.map((row: any) => ({ day_index: row.day_index, removed_player_ids: row.removed_player_ids, timestamp: row.timestamp })) : [],
+    current_round_id: isMember ? session.current_round_id : undefined,
+    rematch_deadline: isMember ? session.rematch_deadline : undefined,
+    phase_sequence: session.phase_sequence, updated_at: session.updated_at,
+  };
+}

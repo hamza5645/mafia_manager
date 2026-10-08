@@ -47,6 +47,6 @@ export async function startNight(t: Backend, r: Awaited<ReturnType<typeof room>>
   await t.mutation(api.sessions.updateSessionPhase, {
     ...r.hostArgs, current_phase: 'night', current_phase_data: { type: 'night', nightIndex: 0 },
   });
-  const active = await t.query(api.sessions.getSessionById, { session_id: r.session.id });
+  const active = await t.query(api.sessions.getSessionById, r.viewerArgs(r.host));
   return active!;
 }

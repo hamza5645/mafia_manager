@@ -34,7 +34,6 @@ final class RealtimeService: ObservableObject {
         await unsubscribeAll(preserveSnapshotCache: preserveSnapshotCache)
 
         let sessionKey = "session:\(sessionId.uuidString)"
-        let sessionArgs: [String: ConvexEncodable?] = ["session_id": sessionId.uuidString.lowercased()]
         let playerArgs: [String: ConvexEncodable?] = [
             "session_id": sessionId.uuidString.lowercased(),
             "viewer_user_id": viewerUserId?.uuidString.lowercased(),
@@ -43,7 +42,7 @@ final class RealtimeService: ObservableObject {
 
         cancellables["\(sessionKey):session"] = convex.subscribe(
             "sessions:getSessionById",
-            with: sessionArgs,
+            with: playerArgs,
             as: GameSession?.self
         )
         .receive(on: DispatchQueue.main)

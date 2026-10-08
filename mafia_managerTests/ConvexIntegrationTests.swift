@@ -92,7 +92,9 @@ final class ConvexIntegrationTests: XCTestCase {
                 sessionId: session.id, currentPhase: "voting", phaseData: .voting(dayIndex: 0),
                 callerUserId: host.id, guestSecretHash: hash
             )
-            let activeSnapshot = try await sessionService.getSession(sessionId: session.id)
+            let activeSnapshot = try await sessionService.getSession(
+                sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash
+            )
             let active = try XCTUnwrap(activeSnapshot)
             let round = try XCTUnwrap(active.currentRoundId)
             _ = try await sessionService.submitAction(
@@ -108,7 +110,9 @@ final class ConvexIntegrationTests: XCTestCase {
             store.myPlayer = player
             store.allPlayers = [player]
             try await store.showVotingResults(dayIndex: 0)
-            let result = try await sessionService.getSession(sessionId: session.id)
+            let result = try await sessionService.getSession(
+                sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash
+            )
             XCTAssertEqual(result?.currentPhase, "voting_results")
             guard case .votingResults(let day, _, _)? = result?.currentPhaseData else {
                 return XCTFail("Expected voting results")
@@ -275,7 +279,9 @@ final class ConvexIntegrationTests: XCTestCase {
             callerUserId: host.id,
             guestSecretHash: hostHash
         )
-        let nightSession = try await sessionService.getSession(sessionId: session.id)
+        let nightSession = try await sessionService.getSession(
+            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
+        )
         let roundId = try XCTUnwrap(nightSession?.currentRoundId)
 
         // Submit a mafia action for the current round and read it back.
@@ -348,7 +354,9 @@ final class ConvexIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(resolved)
 
-        let maybeFinalSession = try await sessionService.getSession(sessionId: session.id)
+        let maybeFinalSession = try await sessionService.getSession(
+            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
+        )
         let finalSession = try XCTUnwrap(maybeFinalSession)
         XCTAssertTrue(finalSession.isGameOver)
         XCTAssertEqual(finalSession.winner, .mafia)
@@ -472,7 +480,9 @@ final class ConvexIntegrationTests: XCTestCase {
             callerUserId: host.id,
             guestSecretHash: hostHash
         )
-        let updatedSession = try await sessionService.getSession(sessionId: session.id)
+        let updatedSession = try await sessionService.getSession(
+            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
+        )
         let roundId = try XCTUnwrap(updatedSession?.currentRoundId)
         let hostAction = GameAction.mafiaAction(
             sessionId: session.id,

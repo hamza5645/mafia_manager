@@ -126,7 +126,9 @@ final class MultiplayerGameStore: ObservableObject {
             return try await provider(sessionId)
         }
 #endif
-        return try await sessionService.getSession(sessionId: sessionId)
+        return try await sessionService.getSession(
+            sessionId: sessionId, viewerUserId: currentUserId(), guestSecretHash: guestSecretHash
+        )
     }
 
     private func loadPlayerSnapshot(sessionId: UUID) async throws -> [SessionPlayer] {
@@ -1571,7 +1573,9 @@ final class MultiplayerGameStore: ObservableObject {
 
         do {
             // Fetch current server state
-            guard let serverSession = try await sessionService.getSession(sessionId: sessionId) else {
+            guard let serverSession = try await sessionService.getSession(
+                sessionId: sessionId, viewerUserId: currentUserId(), guestSecretHash: guestSecretHash
+            ) else {
                 print("⚠️ [MultiplayerGameStore] Consistency check: session not found on server")
                 return
             }

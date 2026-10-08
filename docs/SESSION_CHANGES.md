@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-05: Private session history
+
+- Room discovery returns a safe projection with no history, phase payload,
+  role assignments, or round ID. Authenticated member snapshots retain published
+  outcomes and typed public phase data; hosts and final-game members retain full
+  records. Swift snapshot queries/subscriptions now send guest viewer proof.
+- Validation: 4/4 backend regressions passed; all 7 live Swift integration tests
+  passed, including model decoding, full lifecycle history, voting, and kicking.
+  Development backend typecheck passed. Source review checked every Swift read.
+- Rollback: revert client query arguments and backend projection together.
+  Reverting only the client would deprive guest hosts of private resolution data.
+
 ### E2E-04: Action and selection privacy
 
 - All four action/selection queries omit rows that would reveal another role.

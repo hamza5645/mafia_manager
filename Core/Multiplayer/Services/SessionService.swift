@@ -64,10 +64,16 @@ final class SessionService {
         )
     }
 
-    func getSession(sessionId: UUID) async throws -> GameSession? {
+    func getSession(
+        sessionId: UUID, viewerUserId: UUID? = nil, guestSecretHash: String? = nil
+    ) async throws -> GameSession? {
         try await convex.query(
             "sessions:getSessionById",
-            with: ["session_id": sessionId.uuidString.lowercased()],
+            with: [
+                "session_id": sessionId.uuidString.lowercased(),
+                "viewer_user_id": viewerUserId?.uuidString.lowercased(),
+                "guest_secret_hash": guestSecretHash,
+            ],
             as: GameSession?.self
         )
     }

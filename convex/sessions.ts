@@ -17,6 +17,7 @@ import {
   requireSessionHostStrict,
   resolveCaller,
   resolveViewer,
+  sessionForViewer,
   transferHostIfNeeded,
   uuid,
   visiblePlayerForViewer,
@@ -175,17 +176,28 @@ async function removePlayerImpl(ctx: any, playerRecordId: string) {
 }
 
 export const getSessionById = query({
-  args: { session_id: v.string() },
-  handler: async (ctx, args) => await getSession(ctx, args.session_id),
+  args: {
+    session_id: v.string(),
+    viewer_user_id: v.optional(v.string()),
+    guest_secret_hash: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSession(ctx, args.session_id);
+    if (!session) return null;
+    const viewer = await resolveViewer(ctx, args.viewer_user_id, args.guest_secret_hash);
+    return sessionForViewer(session, viewer, await listSessionPlayers(ctx, args.session_id));
+  },
 });
 
 export const getSessionByRoomCode = query({
   args: { room_code: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  handler: async (ctx, args) => {
+    const session = await ctx.db
       .query("game_sessions")
       .withIndex("by_room_code", (q) => q.eq("room_code", args.room_code.toUpperCase()))
-      .first(),
+      .first();
+    return session ? sessionForViewer(session, null, []) : null;
+  },
 });
 
 export const updateSessionStatus = mutation({
@@ -784,7 +796,7 @@ export const getActionsForPhase = query({
           );
     const sorted = baseRows.sort((a, b) => a.created_at - b.created_at);
     const session = await getSession(ctx, args.session_id);
-    if (!session) return sorted;
+    if (!session) return [];
     const players = await listSessionPlayers(ctx, args.session_id);
     return sorted.flatMap((row) => {
       const visible = filterActionForViewer(row, session, viewer, players);
@@ -815,7 +827,7 @@ export const getAllActions = query({
         .collect()
     ).sort((a, b) => a.created_at - b.created_at);
     const session = await getSession(ctx, args.session_id);
-    if (!session) return rows;
+    if (!session) return [];
     const players = await listSessionPlayers(ctx, args.session_id);
     return rows.flatMap((row) => {
       const visible = filterActionForViewer(row, session, viewer, players);
