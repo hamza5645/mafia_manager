@@ -5,6 +5,17 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-12: Profile name persistence
+
+- Routine Clerk synchronization preserves an existing Convex display name.
+  Explicit names still update it. Legacy claims retain the saved name unless
+  the caller explicitly supplies a replacement.
+- Validation: 22/22 backend regressions passed; native Clerk lifecycle passed
+  (1/1), proving edits survive refresh, password sign-in, and password reset.
+  Development typecheck and signed build passed.
+- Rollback: revert name selection. Previously overwritten names need manual
+  restoration or a data backup; a code rollback cannot recover those values.
+
 ### E2E-11: Active room upgrade
 
 - Guest merge transfers seat ownership, current host, and stored original host

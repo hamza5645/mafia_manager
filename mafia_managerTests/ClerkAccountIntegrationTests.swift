@@ -51,6 +51,10 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         print("QA STAGE: native profile restoration")
         let restored = await service.currentUser
         XCTAssertEqual(restored?.id, account.id)
+        print("QA STAGE: native profile edit survives refresh")
+        try await service.updateUserProfile(userId: account.id, displayName: "QA Edited Native", guestSecretHash: nil)
+        let edited = await service.currentUser
+        XCTAssertEqual(edited?.displayName, "QA Edited Native")
 
         print("QA STAGE: native guest stats merge")
         try await database.upsertPlayerStat(userId: account.id, playerName: statName, role: .mafia, won: true, kills: 2)
@@ -100,6 +104,7 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         XCTAssertEqual(signedIn.id, account.id)
         let afterSignIn = await service.currentUser
         XCTAssertEqual(afterSignIn?.id, account.id)
+        XCTAssertEqual(afterSignIn?.displayName, "QA Edited Native")
 
         try await service.signOut()
         print("QA STAGE: native password reset")
@@ -118,6 +123,7 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         print("QA STAGE: accept reset password")
         let final = try await service.signIn(email: email, password: resetPassword)
         XCTAssertEqual(final.id, account.id)
+        XCTAssertEqual(final.displayName, "QA Edited Native")
         try await service.signOut()
     }
 }

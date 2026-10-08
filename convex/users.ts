@@ -31,7 +31,7 @@ export const ensureUser = mutation({
 
     const timestamp = nowAppleEpochSeconds();
     const displayName =
-      args.display_name?.trim() || displayNameFromIdentity(identity as any);
+      args.display_name?.trim() || existing?.display_name || displayNameFromIdentity(identity as any);
     const identityEmail =
       typeof (identity as any).email === "string"
         ? ((identity as any).email as string).toLowerCase()
@@ -63,6 +63,7 @@ export const ensureUser = mutation({
         .sort((a, b) => b.updated_at - a.updated_at);
       if (claimable.length > 0) {
         const target = claimable[0];
+        const claimedName = args.display_name?.trim() || target.display_name || displayName;
         if (claimable.length > 1) {
           console.warn(
             `[ensureUser] multiple legacy rows for ${identityEmail}; claiming ${target.id}, leaving ${claimable.length - 1} unclaimed`,
@@ -70,14 +71,14 @@ export const ensureUser = mutation({
         }
         await ctx.db.patch(target._id, {
           auth_subject: identity.subject,
-          display_name: displayName,
+          display_name: claimedName,
           is_anonymous: false,
           updated_at: timestamp,
         });
         return {
           ...target,
           auth_subject: identity.subject,
-          display_name: displayName,
+          display_name: claimedName,
           is_anonymous: false,
           updated_at: timestamp,
         };
