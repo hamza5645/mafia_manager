@@ -155,6 +155,7 @@
 		0207A94C03D3E15390DBF017 /* ConvexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvexService.swift; sourceTree = "<group>"; };
 		0221E3D8F2B7BE09934D0F51 /* MultiplayerMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerMenuView.swift; sourceTree = "<group>"; };
 		075CC3468DFFD1E21D0DD58D /* police_siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = police_siren.wav; sourceTree = "<group>"; };
+		0991E2201AECB32BDE389F4E /* Production.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
 		0A02C122A7E1DCCE4153DA90 /* RoleRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleRevealView.swift; sourceTree = "<group>"; };
 		0DED44968DC5183C7D49FEF0 /* PhoneNumberKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = PhoneNumberKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		0EC9EEFB25DB528CC5555DF9 /* VoteResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteResultsView.swift; sourceTree = "<group>"; };
@@ -168,6 +169,7 @@
 		235911560BC05DFA440783E5 /* Clerk_ClerkKitUI.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Clerk_ClerkKitUI.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		296F7D5D5D82298EB4028369 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		2A987066997CCA60B2B0F00C /* PlayerStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerStatsView.swift; sourceTree = "<group>"; };
+		2ACF97490DF85F9FB0093AF9 /* mafia_manager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = mafia_manager.entitlements; sourceTree = "<group>"; };
 		2BFA5165B2D73A1451A05213 /* ConvexConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvexConfig.swift; sourceTree = "<group>"; };
 		2C0582477D7FD79772923584 /* RealtimeEventProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeEventProcessor.swift; sourceTree = "<group>"; };
 		31CFB762B61EF2BC84BDBEAF /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -311,6 +313,7 @@
 			isa = PBXGroup;
 			children = (
 				C7C6F4DD89D5C90EC779D429 /* App */,
+				616D2FC53BDE1E2731DAF49A /* Configuration */,
 				683C0457DE23DB9640A2AD84 /* Core */,
 				30CF58D7CED7F4AEB81E79EF /* Derived */,
 				4098CF10A99F5CE73EA75DFE /* Features */,
@@ -411,6 +414,7 @@
 		30CF58D7CED7F4AEB81E79EF /* Derived */ = {
 			isa = PBXGroup;
 			children = (
+				5F60F67FA072C40BD78FC567 /* Entitlements */,
 				9BB8E5DA6053061D47F21B78 /* InfoPlists */,
 				4B81DC7F023745C3A38EAE69 /* Sources */,
 			);
@@ -469,6 +473,22 @@
 				84DB4D84442D00F52CF5B7FE /* Store */,
 			);
 			path = Auth;
+			sourceTree = "<group>";
+		};
+		5F60F67FA072C40BD78FC567 /* Entitlements */ = {
+			isa = PBXGroup;
+			children = (
+				2ACF97490DF85F9FB0093AF9 /* mafia_manager.entitlements */,
+			);
+			path = Entitlements;
+			sourceTree = "<group>";
+		};
+		616D2FC53BDE1E2731DAF49A /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				0991E2201AECB32BDE389F4E /* Production.xcconfig */,
+			);
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 		683C0457DE23DB9640A2AD84 /* Core */ = {
@@ -766,6 +786,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = CC0FEA5D326FA62F5F8BFD26 /* Build configuration list for PBXNativeTarget "mafia_manager" */;
 			buildPhases = (
+				B1EA3BF63E7A3AA87AA29D68 /* Validate production backend configuration */,
 				3C178EA4127A84AD6E6C0269 /* Sources */,
 				1B6406029E85ACD417BD12C3 /* Resources */,
 				6D476131B415F54F1567836B /* Frameworks */,
@@ -860,6 +881,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B1EA3BF63E7A3AA87AA29D68 /* Validate production backend configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Validate production backend configuration";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT\"/scripts/verify_release_config.sh ";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1388D71B98471B769BD5537C /* Sources */ = {
@@ -969,9 +1012,11 @@
 /* Begin XCBuildConfiguration section */
 		06BF6FBC5A94A2CCAB58E442 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0991E2201AECB32BDE389F4E /* Production.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Derived/Entitlements/mafia_manager.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -1057,6 +1102,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				MAFIA_CLERK_FRONTEND_HOST = "striking-elf-22.clerk.accounts.dev";
 				MARKETING_VERSION = 5.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1104,6 +1150,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Derived/Entitlements/mafia_manager.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -1187,6 +1234,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				MAFIA_CLERK_FRONTEND_HOST = "striking-elf-22.clerk.accounts.dev";
 				MARKETING_VERSION = 5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_NAME = "$(TARGET_NAME)";

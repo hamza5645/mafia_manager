@@ -5,6 +5,23 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### REVIEW-01: Separate production configuration
+
+- Release reads a production xcconfig/Info.plist and has no dev fallback. A
+  Tuist pre-build guard rejects missing/test keys, dev backend, and mismatched
+  Clerk domains. Tuist generates associated-domain entitlements. Updated setup
+  docs with the remaining production provisioning/deployment/data steps.
+- Validation: 3/3 configuration regressions passed. An unconfigured Release
+  build failed at the intended guard. Release device compilation passed with a
+  synthetic key fixture (no production auth claims); signed Debug/native account
+  lifecycle passed (1/1). One concurrent build attempt hit Xcode's DB lock;
+  sequential validation succeeded.
+- Production readiness: `handsome-tiger-460` has no deployed functions or Clerk
+  issuer. Clerk dashboard was signed out; real production key/domain/registration
+  remain required. No production configuration/deployment/data were changed.
+- Rollback: revert manifest/config/scripts and regenerate with Tuist. This
+  removes the release protection; never ship with the previous development key.
+
 ### E2E-14: End Game and empty-room cancellation
 
 - Host End Game cancels the entire room and removes seats/actions/selections.
