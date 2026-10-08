@@ -4,6 +4,40 @@ import XCTest
 
 @MainActor
 final class AuthRegressionTests: XCTestCase {
+    func testGuestToAccountTransitionChangesLoginDismissalSignal() async throws {
+        let guest = profile(isAnonymous: true)
+        let account = profile(isAnonymous: false)
+        let service = MockAuthService(guest: guest, account: account)
+        let suiteName = "AuthDismissal.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = AuthStore(authService: service, keychain: MemoryKeychain(), defaults: defaults, autoRestore: false)
+        XCTAssertNil(store.authenticatedAccountId)
+        let guestSignedIn = await store.signInAsGuest(displayName: guest.displayName)
+        XCTAssertTrue(guestSignedIn)
+        XCTAssertTrue(store.isAuthenticated)
+        XCTAssertNil(store.authenticatedAccountId, "Guest auth must not dismiss account forms")
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        XCTAssertTrue(store.isAuthenticated, "This Boolean stays true across the transition")
+        XCTAssertEqual(store.authenticatedAccountId, account.id, "Account identity must trigger form dismissal")
+    }
+
+    func testFailedAccountLoginKeepsGuestDismissalSignalEmpty() async throws {
+        let guest = profile(isAnonymous: true)
+        let service = MockAuthService(guest: guest, account: profile(isAnonymous: false))
+        service.signInError = TestError.expected
+        let suiteName = "AuthFailedDismissal.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = AuthStore(authService: service, keychain: MemoryKeychain(), defaults: defaults, autoRestore: false)
+        _ = await store.signInAsGuest(displayName: guest.displayName)
+        await store.signIn(email: "qa@example.com", password: "wrong-password")
+        XCTAssertTrue(store.isAuthenticated)
+        XCTAssertEqual(store.currentUserId, guest.id)
+        XCTAssertNil(store.authenticatedAccountId)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
     func testTypedExistingEmailErrorMapsToAuthError() {
         guard case AuthError.emailAlreadyInUse? = AuthService.signUpError(
             forClerkCode: "form_identifier_exists"
@@ -122,6 +156,7 @@ private final class MockAuthService: AuthServicing {
     let account: UserProfile
     var restoredUser: UserProfile?
     var mergeError: Error?
+    var signInError: Error?
     var mergeAttempts = 0
 
     init(guest: UserProfile, account: UserProfile) {
@@ -144,7 +179,8 @@ private final class MockAuthService: AuthServicing {
     func resendSignUpEmailCode() async throws {}
 
     func signIn(email: String, password: String) async throws -> UserProfile {
-        account
+        if let signInError { throw signInError }
+        return account
     }
 
     func signOut() async throws {}

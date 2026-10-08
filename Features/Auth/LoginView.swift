@@ -134,8 +134,8 @@ struct LoginView: View {
         .onAppear {
             authStore.clearError()
         }
-        .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
-            if isAuthenticated {
+        .onChange(of: authStore.authenticatedAccountId) { _, accountId in
+            if accountId != nil {
                 dismiss()
             }
         }
@@ -229,8 +229,8 @@ struct PasswordResetView: View {
         .onAppear {
             authStore.clearError()
         }
-        .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
-            if isAuthenticated {
+        .onChange(of: authStore.authenticatedAccountId) { _, accountId in
+            if accountId != nil {
                 dismiss()
             }
         }
@@ -333,7 +333,7 @@ struct PasswordResetCompleteView: View {
                         guard validate() else { return }
                         Task {
                             _ = await authStore.confirmPasswordReset(code: code, newPassword: newPassword)
-                            // On success, the parent reset stack auto-dismisses via isAuthenticated change.
+                            // On success, the parent reset stack auto-dismisses when account identity becomes available.
                         }
                     } label: {
                         HStack {

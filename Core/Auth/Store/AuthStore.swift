@@ -14,6 +14,12 @@ final class AuthStore: ObservableObject {
     @Published var isAnonymous = false
     @Published private(set) var hasPendingGuestMerge = false
 
+    /// Guests are authenticated too; account identity is the completion signal
+    /// for sign-in/signup/reset presentation, including guest upgrades.
+    var authenticatedAccountId: UUID? {
+        isAuthenticated && userProfile?.isAnonymous == false ? userProfile?.id : nil
+    }
+
     var guestDisplayName: String? {
         get { defaults.string(forKey: "guest_display_name") }
         set {

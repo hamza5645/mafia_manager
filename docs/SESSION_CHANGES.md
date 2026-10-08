@@ -5,6 +5,17 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### REVIEW-03: Guest-to-account form dismissal
+
+- Login/password-reset forms observe authenticated account identity instead of
+  the guest-inclusive authentication Boolean. Guest auth does not dismiss an
+  account form; completing account auth does. Failed login keeps the form open.
+- Validation: 7/7 Swift auth regressions passed, including guest/account signal
+  transition and failed sign-in. Signed build and source/navigation review passed.
+  The final visible E2E pass will verify actual sheet behavior separately.
+- Rollback: revert the derived identity and observers, restoring the guest
+  transition dismissal defect. No stored data or backend API changes.
+
 ### REVIEW-02: Migration parity and orphan verification
 
 - Verification compares all source legacy IDs, every child owner mapping, and
