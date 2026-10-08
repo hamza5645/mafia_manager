@@ -43,9 +43,14 @@ final class ConvexService {
         with args: [String: ConvexEncodable?]? = nil,
         as type: T.Type = T.self
     ) async throws -> T {
-        try await client.subscribe(to: name, with: stripNilArgs(args), yielding: type)
-            .first()
-            .async()
+        do {
+            return try await client.subscribe(to: name, with: stripNilArgs(args), yielding: type)
+                .first()
+                .async()
+        } catch {
+            if error is CancellationError { throw error }
+            throw BackendRequestError(error)
+        }
     }
 
     func mutation<T: Decodable>(
@@ -53,14 +58,24 @@ final class ConvexService {
         with args: [String: ConvexEncodable?]? = nil,
         as type: T.Type = T.self
     ) async throws -> T {
-        try await client.mutation(name, with: stripNilArgs(args))
+        do {
+            return try await client.mutation(name, with: stripNilArgs(args))
+        } catch {
+            if error is CancellationError { throw error }
+            throw BackendRequestError(error)
+        }
     }
 
     func mutation(
         _ name: String,
         with args: [String: ConvexEncodable?]? = nil
     ) async throws {
-        try await client.mutation(name, with: stripNilArgs(args))
+        do {
+            return try await client.mutation(name, with: stripNilArgs(args))
+        } catch {
+            if error is CancellationError { throw error }
+            throw BackendRequestError(error)
+        }
     }
 
     func subscribe<T: Decodable>(

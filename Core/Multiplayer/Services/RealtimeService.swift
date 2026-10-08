@@ -185,7 +185,7 @@ final class RealtimeService: ObservableObject {
                 await onReconnected()
             } catch {
                 isReconnecting = false
-                connectionError = error.localizedDescription
+                connectionError = BackendRequestError(error).localizedDescription
                 onDecodeError(error, "convex")
             }
         }
@@ -226,7 +226,7 @@ final class RealtimeService: ObservableObject {
     ) {
         if case .failure(let error) = completion {
             isConnected = false
-            connectionError = error.localizedDescription
+            connectionError = BackendRequestError(error).localizedDescription
             onDecodeError(error, table)
             onDisconnect?(sessionId)
         }

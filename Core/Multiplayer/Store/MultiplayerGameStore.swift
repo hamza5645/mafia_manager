@@ -3517,6 +3517,7 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Maps raw errors to user-friendly messages, following AuthStore.mapAuthError() pattern
     private func mapSessionError(_ error: Error) -> String {
+        if let backendError = error as? BackendRequestError { return backendError.localizedDescription }
         // 1. Handle known error types with LocalizedError descriptions
         if let sessionError = error as? SessionError {
             return sessionError.errorDescription ?? "Session error occurred"

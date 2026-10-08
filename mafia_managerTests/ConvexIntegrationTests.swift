@@ -178,6 +178,20 @@ final class ConvexIntegrationTests: XCTestCase {
                               users: [(host.id, hostHash), (member.id, memberHash)])
     }
 
+    func testInvalidRoomReturnsReadableMessageThroughNativeSDK() async throws {
+        let hash = "qa-invalid-room-\(UUID().uuidString)"
+        let guest = try await makeGuest(name: "QA Invalid Room", hash: hash)
+        do {
+            _ = try await sessionService.joinSession(
+                roomCode: "000000", userId: guest.id, playerName: guest.displayName, guestSecretHash: hash
+            )
+            XCTFail("Invalid room should fail")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "Game session not found. It may have ended.")
+            XCTAssertFalse(error.localizedDescription.contains("UniFFI"))
+        }
+    }
+
     func testGuestCreateAndRestoreIsIdempotent() async throws {
         let hash = "qa-swift-int-guest"
         let first = try await makeGuest(name: "QA Swift Guest", hash: hash)

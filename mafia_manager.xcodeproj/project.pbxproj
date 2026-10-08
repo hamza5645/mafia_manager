@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0104AC8837941A68B2B6E9A3 /* BackendRequestError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70123F4A3E1A658C431E8911 /* BackendRequestError.swift */; };
 		04E4D792A65C66A24D14B801 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9891637274E3D07ED977CEC5 /* UserProfile.swift */; };
 		059D9577CDD77578FB8D6668 /* Clerk_ClerkKitUI.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 235911560BC05DFA440783E5 /* Clerk_ClerkKitUI.bundle */; };
 		0837AC63C3F82DFF3F92E1BA /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E8B0CF45973472B9361542E /* Persistence.swift */; };
@@ -98,6 +99,7 @@
 		E75BA9933A8A112860BAAA3F /* mafia_gunshot.wav in Resources */ = {isa = PBXBuildFile; fileRef = C990D42FD4558C9A2EE8E3C3 /* mafia_gunshot.wav */; };
 		EAA651F1E9998C20D06D3A04 /* MultiplayerNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */; };
 		EF6F2FA6D6F712F0A62194A1 /* RealtimeEventProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0582477D7FD79772923584 /* RealtimeEventProcessor.swift */; };
+		EFB9FFD66B1CBF80268E3525 /* BackendRequestErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB2C5CE5F9FDC51C323C408 /* BackendRequestErrorTests.swift */; };
 		F022798F4DEA8B67EC479990 /* GameAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8580D88ADA64768D1776B6 /* GameAction.swift */; };
 		F60EC272F8B07D86BAD26405 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDC44BB42D2D503D48434C0 /* SettingsView.swift */; };
 		F9A4647F261493B6A730BCDC /* CreateGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 378F9A5F5395A0E73FB54A72 /* CreateGameView.swift */; };
@@ -197,8 +199,10 @@
 		63D6DD68E21901580152D205 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		67017A4D1045DB0001CDAA48 /* PhoneNumberKit_PhoneNumberKit.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhoneNumberKit_PhoneNumberKit.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		675F15E4E35C4B0E173A3660 /* VotingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VotingSession.swift; sourceTree = "<group>"; };
+		6CB2C5CE5F9FDC51C323C408 /* BackendRequestErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendRequestErrorTests.swift; sourceTree = "<group>"; };
 		6FDC44BB42D2D503D48434C0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6FEA6F261D60B4FC9F8E6B6B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		70123F4A3E1A658C431E8911 /* BackendRequestError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendRequestError.swift; sourceTree = "<group>"; };
 		728D147A4E511CD5EDA1B63E /* PrivacyBlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyBlurView.swift; sourceTree = "<group>"; };
 		769D43B5F59FB28DF8F37D6B /* ClerkAccountIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkAccountIntegrationTests.swift; sourceTree = "<group>"; };
 		79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerNightView.swift; sourceTree = "<group>"; };
@@ -357,6 +361,7 @@
 		24493E680924DCE02FF4AB4C /* Backend */ = {
 			isa = PBXGroup;
 			children = (
+				70123F4A3E1A658C431E8911 /* BackendRequestError.swift */,
 				2BFA5165B2D73A1451A05213 /* ConvexConfig.swift */,
 				0207A94C03D3E15390DBF017 /* ConvexService.swift */,
 				63D6DD68E21901580152D205 /* DatabaseService.swift */,
@@ -622,6 +627,7 @@
 			isa = PBXGroup;
 			children = (
 				E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */,
+				6CB2C5CE5F9FDC51C323C408 /* BackendRequestErrorTests.swift */,
 				769D43B5F59FB28DF8F37D6B /* ClerkAccountIntegrationTests.swift */,
 				DC0B6901DF574ABB253D29A5 /* ConvexIntegrationTests.swift */,
 				A0342891BA342790B3D72E97 /* GameStoreTests.swift */,
@@ -861,6 +867,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				800E424F4372CA2DB1D1CBF3 /* AuthRegressionTests.swift in Sources */,
+				EFB9FFD66B1CBF80268E3525 /* BackendRequestErrorTests.swift in Sources */,
 				75AAEA726C608069CC57F0B1 /* ClerkAccountIntegrationTests.swift in Sources */,
 				3973D178FCDB3484DB928C90 /* ConvexIntegrationTests.swift in Sources */,
 				7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */,
@@ -877,6 +884,7 @@
 				331020CC377FD3AF71B1EEC6 /* AuthService.swift in Sources */,
 				4C3162B123466DC5D135783E /* KeychainHelper.swift in Sources */,
 				6EAFB13A8178319479569611 /* AuthStore.swift in Sources */,
+				0104AC8837941A68B2B6E9A3 /* BackendRequestError.swift in Sources */,
 				D563BF5CB4609C6D7F7271D4 /* ConvexConfig.swift in Sources */,
 				602CB5498C6326B83015E9CD /* ConvexService.swift in Sources */,
 				B333DCD77DC8907AD2E2730C /* DatabaseService.swift in Sources */,

@@ -5,6 +5,17 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-13: Readable backend errors
+
+- Convex query/mutation errors become safe localized messages at the service
+  boundary. Known gameplay errors remain actionable; unknown validation/SDK
+  payloads cannot leak into alerts. Realtime connection and voting errors use
+  the same mapping. Added source/tests through Tuist generation.
+- Validation: 5/5 Swift tests passed, including a real invalid-room SDK request
+  and unknown-payload redaction. Signed build and diff review passed.
+- Rollback: revert mapping and regenerated source registration through Tuist;
+  this restores raw SDK errors in app alerts.
+
 ### E2E-12: Profile name persistence
 
 - Routine Clerk synchronization preserves an existing Convex display name.
