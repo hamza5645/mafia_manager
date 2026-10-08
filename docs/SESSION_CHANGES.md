@@ -5,6 +5,17 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-04: Action and selection privacy
+
+- All four action/selection queries omit rows that would reveal another role.
+  Own-role coordination, host resolution, public votes, and completed-game
+  results remain available. Other inspectors cannot read an actor's result.
+- Validation: 3/3 isolated regressions passed across all four query paths and
+  host/actor/teammate/citizen visibility. Live Swift authorization test passed
+  (1/1), updated to require citizens receive no Mafia actions. Dev typecheck passed.
+- Rollback: revert backend filters and test expectation together; rollback
+  restores the role-disclosure vulnerability.
+
 ### E2E-03: Kicked-player subscriptions
 
 - Proven former members receive an empty roster, so the existing snapshot diff

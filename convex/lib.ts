@@ -262,28 +262,32 @@ export async function resolveViewer(
   return await resolveCaller(ctx, assertedViewerAppId, guestSecretHash);
 }
 
-// Strips `inspector_result` from an action row when the viewer should not
-// see it. Visible to: the inspector actor themselves and everyone after
-// game_over. Citizens/Mafia/Doctors never see other inspectors' results.
+// Night actors and targets reveal roles. Return no row unless the viewer may
+// coordinate that action. The host needs every action to resolve the game;
+// teammates see their role's selections, but inspector results stay private.
 export function filterActionForViewer(
   row: any,
   session: any,
   viewer: any | null,
   players: any[],
 ) {
-  if (!row.action_data?.inspector_result) return row;
   const viewerPlayer = viewer
     ? players.find((candidate) => candidate.user_id === viewer.id)
     : null;
-  const isActor = !!viewerPlayer && viewerPlayer.player_id === row.actor_player_id;
-  const isGameOver =
-    session.is_game_over || session.current_phase === "game_over";
-  if (isActor || isGameOver) return row;
-  const { inspector_result, ...rest } = row.action_data;
-  return {
-    ...row,
-    action_data: Object.keys(rest).length > 0 ? rest : undefined,
+  if (!viewerPlayer) return null;
+  const isActor = viewerPlayer.player_id === row.actor_player_id;
+  const isHost = session.host_user_id === viewer.id;
+  const isGameOver = session.is_game_over || session.current_phase === "game_over";
+  const actionRole: Record<string, string> = {
+    mafia_target: "mafia", doctor_protect: "doctor", inspector_check: "inspector",
   };
+  if (!isHost && !isGameOver && !isActor && row.action_type !== "vote" &&
+      viewerPlayer.role !== actionRole[row.action_type]) {
+    return null;
+  }
+  if (!row.action_data?.inspector_result || isHost || isActor || isGameOver) return row;
+  const { inspector_result, ...rest } = row.action_data;
+  return { ...row, action_data: Object.keys(rest).length > 0 ? rest : undefined };
 }
 
 export function nextPhaseSequence(session: any) {

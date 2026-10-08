@@ -509,7 +509,7 @@ final class ConvexIntegrationTests: XCTestCase {
             viewerUserId: member.id,
             guestSecretHash: memberHash
         )
-        XCTAssertEqual(memberRead.count, 1)
+        XCTAssertTrue(memberRead.isEmpty, "Citizens must not see another role’s actions")
 
         let botAction = GameAction.doctorAction(
             sessionId: session.id,

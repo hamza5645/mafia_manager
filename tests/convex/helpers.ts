@@ -36,3 +36,17 @@ export async function room(t: Backend, members = 4) {
     viewerArgs: (user: Guest) => ({ session_id: session.id, viewer_user_id: user.id, ...proof(user) }),
   };
 }
+
+export async function startNight(t: Backend, r: Awaited<ReturnType<typeof room>>) {
+  const roles = ['citizen', 'mafia', 'doctor', 'inspector', 'citizen', 'mafia'] as const;
+  await t.mutation(api.sessions.assignRolesAndNumbers, {
+    ...r.hostArgs,
+    assignments: r.players.map((player, i) => ({ player_id: player.player_id, role: roles[i], number: i + 1 })),
+  });
+  await t.mutation(api.sessions.updateSessionStatus, { ...r.hostArgs, status: 'in_progress' });
+  await t.mutation(api.sessions.updateSessionPhase, {
+    ...r.hostArgs, current_phase: 'night', current_phase_data: { type: 'night', nightIndex: 0 },
+  });
+  const active = await t.query(api.sessions.getSessionById, { session_id: r.session.id });
+  return active!;
+}

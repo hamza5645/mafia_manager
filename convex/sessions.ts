@@ -786,7 +786,10 @@ export const getActionsForPhase = query({
     const session = await getSession(ctx, args.session_id);
     if (!session) return sorted;
     const players = await listSessionPlayers(ctx, args.session_id);
-    return sorted.map((row) => filterActionForViewer(row, session, viewer, players));
+    return sorted.flatMap((row) => {
+      const visible = filterActionForViewer(row, session, viewer, players);
+      return visible ? [visible] : [];
+    });
   },
 });
 
@@ -814,7 +817,10 @@ export const getAllActions = query({
     const session = await getSession(ctx, args.session_id);
     if (!session) return rows;
     const players = await listSessionPlayers(ctx, args.session_id);
-    return rows.map((row) => filterActionForViewer(row, session, viewer, players));
+    return rows.flatMap((row) => {
+      const visible = filterActionForViewer(row, session, viewer, players);
+      return visible ? [visible] : [];
+    });
   },
 });
 
@@ -968,13 +974,13 @@ export const listTentativeSelections = query({
     guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireSessionMember(
+    const { caller: viewer } = await requireSessionMember(
       ctx,
       args.session_id,
       args.viewer_user_id,
       args.guest_secret_hash,
     );
-    return await ctx.db
+    const rows = await ctx.db
       .query("tentative_selections")
       .withIndex("by_session_phase_type", (q) =>
         q
@@ -983,6 +989,13 @@ export const listTentativeSelections = query({
           .eq("action_type", args.action_type),
       )
       .collect();
+    const session = await getSession(ctx, args.session_id);
+    if (!session) return [];
+    const players = await listSessionPlayers(ctx, args.session_id);
+    return rows.flatMap((row) => {
+      const visible = filterActionForViewer(row, session, viewer, players);
+      return visible ? [visible] : [];
+    });
   },
 });
 
@@ -993,16 +1006,23 @@ export const listTentativeSelectionsForSession = query({
     guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireSessionMember(
+    const { caller: viewer } = await requireSessionMember(
       ctx,
       args.session_id,
       args.viewer_user_id,
       args.guest_secret_hash,
     );
-    return await ctx.db
+    const rows = await ctx.db
       .query("tentative_selections")
       .withIndex("by_session_phase_type", (q) => q.eq("session_id", args.session_id))
       .collect();
+    const session = await getSession(ctx, args.session_id);
+    if (!session) return [];
+    const players = await listSessionPlayers(ctx, args.session_id);
+    return rows.flatMap((row) => {
+      const visible = filterActionForViewer(row, session, viewer, players);
+      return visible ? [visible] : [];
+    });
   },
 });
 
