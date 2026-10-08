@@ -1132,6 +1132,9 @@ export const executeRematch = mutation({
       args.guest_secret_hash,
     );
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    if (session.status !== "completed" || !session.is_game_over || session.current_phase !== "game_over") {
+      throw new ConvexError("Rematch requires a completed game");
+    }
 
     const players = await listSessionPlayers(ctx, args.session_id);
     const readyCount = players.filter((player) => player.is_ready).length;

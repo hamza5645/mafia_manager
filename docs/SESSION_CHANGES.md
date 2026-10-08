@@ -5,6 +5,14 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-09: Rematch state guard
+
+- Rematch requires `completed` status, the game-over phase, and a final game.
+  Active games are rejected before any players, actions, or history are changed.
+- Validation: 16/16 backend regressions passed, including unchanged active state
+  on rejection and completed-game reset/cleanup. Development typecheck passed.
+- Rollback: revert the guard, restoring the active-game reset vulnerability.
+
 ### E2E-08: Trusted original host ownership
 
 - Convex stores the original host at room creation/game assignment. Play Again
