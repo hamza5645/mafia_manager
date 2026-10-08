@@ -1,6 +1,7 @@
 import Foundation
 
 enum ConvexConfig {
+    static let apiContractVersion = 2
     static let deploymentURL = "https://energized-herring-345.eu-west-1.convex.cloud"
 
     static let clerkPublishableKey = "pk_test_c3RyaWtpbmctZWxmLTIyLmNsZXJrLmFjY291bnRzLmRldiQ"

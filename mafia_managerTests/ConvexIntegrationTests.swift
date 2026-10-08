@@ -38,6 +38,7 @@ final class ConvexIntegrationTests: XCTestCase {
         let ok: Bool
         let backend: String
         let version: String
+        let api_contract: Int
     }
 
     private func makeGuest(name: String, hash: String) async throws -> UserProfile {
@@ -72,6 +73,7 @@ final class ConvexIntegrationTests: XCTestCase {
         let health: HealthResponse = try await ConvexService.shared.query("health:check")
         XCTAssertTrue(health.ok)
         XCTAssertEqual(health.backend, "convex")
+        XCTAssertEqual(health.api_contract, ConvexConfig.apiContractVersion)
     }
 
     func testGuestCreateAndRestoreIsIdempotent() async throws {

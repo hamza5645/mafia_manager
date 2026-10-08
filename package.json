@@ -7,12 +7,17 @@
     "convex:deploy": "convex deploy",
     "migrate:export": "node scripts/migration/export.mjs",
     "migrate:ingest": "node scripts/migration/ingest.mjs",
-    "migrate:verify": "node scripts/migration/verify.mjs"
+    "migrate:verify": "node scripts/migration/verify.mjs",
+    "test:backend": "vitest run",
+    "convex:verify-deployment": "node scripts/e2e/verify-deployment.mjs"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "convex": "^1.37.0",
+    "convex-test": "^0.0.60",
     "dotenv": "^16.4.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   }
 }

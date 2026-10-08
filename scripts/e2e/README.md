@@ -51,3 +51,12 @@ python3 scripts/e2e/legacy-export-parity.py \
 ```
 
 Keep raw snapshots private: users contain legacy personal data and guest proof. Only the sanitized count/mismatch report should be shared. Verify the CLI limit exceeds the table size. The comparison uses the saved export, excludes expected updated-timestamp changes, and checks legacy IDs, data fields, and mapped user ownership. It does not prove parity with the current live Supabase database.
+
+## Deployment compatibility and regression tests
+
+Run `npm run test:backend` for isolated Convex function regressions using the
+[official convex-test harness](https://docs.convex.dev/testing/convex-test).
+Run `npm run convex:verify-deployment` against the selected deployment before
+shipping the corresponding app. A missing or mismatched API contract fails the
+check. Deploy the matching backend and re-run the check; coordinate guest-proof
+API changes with the client rollout. This check does not deploy any functions.

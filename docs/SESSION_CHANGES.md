@@ -1,5 +1,20 @@
 # Session Changes
 
+## Convex audit fixes — 2026-10-08
+
+Fixes are committed and pushed separately, in report order. The original audit
+remains the before-fix record; final E2E results will be recorded separately.
+
+### E2E-01: Deployment compatibility
+
+- Added API contract 2 to the backend health response and the app configuration.
+  Live Swift health coverage and `convex:verify-deployment` now fail when the
+  selected backend is incompatible. Added isolated Convex regression tooling.
+- Validation: backend compatibility regression, development deployment typecheck,
+  and live deployment contract check.
+- Rollback: revert the contract/check together. Guest-proof API rollout still
+  requires coordinated client/backend deployment. Production is unchanged.
+
 ## Extensive Convex migration E2E audit — 2026-10-08
 
 ### What Changed
