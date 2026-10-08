@@ -95,6 +95,7 @@ final class MultiplayerGameStore: ObservableObject {
     var testSessionSnapshotProvider: ((UUID) async throws -> GameSession?)?
     var testPlayerSnapshotProvider: ((UUID) async throws -> [SessionPlayer])?
     var testCurrentUserIdProvider: (() -> UUID?)?
+    var testGuestSecretHashProvider: (() -> String?)?
 #endif
 
     func setAuthStore(_ authStore: AuthStore) {
@@ -111,7 +112,12 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private var guestSecretHash: String? {
-        authStore?.isAnonymous == true ? authStore?.currentGuestSecretHash : nil
+#if DEBUG
+        if let provider = testGuestSecretHashProvider {
+            return provider()
+        }
+#endif
+        return authStore?.isAnonymous == true ? authStore?.currentGuestSecretHash : nil
     }
 
     private func loadSessionSnapshot(sessionId: UUID) async throws -> GameSession? {
@@ -2600,7 +2606,9 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             actionType: .vote,
             phaseIndex: dayIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
         )
 
         // DEBUG: Log fetched votes

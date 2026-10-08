@@ -76,6 +76,51 @@ final class ConvexIntegrationTests: XCTestCase {
         XCTAssertEqual(health.api_contract, ConvexConfig.apiContractVersion)
     }
 
+    func testGuestHostCanAdvanceVotingThroughGameStore() async throws {
+        let hash = "qa-voting-\(UUID().uuidString)"
+        let host = try await makeGuest(name: "QA Voting Host", hash: hash)
+        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hash)
+        let player = try await sessionService.addPlayer(
+            sessionId: session.id, userId: host.id, playerName: host.displayName,
+            isBot: false, callerUserId: host.id, guestSecretHash: hash
+        )
+        do {
+            try await sessionService.updateSessionStatus(
+                sessionId: session.id, status: .inProgress, callerUserId: host.id, guestSecretHash: hash
+            )
+            try await sessionService.updateSessionPhase(
+                sessionId: session.id, currentPhase: "voting", phaseData: .voting(dayIndex: 0),
+                callerUserId: host.id, guestSecretHash: hash
+            )
+            let activeSnapshot = try await sessionService.getSession(sessionId: session.id)
+            let active = try XCTUnwrap(activeSnapshot)
+            let round = try XCTUnwrap(active.currentRoundId)
+            _ = try await sessionService.submitAction(
+                GameAction.voteAction(sessionId: session.id, roundId: round, dayIndex: 0,
+                                      actorPlayerId: player.playerId, targetPlayerId: nil),
+                guestSecretHash: hash
+            )
+            let store = MultiplayerGameStore()
+            store.testCurrentUserIdProvider = { host.id }
+            store.testGuestSecretHashProvider = { hash }
+            store.currentSession = active
+            store.isHost = true
+            store.myPlayer = player
+            store.allPlayers = [player]
+            try await store.showVotingResults(dayIndex: 0)
+            let result = try await sessionService.getSession(sessionId: session.id)
+            XCTAssertEqual(result?.currentPhase, "voting_results")
+            guard case .votingResults(let day, _, _)? = result?.currentPhaseData else {
+                return XCTFail("Expected voting results")
+            }
+            XCTAssertEqual(day, 0)
+        } catch {
+            await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
+            throw error
+        }
+        await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
+    }
+
     func testGuestCreateAndRestoreIsIdempotent() async throws {
         let hash = "qa-swift-int-guest"
         let first = try await makeGuest(name: "QA Swift Guest", hash: hash)

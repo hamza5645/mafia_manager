@@ -5,6 +5,15 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-02: Voting advancement
+
+- `showVotingResults` passes the viewer ID and guest proof. The voting alert now
+  describes failure to finish voting accurately. The API audit uses the corrected
+  call contract. Added a live store-level regression with a real guest room.
+- Validation: signed simulator build and store-level live test passed (1/1),
+  including the transition to `voting_results`; diff review passed.
+- Rollback: revert this commit. No backend contract change is required.
+
 ### E2E-01: Deployment compatibility
 
 - Added API contract 2 to the backend health response and the app configuration.

@@ -231,7 +231,7 @@ struct MultiplayerVotingView: View {
                 }
             } catch {
                 await MainActor.run {
-                    votingError = "Bot voting failed. Please try again."
+                    votingError = "Could not finish voting. Please try again."
                 }
                 print("❌ Failed to show voting results: \(error.localizedDescription)")
             }
