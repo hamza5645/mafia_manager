@@ -282,6 +282,7 @@ export function filterActionForViewer(
   session: any,
   viewer: any | null,
   players: any[],
+  voteActions: any[] = [],
 ) {
   const viewerPlayer = viewer
     ? players.find((candidate) => candidate.user_id === viewer.id)
@@ -293,6 +294,18 @@ export function filterActionForViewer(
   const actionRole: Record<string, string> = {
     mafia_target: "mafia", doctor_protect: "doctor", inspector_check: "inspector",
   };
+  if (row.action_type === "vote" && !isHost && !isActor) {
+    // Draft selections are never another player's published vote.
+    if (!row.round_id) return null;
+    if (!isGameOver && session.current_phase === "voting" && row.round_id === session.current_round_id) {
+      const submitted = new Set(voteActions.filter(action =>
+        action.action_type === "vote" && action.round_id === session.current_round_id &&
+        action.phase_index === session.current_phase_data?.dayIndex
+      ).map(action => action.actor_player_id));
+      if (players.some(player => player.is_alive && !submitted.has(player.player_id))) return null;
+    }
+  }
+
   if (!isHost && !isGameOver && !isActor && row.action_type !== "vote" &&
       viewerPlayer.role !== actionRole[row.action_type]) {
     return null;

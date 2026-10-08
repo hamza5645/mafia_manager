@@ -91,6 +91,7 @@ try {
   await m('sessions:submitAction', action(0, 'vote', ps[1].player_id));
   await m('sessions:submitAction', action(0, 'vote', ps[2].player_id));
   await check('Vote change overwrites one row', async () => { const rows = await q('sessions:getActionsForPhase', { ...viewerArgs(s, host), action_type: 'vote', phase_index: 0, round_id: active.current_round_id }); return expect(rows.filter(r => r.actor_player_id === ps[0].player_id).length === 1 && rows.find(r => r.actor_player_id === ps[0].player_id).target_player_id === ps[2].player_id, 'one updated vote'); });
+  await check('Peer votes stay private before all players have voted', async () => expect((await q('sessions:getActionsForPhase', { ...viewerArgs(s, citizen), action_type: 'vote', phase_index: 0, round_id: active.current_round_id })).length === 0, 'peer votes hidden'));
   await check('Cannot return to lobby midgame', () => rejects(() => m('sessions:returnToLobby', { session_id: s.id, player_id: ps[4].id, player_user_id: citizen.id, original_host_user_id: host.id, ...proof(citizen) })));
   const rematchRoom = await room(host, [mafia, doctor, inspector]);
   await m('sessions:updateSessionStatus', { ...hostArgs(rematchRoom.s, host), status: 'in_progress' });

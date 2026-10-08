@@ -5,6 +5,19 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-04: Private voting contract
+
+- The visible voting screen promises private votes until everyone has voted;
+  member queries previously returned peer actors/targets immediately. Confirmed
+  votes now stay private until every living player submits, or results publish.
+  Draft selections stay private to the actor/host. Host bot coordination and own
+  vote confirmation remain available. Added a live API assertion.
+- Validation: privacy regression failed before correction; 39/39 backend tests
+  passed afterward across all four read paths, own/host access, and publication.
+  Expanded real guest API campaign passed 50/50. Development typecheck passed.
+- Rollback: revert filters/test expectations together, restoring the vote leak.
+  No production or legacy data was changed.
+
 ### FOLLOWUP-03: Consolidate manual night completion
 
 - Live store regression exposed the legacy `completeNightPhase` entry point:

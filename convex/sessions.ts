@@ -844,7 +844,7 @@ export const getActionsForPhase = query({
     if (!session) return [];
     const players = await listSessionPlayers(ctx, args.session_id);
     return sorted.flatMap((row) => {
-      const visible = filterActionForViewer(row, session, viewer, players);
+      const visible = filterActionForViewer(row, session, viewer, players, sorted);
       return visible ? [visible] : [];
     });
   },
@@ -875,7 +875,7 @@ export const getAllActions = query({
     if (!session) return [];
     const players = await listSessionPlayers(ctx, args.session_id);
     return rows.flatMap((row) => {
-      const visible = filterActionForViewer(row, session, viewer, players);
+      const visible = filterActionForViewer(row, session, viewer, players, rows);
       return visible ? [visible] : [];
     });
   },
