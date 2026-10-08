@@ -5,6 +5,20 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### REVIEW-02: Migration parity and orphan verification
+
+- Verification compares all source legacy IDs, every child owner mapping, and
+  per-user legacy counts, while allowing fresh Convex rows. All child references
+  are checked for missing users. An admin-only snapshot returns no personal
+  fields. Added explicit saved-export mode and legacy-only table counts.
+- Validation: 30/30 backend/migration regressions passed, including equal-count
+  corruption, missing/duplicate IDs, claimed users, fresh data, and child orphans.
+  Development typecheck passed. Export verification matched 86 users / 48 stats /
+  6 configs / 2 groups. Live source remained unreachable and exited nonzero.
+- A valid optional-timestamp ingestion input exposed a separate preexisting
+  defect; tracked as FOLLOWUP-01 for a separate fix/regression.
+- Rollback: revert verifier/audit query together. No durable data was changed.
+
 ### REVIEW-01: Separate production configuration
 
 - Release reads a production xcconfig/Info.plist and has no dev fallback. A

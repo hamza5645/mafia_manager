@@ -232,8 +232,11 @@ export const countByTable = internalQuery({
         (row) => row.legacy_supabase_user_id !== undefined,
       ).length,
       player_stats: stats.length,
+      legacy_player_stats: stats.filter(row => row.legacy_supabase_id !== undefined).length,
       custom_roles_configs: configs.length,
+      legacy_custom_roles_configs: configs.filter(row => row.legacy_supabase_id !== undefined).length,
       player_groups: groups.length,
+      legacy_player_groups: groups.filter(row => row.legacy_supabase_id !== undefined).length,
     };
   },
 });
@@ -276,5 +279,27 @@ export const listLegacyOrphans = internalQuery({
         email: row.email,
         legacy_supabase_user_id: row.legacy_supabase_user_id,
       }));
+  },
+});
+
+
+// Admin-only, read-only ownership data. Never returns emails, names, or guest
+// proofs; a single query keeps counts/owner mappings on a consistent snapshot.
+export const getOwnershipSnapshot = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    const childTables = ["player_stats", "custom_roles_configs", "player_groups"] as const;
+    const children = await Promise.all(childTables.map(async table => {
+      const rows = await ctx.db.query(table).collect();
+      return [table, rows.map(row => ({
+        id: row.id, user_id: row.user_id, legacy_supabase_id: row.legacy_supabase_id,
+        legacy_supabase_user_id: row.legacy_supabase_user_id,
+      }))] as const;
+    }));
+    return {
+      users: users.map(row => ({ id: row.id, legacy_supabase_user_id: row.legacy_supabase_user_id })),
+      ...Object.fromEntries(children),
+    };
   },
 });
