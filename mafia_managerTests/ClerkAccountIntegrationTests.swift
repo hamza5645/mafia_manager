@@ -28,6 +28,29 @@ final class ClerkAccountIntegrationTests: XCTestCase {
             sessionId: guestRoom.id, userId: guest.id, playerName: guest.displayName,
             isBot: false, callerUserId: guest.id, guestSecretHash: guestHash
         )
+        let realtime = RealtimeService()
+        let guestSeen = expectation(description: "Guest realtime seat is present")
+        let noRemoval = expectation(description: "Upgrade does not kick the guest")
+        noRemoval.isInverted = true
+        var sawGuest = false
+        var watchingUpgrade = true
+        var subscriptionErrors: [String] = []
+        try await realtime.subscribeToSession(
+            sessionId: guestRoom.id, viewerUserId: guest.id, guestSecretHash: guestHash,
+            onSessionUpdate: { _ in },
+            onPlayerUpdate: { player in
+                if player.id == guestPlayer.id && player.userId == guest.id && !sawGuest {
+                    sawGuest = true
+                    guestSeen.fulfill()
+                }
+            },
+            onPlayerRemoved: { id in
+                if watchingUpgrade && id == guestPlayer.id { noRemoval.fulfill() }
+            },
+            onActionUpdate: { _ in },
+            onDecodeError: { error, _ in if watchingUpgrade { subscriptionErrors.append(error.localizedDescription) } }
+        )
+        await fulfillment(of: [guestSeen], timeout: 10)
         let statName = "QA Native Collision"
         try await database.upsertPlayerStat(
             userId: guest.id, playerName: statName, role: .doctor, won: false, kills: 1,
@@ -56,6 +79,9 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         let edited = await service.currentUser
         XCTAssertEqual(edited?.displayName, "QA Edited Native")
 
+        print("QA STAGE: guest subscriptions survive new Clerk identity")
+        await fulfillment(of: [noRemoval], timeout: 1)
+        XCTAssertTrue(subscriptionErrors.isEmpty, "Changing auth must not terminate guest subscriptions")
         print("QA STAGE: native guest stats merge")
         try await database.upsertPlayerStat(userId: account.id, playerName: statName, role: .mafia, won: true, kills: 2)
         do {
@@ -69,6 +95,9 @@ final class ClerkAccountIntegrationTests: XCTestCase {
             let seats = try await sessions.getSessionPlayers(sessionId: guestRoom.id, viewerUserId: account.id)
             XCTAssertEqual(seats.first(where: { $0.id == guestPlayer.id })?.userId, account.id)
             XCTAssertEqual(seats.first(where: { $0.id == guestPlayer.id })?.playerId, guestPlayer.playerId)
+            XCTAssertTrue(realtime.isConnected, "Merged room subscriptions must remain active")
+            watchingUpgrade = false
+            await realtime.unsubscribeAll()
             try await sessions.updateSessionStatus(sessionId: guestRoom.id, status: .cancelled, callerUserId: account.id)
             try await sessions.leaveSession(sessionId: guestRoom.id, userId: account.id)
             let afterLeave = try await sessions.getSessionPlayers(sessionId: guestRoom.id, viewerUserId: account.id)
@@ -84,6 +113,8 @@ final class ClerkAccountIntegrationTests: XCTestCase {
             let incremented = try await database.getPlayerStat(userId: account.id, playerName: statName)
             XCTAssertEqual(incremented?.gamesPlayed, 3)
         } catch {
+            watchingUpgrade = false
+            await realtime.unsubscribeAll()
             try? await sessions.updateSessionStatus(sessionId: guestRoom.id, status: .cancelled, callerUserId: account.id)
             try? await sessions.leaveSession(sessionId: guestRoom.id, userId: account.id)
             for row in (try? await database.getPlayerStats(userId: account.id)) ?? [] where row.playerName == statName {

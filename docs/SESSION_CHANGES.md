@@ -5,6 +5,22 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-02: Realtime auth handoff during guest upgrade
+
+- The first full retest exposed a live handoff failure: Clerk profile creation
+  made the guest roster disappear before merge and terminated action/selection
+  subscriptions. Read viewers now retain proven guest authority through that
+  window, then use the actual authenticated account after seat transfer. Mutation
+  caller assertions remain strict; guessed viewer IDs/proofs cannot reveal roles.
+- Validation: first full Swift run had 46 passed / 1 failed test (3 assertions)
+  in the new native subscription monitor. After correction, that actual Clerk
+  signup/merge subscription test passed (1/1), and 38/38 backend regressions passed.
+  All 49 guest API checks passed before the handoff fix. Dev typecheck passed.
+- The failed Xcode run completed assertions but hung collecting diagnostics;
+  its own process was interrupted. Subsequent runs disable diagnostics collection.
+- Rollback: revert viewer handoff and regressions; this restores false kicks
+  during upgrade. No production or legacy data was changed.
+
 ### FOLLOWUP-01: Missing migration timestamps
 
 - New regression fixtures exposed a preexisting valid-input failure: optional

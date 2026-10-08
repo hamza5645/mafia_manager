@@ -116,7 +116,8 @@ export async function requireSessionMember(
   assertedUserAppId: string,
   guestSecretHash?: string,
 ) {
-  const caller = await resolveCaller(ctx, assertedUserAppId, guestSecretHash);
+  const caller = await resolveViewer(ctx, assertedUserAppId, guestSecretHash);
+  if (!caller) throw new ConvexError("Authentication required");
   const player = await ctx.db
     .query("session_players")
     .withIndex("by_session_user", (q) =>
@@ -250,17 +251,25 @@ export function visiblePlayerForViewer(
   };
 }
 
-// Resolves the viewer for role-visibility / action-visibility filtering.
-// When Clerk auth is present, ignore the client-supplied `assertedViewerAppId`
-// to prevent spoofing — pass through the authenticated user's record only.
-// Guests must prove control of the asserted anonymous row through resolveCaller.
+// Read subscriptions may retain a proven guest viewer while Clerk signup is
+// completing. Keep that guest authority until the merge transfers its seat;
+// afterwards the authenticated account is the viewer, even if the subscription
+// still contains the deleted guest's ID. An asserted ID alone never grants access.
 export async function resolveViewer(
   ctx: Ctx,
   assertedViewerAppId?: string,
   guestSecretHash?: string,
 ) {
   const clerkViewer = await getCurrentUser(ctx);
-  if (clerkViewer) return clerkViewer;
+  if (clerkViewer) {
+    if (assertedViewerAppId && guestSecretHash) {
+      const guest = await getByAppId(ctx, "users", assertedViewerAppId);
+      if (guest?.is_anonymous && !guest.auth_subject && guest.guest_secret_hash === guestSecretHash) {
+        return guest;
+      }
+    }
+    return clerkViewer;
+  }
   if (!assertedViewerAppId) return null;
   return await resolveCaller(ctx, assertedViewerAppId, guestSecretHash);
 }
