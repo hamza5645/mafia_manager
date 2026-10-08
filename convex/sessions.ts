@@ -377,6 +377,7 @@ export const updateSessionState = mutation({
 export const resolveNightAtomic = mutation({
   args: {
     session_id: v.string(),
+    expected_round_id: v.string(),
     night_record: v.any(),
     eliminated_player_ids: v.array(v.string()),
     next_phase: v.string(),
@@ -394,6 +395,36 @@ export const resolveNightAtomic = mutation({
       args.guest_secret_hash,
     );
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    const fingerprint = JSON.stringify({
+      night_record: args.night_record, eliminated_player_ids: args.eliminated_player_ids,
+      next_phase: args.next_phase, next_phase_data: args.next_phase_data,
+      is_game_over: args.is_game_over ?? false, winner: args.winner ?? null,
+    }, (_key, value) => value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value);
+    if (session.night_resolution?.round_id === args.expected_round_id) {
+      // An identical retry is harmless only while the resolved phase remains
+      // current. Never move a later phase backwards, even for a valid retry.
+      if (session.current_phase === session.night_resolution.next_phase &&
+          session.night_resolution.fingerprint === fingerprint) return true;
+      throw new ConvexError("Night already resolved or phase has advanced");
+    }
+    if (session.status !== "in_progress" || session.is_game_over || session.current_phase !== "night" ||
+        session.current_round_id !== args.expected_round_id ||
+        session.current_phase_data?.nightIndex !== args.night_record?.night_index) {
+      throw new ConvexError("Stale night resolution");
+    }
+    if (args.night_record?.is_resolved !== true ||
+        !["morning", "game_over"].includes(args.next_phase) ||
+        (args.next_phase === "game_over") !== (args.is_game_over === true) ||
+        args.next_phase_data?.type !== (args.next_phase === "morning" ? "morning" : "gameOver") ||
+        (args.next_phase === "morning" && args.next_phase_data?.nightIndex !== args.night_record.night_index)) {
+      throw new ConvexError("Invalid night resolution");
+    }
+    const players = await listSessionPlayers(ctx, args.session_id);
+    if (args.eliminated_player_ids.some(id => !players.some(player => player.player_id === id && player.is_alive))) {
+      throw new ConvexError("Elimination target is not alive in this session");
+    }
+
     for (const playerId of args.eliminated_player_ids) {
       const player = await ctx.db
         .query("session_players")
@@ -421,6 +452,7 @@ export const resolveNightAtomic = mutation({
 
     await ctx.db.patch(session._id, {
       night_history: nightHistory,
+      night_resolution: { round_id: args.expected_round_id, fingerprint, next_phase: args.next_phase },
       current_phase: args.next_phase,
       current_phase_data: args.next_phase_data,
       is_game_over: args.is_game_over ?? session.is_game_over,
@@ -875,6 +907,7 @@ export const returnToLobby = mutation({
         night_history: [],
         day_history: [],
         current_round_id: undefined,
+        night_resolution: undefined,
         rematch_deadline: undefined,
         updated_at: nowAppleEpochSeconds(),
         phase_sequence: nextPhaseSequence(session),
@@ -1134,6 +1167,7 @@ export const executeRematch = mutation({
       night_history: [],
       day_history: [],
       current_round_id: undefined,
+      night_resolution: undefined,
       rematch_deadline: undefined,
       updated_at: nowAppleEpochSeconds(),
       phase_sequence: nextPhaseSequence(session),

@@ -117,6 +117,9 @@ export default defineSchema({
     night_history: v.array(v.any()),
     day_history: v.array(v.any()),
     current_round_id: v.optional(v.string()),
+    night_resolution: v.optional(v.object({
+      round_id: v.string(), fingerprint: v.string(), next_phase: v.string(),
+    })),
     rematch_deadline: v.optional(v.number()),
     phase_sequence: v.optional(v.number()),
     updated_at: v.number(),

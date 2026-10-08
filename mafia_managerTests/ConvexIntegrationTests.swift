@@ -343,6 +343,7 @@ final class ConvexIntegrationTests: XCTestCase {
         )
         let resolved = try await sessionService.resolveNightAtomic(
             sessionId: session.id,
+            expectedRoundId: roundId,
             nightRecord: record,
             eliminatedPlayerIds: [joinerPlayer.playerId],
             nextPhase: "game_over",

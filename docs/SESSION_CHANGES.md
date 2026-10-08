@@ -5,6 +5,18 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### E2E-07: Conditional atomic night resolution
+
+- Atomic resolution requires the expected round, active night/index, valid
+  elimination targets, and a final morning/game-over state. Identical retries
+  are idempotent; changed or late requests cannot rewind phases or add deaths.
+  Session reset clears resolution metadata. Client outcomes are applied only
+  after the server succeeds; winner calculation uses projected deaths.
+- Validation: 14/14 backend regressions and all 7 live Swift integration tests
+  passed; signed build, development typecheck, and deployment check passed.
+- Rollback: revert Swift arguments and backend validators/schema together.
+  API contract is now 3; deploy matching clients/backend as a coordinated rollout.
+
 ### E2E-06: Server-side game action rules
 
 - Submitted actions and tentative selections validate game status, current

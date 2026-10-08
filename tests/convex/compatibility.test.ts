@@ -4,7 +4,7 @@ import { backend, guest, proof } from './helpers';
 
 test('deployment advertises guest proof API and rejects unproven profile access', async () => {
   const t = backend();
-  expect(await t.query(api.health.check, {})).toMatchObject({ ok: true, api_contract: 2 });
+  expect(await t.query(api.health.check, {})).toMatchObject({ ok: true, api_contract: 3 });
   const user = await guest(t, 'QA compatibility');
   await expect(t.query(api.users.getUserProfile, { user_id: user.id })).rejects.toThrow();
   expect(await t.query(api.users.getUserProfile, { user_id: user.id, ...proof(user) })).toMatchObject({ id: user.id });

@@ -2258,6 +2258,10 @@ final class MultiplayerGameStore: ObservableObject {
             print("ERROR: [resolveNightOutcome] No current session - cannot resolve night \(nightIndex)")
             return
         }
+        guard case .night(let activeNightIndex, _) = session.currentPhaseData,
+              activeNightIndex == nightIndex, let expectedRoundId = session.currentRoundId else {
+            throw SessionError.noActiveSession
+        }
         guard var nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
             print("ERROR: [resolveNightOutcome] Night record missing for nightIndex \(nightIndex) in session \(session.id)")
             print("ERROR: [resolveNightOutcome] Current nightHistory: \(session.nightHistory.map { "night \($0.nightIndex), resolved: \($0.isResolved)" })")
@@ -2290,17 +2294,10 @@ final class MultiplayerGameStore: ObservableObject {
         var updatedHistory = session.nightHistory.filter { $0.nightIndex != nightIndex }
         updatedHistory.append(nightRecord)
         updatedHistory.sort { $0.nightIndex < $1.nightIndex }
-        currentSession?.nightHistory = updatedHistory
 
-        // CRITICAL: Apply deaths to local state BEFORE win check so evaluateWinners sees correct counts
-        for playerId in resultingDeaths {
-            if let index = allPlayers.firstIndex(where: { $0.playerId == playerId }) {
-                allPlayers[index].isAlive = false
-            }
-        }
-
-        // Check win conditions AFTER death but BEFORE phase transition
-        let winnerCheck = evaluateWinners(startOfDay: true)
+        let winnerCheck = evaluateWinners(
+            startOfDay: true, excludingPlayerIds: Set(resultingDeaths)
+        )
         let nextPhaseName: String
         let nextPhaseData: PhaseData
 
@@ -2320,6 +2317,7 @@ final class MultiplayerGameStore: ObservableObject {
         // ATOMIC OPERATION: Apply deaths + update history + advance phase in single transaction
         let success = try await sessionService.resolveNightAtomic(
             sessionId: session.id,
+            expectedRoundId: expectedRoundId,
             nightRecord: nightRecord,
             eliminatedPlayerIds: resultingDeaths,
             nextPhase: nextPhaseName,
@@ -2331,6 +2329,7 @@ final class MultiplayerGameStore: ObservableObject {
         )
 
         if success {
+            currentSession?.nightHistory = updatedHistory
             currentSession?.currentPhase = nextPhaseName
             currentSession?.currentPhaseData = nextPhaseData
             currentSession?.isGameOver = winnerCheck.isGameOver
@@ -3041,8 +3040,10 @@ final class MultiplayerGameStore: ObservableObject {
         return nil
     }
 
-    private func evaluateWinners(startOfDay: Bool) -> (winner: Role?, isGameOver: Bool) {
-        let alivePlayers = allPlayers.filter { $0.isAlive }
+    private func evaluateWinners(
+        startOfDay: Bool, excludingPlayerIds: Set<UUID> = []
+    ) -> (winner: Role?, isGameOver: Bool) {
+        let alivePlayers = allPlayers.filter { $0.isAlive && !excludingPlayerIds.contains($0.playerId) }
         let mafiaCount = alivePlayers.filter { $0.role == .mafia }.count
         let nonMafiaCount = alivePlayers.filter { $0.role != .mafia }.count
         let aliveHumans = alivePlayers.filter { !$0.isBot }

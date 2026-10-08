@@ -5,8 +5,8 @@ export const check = query({
   handler: async () => ({
     ok: true,
     backend: "convex",
-    version: "convex-clerk-v2",
-    api_contract: 2,
+    version: "convex-clerk-v3",
+    api_contract: 3,
     checked_at: new Date().toISOString(),
   }),
 });

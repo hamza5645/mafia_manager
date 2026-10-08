@@ -174,6 +174,7 @@ final class SessionService {
 
     func resolveNightAtomic(
         sessionId: UUID,
+        expectedRoundId: UUID,
         nightRecord: NightActionRecord,
         eliminatedPlayerIds: [UUID],
         nextPhase: String,
@@ -187,6 +188,7 @@ final class SessionService {
             "sessions:resolveNightAtomic",
             with: [
                 "session_id": sessionId.uuidString.lowercased(),
+                "expected_round_id": expectedRoundId.uuidString.lowercased(),
                 "night_record": try raw(nightRecord),
                 "eliminated_player_ids": eliminatedPlayerIds.map { $0.uuidString.lowercased() as ConvexEncodable? },
                 "next_phase": nextPhase,
