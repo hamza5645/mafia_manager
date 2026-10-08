@@ -5,6 +5,17 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### Retest tooling and fresh automated pass
+
+- Audit campaigns now exit nonzero on failed assertions, use valid Swift
+  phase/history fixtures, and clean account rooms/revoke API sessions. Added
+  a private account-output directory override for UI follow-up.
+- Validation: fresh account campaign passed 27/27 checks. The repeated full
+  signed Swift suite passed 47/47 with all live/native flags enabled (no skips),
+  including the guest auth-handoff monitor. Guest API campaign passed 49/49;
+  it is rerunning after the final handoff change. Visible E2E follows.
+- Rollback: revert audit-script changes; this only affects validation tooling.
+
 ### FOLLOWUP-02: Realtime auth handoff during guest upgrade
 
 - The first full retest exposed a live handoff failure: Clerk profile creation

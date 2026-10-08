@@ -1,18 +1,20 @@
 import { ConvexHttpClient } from 'convex/browser';
 import { randomUUID, createHash, randomBytes } from 'node:crypto';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 
 // Native Clerk Frontend API paths/params match the installed ClerkKit sources.
 // Only Clerk development test emails are used; no real verification email is sent.
 const base = 'https://striking-elf-22.clerk.accounts.dev';
 const convex = new ConvexHttpClient('https://energized-herring-345.eu-west-1.convex.cloud');
 const resume = process.env.CLERK_AUDIT_RESUME === '1';
-const credentials = resume ? JSON.parse(readFileSync('/tmp/mafia-e2e-20261008/api-test-account.json', 'utf8')) : { email: `mafia-qa-${Date.now()}+clerk_test@example.com`, password: randomBytes(24).toString('base64url') };
+const outputDir = process.env.CLERK_AUDIT_DIR ?? '/tmp/mafia-e2e-20261008';
+mkdirSync(outputDir, { recursive: true });
+const credentials = resume ? JSON.parse(readFileSync(`${outputDir}/api-test-account.json`, 'utf8')) : { email: `mafia-qa-${Date.now()}+clerk_test@example.com`, password: randomBytes(24).toString('base64url') };
 const results = [];
 let deviceToken, clientId, sessionId, account;
 if (resume) {
-  ({ deviceToken, clientId, sessionId } = JSON.parse(readFileSync('/tmp/mafia-e2e-20261008/api-test-session.json', 'utf8')));
-  account = { id: JSON.parse(readFileSync('/tmp/mafia-e2e-20261008/account-results.json', 'utf8')).accountId };
+  ({ deviceToken, clientId, sessionId } = JSON.parse(readFileSync(`${outputDir}/api-test-session.json`, 'utf8')));
+  account = { id: JSON.parse(readFileSync(`${outputDir}/account-results.json`, 'utf8')).accountId };
 }
 const fixtures = { guests: [], rooms: [], stats: [] };
 async function clerk(path, body, method = 'POST') {
@@ -103,10 +105,13 @@ try {
 } catch (e) { results.push({ name: 'Campaign fatal error', status: 'ERROR', evidence: String(e.message ?? e) }); }
 finally {
   for (const id of fixtures.stats) await check('Cleanup QA stats', () => convex.mutation('stats:deletePlayerStat', { id }));
-  // Deliberately keep the isolated test account for native sign-in/restoration.
+  for (const id of fixtures.rooms) await check('Cleanup QA account room', () => convex.mutation('sessions:cancelSession', { session_id: id, caller_user_id: account.id }));
+  if (sessionId) await check('Revoke QA API session', () => clerk(`/v1/client/sessions/${sessionId}/remove`, {}));
+  // Keep only the isolated development account for follow-up UI sign-in.
   const safe = JSON.stringify({ email: credentials.email, accountId: account?.id, timestamp: new Date().toISOString(), results, fixtures }, null, 2).replaceAll(credentials.password, '[REDACTED]');
-  writeFileSync(`/tmp/mafia-e2e-20261008/${resume ? 'password-reset-results' : 'account-results'}.json`, safe);
-  writeFileSync('/tmp/mafia-e2e-20261008/api-test-account.json', JSON.stringify(credentials), { mode: 0o600 });
-  writeFileSync('/tmp/mafia-e2e-20261008/api-test-session.json', JSON.stringify({ deviceToken, clientId, sessionId }), { mode: 0o600 });
+  writeFileSync(`${outputDir}/${resume ? 'password-reset-results' : 'account-results'}.json`, safe);
+  writeFileSync(`${outputDir}/api-test-account.json`, JSON.stringify(credentials), { mode: 0o600 });
+  writeFileSync(`${outputDir}/api-test-session.json`, JSON.stringify({ deviceToken, clientId, sessionId }), { mode: 0o600 });
   console.log(JSON.stringify({ passed: results.filter(r => r.status === 'PASS').length, failed: results.filter(r => r.status !== 'PASS').length }));
+  process.exitCode = results.some(r => r.status !== 'PASS') ? 1 : 0;
 }

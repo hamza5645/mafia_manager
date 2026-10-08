@@ -81,11 +81,11 @@ try {
   await check('Dead player cannot submit vote', () => rejects(() => m('sessions:submitAction', action(4, 'vote', ps[1].player_id))));
   await m('sessions:updatePlayerLifeStatus', { record_id: ps[4].id, is_alive: true, caller_user_id: host.id, ...proof(host) });
   await check('Nonhost cannot resolve night', () => rejects(() => m('sessions:resolveNightAtomic', { ...hostArgs(s, citizen), expected_round_id: active.current_round_id, night_record: { night_index: 0 }, eliminated_player_ids: [], next_phase: 'morning', next_phase_data: { type: 'morning', nightIndex: 0 } })));
-  await check('Atomic resolution saves protected target', async () => { await m('sessions:resolveNightAtomic', { ...hostArgs(s, host), expected_round_id: active.current_round_id, night_record: { night_index: 0, is_resolved: true, mafia_target_id: ps[4].player_id, doctor_protected_id: ps[4].player_id, resulting_deaths: [] }, eliminated_player_ids: [], next_phase: 'morning', next_phase_data: { type: 'morning', nightIndex: 0 } }); return expect((await q('sessions:getSessionPlayers', viewerArgs(s, host))).every(p => p.is_alive), 'all alive'); });
+  await check('Atomic resolution saves protected target', async () => { await m('sessions:resolveNightAtomic', { ...hostArgs(s, host), expected_round_id: active.current_round_id, night_record: { night_index: 0, is_resolved: true, timestamp: Date.now() / 1000 - 978307200, mafia_target_id: ps[4].player_id, doctor_protected_id: ps[4].player_id, resulting_deaths: [] }, eliminated_player_ids: [], next_phase: 'morning', next_phase_data: { type: 'morning', nightIndex: 0 } }); return expect((await q('sessions:getSessionPlayers', viewerArgs(s, host))).every(p => p.is_alive), 'all alive'); });
   await check('Public discovery does not expose secret night targets', async () => { const row = await q('sessions:getSessionByRoomCode', { room_code: s.room_code }); return expect(!row.night_history.some(n => n.mafia_target_id || n.doctor_protected_id), row.night_history); });
   active = await phase(s, host, 'voting');
   await check('Host voting-results request with app arguments succeeds', async () => q('sessions:getActionsForPhase', { ...viewerArgs(s, host), action_types: ['vote'], phase_index: 0, round_id: active.current_round_id }));
-  await check('Reject stale atomic night resolution after voting starts', () => rejects(() => m('sessions:resolveNightAtomic', { ...hostArgs(s, host), expected_round_id: active.current_round_id, night_record: { night_index: 0, is_resolved: true, resulting_deaths: [] }, eliminated_player_ids: [], next_phase: 'morning', next_phase_data: { type: 'morning', nightIndex: 0 } })));
+  await check('Reject stale atomic night resolution after voting starts', () => rejects(() => m('sessions:resolveNightAtomic', { ...hostArgs(s, host), expected_round_id: active.current_round_id, night_record: { night_index: 0, is_resolved: true, timestamp: Date.now() / 1000 - 978307200, resulting_deaths: [] }, eliminated_player_ids: [], next_phase: 'morning', next_phase_data: { type: 'morning', nightIndex: 0 } })));
   active = await phase(s, host, 'voting');
   await check('Reject inspector action during voting', () => rejects(() => m('sessions:submitAction', action(3, 'inspector_check', ps[1].player_id))));
   await m('sessions:submitAction', action(0, 'vote', ps[1].player_id));
@@ -96,7 +96,7 @@ try {
   await m('sessions:updateSessionStatus', { ...hostArgs(rematchRoom.s, host), status: 'in_progress' });
   await phase(rematchRoom.s, host, 'night');
   await check('Rematch cannot reset an active game', () => rejects(() => m('sessions:executeRematch', hostArgs(rematchRoom.s, host))));
-  await m('sessions:updateSessionState', { ...hostArgs(s, host), current_phase: 'game_over', current_phase_data: { type: 'game_over', winner: 'citizen' }, is_game_over: true, winner: 'citizen' });
+  await m('sessions:updateSessionState', { ...hostArgs(s, host), current_phase: 'game_over', current_phase_data: { type: 'gameOver', winner: 'citizen' }, is_game_over: true, winner: 'citizen' });
   await check('Final roles visible to members', async () => expect((await q('sessions:getSessionPlayers', viewerArgs(s, citizen))).every(p => p.role), 'all final roles visible'));
   await m('sessions:returnToLobby', { session_id: s.id, player_id: ps[0].id, player_user_id: host.id, original_host_user_id: host.id, ...proof(host) });
   await check('Play again clears actions and selections', async () => expect((await q('sessions:getAllActions', viewerArgs(s, host))).length === 0 && (await q('sessions:listTentativeSelectionsForSession', viewerArgs(s, host))).length === 0, 'empty snapshots'));
@@ -135,4 +135,5 @@ finally {
   for (const u of users) safeReport = safeReport.replaceAll(u.hash, '[REDACTED QA GUEST PROOF]');
   writeFileSync(process.env.CONVEX_AUDIT_OUTPUT ?? '/tmp/mafia-e2e-20261008/backend-results.json', safeReport);
   console.log(JSON.stringify({ passed: results.filter(r => r.status === 'PASS').length, failed: results.filter(r => r.status !== 'PASS').length }));
+  process.exitCode = results.some(r => r.status !== 'PASS') ? 1 : 0;
 }

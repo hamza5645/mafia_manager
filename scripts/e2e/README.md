@@ -60,3 +60,9 @@ Run `npm run convex:verify-deployment` against the selected deployment before
 shipping the corresponding app. A missing or mismatched API contract fails the
 check. Deploy the matching backend and re-run the check; coordinate guest-proof
 API changes with the client rollout. This check does not deploy any functions.
+
+The campaigns now exit nonzero on any failed/error assertion. Backend fixtures
+use Swift-compatible phase/history payloads. `CLERK_AUDIT_DIR` selects a private
+output directory for the account campaign; it cancels QA rooms and revokes its
+API session at completion. Its development account/password file remains for
+visible UI follow-up; delete private credential/session files when finished.
