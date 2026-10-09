@@ -23,17 +23,28 @@ final class AuthService {
 
     var currentUser: UserProfile? {
         get async {
-            if ConvexConfig.hasConfiguredClerkKey, Clerk.shared.user != nil {
-                return try? await ensureClerkUser()
-            }
-            if ConvexConfig.hasConfiguredClerkKey {
+            guard ConvexConfig.hasConfiguredClerkKey else { return nil }
+            if Clerk.shared.user == nil {
                 _ = try? await Clerk.shared.refreshClient()
-                if Clerk.shared.user != nil {
-                    return try? await ensureClerkUser()
-                }
             }
-            return nil
+            return try? await Self.restoreAccountProfile(
+                hasClerkUser: Clerk.shared.user != nil,
+                refreshConvexAuth: { try await self.convex.refreshAuthFromClerk() },
+                loadProfile: { try await self.ensureClerkUser() }
+            )
         }
+    }
+
+    /// Cached Clerk identity can load before the provider's asynchronous
+    /// session-sync task. Install Convex auth before restoring its profile.
+    static func restoreAccountProfile(
+        hasClerkUser: Bool,
+        refreshConvexAuth: () async throws -> Void,
+        loadProfile: () async throws -> UserProfile
+    ) async throws -> UserProfile? {
+        guard hasClerkUser else { return nil }
+        try await refreshConvexAuth()
+        return try await loadProfile()
     }
 
     enum SignUpStartResult {

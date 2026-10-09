@@ -1,3 +1,12 @@
+## 2026-10-09 — FOLLOWUP-10: restore production account after cold launch
+
+- Simulator E2E reproduced a production account mismatch: Clerk retained an active session after relaunch, but Settings displayed Login / Sign Up and another login returned “You’re already signed in.”
+- `AuthService.currentUser` now installs cached Clerk authentication in Convex before loading the account profile. The bounded auth wait also checks Clerk environment/client readiness.
+- Added three Swift Testing regressions for token-before-profile ordering, failed-token short circuit, and signed-out launch.
+- Validation: focused auth tests 10/10, no skips; backend 39/39; production contract 3; Release simulator build succeeds; production account restored on two consecutive cold launches. Screenshot: `docs/e2e-evidence/2026-10-09-simulator/account-restored.png`.
+- Rollback: revert this commit and regenerate through Tuist; doing so reintroduces the observed startup race. No backend/schema change.
+- Gotcha: the earlier signed archive/IPA predates this fix and must be rebuilt before distribution. Full simulator E2E remains in progress.
+
 # Session Changes
 
 ## Convex audit fixes — 2026-10-08

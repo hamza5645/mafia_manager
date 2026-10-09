@@ -113,7 +113,7 @@ final class ConvexService {
         // a few hundred ms, so poll briefly with a hard ceiling before
         // calling loginFromCache (which throws noActiveSession otherwise).
         let deadline = Date().addingTimeInterval(5.0)
-        while Clerk.shared.session?.status != .active && Date() < deadline {
+        while (!Clerk.shared.isLoaded || Clerk.shared.session?.status != .active) && Date() < deadline {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         _ = try await authed.loginFromCache().get()
