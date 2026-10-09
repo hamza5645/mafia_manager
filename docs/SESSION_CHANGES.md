@@ -6,6 +6,21 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### FOLLOWUP-09: Release simulator architecture compatibility
+
+- A real-production Release simulator build tried to link x86_64 and failed on
+  ConvexMobile Rust symbols. Inspection confirms the installed Convex XCFramework
+  provides only arm64 simulator/device/macOS slices. Exclude x86_64 for simulator
+  builds through Project.swift, then regenerate with Tuist.
+- Validation: the same Release simulator build failed before the setting and
+  passed afterward. Production device archive/export already passed; the setting
+  applies only to iphonesimulator. Apple Silicon simulator support is explicit;
+  this SDK version does not provide Intel simulator support.
+- User's signing selection remains 5GH22BAXAU through the manifest. Tuist
+  regenerated the project; no direct .pbxproj edits were made by the agent.
+- Rollback: revert the simulator exclusion and regenerate, restoring the Release
+  simulator linker failure. No backend or durable data changes.
+
 ### Signing access diagnosis — 2026-10-09
 
 - User confirmed team 5GH22BAXAU is an Individual membership. Their App Store

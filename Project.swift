@@ -6,6 +6,8 @@ let project = Project(
         base: [
             "DEVELOPMENT_TEAM": "5GH22BAXAU",
             "CODE_SIGN_STYLE": "Automatic",
+            // ConvexMobile's Rust XCFramework ships an arm64-only simulator slice.
+            "EXCLUDED_ARCHS[sdk=iphonesimulator*]": "x86_64",
             "MARKETING_VERSION": "5.0",
             "CURRENT_PROJECT_VERSION": "11",
             "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
