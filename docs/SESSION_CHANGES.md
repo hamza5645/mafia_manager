@@ -6,6 +6,26 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### Clerk production DNS — 2026-10-09
+
+- Directly accessed the authenticated Cloudflare zone for
+  `monitorthesituations.com`. All five supplied Clerk CNAMEs were absent;
+  none existed with a conflicting target. Added these DNS-only, TTL Auto:
+  - `accounts.mafia` → `accounts.clerk.services`
+  - `clerk.mafia` → `frontend-api.clerk.services`
+  - `clk._domainkey.mafia` → `dkim1.dqnbqbamj40d.clerk.services`
+  - `clk2._domainkey.mafia` → `dkim2.dqnbqbamj40d.clerk.services`
+  - `clkmail.mafia` → `mail.dqnbqbamj40d.clerk.services`
+- Validation: all five match exactly on both authoritative Cloudflare
+  nameservers, and Cloudflare shows DNS-only for each. See sanitized
+  `docs/e2e-evidence/2026-10-09-retest/clerk-production-dns.json`.
+- No existing DMARC TXT policy was found at the root or Mafia subdomain;
+  no TXT value was supplied, so DMARC was not changed. Existing root/tunnel
+  records were preserved. Clerk verification/certificates still need to be
+  rerun in the dashboard; its shared-browser session is signed out.
+- Rollback: remove only the five new CNAMEs above from the Cloudflare zone.
+  App production key, native registration and Convex deployment remain pending.
+
 ### Production URL correction — 2026-10-09
 
 - The production dashboard screenshot confirms the deployment's Cloud URL is
