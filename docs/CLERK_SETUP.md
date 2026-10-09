@@ -69,13 +69,13 @@ Production is now configured in `Configuration/Production.xcconfig`:
   deployed. The read-only deployment check passes with API contract 3.
 - Imported and verified the saved export: 86 users, 48 stats, 6 role configs,
   2 groups. All fields/legacy IDs/owner mappings match; zero orphaned rows.
-- Tuist generation, production configuration guard, and the real-key Release
-  device compilation passed. Signed archive is blocked: Xcode has no Apple account
-  for team `5GH22BAXAU`; its cached wildcard profile lacks Associated Domains.
-  The team is an Individual membership; the invited App Store Connect Admin
-  lacks signing-resource access. The account holder must sign into Xcode or
-  supply a distribution certificate/private key and an updated App Store profile
-  with Associated Domains. Regenerate provisioning before archive.
+- Tuist generation, configuration guard, Release device compilation, signed
+  production archive and App Store IPA export all passed. IPA signature verifies
+  as Apple Distribution for 5GH22BAXAU, with production associated domain,
+  get-task-allow disabled, and an App Store provisioning profile.
+- Version 5.0, build 11. Artifacts remain local; no upload was performed.
+- Production Release simulator build passes on Apple Silicon. Convex's installed
+  binary omits Intel simulator support; Tuist excludes x86_64 for that SDK.
 
 The original live database hostname is unavailable. Import verification compares
 against the saved export, not a fresh live source. A real legacy account claim,

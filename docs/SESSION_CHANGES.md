@@ -6,6 +6,26 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### Signed production archive and App Store export — 2026-10-09
+
+- Account holder access is now available. Signed Release archive passed for team
+  5GH22BAXAU, version 5.0/build 11. Exported the App Store IPA successfully.
+- Verified archive and IPA signatures, exact production Convex host/key,
+  application identifier, and `webcredentials:clerk.mafia.monitorthesituations.com`.
+  The exported IPA uses Apple Distribution, disables get-task-allow, has an App
+  Store profile without device restrictions, and includes Associated Domains.
+- Local artifacts: /tmp/mafia-manager-production-ready-20261009.xcarchive and
+  /tmp/mafia-manager-production-export-20261009/mafia_manager.ipa. No upload or
+  App Store submission was performed. Sanitized signature/hash evidence is in
+  `docs/e2e-evidence/2026-10-09-production/distribution-checks.json`.
+- Production Release UI signup reached real email verification and delivery was
+  confirmed by the user. Browser and simulator automation services then became
+  unavailable; the Verify tap could not be confirmed. API account checks are
+  continuing with real OTPs. Do not count the incomplete UI flow as a pass.
+- Rollback: remove local artifacts if superseded. No new application code or
+  production data changes were required for signing. Keep the required domain
+  entitlement and publishing team; historical signing blockers are resolved.
+
 ### FOLLOWUP-09: Release simulator architecture compatibility
 
 - A real-production Release simulator build tried to link x86_64 and failed on
