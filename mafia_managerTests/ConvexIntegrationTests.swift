@@ -267,6 +267,8 @@ final class ConvexIntegrationTests: XCTestCase {
                 }
                 return fullRoster
             }
+            // Model an older reactive snapshot arriving after the record write.
+            store.testNightRecordStoredHandler = { [weak store] in store?.currentSession = active }
             let readiness = Task { await store.testEvaluatePhaseReadiness() }
             await fulfillment(of: [readinessStarted], timeout: 5)
             do {

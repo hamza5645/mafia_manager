@@ -5,6 +5,19 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-07: Retain the recorded night through reactive cache replacement
+
+- Pass the phase-one record directly to atomic resolution. An older session
+  snapshot can replace local night history after the record mutation completes;
+  previously phase two could silently return with no outcome. Missing records
+  now report a readable completion error. Test hooks are DEBUG-only.
+- Validation: targeted live regression passed with history removed between the
+  two phases; the full live Convex suite passed 10/10 with the new regression.
+  The first full run exposed a separate repeated-sign-out setup failure; Clerk
+  lifecycle is being corrected and the complete suite will be rerun.
+- Rollback: revert direct record handoff and regression, restoring the cache race.
+  No backend/schema or durable data changes.
+
 ### FOLLOWUP-06: Independent Settings authentication buttons
 
 - Login and Sign Up inside a Settings List row could both fire, opening Sign Up

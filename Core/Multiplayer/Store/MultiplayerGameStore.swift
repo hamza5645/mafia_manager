@@ -94,6 +94,7 @@ final class MultiplayerGameStore: ObservableObject {
     var testPlayerSnapshotProvider: ((UUID) async throws -> [SessionPlayer])?
     var testCurrentUserIdProvider: (() -> UUID?)?
     var testGuestSecretHashProvider: (() -> String?)?
+    var testNightRecordStoredHandler: (() -> Void)?
 #endif
 
     func setAuthStore(_ authStore: AuthStore) {
@@ -608,8 +609,8 @@ final class MultiplayerGameStore: ObservableObject {
               case .night(let nightIndex, _) = currentSession?.currentPhaseData else { return }
         isCompletingNight = true
         defer { isCompletingNight = false }
-        try await recordNightActions(nightIndex: nightIndex)
-        try await resolveNightOutcome(nightIndex: nightIndex)
+        let recordedNight = try await recordNightActions(nightIndex: nightIndex)
+        try await resolveNightOutcome(nightIndex: nightIndex, recordedNight: recordedNight)
     }
 
     // MARK: - Real-time Subscriptions
@@ -2130,21 +2131,17 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Two-Phase Night Resolution Pattern
 
     /// Phase 1: Record night actions without applying deaths (guards against duplicate resolution)
-    func recordNightActions(nightIndex: Int) async throws {
-        guard isHost else { return }
+    @discardableResult
+    func recordNightActions(nightIndex: Int) async throws -> NightActionRecord {
+        guard isHost else { throw SessionError.notHost }
         guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
               activeNightIndex == nightIndex else {
-            return
+            throw SessionError.noActiveSession
         }
-        guard let session = currentSession else { return }
+        guard let session = currentSession else { throw SessionError.noActiveSession }
 
-        // Check if this night is already recorded
         if let existingRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) {
-            if existingRecord.isResolved {
-                return
-            }
-            // If recorded but not resolved, continue to phase 2
-            return
+            return existingRecord
         }
 
         // FIX: Refresh players from database to ensure we have latest playerNumber values
@@ -2245,23 +2242,22 @@ final class MultiplayerGameStore: ObservableObject {
             nightHistory: updatedHistory,
             guestSecretHash: guestSecretHash
         )
+#if DEBUG
+        testNightRecordStoredHandler?()
+#endif
+        return nightRecord
     }
 
     /// Phase 2: Apply night outcomes atomically (with duplicate resolution guard)
-    func resolveNightOutcome(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard let session = currentSession else {
-            print("ERROR: [resolveNightOutcome] No current session - cannot resolve night \(nightIndex)")
-            return
-        }
+    func resolveNightOutcome(nightIndex: Int, recordedNight: NightActionRecord? = nil) async throws {
+        guard isHost else { throw SessionError.notHost }
+        guard let session = currentSession else { throw SessionError.noActiveSession }
         guard case .night(let activeNightIndex, _) = session.currentPhaseData,
               activeNightIndex == nightIndex, let expectedRoundId = session.currentRoundId else {
             throw SessionError.noActiveSession
         }
-        guard var nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
-            print("ERROR: [resolveNightOutcome] Night record missing for nightIndex \(nightIndex) in session \(session.id)")
-            print("ERROR: [resolveNightOutcome] Current nightHistory: \(session.nightHistory.map { "night \($0.nightIndex), resolved: \($0.isResolved)" })")
-            return
+        guard var nightRecord = recordedNight ?? session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
+            throw SessionError.operationFailed("Night actions are not ready. Please try finishing the night again.")
         }
 
         // CRITICAL: Guard against duplicate resolution
