@@ -1,3 +1,11 @@
+## 2026-10-09 — FOLLOWUP-11: reset and validate solo votes at each handoff
+
+- Simulator E2E reproduced a retained target when moving from one solo voter to the next. The next player could confirm the previous target without selecting a card, including a self-vote.
+- Voting now clears its local selection at handoff, enables confirmation only for a live eligible target, and advances only after an accepted store vote. `GameStore` rejects self-votes, unknown/dead participants, and attempts to replace locked votes.
+- Validation: focused gameplay tests 24/24; full Swift suite with live integration flags 53/53, zero skips; Release simulator build succeeds. The real UI handoff shows Lock Vote disabled until selection; the four-role game completes with the expected citizen win and event log. Evidence in `docs/e2e-evidence/2026-10-09-simulator/`.
+- Rollback: revert this commit and regenerate through Tuist. No backend/schema change; reverting restores the solo vote handoff defect.
+- Gotcha: rebuild the signed distribution artifact after this fix. Full production multiplayer UI testing remains in progress.
+
 ## 2026-10-09 — FOLLOWUP-10: restore production account after cold launch
 
 - Simulator E2E reproduced a production account mismatch: Clerk retained an active session after relaunch, but Settings displayed Login / Sign Up and another login returned “You’re already signed in.”

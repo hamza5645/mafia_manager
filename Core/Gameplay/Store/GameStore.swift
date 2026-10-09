@@ -406,11 +406,17 @@ final class GameStore: ObservableObject {
         save()
     }
 
-    func recordVote(from voterID: UUID, for targetID: UUID) {
-        guard var votingSession = state.currentVotingSession else { return }
+    @discardableResult
+    func recordVote(from voterID: UUID, for targetID: UUID) -> Bool {
+        guard var votingSession = state.currentVotingSession,
+              voterID != targetID,
+              state.players.contains(where: { $0.id == voterID && $0.alive }),
+              state.players.contains(where: { $0.id == targetID && $0.alive }),
+              votingSession.votes[voterID] == nil else { return false }
         votingSession.recordVote(from: voterID, for: targetID)
         state.currentVotingSession = votingSession
         save()
+        return true
     }
 
     func advanceToNextVoter() {

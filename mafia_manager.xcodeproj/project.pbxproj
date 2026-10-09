@@ -83,6 +83,7 @@
 		B0EC4F191EDF39F020F14FE7 /* libconvexmobile-rs.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF973E899C295FF8E5F9B748 /* libconvexmobile-rs.xcframework */; };
 		B333DCD77DC8907AD2E2730C /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D6DD68E21901580152D205 /* DatabaseService.swift */; };
 		B6636C06A4C4B4293850CCE8 /* AccountRestorationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F1DAD259868CDD1ADAC71D /* AccountRestorationTests.swift */; };
+		BA6882372109ABB030574F08 /* SoloVoteValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C764D8B002AE5B7BAD94906 /* SoloVoteValidationTests.swift */; };
 		C00F253B9EB59251418EA344 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = C52CF4CB5D7EC9FF6D40F948 /* PlayerStats.swift */; };
 		C0CD25D5121EDDEE526A2A85 /* MultiplayerGameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CF0053C5073C789B5620F7 /* MultiplayerGameOverView.swift */; };
 		C252926FA0D460872C90F48E /* ConvexMobile.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BE0E02693EA882B608863FB /* ConvexMobile.framework */; };
@@ -221,6 +222,7 @@
 		9891637274E3D07ED977CEC5 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		9A3DC26119C9D2FDAFE09DD3 /* SignupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupVerificationView.swift; sourceTree = "<group>"; };
 		9AE22A0634FE91E7CB2F991D /* JoinGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinGameView.swift; sourceTree = "<group>"; };
+		9C764D8B002AE5B7BAD94906 /* SoloVoteValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoloVoteValidationTests.swift; sourceTree = "<group>"; };
 		9CCF5E9A1A563DD4506F0A35 /* CustomRolesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomRolesView.swift; sourceTree = "<group>"; };
 		A0342891BA342790B3D72E97 /* GameStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameStoreTests.swift; sourceTree = "<group>"; };
 		A6D0475004635445C3CF22A3 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
@@ -655,6 +657,7 @@
 				DC0B6901DF574ABB253D29A5 /* ConvexIntegrationTests.swift */,
 				A0342891BA342790B3D72E97 /* GameStoreTests.swift */,
 				504EA5E2A08DAAE015F76409 /* RealtimeRegressionTests.swift */,
+				9C764D8B002AE5B7BAD94906 /* SoloVoteValidationTests.swift */,
 			);
 			path = mafia_managerTests;
 			sourceTree = "<group>";
@@ -919,6 +922,7 @@
 				3973D178FCDB3484DB928C90 /* ConvexIntegrationTests.swift in Sources */,
 				7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */,
 				1FE4DB73AF79FA7379741E5A /* RealtimeRegressionTests.swift in Sources */,
+				BA6882372109ABB030574F08 /* SoloVoteValidationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
