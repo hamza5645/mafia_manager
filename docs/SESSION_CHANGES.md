@@ -6,6 +6,36 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### Production Clerk/Convex configuration and data import — 2026-10-09
+
+- Configured the user-provided `pk_live_` key and matching Clerk frontend host in
+  Release settings. HTTPS issuer discovery now succeeds. User enabled Native API
+  and registered the iOS application; published AASA lists
+  `5GH22BAXAU.com.hamza5645.mafia`, matching the local provisioning prefix.
+- Set production Convex `CLERK_FRONTEND_API_URL`, reviewed a dry-run, then deployed
+  the backend to `handsome-tiger-460.eu-west-1.convex.cloud` with typecheck enabled.
+  Production health passes API contract 3.
+- Production was empty. Imported the validated saved export through internal
+  migration mutations: 86 users, 48 stats, 6 configs and 2 groups. Preflight checked
+  unique IDs/emails and owner references; insertion reported zero orphaned rows.
+  Fresh production snapshots match every exported field and owner mapping.
+- Validation: Tuist generation, actual-key configuration guard and all 3 guard
+  regressions passed; unsigned Release device compilation passed. Generated app
+  plist contains the exact production host/key. Signed archive failed because
+  Xcode has no Apple account for team 5GH22BAXAU and the cached wildcard profile
+  lacks Associated Domains. Requires Xcode Settings → Accounts sign-in and fresh
+  provisioning; do not remove the required entitlement to bypass the failure.
+- Remaining: signed archive, real production account/JWT/legacy-account checks,
+  and physical-device E2E. Live legacy source is unavailable; parity establishes
+  the saved export only. No development test fixture campaign ran on production.
+- Evidence: `docs/e2e-evidence/2026-10-09-production/` contains sanitized setup,
+  insertion and parity results. Raw production snapshots are private in /tmp.
+- Rollback: revert the production config commit to block Release again. Backend
+  rollback must coordinate API contract 3 with the app. Restore the prior issuer
+  only with a matching backend/client. Imported rows are new; remove only verified
+  unclaimed/unmodified legacy rows if a data rollback is required, preserving any
+  subsequent account claims and edits. Avoid rerunning imports after user edits.
+
 ### Clerk production DNS — 2026-10-09
 
 - Directly accessed the authenticated Cloudflare zone for

@@ -1,0 +1,19 @@
+{
+  "convexUrl": "https://handsome-tiger-460.eu-west-1.convex.cloud",
+  "clerkIssuer": "https://clerk.mafia.monitorthesituations.com",
+  "deploymentContract": 3,
+  "releaseBuild": "passed; real production key; unsigned device compilation",
+  "configurationGuardTests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "nativeApplicationIdentifier": "5GH22BAXAU.com.hamza5645.mafia",
+  "nativeAssociationPublished": true,
+  "productionAccountE2E": "not yet verified",
+  "physicalDeviceE2E": "not yet verified",
+  "legacySource": "saved export; live source unavailable",
+  "signedArchive": {
+    "status": "blocked",
+    "reason": "Xcode has no Apple account for team 5GH22BAXAU; cached profile lacks Associated Domains"
+  }
+}

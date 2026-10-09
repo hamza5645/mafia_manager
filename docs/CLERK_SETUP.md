@@ -55,28 +55,40 @@ frontend domain that does not match the key. Tuist generates the matching
 `webcredentials` associated-domain entitlement, following
 [Clerk's iOS quickstart](https://clerk.com/docs/ios/getting-started/quickstart).
 
-Production Convex `handsome-tiger-460` exists, but the 2026-10-08 inspection found
-no functions deployed and no Clerk issuer environment variable. The Clerk
-production instance could not be inspected because the shared dashboard was
-signed out. A production key is intentionally not fabricated or copied from dev.
-Release builds remain blocked until this setup is completed:
+## Production setup status — 2026-10-09
 
-1. In Clerk, create/open the production instance, complete its domain/DNS setup,
-   enable Native API, and register the iOS App ID Prefix and bundle
-   `com.hamza5645.mafia`. Configure its Convex JWT integration/template with
-   audience `convex` and verified email claims for legacy account restoration.
-2. Fill the production `pk_live_` key and its frontend hostname in
-   `Configuration/Production.xcconfig`. Clerk publishable keys are safe client
-   configuration; secret keys must never go in the app or this file.
-3. Set `CLERK_FRONTEND_API_URL` on **production** Convex to that Clerk issuer,
-   deploy this branch's backend to production, and ingest/verify the durable
-   legacy data using the migration scripts configured for the production URL.
-4. Run `tuist generate --no-open` and verify the selected production API contract
-   with `CONVEX_AUDIT_URL=https://handsome-tiger-460.eu-west-1.convex.cloud npm run convex:verify-deployment`.
-   Then build/archive Release and test signup, sign-in, reset, migrated-account
-   restoration, and multiplayer on a physical device with production services.
+Production is now configured in `Configuration/Production.xcconfig`:
 
-Do not run the development fixture campaigns against production. See
-[Clerk's production guide](https://clerk.com/docs/guides/development/deployment/production)
-for the dashboard prerequisites. A Release compilation with a synthetic test
-key only verifies configuration plumbing; it does not prove production auth works.
+- Convex Cloud URL: `https://handsome-tiger-460.eu-west-1.convex.cloud`.
+- Clerk Frontend API/issuer: `https://clerk.mafia.monitorthesituations.com`.
+- The real production publishable key is configured; it matches that hostname.
+- All five Clerk CNAMEs are DNS-only and verified. HTTPS/OpenID discovery works.
+- Native API is enabled (dashboard evidence). The published association file
+  lists `5GH22BAXAU.com.hamza5645.mafia`, matching the actual provisioning prefix.
+- Production Convex has `CLERK_FRONTEND_API_URL` set and the branch backend
+  deployed. The read-only deployment check passes with API contract 3.
+- Imported and verified the saved export: 86 users, 48 stats, 6 role configs,
+  2 groups. All fields/legacy IDs/owner mappings match; zero orphaned rows.
+- Tuist generation, production configuration guard, and the real-key Release
+  device compilation passed. Signed archive is blocked: Xcode has no Apple account
+  for team `5GH22BAXAU`; its cached wildcard profile lacks Associated Domains.
+  Sign into Xcode Settings → Accounts and regenerate provisioning before archive.
+
+The original live database hostname is unavailable. Import verification compares
+against the saved export, not a fresh live source. A real legacy account claim,
+production signup/sign-in/reset JWT exchange, and physical-device gameplay still
+need end-to-end validation before publishing. Do not run the development fixture
+campaigns against production.
+
+For a future production instance change:
+
+1. Enable Native API and register the App ID Prefix and bundle ID again.
+2. Activate the Convex integration/JWT template with audience `convex` and
+   verified email claims. A copied development instance does not copy integrations.
+3. Update the production key/hostname in `Configuration/Production.xcconfig` and
+   set `CLERK_FRONTEND_API_URL` on production Convex to the same issuer.
+4. Regenerate through Tuist and redeploy the matching backend. Verify contract 3,
+   migration ownership and real native account flows before releasing.
+
+See [Clerk's production guide](https://clerk.com/docs/guides/development/deployment/production)
+for dashboard prerequisites and native registration.

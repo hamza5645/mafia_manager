@@ -1,5 +1,10 @@
 # Convex migration fixes and retest — 2026-10-09
 
+> Later production setup is recorded in [Clerk setup status](CLERK_SETUP.md#production-setup-status--2026-10-09)
+> and [Session changes](SESSION_CHANGES.md). The audit below reflects tested code
+> `76e84bb` and its environment at the time; production configuration/deployment
+> and saved-export import have since been completed.
+
 The 14 confirmed audit issues and three source-review findings have code fixes,
 committed and pushed individually to `origin/AWS`. Retesting found eight further
 issues; those were also fixed in separate commits. All final automated development
