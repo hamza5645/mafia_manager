@@ -5,6 +5,19 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-05: Readiness checks must not suppress night completion
+
+- Final visible retest exposed a silent no-op: background readiness evaluation
+  shared the night-completion lock. Split the locks, so an in-flight read cannot
+  discard the host's Finish Night action. New readiness/resync work pauses during
+  actual completion; duplicate completion remains serialized.
+- Validation: live regression holds a background player read in progress.
+  Before the fix it stayed in night with no outcome/death (3 failed assertions).
+  After correction the same test passed (1/1), with atomic morning/death/history.
+  Signed build and diff review passed. Room `457140` was ended in the UI.
+- Rollback: revert the separate completion flag and concurrent regression,
+  restoring the discarded-button race. No backend or durable data changes.
+
 ### FOLLOWUP-04: Private voting contract
 
 - The visible voting screen promises private votes until everyone has voted;

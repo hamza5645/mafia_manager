@@ -253,7 +253,31 @@ final class ConvexIntegrationTests: XCTestCase {
             store.currentSession = active
             store.isHost = true
             store.myPlayer = players[0]
-            try await store.completeNightPhase()
+            let fullRoster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
+            let readinessStarted = expectation(description: "Background readiness read is in flight")
+            var pendingRead: CheckedContinuation<[SessionPlayer], Error>?
+            var pauseNextRead = true
+            store.testPlayerSnapshotProvider = { _ in
+                if pauseNextRead {
+                    pauseNextRead = false
+                    return try await withCheckedThrowingContinuation { continuation in
+                        pendingRead = continuation
+                        readinessStarted.fulfill()
+                    }
+                }
+                return fullRoster
+            }
+            let readiness = Task { await store.testEvaluatePhaseReadiness() }
+            await fulfillment(of: [readinessStarted], timeout: 5)
+            do {
+                try await store.completeNightPhase()
+            } catch {
+                pendingRead?.resume(throwing: error)
+                await readiness.value
+                throw error
+            }
+            pendingRead?.resume(returning: fullRoster)
+            await readiness.value
             let result = try await sessionService.getSession(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
             XCTAssertEqual(result?.currentPhase, "morning")
             XCTAssertTrue(result?.nightHistory.first?.isResolved == true, "Manual finish must use the atomic outcome path")

@@ -54,6 +54,7 @@ final class MultiplayerGameStore: ObservableObject {
     private var processedBotNightIndices: Set<Int> = []
     private var processedBotVotingDays: Set<Int> = []
     private var isResolvingPhase = false
+    private var isCompletingNight = false
     private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
@@ -150,6 +151,10 @@ final class MultiplayerGameStore: ObservableObject {
         handlePlayerUpdate(player)
     }
 
+    func testEvaluatePhaseReadiness() async {
+        await evaluatePhaseProgression(trigger: "test")
+    }
+
     func testHandlePlayerRemoval(_ playerId: UUID) {
         handlePlayerRemoval(playerId: playerId)
     }
@@ -161,6 +166,7 @@ final class MultiplayerGameStore: ObservableObject {
         processedBotVotingDays.removeAll()
         isPhaseReadyToAdvance = false
         isResolvingPhase = false
+        isCompletingNight = false
         botNightActionsSubmitted.removeAll()
         previousNightVotes.removeAll()
         nightVoteCounts.removeAll()
@@ -598,10 +604,10 @@ final class MultiplayerGameStore: ObservableObject {
     
     /// Manually complete the night phase (Host only)
     func completeNightPhase() async throws {
-        guard isHost, !isResolvingPhase,
+        guard isHost, !isCompletingNight,
               case .night(let nightIndex, _) = currentSession?.currentPhaseData else { return }
-        isResolvingPhase = true
-        defer { isResolvingPhase = false }
+        isCompletingNight = true
+        defer { isCompletingNight = false }
         try await recordNightActions(nightIndex: nightIndex)
         try await resolveNightOutcome(nightIndex: nightIndex)
     }
@@ -1555,7 +1561,7 @@ final class MultiplayerGameStore: ObservableObject {
     /// This is a safety net for cases where Realtime events are missed
     private func validateStateConsistency() async {
         // Skip if in middle of phase resolution or resync to avoid false positives
-        guard !isResolvingPhase, !isPerformingResync else {
+        guard !isResolvingPhase, !isCompletingNight, !isPerformingResync else {
             print("⏳ [MultiplayerGameStore] Skipping consistency check - operation in progress")
             return
         }
@@ -1982,7 +1988,7 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func evaluatePhaseProgression(trigger: String) async {
-        guard isHost, !isResolvingPhase else { return }
+        guard isHost, !isResolvingPhase, !isCompletingNight else { return }
         guard let session = currentSession, let phaseData = session.currentPhaseData else { return }
 
         isResolvingPhase = true
