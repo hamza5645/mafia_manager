@@ -1,3 +1,11 @@
+## 2026-10-10 — FOLLOWUP-13: preserve guest progress through password reset
+
+- Password reset authenticated the account but unconditionally deleted the guest merge proof, leaving pending progress permanently unable to merge.
+- Reset now retries a pending merge, matching sign-in behavior. A failed merge retains its Keychain proof for retry; a successful merge clears both pending state and proof.
+- Validation: both new Swift Testing regressions fail before the fix and pass after it; existing auth regressions also pass (9 total). Backend suite 41/41 passes. Two-device production UI completed voting, citizen win, rematch, and cancellation before this change.
+- Rollback: revert this commit. No schema or Clerk configuration changes.
+- Gotcha: this prevents future proof loss; it cannot reconstruct a guest secret already discarded by an older build. Rebuild distribution artifacts after the final retest.
+
 ## 2026-10-10 — FOLLOWUP-12: require submitted actions before multiplayer night resolution
 
 - Two-device production E2E reproduced a Finish Night button enabled while a live police guest had not submitted. Role-reveal ready flags were accepted as night completion evidence.

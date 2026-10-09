@@ -1,4 +1,5 @@
 import XCTest
+import Testing
 
 @testable import mafia_manager
 
@@ -143,6 +144,50 @@ final class AuthRegressionTests: XCTestCase {
             createdAt: Date(),
             updatedAt: Date()
         )
+    }
+}
+
+@MainActor
+struct PasswordResetMergeTests {
+    @Test func resetFinishesPendingGuestMerge() async throws {
+        try await checkReset(mergeFails: false)
+    }
+
+    @Test func failedMergeAfterResetKeepsProofForRetry() async throws {
+        try await checkReset(mergeFails: true)
+    }
+
+    private func checkReset(mergeFails: Bool) async throws {
+        let guest = UserProfile(id: UUID(), displayName: "Guest", isAnonymous: true,
+                                createdAt: Date(), updatedAt: Date())
+        let account = UserProfile(id: UUID(), displayName: "Account", isAnonymous: false,
+                                  createdAt: Date(), updatedAt: Date())
+        let service = MockAuthService(guest: guest, account: account)
+        let keychain = MemoryKeychain()
+        try keychain.save("guest-proof", forKey: "convex_guest_secret")
+        let suite = "PasswordResetMerge.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(guest.id.uuidString, forKey: "pending_merge_from_anonymous_id")
+        let store = AuthStore(authService: service, keychain: keychain,
+                              defaults: defaults, autoRestore: false)
+        if mergeFails { service.mergeError = TestError.expected }
+
+        let reset = await store.confirmPasswordReset(code: "test-code", newPassword: "test-password")
+
+        #expect(reset)
+        #expect(store.authenticatedAccountId == account.id)
+        #expect(service.mergeAttempts == 1)
+        #expect(store.hasPendingGuestMerge == mergeFails)
+        if mergeFails {
+            #expect(store.currentGuestSecretHash != nil)
+            service.mergeError = nil
+            let retried = await store.retryPendingGuestMerge()
+            #expect(retried)
+            #expect(service.mergeAttempts == 2)
+        }
+        #expect(store.hasPendingGuestMerge == false)
+        #expect(store.currentGuestSecretHash == nil)
     }
 }
 

@@ -265,7 +265,11 @@ final class AuthStore: ObservableObject {
         do {
             let profile = try await authService.confirmPasswordReset(code: code, newPassword: newPassword)
             applyAuthenticatedProfile(profile)
-            clearGuestSecret()
+            if hasPendingGuestMerge {
+                _ = await retryPendingGuestMerge()
+            } else {
+                clearGuestSecret()
+            }
             return true
         } catch {
             errorMessage = mapAuthError(error)
