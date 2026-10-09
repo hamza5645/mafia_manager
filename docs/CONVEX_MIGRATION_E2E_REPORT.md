@@ -1,5 +1,8 @@
 # Convex migration E2E report — 2026-10-08
 
+> Historical before-fix audit. See the [fixes and final retest](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
+> for the current branch status, individual commits and remaining publishing prerequisites.
+
 The branch is **not ready for release**. The existing Swift tests pass after synchronizing the development backend, but broader testing reproduced gameplay, privacy, authorization, and account-data failures.
 
 Tested branch: `AWS`, starting commit `0d75931fd4df47899e75a31f981006abf95fe2f6`. No app or backend fixes were made. This session adds test tooling, evidence, and this report. Findings describe this branch; whether each issue existed before the migration has not been established.

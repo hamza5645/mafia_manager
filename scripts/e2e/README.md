@@ -1,6 +1,6 @@
 # Convex migration audit tooling
 
-These scripts exercise the configured **development** Clerk/Convex services and create isolated QA data. They deliberately assert safe/expected behavior, so failures expose unresolved branch issues. They do not fix app/backend code. Read [the report](../../docs/CONVEX_MIGRATION_E2E_REPORT.md) before rerunning.
+These scripts exercise the configured **development** Clerk/Convex services and create isolated QA data. They deliberately assert safe/expected behavior, so failures expose unresolved branch issues. They do not fix app/backend code. Read the [final fixes/retest report](../../docs/CONVEX_MIGRATION_FIXES_AND_RETEST.md) and [original audit](../../docs/CONVEX_MIGRATION_E2E_REPORT.md) before rerunning.
 
 ## Backend campaign
 
@@ -17,7 +17,7 @@ Defaults to the app's development URL. Optional `CONVEX_AUDIT_URL` and `CONVEX_A
 node scripts/e2e/clerk-convex-audit.mjs
 ```
 
-Uses the installed ClerkKit native API paths and Clerk's development test-email convention, verified by [Clerk's test-email documentation](https://clerk.com/docs/guides/development/testing/test-emails-and-phones). Creates a new test account, verifies signup/sign-in/reset, and probes merge collisions and active-room ownership. Stats fixtures are removed. A room stranded by the merge bug requires development-admin cleanup; its IDs appear in the output.
+Uses the installed ClerkKit native API paths and Clerk's development test-email convention, verified by [Clerk's test-email documentation](https://clerk.com/docs/guides/development/testing/test-emails-and-phones). Creates a new test account, verifies signup/sign-in/reset, and probes merge collisions and active-room ownership. Saved-data fixtures are removed, QA rooms are cancelled, and the API session is revoked. Development test accounts and guest profiles remain.
 
 Results go to `/tmp/mafia-e2e-20261008/account-results.json`. Private credentials/device-session state go to `api-test-account.json` and `api-test-session.json` with mode `0600`, for follow-up native sign-in; never commit them. `CLERK_AUDIT_RESUME=1` resumes password-reset checks for that account and writes `password-reset-results.json`.
 
@@ -31,7 +31,7 @@ TEST_RUNNER_CONVEX_INTEGRATION=1 TEST_RUNNER_CLERK_ACCOUNT_E2E=1 \
   xcodebuild test -workspace mafia_manager.xcworkspace -scheme mafia_manager \
   -destination 'platform=iOS Simulator,name=Mafia QA Guest' \
   -only-testing:mafia_managerTests/ClerkAccountIntegrationTests \
-  -parallel-testing-enabled NO
+  -parallel-testing-enabled NO -collect-test-diagnostics never
 ```
 
 This creates a development test account using `+clerk_test@example.com` and `424242`, exercises native signup, verification, sign-in, restoration, reset, and changed-password behavior, then signs out. Passwords are randomly generated and not printed. Without both opt-in flags, the new test skips.

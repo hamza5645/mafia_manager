@@ -3,7 +3,24 @@
 ## Convex audit fixes — 2026-10-08
 
 Fixes are committed and pushed separately, in report order. The original audit
-remains the before-fix record; final E2E results will be recorded separately.
+remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
+are recorded separately.
+
+### Final retest and cleanup — 2026-10-09
+
+- All final checks passed: Swift 48/48 (live Convex/Clerk, no skips), backend 39/39,
+  fresh guest API 50/50, fresh account API 27/27, release guard 3/3, contract 3.
+  Fresh private snapshots match all 142 saved-export rows and owners.
+- Visible final pass verified first-tap night completion, Game Over, Play Again,
+  sign-in/form dismissal/name restoration and sign-out. Two-device kick/cancel
+  and voting/results/winner were verified earlier in the post-fix campaign.
+- Ended final room 588567 and prior room 265275. Removed temporary credentials;
+  sanitized evidence/report committed. QA development profiles remain.
+- Known limits: production Clerk/Convex setup, real legacy account restoration,
+  today's live legacy parity (DNS unavailable), physical iOS 26/iPad and extended
+  disruption checks remain unverified. No production data was changed.
+- Rollback: docs/evidence can be reverted independently. Revert issue commits
+  with their tests; coordinate backend/client contract changes when rolling back.
 
 ### FOLLOWUP-08: Idempotent account sign-out
 

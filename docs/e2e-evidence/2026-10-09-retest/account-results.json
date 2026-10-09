@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-10-09T08:14:48.437Z",
+  "results": [
+    {
+      "name": "Signup requests email verification",
+      "status": "PASS"
+    },
+    {
+      "name": "Signup rejects invalid verification code",
+      "status": "PASS"
+    },
+    {
+      "name": "Signup verification creates active session",
+      "status": "PASS"
+    },
+    {
+      "name": "Convex JWT includes verified account email",
+      "status": "PASS"
+    },
+    {
+      "name": "Authenticated signup creates nonanonymous Convex profile",
+      "status": "PASS"
+    },
+    {
+      "name": "Account restoration preserves profile UUID",
+      "status": "PASS"
+    },
+    {
+      "name": "Account profile update persists",
+      "status": "PASS"
+    },
+    {
+      "name": "Account refresh preserves edited profile name",
+      "status": "PASS"
+    },
+    {
+      "name": "Merge rejects invalid guest proof",
+      "status": "PASS"
+    },
+    {
+      "name": "Guest merge succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "Merge combines same-name player stats into one row",
+      "status": "PASS"
+    },
+    {
+      "name": "Merged stats remain readable and incrementable",
+      "status": "PASS"
+    },
+    {
+      "name": "Guest upgrade preserves active room membership and ownership",
+      "status": "PASS"
+    },
+    {
+      "name": "Upgraded account can leave its guest room",
+      "status": "PASS"
+    },
+    {
+      "name": "Merged room has no orphaned membership",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthenticated account reads fail",
+      "status": "PASS"
+    },
+    {
+      "name": "Sign-in rejects wrong password",
+      "status": "PASS"
+    },
+    {
+      "name": "Password sign-in restores original Convex account",
+      "status": "PASS"
+    },
+    {
+      "name": "Reset rejects invalid code",
+      "status": "PASS"
+    },
+    {
+      "name": "Reset code requests new password",
+      "status": "PASS"
+    },
+    {
+      "name": "Password reset restores same Convex profile",
+      "status": "PASS"
+    },
+    {
+      "name": "Old password no longer authenticates",
+      "status": "PASS"
+    },
+    {
+      "name": "New password authenticates",
+      "status": "PASS"
+    },
+    {
+      "name": "Cleanup QA stats",
+      "status": "PASS"
+    },
+    {
+      "name": "Cleanup QA stats",
+      "status": "PASS"
+    },
+    {
+      "name": "Cleanup QA account room",
+      "status": "PASS"
+    },
+    {
+      "name": "Revoke QA API session",
+      "status": "PASS"
+    }
+  ],
+  "summary": {
+    "passed": 27,
+    "failed": 0
+  }
+}
