@@ -5,6 +5,17 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-08: Idempotent account sign-out
+
+- Repeated native cleanup exposed Clerk's `signed_out` error. Treat that exact
+  response as success and clear Convex authentication; other failures propagate.
+  The native lifecycle regression now signs out twice before creating a guest.
+- Validation: repeated sign-out failed before correction; full signed Swift
+  suite passed 48/48 afterward with live Convex and Clerk flags and no skips.
+  Signup, verification, restoration, reset, old-password rejection, guest upgrade,
+  continuous subscriptions, concurrent night completion and solo tests passed.
+- Rollback: revert the narrow error handling/regression. No data changes.
+
 ### FOLLOWUP-07: Retain the recorded night through reactive cache replacement
 
 - Pass the phase-one record directly to atomic resolution. An older session

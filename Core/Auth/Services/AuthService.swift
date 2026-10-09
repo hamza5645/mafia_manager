@@ -151,7 +151,11 @@ final class AuthService {
 
     func signOut() async throws {
         if ConvexConfig.hasConfiguredClerkKey {
-            try await Clerk.shared.auth.signOut()
+            do {
+                try await Clerk.shared.auth.signOut()
+            } catch let error as ClerkAPIError where error.code == "signed_out" {
+                // The requested account state is already satisfied.
+            }
         }
         await convex.logout()
     }

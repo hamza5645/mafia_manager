@@ -19,6 +19,8 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         print("QA ACCOUNT: \(email)")
 
         try await service.signOut()
+        // Cleanup and a guest-to-account flow may both request sign-out.
+        try await service.signOut()
         let database = DatabaseService()
         let guestHash = "qa-native-merge-\(UUID().uuidString)"
         let guest = try await service.signInAsGuest(displayName: "QA Native Merge", guestSecretHash: guestHash)
