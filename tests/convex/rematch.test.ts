@@ -16,6 +16,9 @@ test('rematch cannot alter an active game, but a completed game resets safely', 
   expect(await t.query(api.sessions.getSessionPlayers, r.viewerArgs(r.host))).toEqual(players);
   expect(await t.query(api.sessions.getAllActions, r.viewerArgs(r.host))).toHaveLength(1);
   await t.mutation(api.sessions.updateSessionState, { ...r.hostArgs, current_phase: 'game_over', current_phase_data: { type: 'gameOver', winner: 'citizen' }, is_game_over: true });
+  for (let i = 0; i < r.players.length; i++) await t.mutation(api.sessions.updatePlayerReady, {
+    player_id: r.players[i].id, is_ready: true, ...proof(r.users[i]),
+  });
   expect((await t.mutation(api.sessions.executeRematch, r.hostArgs)).success).toBe(true);
   const lobby = await t.query(api.sessions.getSessionById, r.viewerArgs(r.host));
   expect(lobby).toMatchObject({ status: 'waiting', current_phase: 'lobby', is_game_over: false, night_history: [], assigned_numbers: [] });

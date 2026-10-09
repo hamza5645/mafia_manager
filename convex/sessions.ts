@@ -57,6 +57,12 @@ function serializeMaybe<T>(value: T | undefined): T | undefined {
   return value === undefined ? undefined : value;
 }
 
+async function resetHumanReadiness(ctx: any, sessionId: string) {
+  for (const player of await listSessionPlayers(ctx, sessionId)) {
+    if (!player.is_bot) await ctx.db.patch(player._id, { is_ready: false });
+  }
+}
+
 export const createSession = mutation({
   args: {
     host_user_id: v.string(),
@@ -326,6 +332,9 @@ export const updateSessionPhase = mutation({
       args.guest_secret_hash,
     );
     const session = await requireDocByAppId(ctx, "game_sessions", args.session_id);
+    if (args.current_phase === "night" || args.current_phase === "voting") {
+      await resetHumanReadiness(ctx, args.session_id);
+    }
     await ctx.db.patch(session._id, {
       current_phase: args.current_phase,
       current_phase_data: serializeMaybe(args.current_phase_data),
@@ -379,6 +388,7 @@ export const updateSessionState = mutation({
     }
     if (args.current_phase === "night" || args.current_phase === "voting") {
       patch.current_round_id = uuid();
+      await resetHumanReadiness(ctx, args.session_id);
     }
     if (args.is_game_over === true) {
       patch.status = "completed";
@@ -435,6 +445,17 @@ export const resolveNightAtomic = mutation({
       throw new ConvexError("Invalid night resolution");
     }
     const players = await listSessionPlayers(ctx, args.session_id);
+    const actions = await ctx.db.query("game_actions")
+      .withIndex("by_session", q => q.eq("session_id", args.session_id)).collect();
+    const requiredByRole = { mafia: "mafia_target", doctor: "doctor_protect", inspector: "inspector_check" };
+    const complete = players.filter(player => player.is_alive).every(player => {
+      if (player.role === "citizen") return true;
+      const required = requiredByRole[player.role as keyof typeof requiredByRole];
+      return required && actions.some(action => action.actor_player_id === player.player_id &&
+        action.action_type === required && action.round_id === args.expected_round_id &&
+        action.phase_index === args.night_record.night_index);
+    });
+    if (!complete) throw new ConvexError("Waiting for all night actions to be submitted");
     if (args.eliminated_player_ids.some(id => !players.some(player => player.player_id === id && player.is_alive))) {
       throw new ConvexError("Elimination target is not alive in this session");
     }

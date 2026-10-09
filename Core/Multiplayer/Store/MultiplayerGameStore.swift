@@ -609,6 +609,10 @@ final class MultiplayerGameStore: ObservableObject {
               case .night(let nightIndex, _) = currentSession?.currentPhaseData else { return }
         isCompletingNight = true
         defer { isCompletingNight = false }
+        try await checkNightPhaseReadiness(nightIndex: nightIndex)
+        guard isPhaseReadyToAdvance else {
+            throw SessionError.operationFailed("Waiting for all night actions to be submitted.")
+        }
         let recordedNight = try await recordNightActions(nightIndex: nightIndex)
         try await resolveNightOutcome(nightIndex: nightIndex, recordedNight: recordedNight)
     }
@@ -736,6 +740,9 @@ final class MultiplayerGameStore: ObservableObject {
             resetPhaseProcessingState()
         }
 
+        if session.currentRoundId != currentSession?.currentRoundId || session.currentPhase != previousPhase {
+            isPhaseReadyToAdvance = false
+        }
         currentSession = session
 
         updateHostStatus(using: session)
@@ -1275,7 +1282,8 @@ final class MultiplayerGameStore: ObservableObject {
         }
         guard let session = currentSession else { return }
         
-        // 1. Update phase first so clients transition to Night view immediately
+        isPhaseReadyToAdvance = false
+        // Convex clears previous ready flags in the phase transaction.
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "night",
@@ -1283,19 +1291,7 @@ final class MultiplayerGameStore: ObservableObject {
             callerUserId: currentUserId() ?? UUID(),
             guestSecretHash: guestSecretHash
         )
-        
-        // 2. Reset ready status for all players (background task)
-        // We do this after phase change to avoid UI flickering "Not Ready" in the Role Reveal view
-        Task {
-            for player in allPlayers {
-                try? await sessionService.updatePlayerReady(
-                    playerId: player.id,
-                    isReady: false,
-                    guestSecretHash: guestSecretHash
-                )
-            }
-        }
-        
+
         try await refreshSession()
         try await refreshPlayers()
     }
@@ -1860,9 +1856,6 @@ final class MultiplayerGameStore: ObservableObject {
 
         switch phaseData {
         case .night(let nightIndex, _):
-            // Reset all players' ready status at the start of night phase
-            await resetAllPlayersReady()
-
             // CRITICAL: Refresh session to get correct roundId before processing bots
             // Fixes bug where inspector bot actions get wrong roundId due to Realtime delay
             try? await refreshSession()
@@ -1878,9 +1871,6 @@ final class MultiplayerGameStore: ObservableObject {
             }
             await evaluatePhaseProgression(trigger: "enter_night")
         case .voting(let dayIndex):
-            // Reset all players' ready status at the start of voting phase
-            await resetAllPlayersReady()
-
             // HAMZA-FIX: SIMPLIFIED - Always process bot votes if ANY bots are missing valid votes
             // This is the PRIMARY trigger for bot voting - don't rely on processedBotVotingDays
             let missingBots = await botsMissingVotes(dayIndex: dayIndex)
@@ -2037,76 +2027,47 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
-        // PERF: Single-pass categorization instead of 6+ separate filter calls
-        let categories = categorizeAlivePlayers(hostUserId: session.hostUserId)
-
-        let mafiaActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .mafiaTarget,
-            phaseIndex: nightIndex
-        )
-        let inspectorActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .inspectorCheck,
-            phaseIndex: nightIndex
-        )
-        let doctorActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .doctorProtect,
-            phaseIndex: nightIndex
-        )
-
-        // Track who has already submitted an action so we don't block on missing ready flags
-        let mafiaActors = Set(mafiaActions.map { $0.actorPlayerId })
-        let doctorActors = Set(doctorActions.map { $0.actorPlayerId })
-        let inspectorActors = Set(inspectorActions.map { $0.actorPlayerId })
-
-        // Check if the host has an active role and has submitted their action
-        let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
-        let hostHasActiveRole = hostPlayer?.role != nil && hostPlayer?.role != .citizen
-        let hostHasSubmitted = hostPlayer.map { player in
-            switch player.role {
-            case .mafia:
-                return mafiaActors.contains(player.playerId)
-            case .doctor:
-                return doctorActors.contains(player.playerId)
-            case .inspector:
-                return inspectorActors.contains(player.playerId)
-            default:
-                return true // No action needed for citizens
-            }
-        } ?? true
-
-        // PERF: Use pre-categorized nonHostHumans instead of filtering again
-        let readyNonHostHumans = categories.nonHostHumans.filter { player in
-            let role = player.role
-            let passive = (role == .citizen)
-
-            let hasAction: Bool = {
-                switch role {
-                case .mafia:
-                    return mafiaActors.contains(player.playerId)
-                case .doctor:
-                    return doctorActors.contains(player.playerId)
-                case .inspector:
-                    return inspectorActors.contains(player.playerId)
-                default:
-                    return false
-                }
-            }()
-
-            return passive || player.isReady || hasAction
+        guard let roundId = session.currentRoundId else {
+            isPhaseReadyToAdvance = false
+            return
         }
+        var actions: [GameAction] = []
+        for actionType in [ActionType.mafiaTarget, .inspectorCheck, .doctorProtect] {
+            actions += await loadActionsSafely(
+                sessionId: session.id, actionType: actionType,
+                phaseIndex: nightIndex, roundId: roundId
+            )
+        }
+        // Role-reveal readiness is not evidence of a night action. Every
+        // living active role (including bots and the host) must submit.
+        guard currentSession?.currentRoundId == roundId,
+              currentSession?.currentPhase == "night" else { return }
+        isPhaseReadyToAdvance = Self.nightActionsReady(
+            players: allPlayers, actions: actions,
+            roundId: roundId, nightIndex: nightIndex
+        )
+    }
 
-        let nonHostReady = categories.nonHostHumans.isEmpty || readyNonHostHumans.count == categories.nonHostHumans.count
-        let allReady = nonHostReady && (!hostHasActiveRole || hostHasSubmitted)
-
-        await MainActor.run {
-            self.isPhaseReadyToAdvance = allReady
+    static func nightActionsReady(
+        players: [SessionPlayer], actions: [GameAction], roundId: UUID, nightIndex: Int
+    ) -> Bool {
+        players.filter(\.isAlive).allSatisfy { player in
+            let required: ActionType
+            switch player.role {
+            case .citizen: return true
+            case .mafia: required = .mafiaTarget
+            case .doctor: required = .doctorProtect
+            case .inspector: required = .inspectorCheck
+            case nil: return false
+            }
+            return actions.contains {
+                $0.actorPlayerId == player.playerId && $0.actionType == required
+                    && $0.roundId == roundId && $0.phaseIndex == nightIndex
+            }
         }
     }
 
-    /// Resilient action fetch that won't block readiness checks if the backend temporarily fails
+    /// Failed reads return no actions, so an incomplete night stays blocked until a successful retry.
     private func loadActionsSafely(
         sessionId: UUID,
         actionType: ActionType,

@@ -1,3 +1,11 @@
+## 2026-10-10 — FOLLOWUP-12: require submitted actions before multiplayer night resolution
+
+- Two-device production E2E reproduced a Finish Night button enabled while a live police guest had not submitted. Role-reveal ready flags were accepted as night completion evidence.
+- Night readiness now requires matching current-round actions from every living active role, including the host and bots. Completion rechecks readiness; Convex independently rejects incomplete atomic resolution. New night/voting rounds clear human ready flags in the phase transaction, replacing delayed per-player resets.
+- Validation: backend 41/41; TypeScript check passes; focused Swift readiness/realtime tests 7/7; Release simulator build succeeds; backend deployed to development and production and production contract 3 verified. Two-device retest with police host/Mafia guest keeps Finish Night disabled after only the host action, enables it after the guest action, and publishes the correct death/investigation. Evidence: `night-waits-for-guest-fixed.png` and `night-ready-after-all-actions.png`.
+- Rollback: revert this commit, regenerate Tuist, and deploy the reverted backend together; this restores the premature-resolution defect. No schema or argument-shape change.
+- Gotcha: signed archive/IPA must be rebuilt from the final tested code. Full simulator campaign is still in progress.
+
 ## 2026-10-09 — FOLLOWUP-11: reset and validate solo votes at each handoff
 
 - Simulator E2E reproduced a retained target when moving from one solo voter to the next. The next player could confirm the previous target without selecting a card, including a self-vote.
