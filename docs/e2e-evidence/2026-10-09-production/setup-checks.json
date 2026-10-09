@@ -14,6 +14,9 @@
   "legacySource": "saved export; live source unavailable",
   "signedArchive": {
     "status": "blocked",
-    "reason": "Xcode has no Apple account for team 5GH22BAXAU; cached profile lacks Associated Domains"
+    "reason": "Xcode has no Apple account for team 5GH22BAXAU; cached profile lacks Associated Domains",
+    "membershipType": "Individual",
+    "signingAccess": "Invited App Store Connect Admin; account-holder signing access required",
+    "localSigningAssets": "Apple Development identities only; cached profiles lack Associated Domains"
   }
 }

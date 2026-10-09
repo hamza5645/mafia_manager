@@ -72,7 +72,10 @@ Production is now configured in `Configuration/Production.xcconfig`:
 - Tuist generation, production configuration guard, and the real-key Release
   device compilation passed. Signed archive is blocked: Xcode has no Apple account
   for team `5GH22BAXAU`; its cached wildcard profile lacks Associated Domains.
-  Sign into Xcode Settings → Accounts and regenerate provisioning before archive.
+  The team is an Individual membership; the invited App Store Connect Admin
+  lacks signing-resource access. The account holder must sign into Xcode or
+  supply a distribution certificate/private key and an updated App Store profile
+  with Associated Domains. Regenerate provisioning before archive.
 
 The original live database hostname is unavailable. Import verification compares
 against the saved export, not a fresh live source. A real legacy account claim,

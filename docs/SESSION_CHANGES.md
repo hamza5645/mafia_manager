@@ -6,6 +6,23 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### Signing access diagnosis — 2026-10-09
+
+- User confirmed team 5GH22BAXAU is an Individual membership. Their App Store
+  Connect Admin role does not provide Apple Developer signing-resource access;
+  Xcode therefore lists only their Personal Team for signing.
+- Read-only Keychain check found two valid Apple Development identities and no
+  Apple Distribution identity. Cached development/store profiles for 5GH22BAXAU
+  lack Associated Domains. Correct-team archive retry still reports No Account
+  for Team and missing Associated Domains in the profile.
+- Resolution: account holder personally signs into Xcode on this Mac, or supplies
+  an Apple Distribution identity with private key and an updated App Store
+  provisioning profile for com.hamza5645.mafia with Associated Domains enabled.
+  Keep the publishing team and Clerk App ID Prefix at 5GH22BAXAU.
+- No certificates were created/revoked, no account permissions were changed,
+  and no generated project edits were made by the agent. User's Xcode changes
+  selecting Personal Team remain uncommitted. Backend/data setup is unaffected.
+
 ### Production Clerk/Convex configuration and data import — 2026-10-09
 
 - Configured the user-provided `pk_live_` key and matching Clerk frontend host in
