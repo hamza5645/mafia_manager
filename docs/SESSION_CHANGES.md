@@ -5,6 +5,14 @@
 Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; final E2E results will be recorded separately.
 
+### FOLLOWUP-06: Independent Settings authentication buttons
+
+- Login and Sign Up inside a Settings List row could both fire, opening Sign Up
+  when Login was tapped. Give the buttons explicit plain styling.
+- Validation: signed simulator build passed; visible Login opened Sign In after
+  reinstall. This is a UI routing correction with no backend/data change.
+- Rollback: revert the button style, restoring ambiguous List button handling.
+
 ### FOLLOWUP-05: Readiness checks must not suppress night completion
 
 - Final visible retest exposed a silent no-op: background readiness evaluation

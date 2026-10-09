@@ -127,6 +127,7 @@ struct SettingsView: View {
                                         .cornerRadius(Design.Radii.small)
                                     }
                                 }
+                                .buttonStyle(.plain)
 
                                 // Clear Guest Data button
                                 Button {
