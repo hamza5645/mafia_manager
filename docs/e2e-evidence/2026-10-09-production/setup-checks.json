@@ -9,7 +9,7 @@
   },
   "nativeApplicationIdentifier": "5GH22BAXAU.com.hamza5645.mafia",
   "nativeAssociationPublished": true,
-  "productionAccountE2E": "not yet verified",
+  "productionAccountE2E": "Native Frontend API checks passed with real email OTPs; native UI completion unverified",
   "physicalDeviceE2E": "not yet verified",
   "legacySource": "saved export; live source unavailable",
   "signedArchive": {
@@ -26,5 +26,6 @@
     "signatureVerified": true,
     "uploaded": false
   },
-  "releaseSimulatorBuild": "passed after FOLLOWUP-09 architecture setting"
+  "releaseSimulatorBuild": "passed after FOLLOWUP-09 architecture setting",
+  "productionGuestRoomSmoke": "passed via public clients: create/join, host permissions, kick/rejoin, cancel, cleanup"
 }

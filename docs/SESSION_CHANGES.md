@@ -6,6 +6,33 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### Production real-email account and room checks — 2026-10-09
+
+- Used the user-approved temporary inbox for one real production QA account.
+  Actual signup/reset emails were delivered by the configured production domain.
+  Browser access recovered and the reset OTP was read directly; no test mode or
+  fabricated OTP was used. Expired signup verification was rejected correctly.
+- Passed production native Frontend API signup, Convex JWT audience/email claims,
+  authenticated profile creation, edited-name persistence, wrong-password rejection,
+  sign-in/UUID restoration, password reset, old-password rejection, new-password
+  sign-in and fresh-native-client login. These are API checks, not Swift UI passes.
+- Production account/guest public-client smoke passed create/join, host permissions,
+  kick/empty roster/rejoin, actual cancelSession, and membership cleanup. Two initial
+  smoke probes had test-payload errors (missing caller ID, wrong cancellation
+  endpoint); corrected to mirror the app's real calls, with no backend change.
+- Cleaned all three own probe/smoke rooms; each is cancelled with zero memberships.
+  All API sessions were revoked. The QA account and anonymous QA profiles remain.
+  Private credentials/session files were removed; sanitized results are committed.
+- Native UI signup reached email verification. Browser and simulator control then
+  failed; restarting the stalled control daemon did not restore device automation.
+  UI signup verification/sign-in/reset, full production gameplay and physical-device
+  validation remain unverified. A real legacy account was not supplied.
+- Production emails still identify the application as "My Application". Update
+  Clerk branding to Mafia Manager before inviting users; this is a dashboard item.
+- Evidence: production-auth-and-room-results.json and qa-room-cleanup.json under
+  docs/e2e-evidence/2026-10-09-production. Rollback: docs/evidence can be reverted;
+  these tests changed only their own QA profile/rooms, never the 142 legacy rows.
+
 ### Signed production archive and App Store export — 2026-10-09
 
 - Account holder access is now available. Signed Release archive passed for team

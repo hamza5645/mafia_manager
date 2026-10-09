@@ -78,9 +78,10 @@ Production is now configured in `Configuration/Production.xcconfig`:
   binary omits Intel simulator support; Tuist excludes x86_64 for that SDK.
 
 The original live database hostname is unavailable. Import verification compares
-against the saved export, not a fresh live source. A real legacy account claim,
-production signup/sign-in/reset JWT exchange, and physical-device gameplay still
-need end-to-end validation before publishing. Do not run the development fixture
+against the saved export, not a fresh live source. Production native Frontend API signup/sign-in/reset, verified-email JWT exchange,
+profile UUID/name restoration, fresh-client login, and account/guest room lifecycle
+checks passed with real email codes. Native UI completion, a real legacy account
+claim, and physical-device gameplay still need validation before publishing. Do not run the development fixture
 campaigns against production.
 
 For a future production instance change:
