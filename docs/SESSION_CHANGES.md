@@ -6,6 +6,15 @@ Fixes are committed and pushed separately, in report order. The original audit
 remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
 are recorded separately.
 
+### Production URL correction — 2026-10-09
+
+- The production dashboard screenshot confirms the deployment's Cloud URL is
+  `https://handsome-tiger-460.eu-west-1.convex.cloud`. Corrected the previously
+  shortened host in Release configuration, setup docs and the guard fixture.
+- Validation: release guard 3/3 passed; Tuist generation and diff review passed.
+  Clerk production values remain empty; no production deployment was performed.
+- Rollback: revert this host correction, restoring the incorrect shortened URL.
+
 ### Final retest and cleanup — 2026-10-09
 
 - All final checks passed: Swift 48/48 (live Convex/Clerk, no skips), backend 39/39,

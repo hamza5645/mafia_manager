@@ -72,7 +72,7 @@ Release builds remain blocked until this setup is completed:
    deploy this branch's backend to production, and ingest/verify the durable
    legacy data using the migration scripts configured for the production URL.
 4. Run `tuist generate --no-open` and verify the selected production API contract
-   with `CONVEX_AUDIT_URL=https://handsome-tiger-460.convex.cloud npm run convex:verify-deployment`.
+   with `CONVEX_AUDIT_URL=https://handsome-tiger-460.eu-west-1.convex.cloud npm run convex:verify-deployment`.
    Then build/archive Release and test signup, sign-in, reset, migrated-account
    restoration, and multiplayer on a physical device with production services.
 

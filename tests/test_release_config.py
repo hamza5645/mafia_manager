@@ -10,7 +10,7 @@ spec.loader.exec_module(module)
 
 class ReleaseConfigTests(unittest.TestCase):
     def values(self):
-        return dict(CONFIGURATION='Release', MAFIA_PRODUCTION_CONVEX_HOST='handsome-tiger-460.convex.cloud',
+        return dict(CONFIGURATION='Release', MAFIA_PRODUCTION_CONVEX_HOST='handsome-tiger-460.eu-west-1.convex.cloud',
                     MAFIA_PRODUCTION_CLERK_PUBLISHABLE_KEY='pk_live_' + base64.b64encode(b'clerk.qa.example$').decode().rstrip('='),
                     MAFIA_CLERK_FRONTEND_HOST='clerk.qa.example')
 
