@@ -52,16 +52,18 @@ final class ConvexService {
         }
     }
 
+    /// For mutations whose result the caller ignores. convex-swift's own
+    /// result-less overload decodes `String?`, which fails for mutations that
+    /// return an object (e.g. `phases:advancePhase`).
     func mutation(
         _ name: String,
         with args: [String: ConvexEncodable?] = [:]
     ) async throws {
-        do {
-            return try await client.mutation(name, with: prepare(args))
-        } catch {
-            if error is CancellationError { throw error }
-            throw BackendError(error)
-        }
+        let _: IgnoredResult = try await mutation(name, with: args)
+    }
+
+    private struct IgnoredResult: Decodable {
+        init(from decoder: Decoder) throws {}
     }
 
     func subscribe<T: Decodable>(

@@ -25,6 +25,9 @@ struct BackendError: LocalizedError, Equatable {
             self.message = message
             isServerMessage = true
         } else {
+            #if DEBUG
+            print("⚠️ [BackendError] Replaced non-server error: \(error)")
+            #endif
             message = (error as NSError).domain == NSURLErrorDomain ? Self.network : Self.generic
             isServerMessage = false
         }
