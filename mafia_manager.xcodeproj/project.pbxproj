@@ -98,6 +98,7 @@
 		DE14F4C36F14D19CE667D9C3 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD3E8154F690748433BC6F7 /* GameSession.swift */; };
 		DF5FEB68B0A0BEC029B46E6A /* MultiplayerGameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29033C3503B112D02AEEC0A /* MultiplayerGameStore.swift */; };
 		E03F00E3542505250BB85AD4 /* PlayerGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A921A20CB744B5A4585CAA /* PlayerGroupsView.swift */; };
+		E1AE450FC0FA5413D4E8F7F6 /* BotNightIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF7C26DAA2C8B11279558EF3 /* BotNightIntegrationTests.swift */; };
 		E30749DC29F0FAF4CE745F17 /* CustomRolesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CCF5E9A1A563DD4506F0A35 /* CustomRolesView.swift */; };
 		E75BA9933A8A112860BAAA3F /* mafia_gunshot.wav in Resources */ = {isa = PBXBuildFile; fileRef = C990D42FD4558C9A2EE8E3C3 /* mafia_gunshot.wav */; };
 		EAA651F1E9998C20D06D3A04 /* MultiplayerNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C0069879FB96DA4A8A3961 /* MultiplayerNightView.swift */; };
@@ -253,6 +254,7 @@
 		ECD3E8154F690748433BC6F7 /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
 		ECF2CB0CDBF86539051ADBF6 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
 		ED6081D60851E8D250414119 /* MultiplayerLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerLobbyView.swift; sourceTree = "<group>"; };
+		EF7C26DAA2C8B11279558EF3 /* BotNightIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotNightIntegrationTests.swift; sourceTree = "<group>"; };
 		F29033C3503B112D02AEEC0A /* MultiplayerGameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerGameStore.swift; sourceTree = "<group>"; };
 		F39B0F450FF95FFD3BF194CD /* mafia_manager-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "mafia_manager-Info.plist"; sourceTree = "<group>"; };
 		FD0F6FB737236EE214C3CE0D /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
@@ -612,6 +614,14 @@
 			path = Store;
 			sourceTree = "<group>";
 		};
+		A2A68E6E5C953AF83BB2F2C6 /* Multiplayer */ = {
+			isa = PBXGroup;
+			children = (
+				EF7C26DAA2C8B11279558EF3 /* BotNightIntegrationTests.swift */,
+			);
+			path = Multiplayer;
+			sourceTree = "<group>";
+		};
 		A9FFB0B4D53088376A12B83E /* Gameplay */ = {
 			isa = PBXGroup;
 			children = (
@@ -652,6 +662,7 @@
 		AB2F704CACB0D5FBF7D5C688 /* mafia_managerTests */ = {
 			isa = PBXGroup;
 			children = (
+				A2A68E6E5C953AF83BB2F2C6 /* Multiplayer */,
 				D4F1DAD259868CDD1ADAC71D /* AccountRestorationTests.swift */,
 				E061E5A7A435C09BBF73852F /* AuthRegressionTests.swift */,
 				6CB2C5CE5F9FDC51C323C408 /* BackendRequestErrorTests.swift */,
@@ -924,6 +935,7 @@
 				75AAEA726C608069CC57F0B1 /* ClerkAccountIntegrationTests.swift in Sources */,
 				3973D178FCDB3484DB928C90 /* ConvexIntegrationTests.swift in Sources */,
 				7E0436564F059661C7389B68 /* GameStoreTests.swift in Sources */,
+				E1AE450FC0FA5413D4E8F7F6 /* BotNightIntegrationTests.swift in Sources */,
 				79284045EAB587C221CD9497 /* NightReadinessTests.swift in Sources */,
 				1FE4DB73AF79FA7379741E5A /* RealtimeRegressionTests.swift in Sources */,
 				BA6882372109ABB030574F08 /* SoloVoteValidationTests.swift in Sources */,

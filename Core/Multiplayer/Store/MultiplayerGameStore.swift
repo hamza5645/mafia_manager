@@ -51,11 +51,12 @@ final class MultiplayerGameStore: ObservableObject {
     private let resyncDebounceInterval: TimeInterval = 2.0  // Minimum 2 seconds between resyncs
     private var isPerformingResync = false
     private var pendingAutoAdvanceTask: Task<Void, Never>?
-    private var processedBotNightIndices: Set<Int> = []
     private var processedBotVotingDays: Set<Int> = []
     private var isResolvingPhase = false
     private var isCompletingNight = false
     private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
+    private var isProcessingBotNightActions = false
+    private var botActionsRoundId: UUID?
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
     // HAMZA-FIX: Bot reactive voting - track which bots have submitted night actions
@@ -156,6 +157,10 @@ final class MultiplayerGameStore: ObservableObject {
         await evaluatePhaseProgression(trigger: "test")
     }
 
+    func testEnterPhase(_ phase: PhaseData) async {
+        await handlePhaseEntry(for: phase)
+    }
+
     func testHandlePlayerRemoval(_ playerId: UUID) {
         handlePlayerRemoval(playerId: playerId)
     }
@@ -163,7 +168,7 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Clear per-game caches so bots/actions get re-processed for a brand new game
     private func resetPhaseProcessingState() {
-        processedBotNightIndices.removeAll()
+        botActionsRoundId = nil
         processedBotVotingDays.removeAll()
         isPhaseReadyToAdvance = false
         isResolvingPhase = false
@@ -1855,20 +1860,11 @@ final class MultiplayerGameStore: ObservableObject {
         guard let phaseData else { return }
 
         switch phaseData {
-        case .night(let nightIndex, _):
+        case .night:
             // CRITICAL: Refresh session to get correct roundId before processing bots
             // Fixes bug where inspector bot actions get wrong roundId due to Realtime delay
             try? await refreshSession()
 
-            if !processedBotNightIndices.contains(nightIndex) {
-                do {
-                    try await processBotActions(nightIndex: nightIndex)
-                    processedBotNightIndices.insert(nightIndex) // Only mark after successful completion
-                } catch {
-                    print("❌ [MultiplayerGameStore] Failed to process bot night actions: \(error)")
-                    // Don't mark as processed so we can retry on next phase entry
-                }
-            }
             await evaluatePhaseProgression(trigger: "enter_night")
         case .voting(let dayIndex):
             // HAMZA-FIX: SIMPLIFIED - Always process bot votes if ANY bots are missing valid votes
@@ -2031,6 +2027,9 @@ final class MultiplayerGameStore: ObservableObject {
             isPhaseReadyToAdvance = false
             return
         }
+        // Readiness checks also recover missing bot submissions after a
+        // delayed roster or failed request, without rewriting completed actions.
+        try await processBotActions(nightIndex: nightIndex)
         var actions: [GameAction] = []
         for actionType in [ActionType.mafiaTarget, .inspectorCheck, .doctorProtect] {
             actions += await loadActionsSafely(
@@ -2990,23 +2989,48 @@ final class MultiplayerGameStore: ObservableObject {
     /// Process bot actions for current phase
     /// HAMZA-FIX: Bots now follow humans - only process independently if no humans have that role
     func processBotActions(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard let session = currentSession else { return }
+        guard isHost, !isProcessingBotNightActions else { return }
+        isProcessingBotNightActions = true
+        defer { isProcessingBotNightActions = false }
 
-        // Clear tracking for this new night phase
-        clearBotNightActionsForNewNight()
+        // The phase snapshot may arrive before assigned player roles.
+        try await refreshPlayers()
+        guard let session = currentSession,
+              case .night(let activeNightIndex, _) = session.currentPhaseData,
+              activeNightIndex == nightIndex,
+              let roundId = session.currentRoundId else { return }
+
+        if botActionsRoundId != roundId {
+            clearBotNightActionsForNewNight()
+            botActionsRoundId = roundId
+        }
 
         let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
         guard !aliveBots.isEmpty else { return }
+        let existingActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionTypes: [.mafiaTarget, .doctorProtect, .inspectorCheck],
+            phaseIndex: nightIndex, roundId: roundId,
+            viewerUserId: currentUserId(), guestSecretHash: guestSecretHash
+        )
+        guard currentSession?.id == session.id,
+              currentSession?.currentRoundId == roundId,
+              currentSession?.currentPhase == "night" else { return }
+        let completedBots = Set(aliveBots.filter {
+            Self.nightActionsReady(players: [$0], actions: existingActions,
+                                   roundId: roundId, nightIndex: nightIndex)
+        }.map(\.playerId))
+        botNightActionsSubmitted.formUnion(completedBots)
+        let pendingBots = aliveBots.filter { !completedBots.contains($0.playerId) }
 
         let alivePlayersList = allPlayers.filter { $0.isAlive }
         let localAlivePlayers = alivePlayersList.map { makeLocalPlayer(from: $0) }
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
 
         // Group bots by role to process each role's coordination separately
-        let mafiaBots = aliveBots.filter { $0.role == .mafia }
-        let doctorBots = aliveBots.filter { $0.role == .doctor }
-        let inspectorBots = aliveBots.filter { $0.role == .inspector }
+        let mafiaBots = pendingBots.filter { $0.role == .mafia }
+        let doctorBots = pendingBots.filter { $0.role == .doctor }
+        let inspectorBots = pendingBots.filter { $0.role == .inspector }
 
         // MAFIA: Only process independently if NO human Mafia
         if !mafiaBots.isEmpty && !hasHumanWithRole(.mafia) {
@@ -3026,7 +3050,8 @@ final class MultiplayerGameStore: ObservableObject {
             }
             print("🤖 [processBotActions] Mafia bots voted independently (no human Mafia)")
         } else if !mafiaBots.isEmpty {
-            print("🤖 [processBotActions] Mafia bots waiting for human vote via Realtime")
+            await recoverBotActionsFollowingHuman(mafiaBots, role: .mafia, actionType: .mafiaTarget,
+                                                 nightIndex: nightIndex, actions: existingActions)
         }
 
         // DOCTOR: Only process independently if NO human Doctor
@@ -3041,7 +3066,8 @@ final class MultiplayerGameStore: ObservableObject {
             }
             print("🤖 [processBotActions] Doctor bots voted independently (no human Doctor)")
         } else if !doctorBots.isEmpty {
-            print("🤖 [processBotActions] Doctor bots waiting for human vote via Realtime")
+            await recoverBotActionsFollowingHuman(doctorBots, role: .doctor, actionType: .doctorProtect,
+                                                 nightIndex: nightIndex, actions: existingActions)
         }
 
         // INSPECTOR: Only process independently if NO human Inspector
@@ -3056,7 +3082,21 @@ final class MultiplayerGameStore: ObservableObject {
             }
             print("🤖 [processBotActions] Inspector bots voted independently (no human Inspector)")
         } else if !inspectorBots.isEmpty {
-            print("🤖 [processBotActions] Inspector bots waiting for human vote via Realtime")
+            await recoverBotActionsFollowingHuman(inspectorBots, role: .inspector, actionType: .inspectorCheck,
+                                                 nightIndex: nightIndex, actions: existingActions)
+        }
+    }
+
+    private func recoverBotActionsFollowingHuman(
+        _ bots: [SessionPlayer], role: Role, actionType: ActionType,
+        nightIndex: Int, actions: [GameAction]
+    ) async {
+        let humans = Set(allPlayers.filter { $0.isAlive && !$0.isBot && $0.role == role }.map(\.playerId))
+        guard let action = actions.filter({ $0.actionType == actionType && humans.contains($0.actorPlayerId) })
+            .max(by: { $0.createdAt < $1.createdAt }) else { return }
+        for bot in bots {
+            try? await submitBotActionAndTrack(bot: bot, actionType: actionType,
+                                              nightIndex: nightIndex, targetId: action.targetPlayerId)
         }
     }
 

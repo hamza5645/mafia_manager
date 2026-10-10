@@ -1,3 +1,12 @@
+## 2026-10-10 — FOLLOWUP-17: refresh bot roles and recover missing night actions
+
+- Production simulator room 315742 with a Citizen host and six bots stalled on Night 1. A phase snapshot could arrive before assigned roles, allowing a role-less bot pass to be marked processed permanently.
+- Night readiness now refreshes assigned players and recovers missing current-round bot actions. Completed targets/timestamps are preserved. Bot responses can follow an existing human action after a missed realtime event, and tracking resets by round rather than by retry.
+- Added three live Swift Testing scenarios: stale roster, pre-submitted Doctor action, and pre-submitted human Mafia action without its realtime event. Both original cases fail before the fix; the final full suite passes 62/62 with zero skips. Tuist regenerated the project to add the test source; Release builds successfully.
+- Production UI retest: the old room became unavailable during the pause. A fresh seven-player room (934779) with a Doctor host and six bots blocks Finish Night until the human action, then resolves to Morning with two Mafia bot actions, the Police bot check, and Doctor self-protection. Evidence is under `docs/e2e-evidence/2026-10-10-simulator/`.
+- Rollback: revert this commit and regenerate Tuist. No backend/schema changes or deployment required; reverting restores the bot-night stall.
+- Final campaign steps still pending: complete the bot match, rebuild/export distribution artifacts from this fix, and finalize the PR report. Earlier IPAs predate this fix. The temporary approval-service usage failure was resolved before this retest.
+
 ## 2026-10-10 — FOLLOWUP-16: display saved-library request failures
 
 - Source review found that Player Groups and Custom Roles captured load/delete failures in state but never rendered them, allowing a failed load to appear as an empty library.
