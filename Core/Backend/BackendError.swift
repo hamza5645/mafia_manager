@@ -30,6 +30,3 @@ struct BackendError: LocalizedError, Equatable {
         }
     }
 }
-
-// TEMP(integration): remove after merge. Multiplayer files still use the old name.
-typealias BackendRequestError = BackendError
