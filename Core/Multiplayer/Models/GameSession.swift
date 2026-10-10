@@ -185,7 +185,6 @@ struct NightActionRecord: Decodable, Sendable {
     let isResolved: Bool
     let mafiaTargetId: UUID?
     let inspectorCheckedId: UUID?
-    let inspectorResult: String?
     let doctorProtectedId: UUID?
     let targetWasSaved: Bool?
     let resultingDeaths: [UUID]
@@ -200,7 +199,6 @@ struct NightActionRecord: Decodable, Sendable {
         case isResolved = "is_resolved"
         case mafiaTargetId = "mafia_target_id"
         case inspectorCheckedId = "inspector_checked_id"
-        case inspectorResult = "inspector_result"
         case doctorProtectedId = "doctor_protected_id"
         case targetWasSaved = "target_was_saved"
         case resultingDeaths = "resulting_deaths"
@@ -219,7 +217,6 @@ struct NightActionRecord: Decodable, Sendable {
         isResolved = (try? container.decode(Bool.self, forKey: .isResolved)) ?? false
         mafiaTargetId = try container.decodeIfPresent(UUID.self, forKey: .mafiaTargetId)
         inspectorCheckedId = try container.decodeIfPresent(UUID.self, forKey: .inspectorCheckedId)
-        inspectorResult = try container.decodeIfPresent(String.self, forKey: .inspectorResult)
         doctorProtectedId = try container.decodeIfPresent(UUID.self, forKey: .doctorProtectedId)
         targetWasSaved = try container.decodeIfPresent(Bool.self, forKey: .targetWasSaved)
         resultingDeaths = try container.decode([UUID].self, forKey: .resultingDeaths)
