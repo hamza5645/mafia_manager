@@ -1,3 +1,13 @@
+## 2026-10-10 — repo cleanup and xcconfig-based backend configuration
+
+- Removed QA campaign records (`docs/e2e-evidence/`, dated E2E/retest reports) and the audit scripts in `scripts/e2e/` (only `verify-deployment.mjs` remains). The migration plan is now the short `docs/BACKEND_DECISIONS.md`; history is in git.
+- Untracked the Tuist-generated `mafia_manager.xcodeproj`/`.xcworkspace`. `.gitignore` ignores them, `xcuserdata/`, Claude local settings/worktrees and the locally installed Clerk skills instead of all of `.agents/` and `.claude/`.
+- Removed the unused vendored `ClerkConvex.xcodeproj` and `Package.swift`; `Vendor/clerk-convex-swift/VENDORED.md` records the upstream tag and local patches.
+- Debug and Release read `MAFIA_CONVEX_HOST`, `MAFIA_CLERK_PUBLISHABLE_KEY` and `MAFIA_CLERK_FRONTEND_HOST` from `Configuration/Debug.xcconfig` / `Production.xcconfig`. `ConvexConfig` fails fast when one is missing and requires `pk_live_` in Release. Removed `hasConfiguredClerkKey` and the Python pre-build guard; `apiContractVersion` is 4.
+- Docs: iOS 18+, README prerequisites, one test command (`tuist test mafia_manager`).
+- Rollback: revert these commits, then `tuist generate`. Reverting the config commit restores the `#if DEBUG` literals and contract 3.
+- Gotchas: after pulling, run `tuist install && tuist generate`, because git deletes the previously tracked project/workspace. The app now needs a backend that reports contract 4 (`node scripts/e2e/verify-deployment.mjs`). A missing xcconfig value crashes at launch rather than failing the build.
+
 ## 2026-10-10 — final simulator campaign results
 
 - Ten simulator follow-ups were fixed, reviewed, committed, and pushed separately (FOLLOWUP-10 through FOLLOWUP-19). Final native suite is 64/64 with zero skips; backend suite 45/45; TypeScript and three production configuration checks pass.

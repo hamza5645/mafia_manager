@@ -1,18 +1,23 @@
-mafia_manager (SwiftUI, iOS 26+)
+mafia_manager (SwiftUI, iOS 18+)
 ================================
 
-**Version 3.0** - An autonomous game manager for the party game Mafia. The app supports local pass-and-play and online multiplayer rooms. It is built with SwiftUI, MVVM, Tuist, local JSON persistence, Convex for backend data/realtime, and Clerk for account auth.
+**Version 5.0** - An autonomous game manager for the party game Mafia. The app supports local pass-and-play and online multiplayer rooms. It is built with SwiftUI, MVVM, Tuist, local JSON persistence, Convex for backend data/realtime, and Clerk for account auth.
 
 Targets and identifiers
-- Bundle Identifier: `com.hamza.mafia-manager`
-- Version: 3.0
-- Minimum iOS: 26.0
+- Bundle Identifier: `com.hamza5645.mafia`
+- Version: 5.0
+- Minimum iOS: 18.0
 
 Backend
 - **Convex**: authoritative multiplayer state, room codes, player/action documents, realtime subscriptions, stats, custom role configs, and player groups.
 - **Clerk**: email/password account auth, password reset, and Convex authentication tokens.
 - **Guest mode**: local Keychain guest secret mapped to a Convex guest profile for quick multiplayer entry.
 - Convex dev deployment: `https://energized-herring-345.eu-west-1.convex.cloud`
+
+Prerequisites
+- Xcode and Tuist on an Apple Silicon Mac (simulator builds exclude x86_64 because ConvexMobile ships no Intel slice).
+- Node >= 22.12, then `npm ci` and `npm run test:backend` for the Convex function tests.
+- Convex/Clerk dashboard access is needed only for backend changes and the opt-in live integration tests.
 
 Build and test
 ```bash

@@ -12,7 +12,7 @@ Modes:
 
 Tech stack:
 - SwiftUI + MVVM
-- iOS 26+
+- iOS 18+
 - Tuist-managed Xcode project
 - Convex backend functions and database
 - Clerk auth for account users
