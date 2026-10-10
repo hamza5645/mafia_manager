@@ -1,10 +1,11 @@
 import Foundation
 
 // Represents a multiplayer game session
-struct GameSession: Codable, Identifiable, Sendable {
+struct GameSession: Decodable, Identifiable, Sendable {
     let id: UUID
     let roomCode: String
-    var hostUserId: UUID // Mutable to allow host transfer
+    var hostUserId: UUID
+    var originalHostUserId: UUID?
     var status: SessionStatus
     let createdAt: Date
     var startedAt: Date?
@@ -29,19 +30,13 @@ struct GameSession: Codable, Identifiable, Sendable {
     // Round ID for action isolation (prevents action replay across rounds)
     var currentRoundId: UUID?
 
-    // Rematch support
-    var rematchDeadline: Date?
-
-    // Phase sequence number (monotonic counter for drift detection)
-    // Increments on every phase change to help clients detect missed updates
-    var phaseSequence: Int?
-
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id
         case roomCode = "room_code"
         case hostUserId = "host_user_id"
+        case originalHostUserId = "original_host_user_id"
         case status
         case createdAt = "created_at"
         case startedAt = "started_at"
@@ -57,8 +52,6 @@ struct GameSession: Codable, Identifiable, Sendable {
         case nightHistory = "night_history"
         case dayHistory = "day_history"
         case currentRoundId = "current_round_id"
-        case rematchDeadline = "rematch_deadline"
-        case phaseSequence = "phase_sequence"
         case updatedAt = "updated_at"
     }
 }
@@ -71,7 +64,7 @@ enum SessionStatus: String, Codable, Sendable {
 }
 
 // Phase data stored as JSON in the database
-enum PhaseData: Codable, Sendable, Equatable {
+enum PhaseData: Decodable, Sendable, Equatable {
     case lobby
     case roleReveal(currentPlayerIndex: Int)
     case night(nightIndex: Int, activeRole: String?)
@@ -129,7 +122,7 @@ enum PhaseData: Codable, Sendable, Equatable {
             self = .voting(dayIndex: dayIndex)
         case "votingResults":
             let dayIndex = try container.decode(Int.self, forKey: .dayIndex)
-            let voteCounts = try container.decode([UUID: Int].self, forKey: .voteCounts)
+            let voteCounts = try Self.decodeVoteCounts(from: container)
             let eliminatedPlayerId = try container.decodeIfPresent(UUID.self, forKey: .eliminatedPlayerId)
             self = .votingResults(dayIndex: dayIndex, voteCounts: voteCounts, eliminatedPlayerId: eliminatedPlayerId)
         case "voteDeathReveal":
@@ -155,45 +148,23 @@ enum PhaseData: Codable, Sendable, Equatable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-
-        switch self {
-        case .lobby:
-            try container.encode("lobby", forKey: .type)
-        case .roleReveal(let index):
-            try container.encode("roleReveal", forKey: .type)
-            try container.encode(index, forKey: .currentPlayerIndex)
-        case .night(let nightIndex, let activeRole):
-            try container.encode("night", forKey: .type)
-            try container.encode(nightIndex, forKey: .nightIndex)
-            try container.encodeIfPresent(activeRole, forKey: .activeRole)
-        case .morning(let nightIndex):
-            try container.encode("morning", forKey: .type)
-            try container.encode(nightIndex, forKey: .nightIndex)
-        case .deathReveal(let nightIndex):
-            try container.encode("deathReveal", forKey: .type)
-            try container.encode(nightIndex, forKey: .nightIndex)
-        case .voting(let dayIndex):
-            try container.encode("voting", forKey: .type)
-            try container.encode(dayIndex, forKey: .dayIndex)
-        case .votingResults(let dayIndex, let voteCounts, let eliminatedPlayerId):
-            try container.encode("votingResults", forKey: .type)
-            try container.encode(dayIndex, forKey: .dayIndex)
-            try container.encode(voteCounts, forKey: .voteCounts)
-            try container.encodeIfPresent(eliminatedPlayerId, forKey: .eliminatedPlayerId)
-        case .voteDeathReveal(let dayIndex, let eliminatedPlayerId, let eliminatedPlayerName, let eliminatedPlayerNumber, let eliminatedPlayerRole, let voteCount):
-            try container.encode("voteDeathReveal", forKey: .type)
-            try container.encode(dayIndex, forKey: .dayIndex)
-            try container.encodeIfPresent(eliminatedPlayerId, forKey: .eliminatedPlayerId)
-            try container.encodeIfPresent(eliminatedPlayerName, forKey: .eliminatedPlayerName)
-            try container.encodeIfPresent(eliminatedPlayerNumber, forKey: .eliminatedPlayerNumber)
-            try container.encodeIfPresent(eliminatedPlayerRole, forKey: .eliminatedPlayerRole)
-            try container.encodeIfPresent(voteCount, forKey: .voteCount)
-        case .gameOver(let winner):
-            try container.encode("gameOver", forKey: .type)
-            try container.encodeIfPresent(winner, forKey: .winner)
+    /// `voteCounts` is a `{ player_id: count }` object. Games started before
+    /// api_contract 4 stored Swift's alternating `[id, count, id, count, …]` array.
+    private static func decodeVoteCounts(from container: KeyedDecodingContainer<CodingKeys>) throws -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        if let object = try? container.decode([String: Int].self, forKey: .voteCounts) {
+            for (key, count) in object {
+                if let id = UUID(uuidString: key) { counts[id] = count }
+            }
+            return counts
         }
+        var legacy = try container.nestedUnkeyedContainer(forKey: .voteCounts)
+        while !legacy.isAtEnd {
+            let key = try legacy.decode(String.self)
+            let count = try legacy.decode(Int.self)
+            if let id = UUID(uuidString: key) { counts[id] = count }
+        }
+        return counts
     }
 }
 
@@ -208,17 +179,17 @@ struct PlayerNumberAssignment: Codable, Sendable {
     }
 }
 
-// Night action record (snapshot)
-struct NightActionRecord: Codable, Sendable {
+// Night record written by the server; ignores `round_id` and `next_phase`.
+struct NightActionRecord: Decodable, Sendable {
     let nightIndex: Int
-    var isResolved: Bool // Guards against duplicate resolution
+    let isResolved: Bool
     let mafiaTargetId: UUID?
     let inspectorCheckedId: UUID?
     let inspectorResult: String?
     let doctorProtectedId: UUID?
-    var targetWasSaved: Bool?
-    var resultingDeaths: [UUID] // Mutable to allow Phase 2 to set final deaths
-    var revealedDeathRoles: [String: String]
+    let targetWasSaved: Bool?
+    let resultingDeaths: [UUID]
+    let revealedDeathRoles: [String: String]
     let mafiaPlayerNumbers: [Int]
     let doctorPlayerNumbers: [Int]
     let inspectorPlayerNumbers: [Int]
@@ -240,37 +211,6 @@ struct NightActionRecord: Codable, Sendable {
         case timestamp
     }
 
-    // Convenience initializer
-    init(
-        nightIndex: Int,
-        isResolved: Bool = false,
-        mafiaTargetId: UUID?,
-        inspectorCheckedId: UUID?,
-        inspectorResult: String?,
-        doctorProtectedId: UUID?,
-        targetWasSaved: Bool? = nil,
-        resultingDeaths: [UUID],
-        revealedDeathRoles: [String: String] = [:],
-        mafiaPlayerNumbers: [Int] = [],
-        doctorPlayerNumbers: [Int] = [],
-        inspectorPlayerNumbers: [Int] = [],
-        timestamp: Date
-    ) {
-        self.nightIndex = nightIndex
-        self.isResolved = isResolved
-        self.mafiaTargetId = mafiaTargetId
-        self.inspectorCheckedId = inspectorCheckedId
-        self.inspectorResult = inspectorResult
-        self.doctorProtectedId = doctorProtectedId
-        self.targetWasSaved = targetWasSaved
-        self.resultingDeaths = resultingDeaths
-        self.revealedDeathRoles = revealedDeathRoles
-        self.mafiaPlayerNumbers = mafiaPlayerNumbers
-        self.doctorPlayerNumbers = doctorPlayerNumbers
-        self.inspectorPlayerNumbers = inspectorPlayerNumbers
-        self.timestamp = timestamp
-    }
-
     // Custom decoder to handle old records without role-specific numbers and isResolved
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -289,24 +229,6 @@ struct NightActionRecord: Codable, Sendable {
         doctorPlayerNumbers = (try? container.decode([Int].self, forKey: .doctorPlayerNumbers)) ?? []
         inspectorPlayerNumbers = (try? container.decode([Int].self, forKey: .inspectorPlayerNumbers)) ?? []
         timestamp = try container.decode(Date.self, forKey: .timestamp)
-    }
-
-    // Standard encoder
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(nightIndex, forKey: .nightIndex)
-        try container.encode(isResolved, forKey: .isResolved)
-        try container.encodeIfPresent(mafiaTargetId, forKey: .mafiaTargetId)
-        try container.encodeIfPresent(inspectorCheckedId, forKey: .inspectorCheckedId)
-        try container.encodeIfPresent(inspectorResult, forKey: .inspectorResult)
-        try container.encodeIfPresent(doctorProtectedId, forKey: .doctorProtectedId)
-        try container.encodeIfPresent(targetWasSaved, forKey: .targetWasSaved)
-        try container.encode(resultingDeaths, forKey: .resultingDeaths)
-        try container.encode(revealedDeathRoles, forKey: .revealedDeathRoles)
-        try container.encode(mafiaPlayerNumbers, forKey: .mafiaPlayerNumbers)
-        try container.encode(doctorPlayerNumbers, forKey: .doctorPlayerNumbers)
-        try container.encode(inspectorPlayerNumbers, forKey: .inspectorPlayerNumbers)
-        try container.encode(timestamp, forKey: .timestamp)
     }
 }
 

@@ -328,7 +328,7 @@ struct MultiplayerVoteDeathRevealView: View {
         Button {
             Task {
                 isTransitioning = true
-                try? await multiplayerStore.completeVoteDeathReveal(dayIndex: dayIndex)
+                try? await multiplayerStore.continueFromVoteReveal()
                 isTransitioning = false
             }
         } label: {
