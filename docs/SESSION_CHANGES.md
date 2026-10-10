@@ -1,3 +1,11 @@
+## 2026-10-10 — FOLLOWUP-14: wait for account restoration before online entry
+
+- A quick Online Game selection could open guest signup while the cached Clerk account was still restoring.
+- Online entry now stays disabled with a progress indicator until restoration finishes; the action also guards the same boundary. Offline local play remains available during restoration.
+- Validation: Release build succeeds; cold-launch production account is shown in Settings and online selection reaches Continue without the guest form. Full Swift run compiled this change and passed auth/restoration regressions; one unrelated manual-night fixture failure remains under investigation (57/58 passed).
+- Rollback: revert this commit. No backend or migration changes.
+- Gotcha: this uses the existing bounded restoration flow; users may briefly see a spinner before online play becomes available.
+
 ## 2026-10-10 — FOLLOWUP-13: preserve guest progress through password reset
 
 - Password reset authenticated the account but unconditionally deleted the guest merge proof, leaving pending progress permanently unable to merge.
