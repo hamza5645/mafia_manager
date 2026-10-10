@@ -9,8 +9,6 @@ struct SignupView: View {
     @State private var confirmPassword = ""
     @State private var displayName = ""
     @State private var validationError: String?
-    @State private var showingEmailConflict = false
-    @State private var conflictAnonymousUserId: UUID?
     @State private var showVerification = false
 
     // Upgrade mode: When true, this is upgrading a guest account to permanent
@@ -143,58 +141,13 @@ struct SignupView: View {
                     Button {
                         if validateForm() {
                             Task {
-                                if isUpgrading {
-                                    // Upgrade guest account to permanent
-                                    let result = await authStore.linkEmailPassword(
-                                        email: sanitizedEmail,
-                                        password: sanitizedPassword,
-                                        displayName: sanitizedDisplayName
-                                    )
-
-                                    switch result {
-                                    case .success:
-                                        await MainActor.run {
-                                            dismiss()
-                                        }
-                                    case .needsEmailVerification:
-                                        await MainActor.run {
-                                            showVerification = true
-                                        }
-                                    case .retryableMergeFailure:
-                                        await MainActor.run {
-                                            showVerification = true
-                                        }
-                                    case .emailAlreadyExists(let anonymousUserId):
-                                        await MainActor.run {
-                                            conflictAnonymousUserId = anonymousUserId
-                                            showingEmailConflict = true
-                                        }
-                                    case .failure:
-                                        // Error is displayed via authStore.errorMessage
-                                        break
-                                    }
-                                } else {
-                                    // Regular new signup
-                                    let step = await authStore.startSignUp(
-                                        email: sanitizedEmail,
-                                        password: sanitizedPassword,
-                                        displayName: sanitizedDisplayName
-                                    )
-                                    switch step {
-                                    case .authenticated:
-                                        await MainActor.run {
-                                            dismiss()
-                                        }
-                                    case .needsEmailCode:
-                                        await MainActor.run {
-                                            showVerification = true
-                                        }
-                                    case .emailAlreadyExists:
-                                        break
-                                    case .failure:
-                                        break
-                                    }
-                                }
+                                // A guest's progress merges into the account once
+                                // it exists; errors show via errorMessage.
+                                showVerification = await authStore.startSignUp(
+                                    email: sanitizedEmail,
+                                    password: sanitizedPassword,
+                                    displayName: sanitizedDisplayName
+                                )
                             }
                         }
                     } label: {
@@ -224,16 +177,16 @@ struct SignupView: View {
                             .foregroundColor(Design.Colors.textSecondary)
 
                         HStack(spacing: 8) {
-                            Image(systemName: sanitizedPassword.count >= 6 ? "checkmark.circle.fill" : "circle")
+                            Image(systemName: isPasswordLongEnough ? "checkmark.circle.fill" : "circle")
                                 .font(Design.Typography.caption)
-                                .foregroundColor(sanitizedPassword.count >= 6 ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
+                                .foregroundColor(isPasswordLongEnough ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
                                 .accessibilityHidden(true)
-                            Text("Be at least 6 characters")
+                            Text("Be at least \(AuthStore.minimumPasswordLength) characters")
                                 .font(Design.Typography.caption)
                                 .foregroundColor(Design.Colors.textSecondary)
                         }
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("At least 6 characters: \(sanitizedPassword.count >= 6 ? "met" : "not met")")
+                        .accessibilityLabel("At least \(AuthStore.minimumPasswordLength) characters: \(isPasswordLongEnough ? "met" : "not met")")
 
                         HStack(spacing: 8) {
                             Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "circle")
@@ -289,41 +242,14 @@ struct SignupView: View {
                 displayName = guestName
             }
         }
-        .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
-            if isAuthenticated && !authStore.isAnonymous {
-                dismiss()
-            }
-        }
-        .onChange(of: authStore.isAnonymous) { _, isAnonymous in
-            if !isAnonymous && authStore.isAuthenticated {
+        .onChange(of: authStore.authenticatedAccountId) { _, accountId in
+            if accountId != nil {
                 dismiss()
             }
         }
         .sheet(isPresented: $showVerification) {
             SignupVerificationView()
                 .environmentObject(authStore)
-        }
-        .alert("Email Already Registered", isPresented: $showingEmailConflict) {
-            Button("Sign In & Merge Stats") {
-                // User wants to sign into existing account and merge stats
-                if let anonymousUserId = conflictAnonymousUserId {
-                    Task {
-                        let success = await authStore.mergeIntoExistingAccount(
-                            anonymousUserId: anonymousUserId,
-                            email: sanitizedEmail,
-                            password: sanitizedPassword
-                        )
-                        if success {
-                            await MainActor.run {
-                                dismiss()
-                            }
-                        }
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This email is already associated with an account. Would you like to sign in and merge your guest stats?")
         }
     }
 
@@ -335,7 +261,7 @@ struct SignupView: View {
         isFormFilled
             && sanitizedDisplayName.count >= 2
             && sanitizedDisplayName.count <= 50
-            && sanitizedPassword.count >= 6
+            && isPasswordLongEnough
             && sanitizedPassword.count <= 72
             && passwordsMatch
             && isValidEmail(sanitizedEmail)
@@ -365,8 +291,8 @@ struct SignupView: View {
             return false
         }
 
-        guard sanitizedPassword.count >= 6 else {
-            validationError = "Password must be at least 6 characters"
+        guard isPasswordLongEnough else {
+            validationError = "Password must be at least \(AuthStore.minimumPasswordLength) characters"
             return false
         }
 
@@ -397,6 +323,10 @@ struct SignupView: View {
 
     private var sanitizedDisplayName: String {
         displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isPasswordLongEnough: Bool {
+        sanitizedPassword.count >= AuthStore.minimumPasswordLength
     }
 
     private var passwordsMatch: Bool {

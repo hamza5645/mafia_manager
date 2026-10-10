@@ -76,8 +76,7 @@ struct PlayerGroupsView: View {
     }
 
     private func loadGroups() async {
-        guard let userId = authStore.currentUserId,
-              authStore.isAuthenticated else {
+        guard authStore.isAuthenticated else {
             errorMessage = "You must be logged in to view player groups"
             return
         }
@@ -86,10 +85,7 @@ struct PlayerGroupsView: View {
         errorMessage = nil
 
         do {
-            playerGroups = try await databaseService.getPlayerGroups(
-                userId: userId,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            playerGroups = try await databaseService.getPlayerGroups()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -104,10 +100,7 @@ struct PlayerGroupsView: View {
         }
 
         do {
-            try await databaseService.deletePlayerGroup(
-                id: group.id,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            try await databaseService.deletePlayerGroup(id: group.id)
             await loadGroups()
         } catch {
             errorMessage = error.localizedDescription
@@ -371,8 +364,7 @@ struct AddPlayerGroupView: View {
     }
 
     private func saveGroup() async {
-        guard let userId = authStore.currentUserId,
-              authStore.isAuthenticated else {
+        guard authStore.isAuthenticated else {
             errorMessage = "You must be logged in to save player groups"
             return
         }
@@ -380,19 +372,10 @@ struct AddPlayerGroupView: View {
         isLoading = true
         errorMessage = nil
 
-        let newGroup = PlayerGroup(
-            id: UUID(),
-            userId: userId,
-            groupName: groupName,
-            playerNames: validPlayerNames,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-
         do {
             try await databaseService.createPlayerGroup(
-                newGroup,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+                name: groupName,
+                playerNames: validPlayerNames
             )
             await onSave()
             dismiss()
@@ -558,8 +541,7 @@ struct EditPlayerGroupView: View {
     }
 
     private func saveGroup() async {
-        guard let userId = authStore.currentUserId,
-              authStore.isAuthenticated else {
+        guard authStore.isAuthenticated else {
             errorMessage = "You must be logged in to save player groups"
             return
         }
@@ -573,10 +555,7 @@ struct EditPlayerGroupView: View {
         updatedGroup.updatedAt = Date()
 
         do {
-            try await databaseService.updatePlayerGroup(
-                updatedGroup,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            try await databaseService.updatePlayerGroup(updatedGroup)
             await onSave()
             dismiss()
         } catch {

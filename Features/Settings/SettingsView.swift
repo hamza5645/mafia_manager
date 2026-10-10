@@ -44,6 +44,28 @@ struct SettingsView: View {
                                 }
                                 .padding(.vertical, 8)
                             }
+
+                            if authStore.hasPendingGuestMerge {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Guest progress hasn't been saved to your account yet.")
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.textSecondary)
+                                        Spacer()
+                                        Button("Retry") {
+                                            Task { await authStore.retryGuestMerge() }
+                                        }
+                                        .font(Design.Typography.subheadline)
+                                        .foregroundColor(Design.Colors.brandGold)
+                                        .buttonStyle(.plain)
+                                    }
+                                    if let errorMessage = authStore.errorMessage {
+                                        Text(errorMessage)
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.dangerRed)
+                                    }
+                                }
+                            }
                         } else if authStore.isAnonymous {
                             // Show guest profile section with upgrade CTA
                             VStack(spacing: 16) {
@@ -140,7 +162,7 @@ struct SettingsView: View {
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 10)
                                 }
-                                .accessibilityHint("Sign out of your guest session and delete saved guest progress")
+                                .accessibilityHint("Sign out of your guest session and remove guest data from this device")
                             }
                         } else {
                             // Show login button when not authenticated at all
@@ -279,7 +301,7 @@ struct SettingsView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will delete your guest account and saved progress on this device. To keep your stats, sign up first.")
+                Text("This signs you out and removes your guest data from this device, so you can't get this guest's progress back. To keep your stats, sign up first.")
             }
         }
     }
