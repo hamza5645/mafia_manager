@@ -45,16 +45,22 @@ const groupOut = (row: Row<"player_groups">) => ({
   updated_at: row.updated_at,
 });
 
-async function ownedRow<T extends "player_stats" | "custom_roles_configs" | "player_groups">(
+// Looks up a library row by app id; a foreign row is treated as missing.
+async function ownedRow(ctx: MutationCtx, table: "player_stats", id: string, userId: string): Promise<Doc<"player_stats"> | null>;
+async function ownedRow(ctx: MutationCtx, table: "custom_roles_configs", id: string, userId: string): Promise<Doc<"custom_roles_configs"> | null>;
+async function ownedRow(ctx: MutationCtx, table: "player_groups", id: string, userId: string): Promise<Doc<"player_groups"> | null>;
+async function ownedRow(
   ctx: MutationCtx,
-  table: T,
+  table: "player_stats" | "custom_roles_configs" | "player_groups",
   id: string,
   userId: string,
-): Promise<Doc<T> | null> {
-  const row = (await ctx.db
-    .query(table)
-    .withIndex("by_app_id", (q: any) => q.eq("id", id))
-    .unique()) as Doc<T> | null;
+) {
+  const row =
+    table === "player_stats"
+      ? await ctx.db.query("player_stats").withIndex("by_app_id", (q) => q.eq("id", id)).unique()
+      : table === "custom_roles_configs"
+        ? await ctx.db.query("custom_roles_configs").withIndex("by_app_id", (q) => q.eq("id", id)).unique()
+        : await ctx.db.query("player_groups").withIndex("by_app_id", (q) => q.eq("id", id)).unique();
   return row && row.user_id === userId ? row : null;
 }
 
@@ -102,9 +108,10 @@ export const getPlayerStat = query({
   args: { player_name: v.string(), ...guestArg },
   handler: async (ctx, args) => {
     const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const playerName = cleanText(args.player_name, 1, 50, E.PLAYER_NAME);
     const row = await ctx.db
       .query("player_stats")
-      .withIndex("by_user_player", (q) => q.eq("user_id", caller.id).eq("player_name", args.player_name))
+      .withIndex("by_user_player", (q) => q.eq("user_id", caller.id).eq("player_name", playerName))
       .first();
     return row ? statOut(row) : null;
   },

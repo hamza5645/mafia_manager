@@ -15,6 +15,7 @@ test('upsertPlayerStat records one game per call and validates bounds', async ()
   const second = await t.mutation(api.stats.upsertPlayerStat, { player_name: 'Ann', role: 'doctor', won: false, kills: 0, ...proof(g) });
   expect(second).toMatchObject({ id: first.id, games_played: 2, games_won: 1, games_lost: 1, total_kills: 2, times_mafia: 1, times_doctor: 1 });
   expect(await t.query(api.stats.getPlayerStat, { player_name: 'Ann', ...proof(g) })).toEqual(second);
+  expect(await t.query(api.stats.getPlayerStat, { player_name: ' Ann ', ...proof(g) })).toEqual(second);
   expect(await t.query(api.stats.listPlayerStats, proof(g))).toEqual([second]);
   for (const kills of [-1, 1.5, 101]) {
     await expect(t.mutation(api.stats.upsertPlayerStat, { player_name: 'Ann', role: 'citizen', won: true, kills, ...proof(g) }))

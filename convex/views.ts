@@ -4,7 +4,7 @@ import { QueryCtx, query } from "./_generated/server";
 import { getSession, listSeats } from "./lib/guards";
 import { getCaller } from "./lib/identity";
 import { actionForViewer, playerForViewer, sessionForViewer, tentativeForViewer } from "./lib/projections";
-import { NIGHT_TYPES, nightActionsReady, votesReady } from "./lib/rules";
+import { NIGHT_TYPES, nightActionsReady, sessionData, votesReady } from "./lib/rules";
 import { guestArg } from "./validators";
 
 // Subscription snapshots. These never throw ConvexError: a missing session or a
@@ -57,7 +57,7 @@ export const getPlayers = query({
 });
 
 function phaseIndexOf(session: Doc<"game_sessions">): number | null {
-  const data = session.current_phase_data;
+  const { phase: data } = sessionData(session);
   if (session.current_phase === "night") return data?.nightIndex ?? null;
   if (["voting", "voting_results", "vote_death_reveal"].includes(session.current_phase)) return data?.dayIndex ?? null;
   return null;
@@ -101,7 +101,7 @@ export const getRoundState = query({
     if (isHost && session.current_phase === "role_reveal") {
       ready = seats.every((s) => s.is_bot || s.is_ready);
     } else if (isHost && session.current_phase === "night" && roundId !== null && phaseIndex !== null) {
-      const resolved = session.night_history.some((e: any) => e.round_id === roundId && e.is_resolved);
+      const resolved = sessionData(session).nights.some((e) => e.round_id === roundId && e.is_resolved);
       ready = !resolved && nightActionsReady(seats, actions, roundId, phaseIndex);
     } else if (isHost && session.current_phase === "voting") {
       ready = votesReady(seats, votes);

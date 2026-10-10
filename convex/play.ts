@@ -3,7 +3,7 @@ import { Doc } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 import { E, fail } from "./lib/errors";
 import { requireRoster } from "./lib/guards";
-import { validateGameAction } from "./lib/rules";
+import { sessionData, validateGameAction } from "./lib/rules";
 import { nowAppleEpochSeconds, uuid } from "./lib/util";
 import { actionTypeValidator, guestArg } from "./validators";
 
@@ -21,7 +21,7 @@ function requireActor(
 }
 
 const nightClosed = (session: Doc<"game_sessions">, roundId: string | undefined) =>
-  roundId !== undefined && session.night_history.some((e: any) => e.round_id === roundId);
+  roundId !== undefined && sessionData(session).nights.some((e) => e.round_id === roundId);
 
 export const submitAction = mutation({
   args: {

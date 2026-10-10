@@ -179,3 +179,20 @@ test('Play Again resets the finished game; the original host reclaims the lobby'
   expect((await sessionRow(t, r.sessionId)).host_user_id).toBe(r.host.id);
   expect((await t.query(api.views.getPlayers, r.as(r.host))).filter(p => p.is_ready)).toHaveLength(3);
 });
+
+test('a host without a seat can still leave and hand over host', async () => {
+  const t = backend(); const r = await room(t, 3);
+  await t.run(async ctx => {
+    const row = await ctx.db.query('session_players').withIndex('by_app_id', q => q.eq('id', r.humans[0].id)).unique();
+    await ctx.db.delete(row!._id);
+  });
+  await t.mutation(api.sessions.leaveSession, r.as(r.host));
+  expect(await sessionRow(t, r.sessionId)).toMatchObject({ host_user_id: r.users[1].id, status: 'waiting' });
+});
+
+test('the host can remove a bot seat', async () => {
+  const t = backend(); const r = await room(t, 2, 2);
+  await t.mutation(api.sessions.removePlayer, { ...r.as(r.host), player_record_id: r.bots[0].id });
+  expect((await t.query(api.views.getPlayers, r.as(r.host))).map(p => p.player_name)).toEqual(['QA 0', 'Bot 2', 'QA 1']);
+  expect((await sessionRow(t, r.sessionId)).host_user_id).toBe(r.host.id);
+});

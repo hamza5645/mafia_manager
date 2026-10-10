@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { E, fail } from "./lib/errors";
 import { requireHost } from "./lib/guards";
-import { readEliminatedId, readVoteCounts } from "./lib/rules";
+import { readEliminatedId, readVoteCounts, sessionData } from "./lib/rules";
 import { enterRound } from "./lib/transitions";
 import { nowAppleEpochSeconds } from "./lib/util";
 import { guestArg, phaseTargetValidator } from "./validators";
@@ -23,7 +23,7 @@ export const advancePhase = mutation({
     if (session.current_phase === args.to_phase) return { current_phase: session.current_phase };
     if (session.status !== "in_progress" || session.is_game_over) fail(E.NOT_ACTIVE);
     if (session.current_phase !== PREDECESSOR[args.to_phase]) fail(E.MOVED_ON);
-    const data = session.current_phase_data;
+    const { phase: data } = sessionData(session);
 
     if (args.to_phase === "night") {
       await enterRound(ctx, session, seats, "night", { type: "night", nightIndex: 0 });
