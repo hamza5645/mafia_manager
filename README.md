@@ -9,7 +9,7 @@ Targets and identifiers
 - Minimum iOS: 18.0
 
 Backend
-- **Convex**: authoritative multiplayer state, room codes, player/action documents, realtime subscriptions, stats, custom role configs, and player groups.
+- **Convex**: authoritative multiplayer state, room codes, night/vote outcomes, win checks, role privacy, realtime subscriptions, stats, custom role configs, and player groups. The server derives the caller from the guest proof or Clerk token; functions never take user ids.
 - **Clerk**: email/password account auth, password reset, and Convex authentication tokens.
 - **Guest mode**: local Keychain guest secret mapped to a Convex guest profile for quick multiplayer entry.
 - Convex dev deployment: `https://energized-herring-345.eu-west-1.convex.cloud`
@@ -50,8 +50,9 @@ Key architecture patterns
 - **Tuist-managed project**: edit `Project.swift` and `Tuist/Package.swift`, then regenerate. Do not hand-edit `.pbxproj`.
 - **Phase-based state machine**: `GamePhase` drives solo navigation; multiplayer phases live in `GameSession.currentPhaseData`.
 - **Single source of truth**: solo state lives in `GameStore`; multiplayer state lives in `MultiplayerGameStore`.
-- **Two-phase night resolution**: `endNight()` records actions, then `resolveNightOutcome()` applies outcomes. Multiplayer mirrors this with Convex mutations and `resolveNightAtomic`.
-- **Backend service layer**: `ConvexService`, `AuthService`, `DatabaseService`, `SessionService`, and `RealtimeService`.
+- **Two-phase resolution**: `endNight()` records actions, then `resolveNightOutcome()` applies outcomes. Multiplayer does the same on the server: `night:recordNightActions` → `night:resolveNightAtomic` and `voting:closeVoting` → `voting:resolveVoteAtomic`; the host only requests transitions and drives bots.
+- **Snapshot data flow**: `MultiplayerGameStore` assigns three supervised Convex subscriptions (`views:getSessionView`, `views:getPlayers`, `views:getRoundState`) straight to state.
+- **Backend service layer**: `ConvexService`, `AuthService`, `DatabaseService`, `SessionService`, and `SubscriptionSupervisor`.
 
 Project structure
 - `App/` - app entry point and root routing

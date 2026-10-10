@@ -30,9 +30,9 @@ Tech stack:
    - Active backend code should use Convex + Clerk.
    - Historical migration/audit docs may mention the previous backend, but app code should not.
 
-3. **Preserve the two-phase night pattern.**
+3. **Preserve the two-phase (record, then resolve) pattern.**
    - Solo: `endNight()` records actions; `resolveNightOutcome()` applies outcomes.
-   - Multiplayer: record submitted actions first; apply final night state through the Convex atomic night mutation.
+   - Multiplayer: Convex computes every outcome. Night: `night:recordNightActions` → `night:resolveNightAtomic`. Voting: `voting:closeVoting` → `voting:resolveVoteAtomic`. The host client only requests transitions (`phases:advancePhase`) and drives bots.
 
 4. **Keep solo and multiplayer state paths separate.**
    - Solo: `GameStore` + local JSON persistence.
@@ -80,19 +80,18 @@ Critical files:
 
 ### Multiplayer Mode
 
-`MultiplayerGameStore` coordinates room/session state and calls:
-- `SessionService` for Convex mutations and snapshots.
-- `RealtimeService` for Convex reactive subscriptions.
+`MultiplayerGameStore` holds three Convex snapshot subscriptions (`views:getSessionView`, `views:getPlayers`, `views:getRoundState`) and assigns each value directly to store state; everything else is derived. Each subscription is supervised and resubscribed with backoff. Mutations go through `SessionService`.
 
 Critical files:
-- `Core/Multiplayer/Store/MultiplayerGameStore.swift`
-- `Core/Multiplayer/Services/SessionService.swift`
-- `Core/Multiplayer/Services/RealtimeService.swift`
-- `Core/Multiplayer/Models/GameSession.swift`
-- `Core/Multiplayer/Models/SessionPlayer.swift`
-- `Core/Multiplayer/Models/GameAction.swift`
-- `convex/schema.ts`
-- `convex/sessions.ts`
+- `Core/Multiplayer/Store/MultiplayerGameStore.swift` - snapshot state, player actions
+- `Core/Multiplayer/Store/MultiplayerGameStore+Connection.swift` - subscriptions, heartbeat, host-offline claim
+- `Core/Multiplayer/Store/MultiplayerGameStore+HostPhases.swift` - host transition requests
+- `Core/Multiplayer/Store/BotDirector.swift` - host-driven bot actions and votes
+- `Core/Multiplayer/Services/SessionService.swift` - Convex mutations
+- `Core/Multiplayer/Services/SubscriptionSupervisor.swift` - keeps one subscription alive
+- `Core/Multiplayer/Models/` - `GameSession`, `SessionPlayer`, `GameAction`, `SessionSnapshots`
+- `convex/schema.ts`, `convex/sessions.ts` (lobby, membership, host), `convex/phases.ts`, `convex/play.ts` (actions, tentative selections), `convex/night.ts`, `convex/voting.ts`, `convex/views.ts` (subscription queries)
+- `convex/lib/` - identity, guards, rules, transitions, privacy projections, errors
 
 ### Auth and Cloud Data
 
@@ -104,6 +103,7 @@ Auth/account state:
 Backend wiring:
 - `Core/Backend/ConvexConfig.swift`
 - `Core/Backend/ConvexService.swift`
+- `Core/Backend/BackendError.swift`
 - `Core/Backend/DatabaseService.swift`
 
 Convex backend:
@@ -122,15 +122,16 @@ Convex backend:
 
 `convex/auth.config.ts` reads the Clerk issuer/frontend API URL from the Convex `CLERK_FRONTEND_API_URL` environment variable.
 
-Guest mode uses a local Keychain secret hashed into `users.guest_secret_hash`; account mode uses Clerk identity subject mapped into `users.auth_subject`.
+Identity is derived on the server; no Convex function accepts a user id. A valid guest proof makes the caller that guest, otherwise the caller is the Clerk user (`identity.subject` → `users.auth_subject`). The guest proof is the sha256 hex of a Keychain secret, sent as `guest_secret_hash`, which `ConvexService` injects into every call. The server stores only `users.guest_secret_digest`, a sha256 of that value.
 
 ## Common Gotchas
 
 - Convex Swift `ConvexEncodable` arguments must encode to raw JSON strings.
 - Swift dates are encoded as seconds since Apple reference date; Convex timestamp helpers should match that for direct `Date` decoding.
 - Role privacy must be enforced in Convex query results, not just hidden in SwiftUI.
-- `current_round_id` must be regenerated for each night/voting phase so old actions cannot replay.
-- Realtime subscriptions emit snapshots; `RealtimeService` diffs snapshots into app events.
+- The server issues a new `current_round_id` for each night/voting phase; actions and the record/resolve mutations must carry the current one.
+- Subscriptions emit full snapshots that are assigned to store state as-is; there is no diffing or polling.
+- Every `ConvexError` is a short user-facing string; Swift shows it through `BackendError`.
 - Host players can also have active roles and must still submit their night actions.
 
 ## Documentation Index
