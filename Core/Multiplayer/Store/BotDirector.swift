@@ -11,22 +11,25 @@ struct BotPlan: Equatable {
 @MainActor
 final class BotDirector {
     /// Server messages after which retrying this round can never succeed.
-    static let roundClosedMessages: Set<String> = [
+    nonisolated static let roundClosedMessages: Set<String> = [
         "Night actions are closed.",
         "The game has moved on.",
         "This action is not available right now.",
         "This game is no longer active.",
     ]
 
-    private let sessionService: SessionService
+    /// Sends one bot action (`play:submitAction`) for the given session, round and phase index.
+    typealias Submit = (_ plan: BotPlan, _ sessionId: UUID, _ roundId: UUID, _ phaseIndex: Int) async throws -> Void
+
+    private let submitAction: Submit
     private let decisions = BotDecisionService()
     private var roundId: UUID?
     /// `"\(roundId):\(botPlayerId)"` for submissions in flight or already accepted this round.
     private var handled: Set<String> = []
     private var isRoundClosed = false
 
-    init(sessionService: SessionService) {
-        self.sessionService = sessionService
+    init(submit: @escaping Submit) {
+        submitAction = submit
     }
 
     func reset() {
@@ -73,14 +76,11 @@ final class BotDirector {
     /// Returns false when the submission should be retried.
     private func submit(_ plan: BotPlan, sessionId: UUID, roundId: UUID, phaseIndex: Int, alive: [UUID]) async -> Bool {
         do {
-            try await sessionService.submitAction(
-                sessionId: sessionId, roundId: roundId, actionType: plan.actionType,
-                phaseIndex: phaseIndex, actorPlayerId: plan.botPlayerId, targetPlayerId: plan.target
-            )
+            try await submitAction(plan, sessionId, roundId, phaseIndex)
             return true
         } catch {
             print("❌ [BotDirector] \(plan.actionType.rawValue) for bot \(plan.botPlayerId) failed: \(error.localizedDescription)")
-            if Self.roundClosedMessages.contains(error.localizedDescription) {
+            if Self.closesRound(error) {
                 if self.roundId == roundId { isRoundClosed = true }
                 return true
             }
@@ -89,15 +89,20 @@ final class BotDirector {
         // A rejected vote falls back to another living seat, and to self as the last resort.
         let fallback = alive.filter { $0 != plan.botPlayerId && $0 != plan.target }.randomElement() ?? plan.botPlayerId
         do {
-            try await sessionService.submitAction(
-                sessionId: sessionId, roundId: roundId, actionType: .vote,
-                phaseIndex: phaseIndex, actorPlayerId: plan.botPlayerId, targetPlayerId: fallback
-            )
+            try await submitAction(BotPlan(botPlayerId: plan.botPlayerId, actionType: .vote, target: fallback),
+                                   sessionId, roundId, phaseIndex)
             return true
         } catch {
             print("❌ [BotDirector] Fallback vote for bot \(plan.botPlayerId) failed: \(error.localizedDescription)")
-            return false
+            if Self.closesRound(error), self.roundId == roundId { isRoundClosed = true }
+            return Self.closesRound(error)
         }
+    }
+
+    /// A server rejection after which no submission can succeed this round.
+    static func closesRound(_ error: Error) -> Bool {
+        guard let error = error as? BackendError, error.isServerMessage else { return false }
+        return roundClosedMessages.contains(error.message)
     }
 
     // MARK: - Planning

@@ -18,6 +18,39 @@ struct SubscriptionSupervisorTests {
         }
     }
 
+    /// Time only moves when a test advances it.
+    private final class ManualClock {
+        private var now: Duration = .zero
+        private(set) var requested: [Duration] = []
+        private var sleepers: [(deadline: Duration, continuation: UnsafeContinuation<Void, Never>)] = []
+
+        func sleep(_ duration: Duration) async {
+            requested.append(duration)
+            await withUnsafeContinuation { sleepers.append((now + duration, $0)) }
+        }
+
+        /// Lets pending tasks reach their sleep, moves time forward and runs the ones that woke.
+        func advance(by duration: Duration) async {
+            await settle()
+            now += duration
+            let due = sleepers.filter { $0.deadline <= now }
+            sleepers.removeAll { $0.deadline <= now }
+            due.forEach { $0.continuation.resume() }
+            await settle()
+        }
+
+        private func settle() async {
+            for _ in 0..<10 { await Task.yield() }
+        }
+    }
+
+    private let feed = Feed()
+    private let clock = ManualClock()
+
+    private func makeSupervisor(onValue: @escaping (Int) -> Void = { _ in }) -> SubscriptionSupervisor {
+        SubscriptionSupervisor(feed.subscribe, sleep: clock.sleep, onValue: onValue)
+    }
+
     /// Values are delivered with `receive(on: DispatchQueue.main)`; let them land.
     private func drainMainQueue() async {
         await withCheckedContinuation { continuation in
@@ -45,9 +78,8 @@ struct SubscriptionSupervisorTests {
     // MARK: - Supervision
 
     @Test func valuesAreDeliveredAndMarkTheSubscriptionLive() async {
-        let feed = Feed()
         var values: [Int] = []
-        let supervisor = SubscriptionSupervisor(feed.subscribe, onValue: { values.append($0) })
+        let supervisor = makeSupervisor { values.append($0) }
         supervisor.start()
         #expect(supervisor.status == .connecting)
         feed.latest.send(1)
@@ -58,12 +90,12 @@ struct SubscriptionSupervisorTests {
     }
 
     @Test func convexErrorStopsUntilTheUserRetries() async {
-        let feed = Feed()
-        let supervisor = SubscriptionSupervisor(feed.subscribe, onValue: { _ in })
+        let supervisor = makeSupervisor()
         supervisor.start()
         feed.latest.send(completion: .failure(.ConvexError(data: "\"You are no longer in this game.\"")))
         await drainMainQueue()
         #expect(supervisor.status == .failed("You are no longer in this game."))
+        await clock.advance(by: .seconds(60))
         #expect(feed.subjects.count == 1, "A ConvexError must not be retried automatically")
 
         supervisor.restartIfNeeded()
@@ -72,8 +104,7 @@ struct SubscriptionSupervisorTests {
     }
 
     @Test func transientFailureWaitsAndForegroundRestartsImmediately() async {
-        let feed = Feed()
-        let supervisor = SubscriptionSupervisor(feed.subscribe, onValue: { _ in })
+        let supervisor = makeSupervisor()
         supervisor.start()
         feed.latest.send(completion: .failure(.ServerError(msg: "Server down")))
         await drainMainQueue()
@@ -88,8 +119,7 @@ struct SubscriptionSupervisorTests {
     }
 
     @Test func healthySubscriptionIsLeftAloneOnForeground() async {
-        let feed = Feed()
-        let supervisor = SubscriptionSupervisor(feed.subscribe, onValue: { _ in })
+        let supervisor = makeSupervisor()
         supervisor.start()
         feed.latest.send(1)
         await drainMainQueue()
@@ -97,15 +127,15 @@ struct SubscriptionSupervisorTests {
         #expect(feed.subjects.count == 1)
     }
 
-    @Test func backoffResubscribesAndAValueResetsTheAttemptCounter() async throws {
-        let feed = Feed()
-        let supervisor = SubscriptionSupervisor(feed.subscribe, onValue: { _ in })
+    @Test func backoffResubscribesAndAValueResetsTheAttemptCounter() async {
+        let supervisor = makeSupervisor()
         supervisor.start()
         feed.latest.send(completion: .failure(.InternalError(msg: "Decoding failed")))
         await drainMainQueue()
         #expect(supervisor.status == .retrying(attempt: 1))
 
-        try await Task.sleep(for: .milliseconds(1_500)) // First retry waits 0.8...1.2 s.
+        await clock.advance(by: .milliseconds(1_200)) // The first retry waits 0.8...1.2 s.
+        #expect(clock.requested.contains { $0 >= .milliseconds(800) && $0 <= .milliseconds(1_200) })
         #expect(feed.subjects.count == 2)
         feed.latest.send(1)
         await drainMainQueue()
@@ -114,22 +144,32 @@ struct SubscriptionSupervisorTests {
         #expect(supervisor.status == .retrying(attempt: 1))
     }
 
-    @Test func aSubscriptionWithoutAFirstValueIsRetried() async throws {
-        let feed = Feed()
-        let supervisor = SubscriptionSupervisor(feed.subscribe, firstValueTimeout: .milliseconds(100), onValue: { _ in })
+    @Test func aSubscriptionWithoutAFirstValueIsRetried() async {
+        let supervisor = makeSupervisor()
         supervisor.start()
-        try await Task.sleep(for: .milliseconds(300))
+        await clock.advance(by: SubscriptionSupervisor.firstValueTimeout)
         #expect(supervisor.status == .retrying(attempt: 1), "A value dropped by ConvexMobile must not hang the screen")
+        await clock.advance(by: .seconds(2))
+        #expect(feed.subjects.count == 2)
     }
 
-    @Test func stopCancelsAPendingRetry() async throws {
-        let feed = Feed()
-        let supervisor = SubscriptionSupervisor(feed.subscribe, onValue: { _ in })
+    @Test func aFirstValueCancelsTheTimeout() async {
+        let supervisor = makeSupervisor()
+        supervisor.start()
+        feed.latest.send(1)
+        await drainMainQueue()
+        await clock.advance(by: .seconds(60))
+        #expect(supervisor.status == .live)
+        #expect(feed.subjects.count == 1)
+    }
+
+    @Test func stopCancelsAPendingRetry() async {
+        let supervisor = makeSupervisor()
         supervisor.start()
         feed.latest.send(completion: .failure(.ServerError(msg: "Server down")))
         await drainMainQueue()
         supervisor.stop()
-        try await Task.sleep(for: .milliseconds(1_500))
+        await clock.advance(by: .seconds(60))
         #expect(feed.subjects.count == 1)
         #expect(supervisor.status == .idle)
     }

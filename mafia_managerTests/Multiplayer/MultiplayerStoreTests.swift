@@ -1,3 +1,4 @@
+import ConvexMobile
 import Foundation
 import Testing
 
@@ -88,6 +89,62 @@ struct MultiplayerStoreTests {
             #expect(store.wasKicked)
             #expect(!store.isInSession)
         }
+    }
+
+    @Test func anUnidentifiedViewerKeepsTheGameAndAsksToSignIn() {
+        let store = MultiplayerGameStore()
+        store.sessionId = UUID()
+        let session = Fixture.session()
+        let me = Fixture.seat(.citizen, bot: false, isMe: true)
+        store.apply(sessionView: Fixture.view(session))
+        store.apply(players: [me])
+        store.apply(roundState: Fixture.round())
+
+        // A lapsed Clerk token: the server sees no caller at all.
+        store.apply(sessionView: Fixture.view(session, isMember: false, userId: nil))
+        store.apply(players: [])
+        store.apply(roundState: nil)
+        #expect(!store.wasKicked)
+        #expect(store.isInSession)
+        #expect(store.currentSession?.id == session.id)
+        #expect(store.myPlayer?.id == me.id)
+        #expect(store.roundState != nil)
+        #expect(store.connectionProblem == "Please sign in to continue.")
+
+        store.apply(sessionView: Fixture.view(session))
+        #expect(!store.needsSignIn)
+        #expect(store.connectionProblem == nil)
+    }
+
+    @Test func onlyTheServerAuthMessageMeansSignInIsRequired() {
+        let auth = BackendError(ClientError.ConvexError(data: "\"Please sign in to continue.\""))
+        let other = BackendError(ClientError.ConvexError(data: "\"Game not found.\""))
+        #expect(MultiplayerGameStore.isSignInRequired(auth))
+        #expect(!MultiplayerGameStore.isSignInRequired(other))
+        #expect(!MultiplayerGameStore.isSignInRequired(URLError(.notConnectedToInternet)))
+    }
+
+    @Test func actionsWaitForTheSnapshotThatCarriesTheRound() async throws {
+        let store = MultiplayerGameStore()
+        store.sessionId = UUID()
+        store.apply(sessionView: Fixture.view(Fixture.session(roundId: nil)))
+        let waiting = Task { try await store.currentRoundId() }
+        for _ in 0..<10 { await Task.yield() }
+
+        let round = UUID()
+        store.apply(sessionView: Fixture.view(Fixture.session(roundId: round)))
+        #expect(try await waiting.value == round)
+    }
+
+    @Test func leavingStopsWaitingForARound() async {
+        let store = MultiplayerGameStore()
+        store.sessionId = UUID()
+        store.apply(sessionView: Fixture.view(Fixture.session(roundId: nil)))
+        let waiting = Task { try await store.currentRoundId() }
+        for _ in 0..<10 { await Task.yield() }
+
+        store.clearLocalSession()
+        await #expect(throws: SessionError.self) { try await waiting.value }
     }
 
     @Test func voluntaryLeaveIsNotAKick() {

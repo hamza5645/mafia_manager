@@ -36,12 +36,12 @@ extension MultiplayerGameStore {
 
     /// Finish Night: record the night's actions, then apply the recorded outcome atomically.
     func completeNightPhase() async throws {
-        guard isHost, !isCompletingNight, let session = currentSession,
-              session.currentPhase == "night", let roundId = session.currentRoundId else { return }
+        guard isHost, !isCompletingNight, let sessionId, currentSession?.currentPhase == "night" else { return }
         isCompletingNight = true
         defer { isCompletingNight = false }
-        try await sessionService.recordNightActions(sessionId: session.id, roundId: roundId)
-        try await sessionService.resolveNightAtomic(sessionId: session.id, roundId: roundId)
+        let roundId = try await currentRoundId()
+        try await sessionService.recordNightActions(sessionId: sessionId, roundId: roundId)
+        try await sessionService.resolveNightAtomic(sessionId: sessionId, roundId: roundId)
     }
 
     func revealDeaths() async throws {
@@ -53,8 +53,8 @@ extension MultiplayerGameStore {
     }
 
     func endVoting() async throws {
-        guard isHost, let session = currentSession, let roundId = session.currentRoundId else { throw SessionError.notHost }
-        try await sessionService.closeVoting(sessionId: session.id, roundId: roundId)
+        guard isHost, let sessionId else { throw SessionError.notHost }
+        try await sessionService.closeVoting(sessionId: sessionId, roundId: try await currentRoundId())
     }
 
     /// Continue from the voting results to the elimination reveal.
@@ -64,8 +64,8 @@ extension MultiplayerGameStore {
 
     /// Continue from the elimination reveal: the server applies the vote and opens the next night.
     func continueFromVoteReveal() async throws {
-        guard isHost, let session = currentSession, let roundId = session.currentRoundId else { throw SessionError.notHost }
-        try await sessionService.resolveVoteAtomic(sessionId: session.id, roundId: roundId)
+        guard isHost, let sessionId else { throw SessionError.notHost }
+        try await sessionService.resolveVoteAtomic(sessionId: sessionId, roundId: try await currentRoundId())
     }
 
     private func advance(to phase: PhaseTarget) async throws {

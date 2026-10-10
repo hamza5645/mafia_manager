@@ -44,18 +44,20 @@ enum Fixture {
         )
     }
 
-    static func view(_ session: GameSession, isMember: Bool = true, isHost: Bool = false) -> SessionView {
+    /// `userId: nil` is what the server returns when it cannot identify the caller.
+    static func view(_ session: GameSession, isMember: Bool = true, isHost: Bool = false, userId: UUID? = UUID()) -> SessionView {
         SessionView(session: session, viewer: .init(
-            userId: UUID(), playerRecordId: nil, playerId: nil, isMember: isMember, isHost: isHost
+            userId: userId, playerRecordId: nil, playerId: nil, isMember: isMember, isHost: isHost
         ))
     }
 
     static func round(
+        _ roundId: UUID = UUID(),
         phase: String = "night",
         ready: Bool = false,
         actions: [GameAction] = [],
         tentative: [TentativeSelection] = []
     ) -> RoundState {
-        RoundState(roundId: UUID(), phase: phase, phaseIndex: 0, readyToAdvance: ready, actions: actions, tentative: tentative)
+        RoundState(roundId: roundId, phase: phase, phaseIndex: 0, readyToAdvance: ready, actions: actions, tentative: tentative)
     }
 }

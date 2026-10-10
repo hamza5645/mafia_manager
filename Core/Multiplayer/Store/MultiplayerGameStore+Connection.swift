@@ -39,14 +39,14 @@ extension MultiplayerGameStore {
         }
     }
 
-    /// The user's Retry: restart failed or waiting subscriptions.
+    /// The user's Retry: restart failed or waiting subscriptions and re-check who I am.
     func retryConnection() {
         subscriptions.forEach { $0.restartIfNeeded() }
+        if needsSignIn { recoverIdentity() }
     }
 
     func updateConnectionStatus() {
         var live = !subscriptions.isEmpty
-        var waiting = false
         var banner = false
         var failure: String?
         for subscription in subscriptions {
@@ -54,7 +54,6 @@ extension MultiplayerGameStore {
             case .live:
                 continue
             case .retrying(let attempt):
-                waiting = true
                 banner = banner || attempt >= 3
             case .failed(let message):
                 failure = failure ?? message
@@ -64,7 +63,6 @@ extension MultiplayerGameStore {
             live = false
         }
         isRealtimeConnected = live
-        isRealtimeReconnecting = waiting
         showsReconnectBanner = banner
         connectionError = failure
     }
@@ -72,13 +70,16 @@ extension MultiplayerGameStore {
     // MARK: - App lifecycle
 
     func handleAppResume() async {
+        isInBackground = false
         guard sessionId != nil else { return }
         await authStore?.ensureValidSession()
+        guard !isInBackground else { return }
         subscriptions.forEach { $0.restartIfNeeded() }
         startTicking() // Sends a heartbeat immediately.
     }
 
     func prepareForBackground() {
+        isInBackground = true
         tickTask?.cancel()
         tickTask = nil
     }

@@ -27,18 +27,21 @@ final class SubscriptionSupervisor {
     }
     var onStatusChange: (() -> Void)?
 
+    static let firstValueTimeout: Duration = .seconds(15)
+
     private let open: (SubscriptionSupervisor) -> AnyCancellable
-    private let firstValueTimeout: Duration
+    /// Waits for backoff delays and the first-value timeout (a fake clock in tests).
+    private let sleep: (Duration) async -> Void
     private var subscription: AnyCancellable?
     private var retryTask: Task<Void, Never>?
     private var attempt = 0
 
     init<Value>(
         _ subscribe: @escaping () -> AnyPublisher<Value, ClientError>,
-        firstValueTimeout: Duration = .seconds(15),
+        sleep: @escaping (Duration) async -> Void = { duration in _ = try? await Task.sleep(for: duration) },
         onValue: @escaping (Value) -> Void
     ) {
-        self.firstValueTimeout = firstValueTimeout
+        self.sleep = sleep
         open = { supervisor in
             subscribe()
                 // FFI callbacks arrive on arbitrary threads; the main queue keeps them in order.
@@ -86,8 +89,8 @@ final class SubscriptionSupervisor {
         subscription?.cancel()
         status = .connecting
         subscription = open(self)
-        retryTask = Task { [weak self, firstValueTimeout] in
-            try? await Task.sleep(for: firstValueTimeout)
+        retryTask = Task { [weak self, sleep] in
+            await sleep(Self.firstValueTimeout)
             guard !Task.isCancelled, let self, self.status == .connecting else { return }
             print("⚠️ [SubscriptionSupervisor] No first value; resubscribing")
             self.subscription?.cancel()
@@ -113,8 +116,8 @@ final class SubscriptionSupervisor {
         let delay = Self.backoffDelay(attempt: attempt, jitter: .random(in: 0.8...1.2))
         attempt += 1
         status = .retrying(attempt: attempt)
-        retryTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(delay))
+        retryTask = Task { [weak self, sleep] in
+            await sleep(.seconds(delay))
             guard !Task.isCancelled else { return }
             self?.connect()
         }

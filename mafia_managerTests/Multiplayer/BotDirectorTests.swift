@@ -1,3 +1,4 @@
+import ConvexMobile
 import Foundation
 import Testing
 
@@ -139,5 +140,121 @@ struct BotDirectorTests {
         #expect(!BotDirector.canTarget(dead.playerId, actor: mafia, role: .mafia, alive: alive))
         let doctor = Fixture.seat(.doctor)
         #expect(BotDirector.canTarget(doctor.playerId, actor: doctor, role: .doctor, alive: alive + [doctor]))
+    }
+
+    // MARK: - Submission pass (`run`)
+
+    private func settle() async {
+        for _ in 0..<10 { await Task.yield() }
+    }
+
+    private func serverError(_ message: String) -> BackendError {
+        BackendError(ClientError.ConvexError(data: "\"\(message)\""))
+    }
+
+    /// A night where one doctor bot acts alone and an inspector bot waits for its human.
+    private func nightTable(round: UUID) -> (GameSession, [SessionPlayer], RoundState) {
+        let players = [Fixture.seat(.doctor), Fixture.seat(.inspector), Fixture.seat(.inspector, bot: false),
+                       Fixture.seat(.mafia, bot: false), Fixture.seat(.citizen)]
+        return (Fixture.session(roundId: round), players, Fixture.round(round))
+    }
+
+    @Test func aBotIsSubmittedOncePerRoundWhileInFlightAndAfterSuccess() async {
+        var calls: [BotPlan] = []
+        var inFlight: [UnsafeContinuation<Void, Never>] = []
+        let director = BotDirector { plan, _, _, _ in
+            calls.append(plan)
+            await withUnsafeContinuation { inFlight.append($0) }
+        }
+        let round = UUID()
+        let (session, players, state) = nightTable(round: round)
+
+        director.run(session: session, players: players, round: state)
+        await settle()
+        #expect(calls.map(\.actionType) == [.doctorProtect])
+        director.run(session: session, players: players, round: state) // Same snapshot, still in flight.
+        await settle()
+        #expect(calls.count == 1)
+
+        inFlight.forEach { $0.resume() }
+        await settle()
+        director.run(session: session, players: players, round: state) // Accepted; the row is not in the snapshot yet.
+        await settle()
+        #expect(calls.count == 1)
+    }
+
+    @Test(arguments: BotDirector.roundClosedMessages.sorted())
+    func aClosedRoundStopsEveryRetry(message: String) async {
+        var calls: [BotPlan] = []
+        let director = BotDirector { plan, _, _, _ in
+            calls.append(plan)
+            throw serverError(message)
+        }
+        let round = UUID()
+        let (session, players, state) = nightTable(round: round)
+        director.run(session: session, players: players, round: state)
+        await settle()
+        #expect(calls.count == 1)
+
+        // The human inspector acts, so the inspector bot would now be planned.
+        let human = players[2]
+        let acted = Fixture.round(round, actions: [Fixture.action(human, .inspectorCheck, target: players[4], round: round)])
+        director.run(session: session, players: players, round: acted)
+        await settle()
+        #expect(calls.count == 1, "No submission can succeed after \(message)")
+
+        let nextRound = UUID()
+        director.run(session: Fixture.session(roundId: nextRound), players: players, round: Fixture.round(nextRound))
+        await settle()
+        #expect(calls.count == 2, "A new round starts fresh")
+    }
+
+    @Test func otherErrorsAreRetriedOnTheNextSnapshot() async {
+        var calls: [BotPlan] = []
+        var failures: [Error] = [
+            serverError("Choose a player who is still alive."),
+            URLError(.notConnectedToInternet),
+        ]
+        let director = BotDirector { plan, _, _, _ in
+            calls.append(plan)
+            if !failures.isEmpty { throw failures.removeFirst() }
+        }
+        let round = UUID()
+        let (session, players, state) = nightTable(round: round)
+        for expected in 1...3 {
+            director.run(session: session, players: players, round: state)
+            await settle()
+            #expect(calls.count == expected)
+        }
+        director.run(session: session, players: players, round: state)
+        await settle()
+        #expect(calls.count == 3, "Accepted on the third try")
+    }
+
+    @Test func onlyServerMessagesCloseARound() {
+        #expect(BotDirector.closesRound(serverError("Night actions are closed.")))
+        #expect(!BotDirector.closesRound(serverError("Choose a player who is still alive.")))
+        #expect(!BotDirector.closesRound(NSError(domain: "Test", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "The game has moved on.",
+        ])))
+    }
+
+    @Test func aRejectedBotVoteFallsBackToAnotherLivingSeat() async throws {
+        var calls: [BotPlan] = []
+        let director = BotDirector { plan, _, _, _ in
+            calls.append(plan)
+            if calls.count == 1 { throw serverError("Choose a player who is still alive.") }
+        }
+        let bot = Fixture.seat(.citizen)
+        let players = [bot, Fixture.seat(.citizen, bot: false), Fixture.seat(.mafia, bot: false)]
+        let round = UUID()
+        director.run(session: Fixture.session(phase: "voting", roundId: round), players: players,
+                     round: Fixture.round(round, phase: "voting"))
+        await settle()
+        #expect(calls.count == 2)
+        let fallback = try #require(calls.last?.target)
+        #expect(fallback != calls.first?.target)
+        #expect(fallback != bot.playerId)
+        #expect(players.contains { $0.playerId == fallback })
     }
 }

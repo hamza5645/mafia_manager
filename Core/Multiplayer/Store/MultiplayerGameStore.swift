@@ -6,7 +6,10 @@ import Foundation
 /// Connection handling, host phase calls and bots live in the sibling files.
 @MainActor
 final class MultiplayerGameStore: ObservableObject {
-    let sessionService = SessionService()
+    /// The server's AUTH message: it no longer knows who this device is.
+    static let signInMessage = "Please sign in to continue."
+
+    let sessionService: SessionService
     let botDirector: BotDirector
 
     // Snapshots (`views:getSessionView`, `views:getPlayers`, `views:getRoundState`)
@@ -15,11 +18,11 @@ final class MultiplayerGameStore: ObservableObject {
     @Published var roundState: RoundState?
 
     // Connection state
-    @Published var isConnecting = false
     /// A ConvexError from a subscription; cleared by a successful retry.
     @Published var connectionError: String?
+    /// The session view arrived without a caller (e.g. a lapsed Clerk token); the last snapshots stay.
+    @Published var needsSignIn = false
     @Published var isRealtimeConnected = false
-    @Published var isRealtimeReconnecting = false
     @Published var showsReconnectBanner = false
 
     @Published var isHostOffline = false
@@ -29,6 +32,7 @@ final class MultiplayerGameStore: ObservableObject {
     var subscriptions: [SubscriptionSupervisor] = []
     var tickTask: Task<Void, Never>?
     var isLeaving = false
+    var isInBackground = false
     var isCompletingNight = false
     var isAdvancingFromRoleReveal = false
     weak var authStore: AuthStore?
@@ -36,7 +40,14 @@ final class MultiplayerGameStore: ObservableObject {
     private var lifecycleObservers: [NSObjectProtocol] = []
 
     init() {
-        botDirector = BotDirector(sessionService: sessionService)
+        let service = SessionService()
+        sessionService = service
+        botDirector = BotDirector { plan, sessionId, roundId, phaseIndex in
+            try await service.submitAction(
+                sessionId: sessionId, roundId: roundId, actionType: plan.actionType,
+                phaseIndex: phaseIndex, actorPlayerId: plan.botPlayerId, targetPlayerId: plan.target
+            )
+        }
         let center = NotificationCenter.default
         lifecycleObservers = [
             center.addObserver(forName: .appDidBecomeActive, object: nil, queue: .main) { [weak self] _ in
@@ -85,6 +96,9 @@ final class MultiplayerGameStore: ObservableObject {
 
     var isPhaseReadyToAdvance: Bool { roundState?.readyToAdvance ?? false }
 
+    /// Shown with a Retry button in the game screens.
+    var connectionProblem: String? { connectionError ?? (needsSignIn ? Self.signInMessage : nil) }
+
     /// The server clears every seat's readiness at game over; Play Again marks it again.
     var playersInLobbyCount: Int { players.filter(\.isReady).count }
 
@@ -96,8 +110,18 @@ final class MultiplayerGameStore: ObservableObject {
 
     // MARK: - Snapshots
 
+    /// The only place that decides whether I was removed or the game ended.
     func apply(sessionView value: SessionView?) {
         guard sessionId != nil else { return }
+        if let value, value.session.status != .cancelled, value.viewer.userId == nil {
+            // The server could not identify me, which is not a kick: keep the last snapshots.
+            if !needsSignIn {
+                needsSignIn = true
+                recoverIdentity()
+            }
+            return
+        }
+        needsSignIn = false
         guard let value, value.viewer.isMember, value.session.status != .cancelled else {
             // Removed by the host, or the host ended the game.
             guard !isLeaving else { return }
@@ -110,15 +134,22 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     func apply(players value: [SessionPlayer]) {
-        guard sessionId != nil else { return }
+        // A member always sees their own seat; `[]` means "not identified" or "removed",
+        // which only the session view decides.
+        guard sessionId != nil, !value.isEmpty else { return }
         players = value
         runHostAutomation()
     }
 
     func apply(roundState value: RoundState?) {
-        guard sessionId != nil else { return }
+        // nil means "not identified" or "removed"; see `apply(sessionView:)`.
+        guard sessionId != nil, let value else { return }
         roundState = value
         runHostAutomation()
+    }
+
+    func recoverIdentity() {
+        Task { await authStore?.ensureValidSession() }
     }
 
     // MARK: - Session lifecycle
@@ -133,12 +164,11 @@ final class MultiplayerGameStore: ObservableObject {
 
     private func enter(_ call: () async throws -> EnterResult) async throws {
         clearLocalSession()
-        isConnecting = true
-        defer { isConnecting = false }
         let result = try await call()
         sessionId = result.sessionId
         startSubscriptions(sessionId: result.sessionId)
-        startTicking()
+        // In the background the ticker waits for the foreground restart.
+        if !isInBackground { startTicking() }
     }
 
     /// Leave this seat; the backend transfers host or cancels an empty room.
@@ -149,8 +179,11 @@ final class MultiplayerGameStore: ObservableObject {
         do {
             try await sessionService.leaveSession(sessionId: sessionId)
         } catch {
-            isLeaving = false
-            throw error
+            // When the server no longer knows me, clear locally so the user isn't trapped.
+            guard Self.isSignInRequired(error) else {
+                isLeaving = false
+                throw error
+            }
         }
         clearLocalSession()
     }
@@ -162,10 +195,18 @@ final class MultiplayerGameStore: ObservableObject {
         do {
             try await sessionService.cancelSession(sessionId: sessionId)
         } catch {
-            isLeaving = false
-            throw error
+            // When the server no longer knows me, clear locally so the user isn't trapped.
+            guard Self.isSignInRequired(error) else {
+                isLeaving = false
+                throw error
+            }
         }
         clearLocalSession()
+    }
+
+    static func isSignInRequired(_ error: Error) -> Bool {
+        guard let error = error as? BackendError else { return false }
+        return error.isServerMessage && error.message == signInMessage
     }
 
     func clearLocalSession() {
@@ -178,6 +219,7 @@ final class MultiplayerGameStore: ObservableObject {
         players = []
         roundState = nil
         isLeaving = false
+        needsSignIn = false
         isHostOffline = false
         wasKicked = false
         botDirector.reset()
@@ -223,13 +265,23 @@ final class MultiplayerGameStore: ObservableObject {
 
     @discardableResult
     private func submit(_ type: ActionType, phaseIndex: Int, target: UUID?) async throws -> ActionResponse {
-        // The round id arrives in the same snapshot as the phase; never fetch it.
-        guard let session = currentSession, let roundId = session.currentRoundId,
-              let me = myPlayer else { throw SessionError.noActiveSession }
+        guard let sessionId, let me = myPlayer else { throw SessionError.noActiveSession }
+        let roundId = try await currentRoundId()
         return try await sessionService.submitAction(
-            sessionId: session.id, roundId: roundId, actionType: type,
+            sessionId: sessionId, roundId: roundId, actionType: type,
             phaseIndex: phaseIndex, actorPlayerId: me.playerId, targetPlayerId: target
         )
+    }
+
+    /// The round id arrives in the same snapshot as the phase; if it is missing, wait for the
+    /// next session snapshot that carries it instead of fetching (§8.1.6).
+    func currentRoundId() async throws -> UUID {
+        if let roundId = currentSession?.currentRoundId { return roundId }
+        for await view in $sessionView.dropFirst().values {
+            if let roundId = view?.session.currentRoundId { return roundId }
+            if sessionId == nil { break }
+        }
+        throw SessionError.noActiveSession
     }
 
     /// Shares a draft target with teammates as soon as it is tapped.
