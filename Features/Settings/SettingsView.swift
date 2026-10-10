@@ -140,7 +140,7 @@ struct SettingsView: View {
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 10)
                                 }
-                                .accessibilityHint("Sign out of your guest session and delete saved guest progress")
+                                .accessibilityHint("Sign out of your guest session and remove guest data from this device")
                             }
                         } else {
                             // Show login button when not authenticated at all
@@ -279,7 +279,7 @@ struct SettingsView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will delete your guest account and saved progress on this device. To keep your stats, sign up first.")
+                Text("This signs you out and removes your guest data from this device, so you can't get this guest's progress back. To keep your stats, sign up first.")
             }
         }
     }

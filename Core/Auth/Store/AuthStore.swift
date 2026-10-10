@@ -5,6 +5,9 @@ import CryptoKit
 
 @MainActor
 final class AuthStore: ObservableObject {
+    /// Clerk's default minimum password length.
+    static let minimumPasswordLength = 8
+
     @Published var isAuthenticated = false
     @Published var currentUserId: UUID?
     @Published var userProfile: UserProfile?
@@ -12,7 +15,6 @@ final class AuthStore: ObservableObject {
     @Published var errorMessage: String?
     @Published var isRestoringSession = true
     @Published var isAnonymous = false
-    @Published private(set) var hasPendingGuestMerge = false
     /// Changes whenever the identity sent to Convex may have changed;
     /// multiplayer subscriptions restart when it does.
     @Published private(set) var identityRevision = 0
@@ -21,6 +23,12 @@ final class AuthStore: ObservableObject {
     /// for sign-in/signup/reset presentation, including guest upgrades.
     var authenticatedAccountId: UUID? {
         isAuthenticated && userProfile?.isAnonymous == false ? userProfile?.id : nil
+    }
+
+    /// An account is signed in but this device's guest progress has not been
+    /// merged into it yet. Every account sign-in retries the merge.
+    var hasPendingGuestMerge: Bool {
+        authenticatedAccountId != nil && currentGuestSecretHash != nil
     }
 
     var guestDisplayName: String? {
@@ -34,31 +42,9 @@ final class AuthStore: ObservableObject {
         }
     }
 
-    enum LinkResult {
-        case success
-        case needsEmailVerification
-        case retryableMergeFailure
-        case emailAlreadyExists(anonymousUserId: UUID)
-        case failure(String)
-    }
-
-    enum SignUpStepResult {
-        case authenticated
-        case needsEmailCode
-        case emailAlreadyExists
-        case failure
-    }
-
-    enum VerificationResult {
-        case success
-        case verificationFailed
-        case retryableMergeFailure
-    }
-
     private let authService: any AuthServicing
     private let keychain: any KeychainStoring
     private let defaults: UserDefaults
-    private var authStateTask: Task<Void, Never>?
 
     private enum KeychainKeys {
         static let guestSecret = "convex_guest_secret"
@@ -66,7 +52,6 @@ final class AuthStore: ObservableObject {
 
     private enum DefaultsKeys {
         static let pendingSignUpDisplayName = "pending_signup_display_name"
-        static let pendingMergeFromAnonymousId = "pending_merge_from_anonymous_id"
     }
 
     init(
@@ -78,7 +63,6 @@ final class AuthStore: ObservableObject {
         self.authService = authService ?? AuthService()
         self.keychain = keychain ?? KeychainHelper.shared
         self.defaults = defaults
-        hasPendingGuestMerge = pendingMergeAnonymousUserId != nil
         // The real AuthService talks to ConvexService.shared; give it this
         // device's guest proof. Injected test services leave Convex untouched.
         if authService == nil {
@@ -94,25 +78,25 @@ final class AuthStore: ObservableObject {
         }
     }
 
-    deinit {
-        authStateTask?.cancel()
-    }
-
-    private func restoreSession() async {
-        if let user = await authService.currentUser {
-            applyAuthenticatedProfile(user)
-            if hasPendingGuestMerge {
-                _ = await retryPendingGuestMerge()
-            }
+    func restoreSession() async {
+        let account: UserProfile?
+        do {
+            account = try await authService.currentUser
+        } catch {
+            // Clerk or Convex is unreachable. Not knowing is not signed out:
+            // keep the current identity and every stored credential.
+            return
+        }
+        if let account {
+            await finishAccountAuth(account)
             return
         }
 
-        if let guestName = guestDisplayName,
-           let secret = try? keychain.load(forKey: KeychainKeys.guestSecret) {
+        if let guestName = guestDisplayName, let guestSecretHash = currentGuestSecretHash {
             do {
                 let profile = try await authService.signInAsGuest(
                     displayName: guestName,
-                    guestSecretHash: hash(secret)
+                    guestSecretHash: guestSecretHash
                 )
                 applyAuthenticatedProfile(profile)
             } catch {
@@ -123,47 +107,41 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    /// Called when the app resumes. Only refreshes the account's Convex token;
+    /// a failure keeps the current identity, since the next token refresh or
+    /// launch can still succeed.
     func ensureValidSession() async {
-        await restoreSession()
+        guard authenticatedAccountId != nil else { return }
+        try? await authService.refreshConvexAuth()
     }
 
-    func startSignUp(email: String, password: String, displayName: String) async -> SignUpStepResult {
+    /// Returns true when Clerk emailed a code that `verifySignUpEmailCode` needs.
+    func startSignUp(email: String, password: String, displayName: String) async -> Bool {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDisplayName = trimmed(displayName)
 
         do {
-            let result = try await authService.startSignUp(
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: password,
+            guard let profile = try await authService.startSignUp(
+                email: trimmed(email),
+                password: trimmed(password),
                 displayName: trimmedDisplayName
-            )
-            switch result {
-            case .completed(let profile):
-                clearPendingVerificationState()
-                applyAuthenticatedProfile(profile)
-                if !hasPendingGuestMerge {
-                    clearGuestSecret()
-                }
-                return .authenticated
-            case .needsEmailCode:
+            ) else {
                 defaults.set(trimmedDisplayName, forKey: DefaultsKeys.pendingSignUpDisplayName)
-                return .needsEmailCode
+                return true
             }
-        } catch AuthError.emailAlreadyInUse {
             clearPendingVerificationState()
-            errorMessage = AuthError.emailAlreadyInUse.errorDescription
-            return .emailAlreadyExists
+            await finishAccountAuth(profile)
         } catch {
             clearPendingVerificationState()
             errorMessage = mapAuthError(error)
-            return .failure
         }
+        return false
     }
 
-    func verifySignUpEmailCode(_ code: String) async -> VerificationResult {
+    func verifySignUpEmailCode(_ code: String) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -171,21 +149,10 @@ final class AuthStore: ObservableObject {
         let displayName = defaults.string(forKey: DefaultsKeys.pendingSignUpDisplayName) ?? ""
         do {
             let profile = try await authService.verifySignUpEmailCode(code, displayName: displayName)
-            applyAuthenticatedProfile(profile)
             clearPendingVerificationState()
-
-            if hasPendingGuestMerge {
-                let merged = await retryPendingGuestMerge()
-                if !merged {
-                    return .retryableMergeFailure
-                }
-            }
-
-            clearGuestSecret()
-            return .success
+            await finishAccountAuth(profile)
         } catch {
             errorMessage = mapAuthError(error)
-            return .verificationFailed
         }
     }
 
@@ -208,32 +175,21 @@ final class AuthStore: ObservableObject {
         defaults.removeObject(forKey: DefaultsKeys.pendingSignUpDisplayName)
     }
 
-    private func clearPendingMergeState() {
-        defaults.removeObject(forKey: DefaultsKeys.pendingMergeFromAnonymousId)
-        hasPendingGuestMerge = false
-    }
-
     func signIn(email: String, password: String) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            let profile = try await authService.signIn(
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: password
-            )
-            applyAuthenticatedProfile(profile)
-            if hasPendingGuestMerge {
-                _ = await retryPendingGuestMerge()
-            } else {
-                clearGuestSecret()
-            }
+            let profile = try await authService.signIn(email: trimmed(email), password: trimmed(password))
+            await finishAccountAuth(profile)
         } catch {
             errorMessage = mapAuthError(error)
         }
     }
 
+    /// Signs out of the account or guest session and forgets this device's
+    /// guest, so its progress can never merge into a later sign-in.
     func signOut() async {
         isLoading = true
         errorMessage = nil
@@ -246,9 +202,7 @@ final class AuthStore: ObservableObject {
         }
 
         clearLocalAuthState()
-        if !hasPendingGuestMerge {
-            clearGuestSecret()
-        }
+        clearGuestData()
     }
 
     func startPasswordReset(email: String) async -> Bool {
@@ -257,7 +211,7 @@ final class AuthStore: ObservableObject {
         defer { isLoading = false }
 
         do {
-            try await authService.startPasswordReset(email: email.trimmingCharacters(in: .whitespacesAndNewlines))
+            try await authService.startPasswordReset(email: trimmed(email))
             return true
         } catch {
             errorMessage = mapAuthError(error)
@@ -265,39 +219,26 @@ final class AuthStore: ObservableObject {
         }
     }
 
-    func confirmPasswordReset(code: String, newPassword: String) async -> Bool {
+    func confirmPasswordReset(code: String, newPassword: String) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            let profile = try await authService.confirmPasswordReset(code: code, newPassword: newPassword)
-            applyAuthenticatedProfile(profile)
-            if hasPendingGuestMerge {
-                _ = await retryPendingGuestMerge()
-            } else {
-                clearGuestSecret()
-            }
-            return true
+            let profile = try await authService.confirmPasswordReset(code: code, newPassword: trimmed(newPassword))
+            await finishAccountAuth(profile)
         } catch {
             errorMessage = mapAuthError(error)
-            return false
         }
     }
 
     func updateProfile(displayName: String) async {
-        guard let userId = currentUserId else { return }
-
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            try await authService.updateUserProfile(
-                userId: userId,
-                displayName: displayName,
-                guestSecretHash: isAnonymous ? currentGuestSecretHash : nil
-            )
+            try await authService.updateProfile(displayName: displayName)
             userProfile?.displayName = displayName
             userProfile?.updatedAt = Date()
         } catch {
@@ -325,106 +266,26 @@ final class AuthStore: ObservableObject {
         }
     }
 
-    func linkEmailPassword(email: String, password: String, displayName: String) async -> LinkResult {
-        guard let anonymousUserId = currentUserId, isAnonymous else {
-            return .failure("No guest account to link")
-        }
-
-        defaults.set(
-            anonymousUserId.uuidString,
-            forKey: DefaultsKeys.pendingMergeFromAnonymousId
-        )
-        hasPendingGuestMerge = true
-
-        // Capture guest credential proof *before* startSignUp — the
-        // .authenticated branch of startSignUp clears the keychain.
-        guard currentGuestSecretHash != nil else {
-            clearPendingMergeState()
-            return .failure("Missing guest credentials for merge")
-        }
-
-        let step = await startSignUp(email: email, password: password, displayName: displayName)
-        switch step {
-        case .authenticated:
-            if await retryPendingGuestMerge() {
-                return .success
-            }
-            return .retryableMergeFailure
-        case .needsEmailCode:
-            return .needsEmailVerification
-        case .emailAlreadyExists:
-            return .emailAlreadyExists(anonymousUserId: anonymousUserId)
-        case .failure:
-            return .failure(errorMessage ?? "Could not create account")
-        }
-    }
-
-    func mergeIntoExistingAccount(anonymousUserId: UUID, email: String, password: String) async -> Bool {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
-        // Capture guest credential proof before signing into the real account.
-        guard let guestSecretHash = currentGuestSecretHash else {
-            errorMessage = "Missing guest credentials for merge"
-            return false
-        }
-
-        defaults.set(
-            anonymousUserId.uuidString,
-            forKey: DefaultsKeys.pendingMergeFromAnonymousId
-        )
-        hasPendingGuestMerge = true
-
-        do {
-            let profile = try await authService.signIn(email: email, password: password)
-            applyAuthenticatedProfile(profile)
-            _ = try await authService.mergeAnonymousStats(
-                anonymousUserId: anonymousUserId,
-                targetUserId: profile.id,
-                guestSecretHash: guestSecretHash
-            )
-            completePendingGuestMerge()
-            return true
-        } catch {
-            errorMessage = mapAuthError(error)
-            return false
-        }
-    }
-
-    @discardableResult
-    func retryPendingGuestMerge() async -> Bool {
-        guard let anonymousUserId = pendingMergeAnonymousUserId else {
-            hasPendingGuestMerge = false
-            return true
-        }
-        guard let targetUserId = currentUserId,
-              userProfile?.isAnonymous == false else {
-            errorMessage = "Sign in to finish saving guest progress"
-            return false
-        }
-        guard let guestSecretHash = currentGuestSecretHash else {
-            errorMessage = "Missing guest credentials for merge"
-            return false
-        }
-
-        do {
-            _ = try await authService.mergeAnonymousStats(
-                anonymousUserId: anonymousUserId,
-                targetUserId: targetUserId,
-                guestSecretHash: guestSecretHash
-            )
-            completePendingGuestMerge()
-            return true
-        } catch {
-            errorMessage = mapAuthError(error)
-            hasPendingGuestMerge = true
-            return false
-        }
-    }
-
     func clearError() {
         errorMessage = nil
+    }
+
+    /// Every account entry path (restore, sign-up, sign-in, password reset)
+    /// ends here. Guest progress on this device merges into the account; if
+    /// that fails the guest secret stays, so the next launch or sign-in
+    /// retries, and requests keep acting as the guest until then.
+    private func finishAccountAuth(_ profile: UserProfile) async {
+        applyAuthenticatedProfile(profile)
+        guard let guestSecretHash = currentGuestSecretHash else { return }
+        do {
+            try await authService.mergeGuestIntoAccount(guestSecretHash: guestSecretHash)
+            clearGuestData()
+        } catch let error as BackendError where error.message == "Guest progress could not be found." {
+            // The guest was never created on the server; nothing is left to merge.
+            clearGuestData()
+        } catch {
+            errorMessage = "Guest progress was not saved to your account yet and will retry next launch. \(mapAuthError(error))"
+        }
     }
 
     private func applyAuthenticatedProfile(_ profile: UserProfile) {
@@ -465,22 +326,16 @@ final class AuthStore: ObservableObject {
         (isAnonymous || hasPendingGuestMerge) ? currentGuestSecretHash : nil
     }
 
-    private var pendingMergeAnonymousUserId: UUID? {
-        defaults.string(forKey: DefaultsKeys.pendingMergeFromAnonymousId)
-            .flatMap(UUID.init(uuidString:))
-    }
-
-    private func completePendingGuestMerge() {
-        isAnonymous = false
-        userProfile?.isAnonymous = false
-        guestDisplayName = nil
-        clearGuestSecret()
-        clearPendingMergeState()
-    }
-
-    private func clearGuestSecret() {
+    /// Forgets this device's guest: its secret (which also ends a pending
+    /// merge) and its name. The server keeps the guest row.
+    private func clearGuestData() {
         try? keychain.delete(forKey: KeychainKeys.guestSecret)
+        guestDisplayName = nil
         identityRevision += 1
+    }
+
+    private func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func hash(_ secret: String) -> String {
