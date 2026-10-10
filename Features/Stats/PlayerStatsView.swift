@@ -39,16 +39,13 @@ struct PlayerStatsView: View {
     }
 
     private func loadStats() async {
-        guard let userId = authStore.currentUserId else { return }
+        guard authStore.currentUserId != nil else { return }
 
         isLoading = true
         errorMessage = nil
 
         do {
-            playerStats = try await databaseService.getPlayerStats(
-                userId: userId,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            playerStats = try await databaseService.getPlayerStats()
         } catch {
             errorMessage = error.localizedDescription
         }

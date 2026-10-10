@@ -679,8 +679,7 @@ final class GameStore: ObservableObject {
     // MARK: - Cloud Sync
 
     func syncPlayerStatsToCloud() async {
-        guard let userId = authStore?.currentUserId,
-              authStore?.isAuthenticated == true,
+        guard authStore?.isAuthenticated == true,
               state.isGameOver,
               let winner = state.winner else { return }
 
@@ -715,14 +714,10 @@ final class GameStore: ObservableObject {
 
             do {
                 try await databaseService.upsertPlayerStat(
-                    userId: userId,
                     playerName: player.name,
                     role: player.role,
                     won: playerWon,
-                    kills: kills,
-                    guestSecretHash: authStore?.isAnonymous == true
-                        ? authStore?.currentGuestSecretHash
-                        : nil
+                    kills: kills
                 )
             } catch {
                 // Continue with other players even if one fails

@@ -490,15 +490,12 @@ struct SetupView: View {
     }
 
     private func loadPlayerGroups() async {
-        guard let userId = authStore.currentUserId else { return }
+        guard authStore.currentUserId != nil else { return }
 
         isLoadingGroups = true
 
         do {
-            playerGroups = try await databaseService.getPlayerGroups(
-                userId: userId,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            playerGroups = try await databaseService.getPlayerGroups()
         } catch {
             // Silent fail - user can try again
             playerGroups = []
@@ -536,15 +533,12 @@ struct SetupView: View {
     }
 
     private func loadCustomRoleConfigs() async {
-        guard let userId = authStore.currentUserId else { return }
+        guard authStore.currentUserId != nil else { return }
 
         isLoadingConfigs = true
 
         do {
-            customRoleConfigs = try await databaseService.getCustomRoleConfigs(
-                userId: userId,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            customRoleConfigs = try await databaseService.getCustomRoleConfigs()
         } catch {
             // Silent fail - user can try again
             customRoleConfigs = []
