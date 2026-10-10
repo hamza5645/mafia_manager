@@ -1,3 +1,12 @@
+## 2026-10-10 — FOLLOWUP-19: restore an existing multiplayer seat after restart
+
+- Production E2E reproduced rejected reentry in a lobby ("already in this game") and active games ("not found"). The latter was a status restriction, not proof the room had expired.
+- The authenticated join mutation now returns the same verified member's seat before applying lobby/capacity checks. It preserves role, elimination, readiness, actor IDs, and current round while renewing online/heartbeat state. Non-members still cannot enter active/completed games, and cancelled rooms remain closed.
+- Reentry responses use the existing server privacy projection. Added four backend regressions covering full lobby, active/dead member and private history, Clerk identity, and cancellation; three cases fail before the fix. Added a native Swift Testing guest reentry round-trip.
+- Validation: backend 45/45, TypeScript check passes, full native suite 64/64 with zero skips. Deployed to development and production. Production QA room 934779 restored the seven-player lobby without duplicates; after another restart it restored the same Police role in Night 1, then resolved bot actions normally. Before/after role screenshots are saved with the campaign evidence.
+- Rollback: revert this commit, regenerate Tuist, and deploy the reverted backend. No schema or request-shape change; reverting restores rejected reentry.
+- Gotcha: rejoining restores a seat, not an extra player. It does not rename or revive the member. Automatic room navigation on app launch is not added; use the room code to re-enter.
+
 ## 2026-10-10 — FOLLOWUP-18: preserve the Mafia cohort target during partial retries
 
 - Review of bot recovery found that a missing Mafia bot could choose a new target even when its teammate had already submitted. Recovery now reuses the submitted Mafia target while preserving completed actions.

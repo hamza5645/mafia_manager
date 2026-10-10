@@ -105,21 +105,32 @@ export const joinSession = mutation({
     guest_secret_hash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
+    const caller = await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
     const session = await ctx.db
       .query("game_sessions")
       .withIndex("by_room_code", (q) => q.eq("room_code", args.room_code.toUpperCase()))
       .first();
-    if (!session || session.status !== "waiting") {
+    if (!session || session.status === "cancelled") {
       throw new ConvexError("Game session not found");
     }
 
     const existingPlayers = await listSessionPlayers(ctx, session.id);
+    const existing = existingPlayers.find((player) => player.user_id === caller.id);
+    if (existing) {
+      // Re-entry restores this identity's seat, including its role/death state.
+      // It does not create a new participant or restart an active round.
+      const online = { is_online: true, last_heartbeat: nowAppleEpochSeconds() };
+      await ctx.db.patch(existing._id, online);
+      return {
+        session: sessionForViewer(session, caller, existingPlayers),
+        player: { ...existing, ...online },
+      };
+    }
+    if (session.status !== "waiting") {
+      throw new ConvexError("This game is no longer accepting new players");
+    }
     if (existingPlayers.length >= session.max_players) {
       throw new ConvexError("Game session is full");
-    }
-    if (existingPlayers.some((player) => player.user_id === args.user_id)) {
-      throw new ConvexError("You are already in this session");
     }
 
     const player = await addPlayerImpl(ctx, {
@@ -128,7 +139,7 @@ export const joinSession = mutation({
       player_name: args.player_name,
       is_bot: false,
     });
-    return { session, player };
+    return { session: sessionForViewer(session, caller, [...existingPlayers, player]), player };
   },
 });
 
