@@ -137,4 +137,4 @@ Guest mode uses a local Keychain secret hashed into `users.guest_secret_hash`; a
 - `docs/ARCHITECTURE_NOTES.md` - deeper architecture notes.
 - `docs/MULTIPLAYER_GUIDE.md` - multiplayer backend and test guide.
 - `docs/CLERK_SETUP.md` - required Clerk dashboard and config values.
-- `docs/SUPABASE_TO_CONVEX_MIGRATION_PLAN.md` - migration plan and audit history.
+- `docs/BACKEND_DECISIONS.md` - why Convex + Clerk, guest proof, legacy-account claiming.
