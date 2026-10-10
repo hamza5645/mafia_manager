@@ -213,20 +213,6 @@ struct MergeStatsResult: Decodable, Sendable {
     }
 }
 
-// TEMP(integration): remove after merge. ConvexIntegrationTests still calls it.
-extension AuthService {
-    func getUserProfile(userId: UUID, guestSecretHash: String? = nil) async throws -> UserProfile {
-        guard let profile = try await convex.query(
-            "users:getMe",
-            with: ["guest_secret_hash": guestSecretHash],
-            as: UserProfile?.self
-        ), profile.id == userId else {
-            throw AuthError.unknown
-        }
-        return profile
-    }
-}
-
 enum AuthError: LocalizedError {
     case emailAlreadyInUse
     case accountNotFound
