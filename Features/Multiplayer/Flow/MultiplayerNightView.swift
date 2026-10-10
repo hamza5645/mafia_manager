@@ -53,7 +53,7 @@ struct MultiplayerNightView: View {
     }
 
     var inspectorTargets: [PublicPlayerInfo] {
-        let roleLookup = Dictionary(uniqueKeysWithValues: multiplayerStore.allPlayers.map { ($0.playerId, $0.role) })
+        let roleLookup = Dictionary(uniqueKeysWithValues: multiplayerStore.players.map { ($0.playerId, $0.role) })
         return alivePlayers.filter { roleLookup[$0.playerId] != .inspector }
     }
 
@@ -224,7 +224,14 @@ struct MultiplayerNightView: View {
             Text(completionError ?? "Please try again.")
         }
         .task {
+            restoreSubmittedAction()
             await autoReadyIfPassive()
+        }
+        .onChange(of: multiplayerStore.myNightAction?.id) { _, _ in
+            restoreSubmittedAction()
+        }
+        .onChange(of: multiplayerStore.isPhaseReadyToAdvance) { _, _ in
+            autoFinishNightIfReady()
         }
         .onChange(of: myRole) { _, _ in
             Task { await autoReadyIfPassive() }
@@ -639,24 +646,7 @@ struct MultiplayerNightView: View {
                     // HAMZA-95: Haptic feedback on successful submission
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
-                }
-
-                // HAMZA-145: Host auto-ends night phase after submitting (except inspector who needs to see result first)
-                if multiplayerStore.isHost && role != .inspector {
-                    // Small delay to ensure state updates propagate before checking readiness
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-
-                    let canAutoAdvance = await MainActor.run {
-                        multiplayerStore.isPhaseReadyToAdvance && !isRecording
-                    }
-
-                    if canAutoAdvance {
-                        await MainActor.run {
-                            recordNightActionsPhase()
-                        }
-                    } else {
-                        print("⏳ [MultiplayerNightView] Skipping auto-advance; waiting for other players/actions")
-                    }
+                    autoFinishNightIfReady()
                 }
             } catch {
                 await MainActor.run {
@@ -665,6 +655,24 @@ struct MultiplayerNightView: View {
                     print("Failed to submit action: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    /// HAMZA-145: once the host has acted and every action is in, the host ends the night
+    /// automatically (except an inspector, who needs to see the result first).
+    private func autoFinishNightIfReady() {
+        guard multiplayerStore.isHost, hasSubmitted, myRole != .inspector,
+              multiplayerStore.isPhaseReadyToAdvance, !isRecording else { return }
+        recordNightActionsPhase()
+    }
+
+    /// After a relaunch, show the action already submitted this round (including the inspector result).
+    private func restoreSubmittedAction() {
+        guard let action = multiplayerStore.myNightAction else { return }
+        hasSubmitted = true
+        selectedTargetId = action.targetPlayerId
+        if let result = action.actionData?.inspectorResult {
+            inspectorResult = result
         }
     }
 

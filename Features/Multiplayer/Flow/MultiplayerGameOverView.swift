@@ -28,13 +28,13 @@ struct MultiplayerGameOverView: View {
                 winnerBanner
 
                 // Player list showing roles
-                if !multiplayerStore.allPlayers.isEmpty {
+                if !multiplayerStore.players.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Final Standings")
                             .font(Design.Typography.title3)
                             .foregroundStyle(Design.Colors.textPrimary)
 
-                        ForEach(multiplayerStore.allPlayers.sorted { $0.playerNumber ?? 0 < $1.playerNumber ?? 0 }) { player in
+                        ForEach(multiplayerStore.players.sorted { $0.playerNumber ?? 0 < $1.playerNumber ?? 0 }) { player in
                             playerRow(player: player)
                         }
                     }
