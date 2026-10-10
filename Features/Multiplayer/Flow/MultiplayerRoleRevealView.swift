@@ -201,7 +201,7 @@ struct MultiplayerRoleRevealView: View {
         // All human players (including host) must mark ready before phase can advance.
         // Bots are always ready. Host must confirm their role just like other players.
         // (See CLAUDE.md "Host with Active Roles" pattern for night phase - same applies to role reveal)
-        let humanPlayers = multiplayerStore.allPlayers.filter { !$0.isBot }
+        let humanPlayers = multiplayerStore.players.filter { !$0.isBot }
         let readyHumans = humanPlayers.filter { $0.isReady }
         return readyHumans.count == humanPlayers.count
     }

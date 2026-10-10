@@ -1,0 +1,5 @@
+// Development Clerk and Convex values; regenerate with Tuist after changes.
+// Only publishable keys and Convex hosts belong here (hosts, because xcconfig treats // as a comment).
+MAFIA_CONVEX_HOST = energized-herring-345.eu-west-1.convex.cloud
+MAFIA_CLERK_PUBLISHABLE_KEY = pk_test_c3RyaWtpbmctZWxmLTIyLmNsZXJrLmFjY291bnRzLmRldiQ
+MAFIA_CLERK_FRONTEND_HOST = striking-elf-22.clerk.accounts.dev

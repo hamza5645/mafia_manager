@@ -225,10 +225,7 @@ struct MultiplayerVotingView: View {
         votingError = nil
         Task {
             do {
-                if let session = multiplayerStore.currentSession,
-                   case .voting(let dayIndex) = session.currentPhaseData {
-                    try await multiplayerStore.showVotingResults(dayIndex: dayIndex)
-                }
+                try await multiplayerStore.endVoting()
             } catch {
                 await MainActor.run {
                     votingError = error.localizedDescription

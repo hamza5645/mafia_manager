@@ -100,12 +100,10 @@ struct MultiplayerVotingResultsView: View {
                             Task {
                                 isTransitioning = true
                                 transitionError = nil
-                                if let data = voteData {
-                                    do {
-                                        try await multiplayerStore.applyVotingResult(dayIndex: data.dayIndex)
-                                    } catch {
-                                        transitionError = "Failed to continue: \(error.localizedDescription)"
-                                    }
+                                do {
+                                    try await multiplayerStore.continueFromVotingResults()
+                                } catch {
+                                    transitionError = "Failed to continue: \(error.localizedDescription)"
                                 }
                                 isTransitioning = false
                             }

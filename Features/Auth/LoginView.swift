@@ -26,6 +26,12 @@ struct LoginView: View {
                         Text("Sign in to continue")
                             .font(Design.Typography.subheadline)
                             .foregroundColor(Design.Colors.textSecondary)
+
+                        if authStore.isAnonymous {
+                            Text("Your guest progress will be saved to this account.")
+                                .font(Design.Typography.caption)
+                                .foregroundColor(Design.Colors.textSecondary)
+                        }
                     }
                     .padding(.top, 60)
 
@@ -104,6 +110,12 @@ struct LoginView: View {
                     .accessibilityLabel("Forgot password")
 
                     Spacer()
+
+                    Text("Played before the update? Sign up with the same email to restore your stats.")
+                        .font(Design.Typography.caption)
+                        .foregroundColor(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
 
                     // Sign Up Link
                     Button {
@@ -332,7 +344,7 @@ struct PasswordResetCompleteView: View {
                     Button {
                         guard validate() else { return }
                         Task {
-                            _ = await authStore.confirmPasswordReset(code: code, newPassword: newPassword)
+                            await authStore.confirmPasswordReset(code: code, newPassword: trimmedNewPassword)
                             // On success, the parent reset stack auto-dismisses when account identity becomes available.
                         }
                     } label: {
@@ -365,7 +377,15 @@ struct PasswordResetCompleteView: View {
     }
 
     private var isFormFilled: Bool {
-        code.count == 6 && newPassword.count >= 6 && newPassword == confirmPassword
+        code.count == 6 && trimmedNewPassword.count >= AuthStore.minimumPasswordLength && passwordsMatch
+    }
+
+    private var trimmedNewPassword: String {
+        newPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var passwordsMatch: Bool {
+        trimmedNewPassword == confirmPassword.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func validate() -> Bool {
@@ -374,11 +394,11 @@ struct PasswordResetCompleteView: View {
             validationError = "Enter the 6-digit code"
             return false
         }
-        guard newPassword.count >= 6 else {
-            validationError = "Password must be at least 6 characters"
+        guard trimmedNewPassword.count >= AuthStore.minimumPasswordLength else {
+            validationError = "Password must be at least \(AuthStore.minimumPasswordLength) characters"
             return false
         }
-        guard newPassword == confirmPassword else {
+        guard passwordsMatch else {
             validationError = "Passwords do not match"
             return false
         }

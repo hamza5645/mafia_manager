@@ -1,729 +1,195 @@
-import Combine
-import XCTest
+import CryptoKit
+import Foundation
+import Testing
 
 @testable import mafia_manager
 
-/// Live integration tests against the Convex dev deployment configured in
-/// `ConvexConfig.swift`. They exercise the real client stack (ConvexMobile FFI,
-/// argument encoding, model decoding, live subscriptions) that replaced the
-/// Supabase SDK in the backend migration.
-///
-/// These tests require network access and a reachable dev deployment, so they
-/// are skipped unless the test runner environment sets `CONVEX_INTEGRATION=1`:
+/// Live multiplayer tests against the Convex dev deployment in `ConvexConfig.swift`.
+/// Opt in with `CONVEX_INTEGRATION=1`, e.g.:
 ///
 ///     xcodebuild test -workspace mafia_manager.xcworkspace -scheme mafia_manager \
 ///       -destination 'platform=iOS Simulator,name=iPhone 17' \
-///       TEST_RUNNER_CONVEX_INTEGRATION=1
+///       TEST_RUNNER_CONVEX_INTEGRATION=1 -only-testing:mafia_managerTests/ConvexIntegrationTests
+///
+/// Every request carries the guest proof that `act(as:)` installed, so each step
+/// runs as exactly one guest. Subscriptions keep the proof they started with.
 @MainActor
-final class ConvexIntegrationTests: XCTestCase {
-    private static var enabled: Bool {
-        ProcessInfo.processInfo.environment["CONVEX_INTEGRATION"] == "1"
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["CONVEX_INTEGRATION"] == "1"),
+       .serialized, .timeLimit(.minutes(2)))
+struct ConvexIntegrationTests {
+    private struct Timeout: Error, CustomStringConvertible {
+        let description: String
     }
 
-    private var sessionService: SessionService!
-    private var authService: AuthService!
+    private struct Guest: Decodable {
+        let id: UUID
+    }
 
-    override func setUp() async throws {
-        try XCTSkipUnless(
-            Self.enabled,
-            "Set TEST_RUNNER_CONVEX_INTEGRATION=1 to run live Convex integration tests"
-        )
-        sessionService = SessionService()
-        authService = AuthService()
+    private let service = SessionService()
+    private let originalProof = ConvexService.shared.guestProofProvider
+
+    // MARK: - Tests
+
+    @Test func smokeCreateJoinStartAndResolveABotNight() async throws {
+        let hostHash = try await createGuest("QA Smoke Host")
+        let memberHash = try await createGuest("QA Smoke Member")
+        act(as: hostHash)
+        let host = MultiplayerGameStore()
+        try await host.createSession(playerName: "QA Smoke Host", botCount: 2)
+        let room = try #require(host.sessionId)
+
+        try await withCleanup(room: room, guests: [hostHash, memberHash], stores: [host]) {
+            try await waitUntil("lobby snapshot") { host.currentSession != nil && host.players.count == 3 }
+            act(as: memberHash)
+            _ = try await service.joinSession(roomCode: try #require(host.currentSession?.roomCode), playerName: "QA Smoke Member")
+            act(as: hostHash)
+            try await waitUntil("member seat") { host.players.count == 4 }
+
+            // Humans are citizens, so the night is decided by the bots alone.
+            let bots = host.players.filter(\.isBot)
+            try await startNight(host, room: room, roles: [bots[0].playerId: .mafia, bots[1].playerId: .inspector])
+
+            try await waitUntil("bot night actions") { host.isPhaseReadyToAdvance }
+            #expect(host.roundState?.actions.count == 2)
+            try await host.completeNightPhase()
+            try await waitUntil("resolved night") { host.currentSession?.currentPhase == "morning" }
+            let record = try #require(host.currentSession?.nightHistory.first)
+            #expect(record.isResolved)
+            #expect(record.resultingDeaths.count == 1)
+        }
+    }
+
+    @Test func botInspectorPicksItsOwnTargetWhenTheHumanInspectsIt() async throws {
+        let hostHash = try await createGuest("QA Inspector Host")
+        act(as: hostHash)
+        let host = MultiplayerGameStore()
+        try await host.createSession(playerName: "QA Inspector Host", botCount: 8)
+        let room = try #require(host.sessionId)
+
+        try await withCleanup(room: room, guests: [hostHash], stores: [host]) {
+            try await waitUntil("nine seats") { host.players.count == 9 && host.myPlayer != nil }
+            let me = try #require(host.myPlayer)
+            let bots = host.players.filter(\.isBot)
+            var roles: [UUID: Role] = [me.playerId: .inspector, bots[0].playerId: .inspector, bots[5].playerId: .doctor]
+            for bot in bots[1...4] { roles[bot.playerId] = .mafia }
+            try await startNight(host, room: room, roles: roles)
+
+            let botInspector = bots[0]
+            let result = try await host.submitNightAction(
+                actionType: .inspectorCheck, nightIndex: 0, targetPlayerId: botInspector.playerId
+            )
+            #expect(result == "blocked")
+            try await waitUntil("every night action, including the bot inspector's") { host.isPhaseReadyToAdvance }
+            let botCheck = host.roundState?.actions.first { $0.actorPlayerId == botInspector.playerId }
+            #expect(botCheck?.targetPlayerId != nil)
+            #expect(botCheck?.targetPlayerId != botInspector.playerId)
+
+            try await host.completeNightPhase()
+            try await waitUntil("resolved night") { host.currentSession?.nightHistory.first?.isResolved == true }
+        }
+    }
+
+    @Test func memberReentersTheSameSeatMidGame() async throws {
+        let hostHash = try await createGuest("QA Reentry Host")
+        let memberHash = try await createGuest("QA Reentry Member")
+        act(as: hostHash)
+        let host = MultiplayerGameStore()
+        try await host.createSession(playerName: "QA Reentry Host", botCount: 2)
+        let room = try #require(host.sessionId)
+        let member = MultiplayerGameStore()
+        let relaunched = MultiplayerGameStore()
+
+        try await withCleanup(room: room, guests: [hostHash, memberHash], stores: [host, member, relaunched]) {
+            try await waitUntil("lobby snapshot") { host.currentSession != nil }
+            let roomCode = try #require(host.currentSession?.roomCode)
+            act(as: memberHash)
+            try await member.joinSession(roomCode: roomCode, playerName: "QA Reentry Member")
+            act(as: hostHash)
+            try await waitUntil("member seat") { host.players.count == 4 && member.myPlayer != nil }
+            let seat = try #require(member.myPlayer)
+            let bots = host.players.filter(\.isBot)
+            try await startNight(host, room: room, roles: [seat.playerId: .inspector, bots[0].playerId: .mafia])
+            try await waitUntil("member night") { member.currentSession?.currentPhase == "night" && member.myRole == .inspector }
+
+            // A relaunch starts from nothing: drop the first device's subscriptions, then re-enter.
+            member.clearLocalSession()
+            act(as: memberHash)
+            let again = try await service.joinSession(roomCode: roomCode, playerName: "Ignored rename")
+            try await relaunched.joinSession(roomCode: roomCode, playerName: "Ignored rename")
+            act(as: hostHash)
+            #expect(again.playerRecordId == seat.id)
+            #expect(again.playerId == seat.playerId)
+
+            try await waitUntil("relaunched snapshot") { relaunched.myPlayer != nil && relaunched.currentSession != nil }
+            let restored = try #require(relaunched.myPlayer)
+            #expect(restored.id == seat.id)
+            #expect(restored.playerName == seat.playerName)
+            #expect(restored.role == .inspector)
+            #expect(restored.isAlive)
+            #expect(relaunched.currentSession?.currentRoundId == host.currentSession?.currentRoundId)
+        }
     }
 
     // MARK: - Helpers
 
-    private struct HealthResponse: Decodable {
-        let ok: Bool
-        let backend: String
-        let version: String
-        let api_contract: Int
-    }
-
-    private func makeGuest(name: String, hash: String) async throws -> UserProfile {
-        try await authService.signInAsGuest(displayName: name, guestSecretHash: hash)
-    }
-
-    /// Ends a test session so no joinable `qa-swift-*` rooms linger on dev.
-    private func tearDownSession(
-        _ session: GameSession,
-        hostUserId: UUID,
-        hostHash: String,
-        users: [(UUID, String)]
-    ) async {
-        try? await sessionService.updateSessionStatus(
-            sessionId: session.id,
-            status: .cancelled,
-            callerUserId: hostUserId,
-            guestSecretHash: hostHash
+    /// A fresh 64-hex guest secret hash per run.
+    private func createGuest(_ name: String) async throws -> String {
+        let hash = SHA256.hash(data: Data(UUID().uuidString.utf8)).map { String(format: "%02x", $0) }.joined()
+        let _: Guest = try await ConvexService.shared.mutation(
+            "users:createOrRestoreGuest", with: ["display_name": name, "guest_secret_hash": hash]
         )
-        for (userId, hash) in users {
-            try? await sessionService.leaveSession(
-                sessionId: session.id,
-                userId: userId,
-                guestSecretHash: hash
-            )
+        return hash
+    }
+
+    private func act(as hash: String) {
+        ConvexService.shared.guestProofProvider = { hash }
+    }
+
+    /// Starts with fixed roles (unlisted seats are citizens), then moves from role reveal to night 0.
+    private func startNight(_ host: MultiplayerGameStore, room: UUID, roles: [UUID: Role]) async throws {
+        let assignments = host.players.enumerated().map { index, seat in
+            RoleAssignment(playerId: seat.playerId, role: roles[seat.playerId] ?? .citizen, number: index + 1)
+        }
+        try await service.startGame(sessionId: room, assignments: assignments)
+        try await waitUntil("role reveal") { host.currentSession?.currentPhase == "role_reveal" }
+        try await host.forceStartNight()
+        try await waitUntil("night round") {
+            host.currentSession?.currentPhase == "night"
+                && host.roundState?.roundId != nil
+                && host.roundState?.roundId == host.currentSession?.currentRoundId
         }
     }
 
-    // MARK: - Tests
-
-    func testHealthCheckRoundTrip() async throws {
-        let health: HealthResponse = try await ConvexService.shared.query("health:check")
-        XCTAssertTrue(health.ok)
-        XCTAssertEqual(health.backend, "convex")
-        XCTAssertEqual(health.api_contract, ConvexConfig.apiContractVersion)
+    private func waitUntil(_ what: String, _ condition: () -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(20)
+        while !condition() {
+            guard ContinuousClock.now < deadline else { throw Timeout(description: "Timed out waiting for \(what)") }
+            try await Task.sleep(for: .milliseconds(100))
+        }
     }
 
-    func testGuestHostCanAdvanceVotingThroughGameStore() async throws {
-        let hash = "qa-voting-\(UUID().uuidString)"
-        let host = try await makeGuest(name: "QA Voting Host", hash: hash)
-        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hash)
-        let player = try await sessionService.addPlayer(
-            sessionId: session.id, userId: host.id, playerName: host.displayName,
-            isBot: false, callerUserId: host.id, guestSecretHash: hash
-        )
+    /// Runs `body`, then always stops the stores, cancels the room and restores the proof.
+    /// The room is cancelled by whichever guest is host now (a night death can move host).
+    private func withCleanup(
+        room: UUID,
+        guests: [String],
+        stores: [MultiplayerGameStore],
+        _ body: () async throws -> Void
+    ) async throws {
+        var failure: Error?
         do {
-            try await sessionService.updateSessionStatus(
-                sessionId: session.id, status: .inProgress, callerUserId: host.id, guestSecretHash: hash
-            )
-            try await sessionService.updateSessionPhase(
-                sessionId: session.id, currentPhase: "voting", phaseData: .voting(dayIndex: 0),
-                callerUserId: host.id, guestSecretHash: hash
-            )
-            let activeSnapshot = try await sessionService.getSession(
-                sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash
-            )
-            let active = try XCTUnwrap(activeSnapshot)
-            let round = try XCTUnwrap(active.currentRoundId)
-            _ = try await sessionService.submitAction(
-                GameAction.voteAction(sessionId: session.id, roundId: round, dayIndex: 0,
-                                      actorPlayerId: player.playerId, targetPlayerId: nil),
-                guestSecretHash: hash
-            )
-            let store = MultiplayerGameStore()
-            store.testCurrentUserIdProvider = { host.id }
-            store.testGuestSecretHashProvider = { hash }
-            store.currentSession = active
-            store.isHost = true
-            store.myPlayer = player
-            store.allPlayers = [player]
-            try await store.showVotingResults(dayIndex: 0)
-            let result = try await sessionService.getSession(
-                sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash
-            )
-            XCTAssertEqual(result?.currentPhase, "voting_results")
-            guard case .votingResults(let day, _, _)? = result?.currentPhaseData else {
-                return XCTFail("Expected voting results")
-            }
-            XCTAssertEqual(day, 0)
+            try await body()
         } catch {
-            await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
-            throw error
+            failure = error
         }
-        await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
-    }
-
-    func testKickedGuestReceivesRemovalFromLiveSubscription() async throws {
-        let hostHash = "qa-kick-host-\(UUID().uuidString)"
-        let memberHash = "qa-kick-member-\(UUID().uuidString)"
-        let host = try await makeGuest(name: "QA Kick Host", hash: hostHash)
-        let member = try await makeGuest(name: "QA Kick Member", hash: memberHash)
-        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hostHash)
-        _ = try await sessionService.addPlayer(
-            sessionId: session.id, userId: host.id, playerName: host.displayName,
-            isBot: false, callerUserId: host.id, guestSecretHash: hostHash
-        )
-        let (_, local) = try await sessionService.joinSession(
-            roomCode: session.roomCode, userId: member.id, playerName: member.displayName,
-            guestSecretHash: memberHash
-        )
-        let store = MultiplayerGameStore()
-        store.myPlayer = local
-        store.isInSession = true
-        store.allPlayers = [local]
-        let realtime = RealtimeService()
-        let joined = expectation(description: "Live subscription contains local player")
-        let removed = expectation(description: "Live subscription observes local removal")
-        do {
-            try await realtime.subscribeToSession(
-                sessionId: session.id, viewerUserId: member.id, guestSecretHash: memberHash,
-                onSessionUpdate: { _ in },
-                onPlayerUpdate: { player in
-                    if player.id == local.id { joined.fulfill() }
-                },
-                onPlayerRemoved: { id in
-                    store.testHandlePlayerRemoval(id)
-                    if id == local.id { removed.fulfill() }
-                },
-                onActionUpdate: { _ in }
-            )
-            await fulfillment(of: [joined], timeout: 15)
-            try await sessionService.removePlayer(
-                playerId: local.id, callerUserId: host.id, guestSecretHash: hostHash
-            )
-            await fulfillment(of: [removed], timeout: 15)
-            XCTAssertTrue(store.wasKicked)
-            XCTAssertFalse(store.isInSession)
-            XCTAssertNil(store.myPlayer)
-        } catch {
-            await realtime.unsubscribeAll()
-            await tearDownSession(session, hostUserId: host.id, hostHash: hostHash,
-                                  users: [(host.id, hostHash), (member.id, memberHash)])
-            throw error
+        stores.forEach { $0.clearLocalSession() }
+        var cancelled = false
+        for guest in guests where !cancelled {
+            act(as: guest)
+            cancelled = (try? await service.cancelSession(sessionId: room)) != nil
         }
-        await realtime.unsubscribeAll()
-        await tearDownSession(session, hostUserId: host.id, hostHash: hostHash,
-                              users: [(host.id, hostHash), (member.id, memberHash)])
-    }
-
-    func testInvalidRoomReturnsReadableMessageThroughNativeSDK() async throws {
-        let hash = "qa-invalid-room-\(UUID().uuidString)"
-        let guest = try await makeGuest(name: "QA Invalid Room", hash: hash)
-        do {
-            _ = try await sessionService.joinSession(
-                roomCode: "000000", userId: guest.id, playerName: guest.displayName, guestSecretHash: hash
-            )
-            XCTFail("Invalid room should fail")
-        } catch {
-            XCTAssertEqual(error.localizedDescription, "Game session not found. It may have ended.")
-            XCTAssertFalse(error.localizedDescription.contains("UniFFI"))
-        }
-    }
-
-    func testHostEndGameCancelsRoomAndClearsStore() async throws {
-        let hash = "qa-end-room-\(UUID().uuidString)"
-        let host = try await makeGuest(name: "QA End Room", hash: hash)
-        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hash)
-        let player = try await sessionService.addPlayer(
-            sessionId: session.id, userId: host.id, playerName: host.displayName,
-            isBot: false, callerUserId: host.id, guestSecretHash: hash
-        )
-        _ = try await sessionService.addPlayer(
-            sessionId: session.id, userId: nil, playerName: "QA End Bot",
-            isBot: true, callerUserId: host.id, guestSecretHash: hash
-        )
-        let store = MultiplayerGameStore()
-        store.testCurrentUserIdProvider = { host.id }
-        store.testGuestSecretHashProvider = { hash }
-        store.currentSession = session
-        store.myPlayer = player
-        store.isHost = true
-        store.isInSession = true
-        try await store.endSession()
-        XCTAssertNil(store.currentSession)
-        XCTAssertNil(store.myPlayer)
-        XCTAssertFalse(store.isInSession)
-        let ended = try await sessionService.getSession(sessionId: session.id)
-        XCTAssertEqual(ended?.status, .cancelled)
-        let roster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
-        XCTAssertTrue(roster.isEmpty)
-    }
-
-    func testManualNightCompletionPublishesResolvedAtomicOutcome() async throws {
-        let hash = "qa-manual-night-\(UUID().uuidString)"
-        let host = try await makeGuest(name: "QA Manual Night", hash: hash)
-        let session = try await sessionService.createSession(hostUserId: host.id, guestSecretHash: hash)
-        var players: [SessionPlayer] = []
-        for index in 0..<4 {
-            players.append(try await sessionService.addPlayer(
-                sessionId: session.id, userId: index == 0 ? host.id : nil,
-                playerName: "QA Night \(index)", isBot: index != 0,
-                callerUserId: host.id, guestSecretHash: hash
-            ))
-        }
-        do {
-            try await sessionService.assignRolesAndNumbers(
-                sessionId: session.id,
-                assignments: [(players[0].playerId, .mafia, 1), (players[1].playerId, .doctor, 2),
-                              (players[2].playerId, .inspector, 3), (players[3].playerId, .citizen, 4)],
-                callerUserId: host.id, guestSecretHash: hash
-            )
-            try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress, callerUserId: host.id, guestSecretHash: hash)
-            try await sessionService.updateSessionPhase(sessionId: session.id, currentPhase: "night", phaseData: .night(nightIndex: 0, activeRole: nil), callerUserId: host.id, guestSecretHash: hash)
-            let snapshot = try await sessionService.getSession(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
-            let active = try XCTUnwrap(snapshot)
-            let round = try XCTUnwrap(active.currentRoundId)
-            _ = try await sessionService.submitAction(.mafiaAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[0].playerId, targetPlayerId: players[3].playerId), guestSecretHash: hash)
-            _ = try await sessionService.submitAction(.doctorAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[1].playerId, targetPlayerId: players[1].playerId), callerUserId: host.id, guestSecretHash: hash)
-            _ = try await sessionService.submitAction(.inspectorAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[2].playerId, targetPlayerId: players[0].playerId, result: nil), callerUserId: host.id, guestSecretHash: hash)
-            let store = MultiplayerGameStore()
-            store.testCurrentUserIdProvider = { host.id }
-            store.testGuestSecretHashProvider = { hash }
-            store.currentSession = active
-            store.isHost = true
-            store.myPlayer = players[0]
-            let fullRoster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
-            store.allPlayers = fullRoster
-            let readinessStarted = expectation(description: "Background readiness read is in flight")
-            var pendingRead: CheckedContinuation<[SessionPlayer], Error>?
-            var pauseNextRead = true
-            store.testPlayerSnapshotProvider = { _ in
-                if pauseNextRead {
-                    pauseNextRead = false
-                    return try await withCheckedThrowingContinuation { continuation in
-                        pendingRead = continuation
-                        readinessStarted.fulfill()
-                    }
-                }
-                return fullRoster
-            }
-            // Model an older reactive snapshot arriving after the record write.
-            store.testNightRecordStoredHandler = { [weak store] in store?.currentSession = active }
-            let readiness = Task { await store.testEvaluatePhaseReadiness() }
-            await fulfillment(of: [readinessStarted], timeout: 5)
-            do {
-                try await store.completeNightPhase()
-            } catch {
-                pendingRead?.resume(throwing: error)
-                await readiness.value
-                throw error
-            }
-            pendingRead?.resume(returning: fullRoster)
-            await readiness.value
-            let result = try await sessionService.getSession(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
-            XCTAssertEqual(result?.currentPhase, "morning")
-            XCTAssertTrue(result?.nightHistory.first?.isResolved == true, "Manual finish must use the atomic outcome path")
-            let roster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
-            XCTAssertFalse(roster.first(where: { $0.playerId == players[3].playerId })!.isAlive)
-        } catch {
-            await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
-            throw error
-        }
-        await tearDownSession(session, hostUserId: host.id, hostHash: hash, users: [(host.id, hash)])
-    }
-
-    func testGuestCreateAndRestoreIsIdempotent() async throws {
-        let hash = "qa-swift-int-guest"
-        let first = try await makeGuest(name: "QA Swift Guest", hash: hash)
-        let second = try await makeGuest(name: "QA Swift Guest Renamed", hash: hash)
-
-        XCTAssertEqual(first.id, second.id, "Same guest secret must restore the same user")
-        XCTAssertTrue(second.isAnonymous)
-        XCTAssertEqual(second.displayName, "QA Swift Guest Renamed")
-    }
-
-    func testMultiplayerSessionLifecycle() async throws {
-        let hostHash = "qa-swift-int-host"
-        let joinerHash = "qa-swift-int-joiner"
-        let host = try await makeGuest(name: "QA Swift Host", hash: hostHash)
-        let joiner = try await makeGuest(name: "QA Swift Joiner", hash: joinerHash)
-
-        let session = try await sessionService.createSession(
-            hostUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        var cleanupUsers = [(host.id, hostHash)]
-        defer {
-            let users = cleanupUsers
-            Task {
-                await self.tearDownSession(
-                    session,
-                    hostUserId: host.id,
-                    hostHash: hostHash,
-                    users: users
-                )
-            }
-        }
-
-        XCTAssertEqual(session.status, .waiting)
-        XCTAssertEqual(session.currentPhase, "lobby")
-        XCTAssertEqual(session.roomCode.count, 6)
-
-        let hostPlayer = try await sessionService.addPlayer(
-            sessionId: session.id,
-            userId: host.id,
-            playerName: "QA Swift Host",
-            isBot: false,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        let (joinedSession, joinerPlayer) = try await sessionService.joinSession(
-            roomCode: session.roomCode,
-            userId: joiner.id,
-            playerName: "QA Swift Joiner",
-            guestSecretHash: joinerHash
-        )
-        cleanupUsers.append((joiner.id, joinerHash))
-        XCTAssertEqual(joinedSession.id, session.id)
-
-        try await sessionService.assignRolesAndNumbers(
-            sessionId: session.id,
-            assignments: [
-                (playerId: hostPlayer.playerId, role: .mafia, number: 1),
-                (playerId: joinerPlayer.playerId, role: .citizen, number: 2),
-            ],
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-
-        // Host is the game master and must see every role; the joiner must
-        // only see their own.
-        let hostView = try await sessionService.getSessionPlayers(
-            sessionId: session.id,
-            viewerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        XCTAssertEqual(hostView.count, 2)
-        XCTAssertEqual(hostView.compactMap(\.role).count, 2)
-
-        let joinerView = try await sessionService.getSessionPlayers(
-            sessionId: session.id,
-            viewerUserId: joiner.id,
-            guestSecretHash: joinerHash
-        )
-        XCTAssertEqual(
-            joinerView.first(where: { $0.playerId == joinerPlayer.playerId })?.role, .citizen
-        )
-        XCTAssertNil(
-            joinerView.first(where: { $0.playerId == hostPlayer.playerId })?.role,
-            "A citizen must not see the host's role before game over"
-        )
-
-        // Enter night: the backend must mint a fresh round id.
-        try await sessionService.updateSessionStatus(
-            sessionId: session.id,
-            status: .inProgress,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        try await sessionService.updateSessionPhase(
-            sessionId: session.id,
-            currentPhase: "night",
-            phaseData: .night(nightIndex: 0, activeRole: nil),
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        let nightSession = try await sessionService.getSession(
-            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
-        )
-        let roundId = try XCTUnwrap(nightSession?.currentRoundId)
-
-        // Submit a mafia action for the current round and read it back.
-        let response = try await sessionService.submitAction(
-            GameAction.mafiaAction(
-                sessionId: session.id,
-                roundId: roundId,
-                nightIndex: 0,
-                actorPlayerId: hostPlayer.playerId,
-                targetPlayerId: joinerPlayer.playerId
-            ),
-            guestSecretHash: hostHash
-        )
-        XCTAssertTrue(response.success)
-
-        let actions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .mafiaTarget,
-            phaseIndex: 0,
-            roundId: roundId,
-            viewerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        XCTAssertEqual(actions.count, 1)
-        XCTAssertEqual(actions.first?.targetPlayerId, joinerPlayer.playerId)
-
-        // A stale round id must be rejected (replay protection).
-        do {
-            _ = try await sessionService.submitAction(
-                GameAction.mafiaAction(
-                    sessionId: session.id,
-                    roundId: UUID(),
-                    nightIndex: 0,
-                    actorPlayerId: hostPlayer.playerId,
-                    targetPlayerId: joinerPlayer.playerId
-                ),
-                guestSecretHash: hostHash
-            )
-            XCTFail("Submitting against a stale round id must throw")
-        } catch {
-            // expected
-        }
-
-        // Two-phase night resolution: record-then-resolve via the atomic mutation.
-        let record = NightActionRecord(
-            nightIndex: 0,
-            isResolved: true,
-            mafiaTargetId: joinerPlayer.playerId,
-            inspectorCheckedId: nil,
-            inspectorResult: nil,
-            doctorProtectedId: nil,
-            targetWasSaved: false,
-            resultingDeaths: [joinerPlayer.playerId],
-            revealedDeathRoles: [joinerPlayer.playerId.uuidString.lowercased(): "citizen"],
-            mafiaPlayerNumbers: [1],
-            doctorPlayerNumbers: [],
-            inspectorPlayerNumbers: [],
-            timestamp: Date()
-        )
-        let resolved = try await sessionService.resolveNightAtomic(
-            sessionId: session.id,
-            expectedRoundId: roundId,
-            nightRecord: record,
-            eliminatedPlayerIds: [joinerPlayer.playerId],
-            nextPhase: "game_over",
-            nextPhaseData: .gameOver(winner: Role.mafia.rawValue),
-            callerUserId: host.id,
-            isGameOver: true,
-            winner: .mafia,
-            guestSecretHash: hostHash
-        )
-        XCTAssertTrue(resolved)
-
-        let maybeFinalSession = try await sessionService.getSession(
-            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
-        )
-        let finalSession = try XCTUnwrap(maybeFinalSession)
-        XCTAssertTrue(finalSession.isGameOver)
-        XCTAssertEqual(finalSession.winner, .mafia)
-        XCTAssertEqual(finalSession.status, .completed)
-        XCTAssertEqual(finalSession.nightHistory.count, 1)
-        XCTAssertEqual(finalSession.nightHistory.first?.resultingDeaths, [joinerPlayer.playerId])
-
-        let finalPlayers = try await sessionService.getSessionPlayers(
-            sessionId: session.id,
-            viewerUserId: joiner.id,
-            guestSecretHash: joinerHash
-        )
-        XCTAssertEqual(
-            finalPlayers.first(where: { $0.playerId == joinerPlayer.playerId })?.isAlive, false
-        )
-        XCTAssertEqual(
-            finalPlayers.compactMap(\.role).count, 2,
-            "All roles must be revealed at game over"
-        )
-        try await sessionService.returnToLobby(
-            sessionId: session.id, playerId: joinerPlayer.id, playerUserId: joiner.id,
-            guestSecretHash: joinerHash
-        )
-        try await sessionService.returnToLobby(
-            sessionId: session.id, playerId: hostPlayer.id, playerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        let lobby = try await sessionService.getSession(
-            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
-        )
-        XCTAssertEqual(lobby?.hostUserId, host.id)
-        XCTAssertEqual(lobby?.currentPhase, "lobby")
-        XCTAssertTrue(lobby?.nightHistory.isEmpty == true)
-    }
-
-    func testGuestAuthorizationAndMembershipBoundaries() async throws {
-        let hostHash = "qa-security-host"
-        let memberHash = "qa-security-member"
-        let outsiderHash = "qa-security-outsider"
-        let host = try await makeGuest(name: "QA Security Host", hash: hostHash)
-        let member = try await makeGuest(name: "QA Security Member", hash: memberHash)
-        let outsider = try await makeGuest(name: "QA Security Outsider", hash: outsiderHash)
-
-        do {
-            _ = try await authService.getUserProfile(userId: host.id)
-            XCTFail("An asserted user id without Clerk or guest proof must fail")
-        } catch {}
-        do {
-            _ = try await authService.getUserProfile(
-                userId: host.id,
-                guestSecretHash: "wrong-proof"
-            )
-            XCTFail("Wrong guest proof must fail")
-        } catch {}
-        let provenHost = try await authService.getUserProfile(
-            userId: host.id,
-            guestSecretHash: hostHash
-        )
-        XCTAssertEqual(provenHost.id, host.id)
-
-        let session = try await sessionService.createSession(
-            hostUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        defer {
-            Task {
-                await self.tearDownSession(
-                    session,
-                    hostUserId: host.id,
-                    hostHash: hostHash,
-                    users: [(host.id, hostHash), (member.id, memberHash)]
-                )
-            }
-        }
-        let hostPlayer = try await sessionService.addPlayer(
-            sessionId: session.id,
-            userId: host.id,
-            playerName: "QA Security Host",
-            isBot: false,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        let (_, memberPlayer) = try await sessionService.joinSession(
-            roomCode: session.roomCode,
-            userId: member.id,
-            playerName: "QA Security Member",
-            guestSecretHash: memberHash
-        )
-        let bot = try await sessionService.addPlayer(
-            sessionId: session.id,
-            userId: nil,
-            playerName: "QA Security Bot",
-            isBot: true,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        try await sessionService.assignRolesAndNumbers(
-            sessionId: session.id,
-            assignments: [
-                (hostPlayer.playerId, .mafia, 1),
-                (memberPlayer.playerId, .citizen, 2),
-                (bot.playerId, .doctor, 3),
-            ],
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-
-        do {
-            _ = try await sessionService.getSessionPlayers(
-                sessionId: session.id,
-                viewerUserId: host.id,
-                guestSecretHash: memberHash
-            )
-            XCTFail("A spoofed host viewer must not reveal roles")
-        } catch {}
-        do {
-            try await sessionService.updatePlayerReady(
-                playerId: hostPlayer.id,
-                isReady: false,
-                guestSecretHash: memberHash
-            )
-            XCTFail("One guest must not mutate another player's row")
-        } catch {}
-
-        try await sessionService.updateSessionStatus(
-            sessionId: session.id,
-            status: .inProgress,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        try await sessionService.updateSessionPhase(
-            sessionId: session.id,
-            currentPhase: "night",
-            phaseData: .night(nightIndex: 0, activeRole: nil),
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        let updatedSession = try await sessionService.getSession(
-            sessionId: session.id, viewerUserId: host.id, guestSecretHash: hostHash
-        )
-        let roundId = try XCTUnwrap(updatedSession?.currentRoundId)
-        let hostAction = GameAction.mafiaAction(
-            sessionId: session.id,
-            roundId: roundId,
-            nightIndex: 0,
-            actorPlayerId: hostPlayer.playerId,
-            targetPlayerId: memberPlayer.playerId
-        )
-        do {
-            _ = try await sessionService.submitAction(
-                hostAction,
-                guestSecretHash: memberHash
-            )
-            XCTFail("One guest must not submit another player's action")
-        } catch {}
-        _ = try await sessionService.submitAction(hostAction, guestSecretHash: hostHash)
-
-        do {
-            _ = try await sessionService.getActionsForPhase(
-                sessionId: session.id,
-                actionType: .mafiaTarget,
-                phaseIndex: 0,
-                roundId: roundId,
-                viewerUserId: outsider.id,
-                guestSecretHash: outsiderHash
-            )
-            XCTFail("An outsider must not read session actions")
-        } catch {}
-        let memberRead = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .mafiaTarget,
-            phaseIndex: 0,
-            roundId: roundId,
-            viewerUserId: member.id,
-            guestSecretHash: memberHash
-        )
-        XCTAssertTrue(memberRead.isEmpty, "Citizens must not see another role’s actions")
-
-        let botAction = GameAction.doctorAction(
-            sessionId: session.id,
-            roundId: roundId,
-            nightIndex: 0,
-            actorPlayerId: bot.playerId,
-            targetPlayerId: memberPlayer.playerId
-        )
-        let botResponse = try await sessionService.submitAction(
-            botAction,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        XCTAssertTrue(botResponse.success)
-    }
-
-    func testLiveSubscriptionDeliversPhaseUpdates() async throws {
-        let hostHash = "qa-swift-int-sub"
-        let host = try await makeGuest(name: "QA Swift Sub Host", hash: hostHash)
-        let session = try await sessionService.createSession(
-            hostUserId: host.id,
-            guestSecretHash: hostHash
-        )
-        defer {
-            Task {
-                await self.tearDownSession(
-                    session,
-                    hostUserId: host.id,
-                    hostHash: hostHash,
-                    users: [(host.id, hostHash)]
-                )
-            }
-        }
-        _ = try await sessionService.addPlayer(
-            sessionId: session.id,
-            userId: host.id,
-            playerName: "QA Swift Sub Host",
-            isBot: false,
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-
-        let sawNightPhase = expectation(description: "subscription delivered the night phase")
-        sawNightPhase.assertForOverFulfill = false
-        var cancellables: Set<AnyCancellable> = []
-        ConvexService.shared.subscribe(
-            "sessions:getSessionById",
-            with: ["session_id": session.id.uuidString.lowercased()],
-            as: GameSession?.self
-        )
-        .receive(on: DispatchQueue.main)
-        .sink(
-            receiveCompletion: { _ in },
-            receiveValue: { update in
-                if update?.currentPhase == "night" {
-                    sawNightPhase.fulfill()
-                }
-            }
-        )
-        .store(in: &cancellables)
-
-        // Give the subscription a moment to deliver its initial snapshot, then
-        // mutate the phase and require the update to arrive reactively.
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-        try await sessionService.updateSessionPhase(
-            sessionId: session.id,
-            currentPhase: "night",
-            phaseData: .night(nightIndex: 0, activeRole: nil),
-            callerUserId: host.id,
-            guestSecretHash: hostHash
-        )
-
-        await fulfillment(of: [sawNightPhase], timeout: 15)
-        cancellables.removeAll()
+        if !cancelled { Issue.record("Could not cancel test room \(room)") }
+        ConvexService.shared.guestProofProvider = originalProof
+        if let failure { throw failure }
     }
 }

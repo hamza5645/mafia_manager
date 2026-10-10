@@ -76,8 +76,7 @@ struct CustomRolesView: View {
     }
 
     private func loadConfigs() async {
-        guard let userId = authStore.currentUserId,
-              authStore.isAuthenticated else {
+        guard authStore.isAuthenticated else {
             errorMessage = "You must be logged in to view custom roles"
             return
         }
@@ -86,10 +85,7 @@ struct CustomRolesView: View {
         errorMessage = nil
 
         do {
-            customConfigs = try await databaseService.getCustomRoleConfigs(
-                userId: userId,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            customConfigs = try await databaseService.getCustomRoleConfigs()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -104,10 +100,7 @@ struct CustomRolesView: View {
         }
 
         do {
-            try await databaseService.deleteCustomRoleConfig(
-                id: config.id,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            try await databaseService.deleteCustomRoleConfig(id: config.id)
             await loadConfigs()
         } catch {
             errorMessage = error.localizedDescription
@@ -335,8 +328,7 @@ struct AddCustomRoleConfigView: View {
     }
 
     private func saveConfig() async {
-        guard let userId = authStore.currentUserId,
-              authStore.isAuthenticated else {
+        guard authStore.isAuthenticated else {
             errorMessage = "You must be logged in to save custom roles"
             return
         }
@@ -352,19 +344,10 @@ struct AddCustomRoleConfigView: View {
             totalPlayers: totalPlayers
         )
 
-        let newConfig = CustomRoleConfig(
-            id: UUID(),
-            userId: userId,
-            configName: configName,
-            roleDistribution: roleDistribution,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-
         do {
             try await databaseService.createCustomRoleConfig(
-                newConfig,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+                name: configName,
+                roleDistribution: roleDistribution
             )
             await onSave()
             dismiss()
@@ -477,8 +460,7 @@ struct EditCustomRoleConfigView: View {
     }
 
     private func saveConfig() async {
-        guard let userId = authStore.currentUserId,
-              authStore.isAuthenticated else {
+        guard authStore.isAuthenticated else {
             errorMessage = "You must be logged in to save custom roles"
             return
         }
@@ -500,10 +482,7 @@ struct EditCustomRoleConfigView: View {
         updatedConfig.updatedAt = Date()
 
         do {
-            try await databaseService.updateCustomRoleConfig(
-                updatedConfig,
-                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
-            )
+            try await databaseService.updateCustomRoleConfig(updatedConfig)
             await onSave()
             dismiss()
         } catch {

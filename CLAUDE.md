@@ -8,7 +8,8 @@ Important current facts:
 - Active Swift backend files live under `Core/Backend/`, `Core/Auth/`, and `Core/Multiplayer/Services/`.
 - Convex backend files live under `convex/`.
 - Solo night resolution must remain two-phase: `endNight()` then `resolveNightOutcome()`.
-- Multiplayer night resolution must preserve the equivalent record-then-resolve flow and use Convex `sessions:resolveNightAtomic` for final state application.
+- Multiplayer outcomes are computed by Convex with the same record-then-resolve flow: `night:recordNightActions` → `night:resolveNightAtomic`, and `voting:closeVoting` → `voting:resolveVoteAtomic`. The host client only requests transitions (`phases:advancePhase`) and drives bots.
+- Convex functions never take user ids: the server derives the caller (valid guest proof → that guest, else the Clerk user). `ConvexService` injects `guest_secret_hash`.
 
 Common commands:
 ```bash

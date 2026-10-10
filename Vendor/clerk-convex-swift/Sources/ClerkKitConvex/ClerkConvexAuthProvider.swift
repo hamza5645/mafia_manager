@@ -81,15 +81,17 @@ public final class ClerkConvexAuthProvider: AuthProvider {
     try await authenticate(onIdToken: onIdToken)
   }
 
-  /// Signs out of the current Clerk session.
+  /// Stops forwarding Clerk tokens to Convex.
   ///
-  /// This will end the active Clerk session, notify Convex of the logout,
-  /// and stop listening for token refresh events.
+  /// Convex calls this from `ConvexClientWithAuth.logout()`, which runs after
+  /// Clerk has already signed out (the app signs out first, and session sync
+  /// only logs out once the Clerk session is gone). Signing out of Clerk a
+  /// second time threw `signed_out`, which made Convex keep the old identity,
+  /// so this never touches Clerk and never throws.
   public func logout() async throws {
     tokenRefreshListenerTask?.cancel()
     tokenRefreshListenerTask = nil
     onIdToken = nil
-    try await Clerk.shared.auth.signOut()
   }
 
   /// Extracts the JWT ID token from the authentication result.

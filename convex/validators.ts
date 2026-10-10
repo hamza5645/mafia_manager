@@ -29,3 +29,14 @@ export const roleDistributionValidator = v.object({
   total_players: v.number(),
 });
 
+
+// Spread into every public function's args. ConvexService injects the guest
+// proof into every call, and Convex rejects unknown args.
+export const guestArg = { guest_secret_hash: v.optional(v.string()) };
+
+export const phaseTargetValidator = v.union(
+  v.literal("night"),
+  v.literal("death_reveal"),
+  v.literal("voting"),
+  v.literal("vote_death_reveal"),
+);

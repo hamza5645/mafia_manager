@@ -28,7 +28,10 @@ export default defineSchema({
     auth_subject: v.optional(v.string()),
     display_name: v.string(),
     is_anonymous: v.boolean(),
-    guest_secret_hash: v.optional(v.string()),
+    // sha256 of the client's guest_secret_hash; only digests are compared.
+    guest_secret_digest: v.optional(v.string()),
+    // Merge tombstones so a retried mergeGuestIntoAccount succeeds.
+    merged_guest_digests: v.optional(v.array(v.string())),
     email: v.optional(v.string()),
     legacy_supabase_user_id: v.optional(v.string()),
     created_at: v.number(),
@@ -36,9 +39,8 @@ export default defineSchema({
   })
     .index("by_app_id", ["id"])
     .index("by_auth_subject", ["auth_subject"])
-    .index("by_guest_secret_hash", ["guest_secret_hash"])
-    .index("by_email_unclaimed", ["email", "auth_subject"])
-    .index("by_legacy_supabase_user_id", ["legacy_supabase_user_id"]),
+    .index("by_guest_secret_digest", ["guest_secret_digest"])
+    .index("by_email_unclaimed", ["email", "auth_subject"]),
 
   player_stats: defineTable({
     id: v.string(),
@@ -59,8 +61,7 @@ export default defineSchema({
   })
     .index("by_app_id", ["id"])
     .index("by_user", ["user_id"])
-    .index("by_user_player", ["user_id", "player_name"])
-    .index("by_legacy_supabase_id", ["legacy_supabase_id"]),
+    .index("by_user_player", ["user_id", "player_name"]),
 
   custom_roles_configs: defineTable({
     id: v.string(),
@@ -80,8 +81,7 @@ export default defineSchema({
   })
     .index("by_app_id", ["id"])
     .index("by_user", ["user_id"])
-    .index("by_user_config_name", ["user_id", "config_name"])
-    .index("by_legacy_supabase_id", ["legacy_supabase_id"]),
+    .index("by_user_config_name", ["user_id", "config_name"]),
 
   player_groups: defineTable({
     id: v.string(),
@@ -95,8 +95,7 @@ export default defineSchema({
   })
     .index("by_app_id", ["id"])
     .index("by_user", ["user_id"])
-    .index("by_user_group_name", ["user_id", "group_name"])
-    .index("by_legacy_supabase_id", ["legacy_supabase_id"]),
+    .index("by_user_group_name", ["user_id", "group_name"]),
 
   game_sessions: defineTable({
     id: v.string(),
@@ -118,11 +117,6 @@ export default defineSchema({
     night_history: v.array(v.any()),
     day_history: v.array(v.any()),
     current_round_id: v.optional(v.string()),
-    night_resolution: v.optional(v.object({
-      round_id: v.string(), fingerprint: v.string(), next_phase: v.string(),
-    })),
-    rematch_deadline: v.optional(v.number()),
-    phase_sequence: v.optional(v.number()),
     updated_at: v.number(),
   })
     .index("by_app_id", ["id"])

@@ -1,61 +1,67 @@
+import ConvexMobile
 import XCTest
-import Testing
 
 @testable import mafia_manager
 
 @MainActor
 final class AuthRegressionTests: XCTestCase {
     func testGuestToAccountTransitionChangesLoginDismissalSignal() async throws {
-        let guest = profile(isAnonymous: true)
-        let account = profile(isAnonymous: false)
-        let service = MockAuthService(guest: guest, account: account)
-        let suiteName = "AuthDismissal.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = AuthStore(authService: service, keychain: MemoryKeychain(), defaults: defaults, autoRestore: false)
+        let service = FakeAuthService()
+        let store = makeStore(service)
         XCTAssertNil(store.authenticatedAccountId)
-        let guestSignedIn = await store.signInAsGuest(displayName: guest.displayName)
+        let guestSignedIn = await store.signInAsGuest(displayName: service.guest.displayName)
         XCTAssertTrue(guestSignedIn)
         XCTAssertTrue(store.isAuthenticated)
         XCTAssertNil(store.authenticatedAccountId, "Guest auth must not dismiss account forms")
         await store.signIn(email: "qa@example.com", password: "test-password")
         XCTAssertTrue(store.isAuthenticated, "This Boolean stays true across the transition")
-        XCTAssertEqual(store.authenticatedAccountId, account.id, "Account identity must trigger form dismissal")
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id, "Account identity must trigger form dismissal")
     }
 
     func testFailedAccountLoginKeepsGuestDismissalSignalEmpty() async throws {
-        let guest = profile(isAnonymous: true)
-        let service = MockAuthService(guest: guest, account: profile(isAnonymous: false))
+        let service = FakeAuthService()
         service.signInError = TestError.expected
-        let suiteName = "AuthFailedDismissal.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = AuthStore(authService: service, keychain: MemoryKeychain(), defaults: defaults, autoRestore: false)
-        _ = await store.signInAsGuest(displayName: guest.displayName)
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
         await store.signIn(email: "qa@example.com", password: "wrong-password")
         XCTAssertTrue(store.isAuthenticated)
-        XCTAssertEqual(store.currentUserId, guest.id)
+        XCTAssertEqual(store.currentUserId, service.guest.id)
         XCTAssertNil(store.authenticatedAccountId)
         XCTAssertNotNil(store.errorMessage)
     }
 
-    func testTypedExistingEmailErrorMapsToAuthError() {
-        guard case AuthError.emailAlreadyInUse? = AuthService.signUpError(
-            forClerkCode: "form_identifier_exists"
-        ) else {
-            return XCTFail("Expected emailAlreadyInUse")
-        }
+    func testClerkCodesMapToActionableErrors() {
+        XCTAssertEqual(AuthService.authError(forClerkCode: "form_identifier_exists"), .emailAlreadyInUse)
+        XCTAssertEqual(AuthService.authError(forClerkCode: "form_identifier_not_found"), .accountNotFound)
+        XCTAssertNil(AuthService.authError(forClerkCode: "form_password_incorrect"))
+        let guidance = AuthError.accountNotFound.errorDescription ?? ""
+        XCTAssertTrue(guidance.contains("before the update"))
+        XCTAssertTrue(guidance.contains("Sign Up with the same email"))
     }
 
-    func testVerificationFreeSignupSynchronizesClerkBeforeConvex() async throws {
-        var events: [String] = []
+    func testUnknownEmailShowsLegacyGuidanceOnSignInAndReset() async {
+        let service = FakeAuthService()
+        service.signInError = AuthError.accountNotFound
+        service.passwordResetError = AuthError.accountNotFound
+        let store = makeStore(service)
 
-        try await AuthService.synchronizeCompletedSignUp(
-            refreshClient: { events.append("clerk") },
-            refreshConvexAuth: { events.append("convex") }
-        )
+        await store.signIn(email: "legacy@example.com", password: "legacy-password")
+        XCTAssertEqual(store.errorMessage, AuthError.accountNotFound.errorDescription)
+        let resetStarted = await store.startPasswordReset(email: "legacy@example.com")
+        XCTAssertFalse(resetStarted)
+        XCTAssertEqual(store.errorMessage, AuthError.accountNotFound.errorDescription)
+    }
 
-        XCTAssertEqual(events, ["clerk", "convex"])
+    func testPasswordsAreTrimmedTheSameWayEverywhere() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+
+        await store.signIn(email: " a@example.com ", password: "  sign-in-pass \n")
+        _ = await store.startSignUp(email: "b@example.com", password: " sign-up-pass ", displayName: "B")
+        await store.confirmPasswordReset(code: "123456", newPassword: "\treset-pass ")
+
+        XCTAssertEqual(service.passwords, ["sign-in-pass", "sign-up-pass", "reset-pass"])
+        XCTAssertEqual(AuthStore.minimumPasswordLength, 8)
     }
 
     func testTemplatedTokenRefreshForwardsOnlySuccessfulFetch() async {
@@ -70,151 +76,231 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(failed)
     }
 
-    func testMergeFailurePersistsAndRetrySuccessClearsCredentials() async throws {
-        let guest = profile(isAnonymous: true)
-        let account = profile(isAnonymous: false)
-        let service = MockAuthService(guest: guest, account: account)
+    // MARK: - Guest merge
+
+    func testUpgradeMergesGuestAndForgetsIt() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        let guestProof = store.currentGuestSecretHash
+
+        let needsCode = await store.startSignUp(email: "guest@example.com", password: "password123", displayName: "Account")
+
+        XCTAssertFalse(needsCode)
+        XCTAssertEqual(service.mergedHashes, [guestProof])
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id)
+        XCTAssertFalse(store.hasPendingGuestMerge)
+        XCTAssertNil(store.currentGuestSecretHash)
+        XCTAssertNil(store.guestDisplayName)
+        XCTAssertNil(store.activeGuestProof)
+    }
+
+    func testPasswordResetFinishesGuestMerge() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+
+        await store.confirmPasswordReset(code: "424242", newPassword: "new-password")
+
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id)
+        XCTAssertEqual(service.mergedHashes.count, 1)
+        XCTAssertNil(store.currentGuestSecretHash)
+    }
+
+    func testFailedMergeStaysPendingAndRetriesAtNextLaunch() async {
+        let service = FakeAuthService()
         let keychain = MemoryKeychain()
-        let suiteName = "AuthRegressionTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = AuthStore(
-            authService: service,
-            keychain: keychain,
-            defaults: defaults,
-            autoRestore: false
-        )
+        let store = makeStore(service, keychain: keychain)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        let guestProof = store.currentGuestSecretHash
+        service.signUpNeedsEmailCode = true
+        service.mergeError = BackendError(ClientError.ConvexError(
+            data: "\"Leave your other seat in this room before saving guest progress.\""
+        ))
 
-        let signedInAsGuest = await store.signInAsGuest(displayName: guest.displayName)
-        XCTAssertTrue(signedInAsGuest)
-        service.mergeError = TestError.expected
+        let needsCode = await store.startSignUp(email: "guest@example.com", password: "password123", displayName: "Account")
+        XCTAssertTrue(needsCode)
+        await store.verifySignUpEmailCode("424242")
 
-        let result = await store.linkEmailPassword(
-            email: "guest@example.com",
-            password: "password123",
-            displayName: account.displayName
-        )
-
-        guard case .retryableMergeFailure = result else {
-            return XCTFail("Expected retryable merge failure")
-        }
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id, "The account is usable while the merge waits")
         XCTAssertTrue(store.hasPendingGuestMerge)
-        XCTAssertNotNil(store.currentGuestSecretHash)
+        XCTAssertEqual(store.activeGuestProof, guestProof, "Requests act as the guest until the merge succeeds")
+        XCTAssertTrue(store.errorMessage?.contains("Leave your other seat") == true)
 
         service.mergeError = nil
-        let retrySucceeded = await store.retryPendingGuestMerge()
-        XCTAssertTrue(retrySucceeded)
-        XCTAssertFalse(store.hasPendingGuestMerge)
-        XCTAssertNil(store.currentGuestSecretHash)
-        XCTAssertFalse(store.isAnonymous)
-        XCTAssertEqual(service.mergeAttempts, 2)
+        service.restoredUser = service.account
+        let relaunched = makeStore(service, keychain: keychain)
+        await relaunched.restoreSession()
+
+        XCTAssertEqual(service.mergedHashes, [guestProof, guestProof])
+        XCTAssertFalse(relaunched.hasPendingGuestMerge)
+        XCTAssertNil(relaunched.currentGuestSecretHash)
+        XCTAssertNil(relaunched.errorMessage)
     }
 
-    func testSessionRestorationRetriesPendingMergeAutomatically() async throws {
-        let guest = profile(isAnonymous: true)
-        let account = profile(isAnonymous: false)
-        let service = MockAuthService(guest: guest, account: account)
-        service.restoredUser = account
-        let keychain = MemoryKeychain()
-        try keychain.save("guest-secret", forKey: "convex_guest_secret")
-        let suiteName = "AuthRestoreTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defaults.set(guest.id.uuidString, forKey: "pending_merge_from_anonymous_id")
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = AuthStore(
-            authService: service,
-            keychain: keychain,
-            defaults: defaults,
-            autoRestore: false
-        )
+    func testSettingsRetryFinishesAPendingMerge() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = TestError.expected
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        XCTAssertTrue(store.hasPendingGuestMerge)
 
-        await store.ensureValidSession()
+        let failure = await store.retryGuestMerge()
+        XCTAssertTrue(store.hasPendingGuestMerge)
+        XCTAssertNotNil(failure, "Settings shows why the retry failed")
 
-        XCTAssertEqual(service.mergeAttempts, 1)
+        service.mergeError = nil
+        let success = await store.retryGuestMerge()
+        XCTAssertNil(success)
         XCTAssertFalse(store.hasPendingGuestMerge)
-        XCTAssertNil(store.currentGuestSecretHash)
-        XCTAssertEqual(store.currentUserId, account.id)
+        XCTAssertEqual(service.mergedHashes.count, 3)
     }
 
-    private func profile(isAnonymous: Bool) -> UserProfile {
-        UserProfile(
-            id: UUID(),
-            displayName: isAnonymous ? "Guest" : "Account",
-            isAnonymous: isAnonymous,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
+    func testMissingServerGuestIsForgottenInsteadOfRetriedForever() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = BackendError(ClientError.ConvexError(data: "\"\(BackendError.guestNotFound)\""))
+
+        await store.signIn(email: "qa@example.com", password: "test-password")
+
+        XCTAssertNil(store.currentGuestSecretHash)
+        XCTAssertFalse(store.hasPendingGuestMerge)
+        XCTAssertNil(store.errorMessage)
+    }
+
+    func testAbandonedUpgradeLeavesAPlainGuestWithNothingPending() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+
+        service.signUpError = AuthError.emailAlreadyInUse
+        let failed = await store.startSignUp(email: "taken@example.com", password: "password123", displayName: "Account")
+        XCTAssertFalse(failed)
+        XCTAssertEqual(store.errorMessage, AuthError.emailAlreadyInUse.errorDescription)
+
+        service.signUpError = nil
+        service.signUpNeedsEmailCode = true
+        let needsCode = await store.startSignUp(email: "new@example.com", password: "password123", displayName: "Account")
+        XCTAssertTrue(needsCode)
+        store.cancelPendingSignUp()
+
+        XCTAssertTrue(store.isAnonymous)
+        XCTAssertFalse(store.hasPendingGuestMerge)
+        XCTAssertTrue(service.mergedHashes.isEmpty)
+    }
+
+    // MARK: - Sign-out
+
+    func testClearingGuestDataRemovesSecretNameAndPendingMerge() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        XCTAssertNotNil(store.currentGuestSecretHash)
+        XCTAssertNotNil(store.guestDisplayName)
+
+        await store.signOut()
+
+        XCTAssertFalse(store.isAuthenticated)
+        XCTAssertNil(store.currentGuestSecretHash)
+        XCTAssertNil(store.guestDisplayName)
+        XCTAssertFalse(store.hasPendingGuestMerge)
+        XCTAssertNil(store.activeGuestProof)
+    }
+
+    func testFailedAccountSignOutKeepsTheAccountAndItsPendingGuest() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = TestError.expected
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        service.signOutError = URLError(.notConnectedToInternet)
+
+        await store.signOut()
+
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id, "Clerk still has the account")
+        XCTAssertTrue(store.hasPendingGuestMerge)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    func testFailedGuestSignOutStillClearsGuestData() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.signOutError = URLError(.notConnectedToInternet)
+
+        await store.signOut()
+
+        XCTAssertFalse(store.isAuthenticated)
+        XCTAssertNil(store.currentGuestSecretHash)
+        XCTAssertNil(store.guestDisplayName)
+    }
+
+    func testSignOutWithPendingMergeNeverMergesIntoTheNextAccount() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = TestError.expected
+        await store.signIn(email: "first@example.com", password: "test-password")
+        XCTAssertTrue(store.hasPendingGuestMerge)
+
+        await store.signOut()
+        service.mergeError = nil
+        await store.signIn(email: "second@example.com", password: "test-password")
+
+        XCTAssertEqual(service.mergedHashes.count, 1, "Only the failed attempt for the first account")
+        XCTAssertFalse(store.hasPendingGuestMerge)
+    }
+
+    private func makeStore(_ service: FakeAuthService, keychain: MemoryKeychain? = nil) -> AuthStore {
+        let suiteName = "AuthRegressionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        return AuthStore(authService: service, keychain: keychain ?? MemoryKeychain(), defaults: defaults, autoRestore: false)
     }
 }
 
-@MainActor
-struct PasswordResetMergeTests {
-    @Test func resetFinishesPendingGuestMerge() async throws {
-        try await checkReset(mergeFails: false)
-    }
-
-    @Test func failedMergeAfterResetKeepsProofForRetry() async throws {
-        try await checkReset(mergeFails: true)
-    }
-
-    private func checkReset(mergeFails: Bool) async throws {
-        let guest = UserProfile(id: UUID(), displayName: "Guest", isAnonymous: true,
-                                createdAt: Date(), updatedAt: Date())
-        let account = UserProfile(id: UUID(), displayName: "Account", isAnonymous: false,
-                                  createdAt: Date(), updatedAt: Date())
-        let service = MockAuthService(guest: guest, account: account)
-        let keychain = MemoryKeychain()
-        try keychain.save("guest-proof", forKey: "convex_guest_secret")
-        let suite = "PasswordResetMerge.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        defaults.set(guest.id.uuidString, forKey: "pending_merge_from_anonymous_id")
-        let store = AuthStore(authService: service, keychain: keychain,
-                              defaults: defaults, autoRestore: false)
-        if mergeFails { service.mergeError = TestError.expected }
-
-        let reset = await store.confirmPasswordReset(code: "test-code", newPassword: "test-password")
-
-        #expect(reset)
-        #expect(store.authenticatedAccountId == account.id)
-        #expect(service.mergeAttempts == 1)
-        #expect(store.hasPendingGuestMerge == mergeFails)
-        if mergeFails {
-            #expect(store.currentGuestSecretHash != nil)
-            service.mergeError = nil
-            let retried = await store.retryPendingGuestMerge()
-            #expect(retried)
-            #expect(service.mergeAttempts == 2)
-        }
-        #expect(store.hasPendingGuestMerge == false)
-        #expect(store.currentGuestSecretHash == nil)
-    }
-}
-
-private enum TestError: Error {
+enum TestError: Error {
     case expected
 }
 
+/// In-memory `AuthServicing` that records what the store sends.
 @MainActor
-private final class MockAuthService: AuthServicing {
-    let guest: UserProfile
-    let account: UserProfile
+final class FakeAuthService: AuthServicing {
+    let guest = UserProfile(id: UUID(), displayName: "Guest", isAnonymous: true, createdAt: Date(), updatedAt: Date())
+    let account = UserProfile(id: UUID(), displayName: "Account", isAnonymous: false, createdAt: Date(), updatedAt: Date())
     var restoredUser: UserProfile?
-    var mergeError: Error?
+    var restoreError: Error?
+    var refreshError: Error?
     var signInError: Error?
-    var mergeAttempts = 0
-
-    init(guest: UserProfile, account: UserProfile) {
-        self.guest = guest
-        self.account = account
-    }
+    var guestSignInError: Error?
+    var signOutError: Error?
+    var signUpError: Error?
+    var passwordResetError: Error?
+    var mergeError: Error?
+    var signUpNeedsEmailCode = false
+    private(set) var passwords: [String] = []
+    private(set) var mergedHashes: [String?] = []
+    private(set) var guestSignIns = 0
+    private(set) var refreshes = 0
 
     var currentUser: UserProfile? {
-        get async { restoredUser }
+        get async throws {
+            if let restoreError { throw restoreError }
+            return restoredUser
+        }
     }
 
-    func startSignUp(email: String, password: String, displayName: String) async throws -> AuthService.SignUpStartResult {
-        .completed(account)
+    func refreshConvexAuth() async throws {
+        refreshes += 1
+        if let refreshError { throw refreshError }
+    }
+
+    func startSignUp(email: String, password: String, displayName: String) async throws -> UserProfile? {
+        passwords.append(password)
+        if let signUpError { throw signUpError }
+        return signUpNeedsEmailCode ? nil : account
     }
 
     func verifySignUpEmailCode(_ code: String, displayName: String) async throws -> UserProfile {
@@ -224,35 +310,39 @@ private final class MockAuthService: AuthServicing {
     func resendSignUpEmailCode() async throws {}
 
     func signIn(email: String, password: String) async throws -> UserProfile {
+        passwords.append(password)
         if let signInError { throw signInError }
         return account
     }
 
-    func signOut() async throws {}
-    func startPasswordReset(email: String) async throws {}
+    func signOut() async throws {
+        if let signOutError { throw signOutError }
+    }
+
+    func startPasswordReset(email: String) async throws {
+        if let passwordResetError { throw passwordResetError }
+    }
 
     func confirmPasswordReset(code: String, newPassword: String) async throws -> UserProfile {
-        account
+        passwords.append(newPassword)
+        return account
     }
 
-    func updateUserProfile(userId: UUID, displayName: String, guestSecretHash: String?) async throws {}
+    func updateProfile(displayName: String) async throws {}
 
     func signInAsGuest(displayName: String, guestSecretHash: String) async throws -> UserProfile {
-        guest
+        guestSignIns += 1
+        if let guestSignInError { throw guestSignInError }
+        return guest
     }
 
-    func mergeAnonymousStats(
-        anonymousUserId: UUID,
-        targetUserId: UUID,
-        guestSecretHash: String
-    ) async throws -> MergeStatsResult {
-        mergeAttempts += 1
+    func mergeGuestIntoAccount(guestSecretHash: String) async throws {
+        mergedHashes.append(guestSecretHash)
         if let mergeError { throw mergeError }
-        return MergeStatsResult(success: true, error: nil, mergedCount: 0, transferredCount: 0)
     }
 }
 
-private final class MemoryKeychain: KeychainStoring {
+final class MemoryKeychain: KeychainStoring {
     private var values: [String: String] = [:]
 
     func save(_ value: String, forKey key: String) throws {

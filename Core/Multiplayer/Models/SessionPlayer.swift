@@ -16,6 +16,7 @@ struct SessionPlayer: Codable, Identifiable, Sendable {
     var lastHeartbeat: Date
     let joinedAt: Date
     var removalNote: String?
+    var isMe: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -32,21 +33,7 @@ struct SessionPlayer: Codable, Identifiable, Sendable {
         case lastHeartbeat = "last_heartbeat"
         case joinedAt = "joined_at"
         case removalNote = "removal_note"
-    }
-
-    // MARK: - Display-relevant comparison to prevent heartbeat-induced flickering
-
-    /// Returns true if display-relevant properties match (ignores heartbeat/connection state).
-    /// Used to prevent unnecessary SwiftUI re-renders when only background properties change.
-    func displayPropertiesEqual(to other: SessionPlayer) -> Bool {
-        return self.userId == other.userId
-            && self.playerName == other.playerName
-            && self.playerNumber == other.playerNumber
-            && self.role == other.role
-            && self.isAlive == other.isAlive
-            && self.isBot == other.isBot
-            && self.isReady == other.isReady
-            && self.removalNote == other.removalNote
+        case isMe = "is_me"
     }
 }
 

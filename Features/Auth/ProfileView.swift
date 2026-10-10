@@ -99,6 +99,14 @@ struct ProfileView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
 
+                    if let errorMessage = authStore.errorMessage {
+                        Text(errorMessage)
+                            .font(Design.Typography.caption)
+                            .foregroundColor(Design.Colors.dangerRed)
+                            .padding(.horizontal, 24)
+                            .accessibilityLabel("Error: \(errorMessage)")
+                    }
+
                     Spacer()
                 }
             }
@@ -111,7 +119,12 @@ struct ProfileView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to sign out?")
+            Text(authStore.hasPendingGuestMerge
+                 ? "Are you sure you want to sign out? Guest progress that hasn't been saved to your account will be removed from this device."
+                 : "Are you sure you want to sign out?")
+        }
+        .onAppear {
+            authStore.clearError()
         }
         .onChange(of: authStore.isAuthenticated) { _, isAuthenticated in
             if !isAuthenticated {

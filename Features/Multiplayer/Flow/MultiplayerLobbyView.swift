@@ -14,7 +14,7 @@ struct MultiplayerLobbyView: View {
 
     /// The session player ID of the host (found by matching userId to session.hostUserId)
     private var hostSessionPlayerId: UUID? {
-        multiplayerStore.allPlayers.first(where: {
+        multiplayerStore.players.first(where: {
             $0.userId == multiplayerStore.currentSession?.hostUserId
         })?.id
     }
@@ -71,6 +71,13 @@ struct MultiplayerLobbyView: View {
                 .animation(.easeInOut(duration: 0.3), value: session.currentPhaseData)
             } else {
                 ProgressView()
+            }
+        }
+        .overlay(alignment: .top) {
+            if let problem = multiplayerStore.connectionProblem {
+                ConnectionBanner(message: problem, onRetry: multiplayerStore.retryConnection)
+            } else if multiplayerStore.showsReconnectBanner {
+                ConnectionBanner(message: "Reconnecting…", onRetry: nil)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -621,7 +628,7 @@ struct MultiplayerMorningView: View {
                 
                 if multiplayerStore.isHost {
                     Button {
-                        Task { try? await multiplayerStore.advanceToDeathRevealManual(nightIndex: nightIndex) }
+                        Task { try? await multiplayerStore.revealDeaths() }
                     } label: {
                         Text("Reveal Deaths")
                             .font(Design.Typography.body)
@@ -701,7 +708,7 @@ struct MultiplayerDeathRevealView: View {
         }
 
         // Try to get role from session player first when the backend returned it
-        if let sessionPlayer = multiplayerStore.allPlayers.first(where: { $0.playerId == player.playerId }),
+        if let sessionPlayer = multiplayerStore.players.first(where: { $0.playerId == player.playerId }),
            let role = sessionPlayer.role {
             return role
         }
@@ -805,7 +812,7 @@ struct MultiplayerDeathRevealView: View {
                 
                 if multiplayerStore.isHost {
                     Button {
-                        Task { try? await multiplayerStore.advanceToVotingManual(nightIndex: nightIndex) }
+                        Task { try? await multiplayerStore.startVoting() }
                     } label: {
                         Text("Start Voting")
                             .font(Design.Typography.body)

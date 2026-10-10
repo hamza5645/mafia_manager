@@ -4,17 +4,22 @@ import ConvexMobile
 
 @MainActor
 protocol AuthServicing: AnyObject {
-    var currentUser: UserProfile? { get async }
-    func startSignUp(email: String, password: String, displayName: String) async throws -> AuthService.SignUpStartResult
+    /// The signed-in account, or nil only when Clerk definitively has no
+    /// user. Throws when Clerk or Convex cannot be reached.
+    var currentUser: UserProfile? { get async throws }
+    /// Reinstalls the account's Clerk token in Convex.
+    func refreshConvexAuth() async throws
+    /// Returns nil when Clerk emailed a code that `verifySignUpEmailCode` needs.
+    func startSignUp(email: String, password: String, displayName: String) async throws -> UserProfile?
     func verifySignUpEmailCode(_ code: String, displayName: String) async throws -> UserProfile
     func resendSignUpEmailCode() async throws
     func signIn(email: String, password: String) async throws -> UserProfile
     func signOut() async throws
     func startPasswordReset(email: String) async throws
     func confirmPasswordReset(code: String, newPassword: String) async throws -> UserProfile
-    func updateUserProfile(userId: UUID, displayName: String, guestSecretHash: String?) async throws
+    func updateProfile(displayName: String) async throws
     func signInAsGuest(displayName: String, guestSecretHash: String) async throws -> UserProfile
-    func mergeAnonymousStats(anonymousUserId: UUID, targetUserId: UUID, guestSecretHash: String) async throws -> MergeStatsResult
+    func mergeGuestIntoAccount(guestSecretHash: String) async throws
 }
 
 @MainActor
@@ -22,41 +27,20 @@ final class AuthService {
     private let convex = ConvexService.shared
 
     var currentUser: UserProfile? {
-        get async {
-            guard ConvexConfig.hasConfiguredClerkKey else { return nil }
+        get async throws {
             if Clerk.shared.user == nil {
-                _ = try? await Clerk.shared.refreshClient()
+                _ = try await Clerk.shared.refreshClient()
             }
-            return try? await Self.restoreAccountProfile(
-                hasClerkUser: Clerk.shared.user != nil,
-                refreshConvexAuth: { try await self.convex.refreshAuthFromClerk() },
-                loadProfile: { try await self.ensureClerkUser() }
-            )
+            guard Clerk.shared.user != nil else { return nil }
+            return try await completeSession()
         }
     }
 
-    /// Cached Clerk identity can load before the provider's asynchronous
-    /// session-sync task. Install Convex auth before restoring its profile.
-    static func restoreAccountProfile(
-        hasClerkUser: Bool,
-        refreshConvexAuth: () async throws -> Void,
-        loadProfile: () async throws -> UserProfile
-    ) async throws -> UserProfile? {
-        guard hasClerkUser else { return nil }
-        try await refreshConvexAuth()
-        return try await loadProfile()
+    func refreshConvexAuth() async throws {
+        try await convex.refreshAuthFromClerk()
     }
 
-    enum SignUpStartResult {
-        case completed(UserProfile)
-        case needsEmailCode
-    }
-
-    func startSignUp(email: String, password: String, displayName: String) async throws -> SignUpStartResult {
-        guard ConvexConfig.hasConfiguredClerkKey else {
-            throw AuthError.providerNotConfigured
-        }
-
+    func startSignUp(email: String, password: String, displayName: String) async throws -> UserProfile? {
         let signUp: SignUp
         do {
             signUp = try await Clerk.shared.auth.signUp(
@@ -65,28 +49,17 @@ final class AuthService {
                 firstName: displayName
             )
         } catch {
-            throw Self.mapSignUpError(error)
+            throw Self.mapClerkError(error)
         }
 
-        if signUp.status == .complete {
-            if let sessionId = signUp.createdSessionId {
-                try await Clerk.shared.auth.setActive(sessionId: sessionId)
-            }
-            try await Self.synchronizeCompletedSignUp(
-                refreshClient: { _ = try? await Clerk.shared.refreshClient() },
-                refreshConvexAuth: { try await self.convex.refreshAuthFromClerk() }
-            )
-            return .completed(try await ensureClerkUser(displayName: displayName))
+        guard signUp.status == .complete else {
+            try await signUp.sendEmailCode()
+            return nil
         }
-
-        try await signUp.sendEmailCode()
-        return .needsEmailCode
+        return try await completeSession(signUp.createdSessionId, displayName: displayName)
     }
 
     func verifySignUpEmailCode(_ code: String, displayName: String) async throws -> UserProfile {
-        guard ConvexConfig.hasConfiguredClerkKey else {
-            throw AuthError.providerNotConfigured
-        }
         guard let signUp = Clerk.shared.auth.currentSignUp else {
             throw AuthError.signUpExpired
         }
@@ -95,28 +68,10 @@ final class AuthService {
         guard updated.status == .complete else {
             throw AuthError.unknown
         }
-
-        if let sessionId = updated.createdSessionId {
-            try await Clerk.shared.auth.setActive(sessionId: sessionId)
-            // setActive() doesn't synchronously flip Clerk.session.status to
-            // .active; refreshClient() does. Best-effort because the dev
-            // instance can be flaky and the bounded poll in
-            // refreshAuthFromClerk is the safety net that actually waits.
-            _ = try? await Clerk.shared.refreshClient()
-        }
-
-        // Force the Convex FFI auth callback install on this task before the
-        // next mutation. The patched ClerkConvexAuthProvider handles
-        // `.signUpCompleted` on its own session-sync Task, but we can't
-        // await that task from here, so the mutation would race it.
-        try await convex.refreshAuthFromClerk()
-        return try await ensureClerkUser(displayName: displayName)
+        return try await completeSession(updated.createdSessionId, displayName: displayName)
     }
 
     func resendSignUpEmailCode() async throws {
-        guard ConvexConfig.hasConfiguredClerkKey else {
-            throw AuthError.providerNotConfigured
-        }
         guard let signUp = Clerk.shared.auth.currentSignUp else {
             throw AuthError.signUpExpired
         }
@@ -124,59 +79,44 @@ final class AuthService {
     }
 
     func signIn(email: String, password: String) async throws -> UserProfile {
-        guard ConvexConfig.hasConfiguredClerkKey else {
-            throw AuthError.providerNotConfigured
+        let signIn: SignIn
+        do {
+            signIn = try await Clerk.shared.auth.signInWithPassword(
+                identifier: email,
+                password: password
+            )
+        } catch {
+            throw Self.mapClerkError(error)
         }
 
-        let signIn = try await Clerk.shared.auth.signInWithPassword(
-            identifier: email,
-            password: password
-        )
-
-        // Clerk returns a SignIn object describing what (if anything) is
-        // still required to complete the sign-in. If MFA is enforced
-        // (app-level or per-user), .createdSessionId is nil and status
-        // is one of .needsSecondFactor / .needsNewPassword / etc. We
-        // surface that as a clear error rather than silently falling
-        // through to refreshAuthFromClerk, which would just time out
-        // polling for a session that will never exist.
+        // Without a session Clerk still needs another step (for example a
+        // second factor), so waiting for an active session would only time out.
         guard let sessionId = signIn.createdSessionId else {
             throw AuthError.unknown
         }
-
-        try await Clerk.shared.auth.setActive(sessionId: sessionId)
-
-        // signInWithPassword's response middleware already applied the
-        // fresh Client and flipped Clerk.shared.session.status to .active
-        // (Clerk.client.didSet emits .sessionChanged). We do NOT call
-        // refreshClient() here — a stale GET /v1/client can clear
-        // lastActiveSessionId and push session out of .active longer
-        // than refreshAuthFromClerk's 5s poll. We still need the
-        // refreshAuthFromClerk call though: the SDK's session-sync Task
-        // handles .sessionChanged on its own queue, so ensureClerkUser
-        // can race past the FFI auth-callback install. This forces the
-        // install on the call-site Task.
-        try await convex.refreshAuthFromClerk()
-        return try await ensureClerkUser()
+        return try await completeSession(sessionId)
     }
 
     func signOut() async throws {
-        if ConvexConfig.hasConfiguredClerkKey {
-            do {
-                try await Clerk.shared.auth.signOut()
-            } catch let error as ClerkAPIError where error.code == "signed_out" {
-                // The requested account state is already satisfied.
-            }
+        var clerkError: Error?
+        do {
+            try await Clerk.shared.auth.signOut()
+        } catch let error as ClerkAPIError where error.code == "signed_out" {
+            // The requested account state is already satisfied.
+        } catch {
+            clerkError = error
         }
+        // Always drop the Convex identity, even when Clerk could not be reached.
         await convex.logout()
+        if let clerkError { throw clerkError }
     }
 
     func startPasswordReset(email: String) async throws {
-        guard ConvexConfig.hasConfiguredClerkKey else {
-            throw AuthError.providerNotConfigured
+        do {
+            _ = try await Clerk.shared.auth.signIn(email)
+        } catch {
+            throw Self.mapClerkError(error)
         }
-
-        _ = try await Clerk.shared.auth.signIn(email)
         guard let signIn = Clerk.shared.auth.currentSignIn else {
             throw AuthError.unknown
         }
@@ -184,9 +124,6 @@ final class AuthService {
     }
 
     func confirmPasswordReset(code: String, newPassword: String) async throws -> UserProfile {
-        guard ConvexConfig.hasConfiguredClerkKey else {
-            throw AuthError.providerNotConfigured
-        }
         guard let signIn = Clerk.shared.auth.currentSignIn else {
             throw AuthError.passwordResetExpired
         }
@@ -203,65 +140,13 @@ final class AuthService {
         guard afterPassword.status == .complete else {
             throw AuthError.unknown
         }
-        if let sessionId = afterPassword.createdSessionId {
-            try await Clerk.shared.auth.setActive(sessionId: sessionId)
-            _ = try? await Clerk.shared.refreshClient()
-        }
-        // Same race as verifySignUpEmailCode — see comment there. The
-        // password-reset SignIn emits `.signInCompleted`, which the SDK
-        // currently does NOT route through syncCompletedSignUp, so we
-        // *must* install the FFI auth callback ourselves before the next
-        // mutation.
-        try await convex.refreshAuthFromClerk()
-        return try await ensureClerkUser()
+        return try await completeSession(afterPassword.createdSessionId)
     }
 
-    func getUserProfile(userId: UUID, guestSecretHash: String? = nil) async throws -> UserProfile {
-        let profile: UserProfile? = try await convex.query(
-            "users:getUserProfile",
-            with: [
-                "user_id": userId.uuidString.lowercased(),
-                "guest_secret_hash": guestSecretHash,
-            ],
-            as: UserProfile?.self
-        )
-
-        guard let profile else {
-            throw AuthError.userNotFound
-        }
-
-        return profile
-    }
-
-    func updateUserProfile(
-        userId: UUID,
-        displayName: String,
-        guestSecretHash: String? = nil
-    ) async throws {
+    func updateProfile(displayName: String) async throws {
         let _: UserProfile = try await convex.mutation(
             "users:updateProfile",
-            with: [
-                "user_id": userId.uuidString.lowercased(),
-                "display_name": displayName,
-                "guest_secret_hash": guestSecretHash,
-            ]
-        )
-    }
-
-    func updateGuestProfile(
-        userId: UUID,
-        displayName: String,
-        isAnonymous: Bool,
-        guestSecretHash: String
-    ) async throws {
-        let _: UserProfile = try await convex.mutation(
-            "users:updateProfile",
-            with: [
-                "user_id": userId.uuidString.lowercased(),
-                "display_name": displayName,
-                "is_anonymous": isAnonymous,
-                "guest_secret_hash": guestSecretHash,
-            ]
+            with: ["display_name": displayName]
         )
     }
 
@@ -275,94 +160,63 @@ final class AuthService {
         )
     }
 
-    func mergeAnonymousStats(
-        anonymousUserId: UUID,
-        targetUserId: UUID,
-        guestSecretHash: String
-    ) async throws -> MergeStatsResult {
+    func mergeGuestIntoAccount(guestSecretHash: String) async throws {
         try await convex.mutation(
             "users:mergeGuestIntoAccount",
-            with: [
-                "guest_user_id": anonymousUserId.uuidString.lowercased(),
-                "target_user_id": targetUserId.uuidString.lowercased(),
-                "guest_secret_hash": guestSecretHash,
-            ]
+            with: ["guest_secret_hash": guestSecretHash]
         )
     }
 
-    @discardableResult
-    func ensureClerkUser(displayName: String? = nil) async throws -> UserProfile {
-        try await convex.mutation(
-            "users:ensureUser",
-            with: [
-                "display_name": displayName,
-            ]
-        )
-    }
-
-    static func mapSignUpError(_ error: Error) -> Error {
-        if let clerkError = error as? ClerkAPIError,
-           let mapped = signUpError(forClerkCode: clerkError.code) {
-            return mapped
+    /// Finishes every account entry path: activates the Clerk session (when
+    /// a flow created one), installs its token in Convex and loads the profile.
+    private func completeSession(_ sessionId: String? = nil, displayName: String? = nil) async throws -> UserProfile {
+        if let sessionId {
+            try await Clerk.shared.auth.setActive(sessionId: sessionId)
         }
-        return error
+        // setActive normally applies the returned client and marks the
+        // session active. Only when it has not, fetch the client: an
+        // unconditional refresh can return a stale client that pushes an
+        // active session out of .active again.
+        if Clerk.shared.session?.status != .active {
+            _ = try? await Clerk.shared.refreshClient()
+        }
+        // The provider's session-sync task installs the token too, but on its
+        // own task; doing it here keeps ensureUser from racing it.
+        try await convex.refreshAuthFromClerk()
+        return try await convex.mutation(
+            "users:ensureUser",
+            with: ["display_name": displayName]
+        )
     }
 
-    static func signUpError(forClerkCode code: String) -> AuthError? {
-        code == "form_identifier_exists" ? .emailAlreadyInUse : nil
+    static func mapClerkError(_ error: Error) -> Error {
+        authError(forClerkCode: (error as? ClerkAPIError)?.code) ?? error
     }
 
-    static func synchronizeCompletedSignUp(
-        refreshClient: () async -> Void,
-        refreshConvexAuth: () async throws -> Void
-    ) async throws {
-        await refreshClient()
-        try await refreshConvexAuth()
+    static func authError(forClerkCode code: String?) -> AuthError? {
+        switch code {
+        case "form_identifier_exists": .emailAlreadyInUse
+        case "form_identifier_not_found": .accountNotFound
+        default: nil
+        }
     }
-
 }
 
 extension AuthService: AuthServicing {}
 
-struct MergeStatsResult: Decodable, Sendable {
-    let success: Bool
-    let error: String?
-    let mergedCount: Int?
-    let transferredCount: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case error
-        case mergedCount = "merged_count"
-        case transferredCount = "transferred_count"
-    }
-}
-
 enum AuthError: LocalizedError {
-    case userNotFound
-    case invalidCredentials
     case emailAlreadyInUse
-    case weakPassword
-    case networkError
-    case providerNotConfigured
+    case accountNotFound
     case signUpExpired
     case passwordResetExpired
     case unknown
 
     var errorDescription: String? {
         switch self {
-        case .userNotFound:
-            return "User not found"
-        case .invalidCredentials:
-            return "Invalid email or password"
         case .emailAlreadyInUse:
-            return "Email already in use"
-        case .weakPassword:
-            return "Password is too weak"
-        case .networkError:
-            return "Network error. Please check your connection"
-        case .providerNotConfigured:
-            return "Clerk is not configured yet. Add your Clerk publishable key in ConvexConfig.swift."
+            return "An account with this email already exists. Sign in instead."
+        case .accountNotFound:
+            return "No account uses this email. If you played before the update, tap Sign Up with the same email to restore your stats."
         case .signUpExpired:
             return "Your verification expired. Please sign up again."
         case .passwordResetExpired:

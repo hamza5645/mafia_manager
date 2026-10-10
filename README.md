@@ -1,18 +1,23 @@
-mafia_manager (SwiftUI, iOS 26+)
+mafia_manager (SwiftUI, iOS 18+)
 ================================
 
-**Version 3.0** - An autonomous game manager for the party game Mafia. The app supports local pass-and-play and online multiplayer rooms. It is built with SwiftUI, MVVM, Tuist, local JSON persistence, Convex for backend data/realtime, and Clerk for account auth.
+**Version 5.0** - An autonomous game manager for the party game Mafia. The app supports local pass-and-play and online multiplayer rooms. It is built with SwiftUI, MVVM, Tuist, local JSON persistence, Convex for backend data/realtime, and Clerk for account auth.
 
 Targets and identifiers
-- Bundle Identifier: `com.hamza.mafia-manager`
-- Version: 3.0
-- Minimum iOS: 26.0
+- Bundle Identifier: `com.hamza5645.mafia`
+- Version: 5.0
+- Minimum iOS: 18.0
 
 Backend
-- **Convex**: authoritative multiplayer state, room codes, player/action documents, realtime subscriptions, stats, custom role configs, and player groups.
+- **Convex**: authoritative multiplayer state, room codes, night/vote outcomes, win checks, role privacy, realtime subscriptions, stats, custom role configs, and player groups. The server derives the caller from the guest proof or Clerk token; functions never take user ids.
 - **Clerk**: email/password account auth, password reset, and Convex authentication tokens.
 - **Guest mode**: local Keychain guest secret mapped to a Convex guest profile for quick multiplayer entry.
 - Convex dev deployment: `https://energized-herring-345.eu-west-1.convex.cloud`
+
+Prerequisites
+- Xcode and Tuist on an Apple Silicon Mac (simulator builds exclude x86_64 because ConvexMobile ships no Intel slice).
+- Node >= 22.12, then `npm ci` and `npm run test:backend` for the Convex function tests.
+- Convex/Clerk dashboard access is needed only for backend changes and the opt-in live integration tests.
 
 Build and test
 ```bash
@@ -29,8 +34,7 @@ npx convex dev --once
 ```
 
 Required app configuration
-- `Core/Backend/ConvexConfig.swift` contains the Convex deployment URL.
-- `Core/Backend/ConvexConfig.swift` contains the Clerk publishable key.
+- `Configuration/Debug.xcconfig` (Debug) and `Configuration/Production.xcconfig` (Release) hold the Convex host, Clerk publishable key and Clerk frontend host; `ConvexConfig` reads them from Info.plist.
 - `CLERK_FRONTEND_API_URL` is set in the Convex dev deployment.
 - See `docs/CLERK_SETUP.md` for Clerk dashboard/config notes.
 
@@ -46,8 +50,9 @@ Key architecture patterns
 - **Tuist-managed project**: edit `Project.swift` and `Tuist/Package.swift`, then regenerate. Do not hand-edit `.pbxproj`.
 - **Phase-based state machine**: `GamePhase` drives solo navigation; multiplayer phases live in `GameSession.currentPhaseData`.
 - **Single source of truth**: solo state lives in `GameStore`; multiplayer state lives in `MultiplayerGameStore`.
-- **Two-phase night resolution**: `endNight()` records actions, then `resolveNightOutcome()` applies outcomes. Multiplayer mirrors this with Convex mutations and `resolveNightAtomic`.
-- **Backend service layer**: `ConvexService`, `AuthService`, `DatabaseService`, `SessionService`, and `RealtimeService`.
+- **Two-phase resolution**: `endNight()` records actions, then `resolveNightOutcome()` applies outcomes. Multiplayer does the same on the server: `night:recordNightActions` → `night:resolveNightAtomic` and `voting:closeVoting` → `voting:resolveVoteAtomic`; the host only requests transitions and drives bots.
+- **Snapshot data flow**: `MultiplayerGameStore` assigns three supervised Convex subscriptions (`views:getSessionView`, `views:getPlayers`, `views:getRoundState`) straight to state.
+- **Backend service layer**: `ConvexService`, `AuthService`, `DatabaseService`, `SessionService`, and `SubscriptionSupervisor`.
 
 Project structure
 - `App/` - app entry point and root routing
