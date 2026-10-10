@@ -19,42 +19,50 @@ Night resolution must remain two-phase.
 2. The outcome UI asks whether the Doctor save worked.
 3. `resolveNightOutcome()` applies death/save state and marks the night as resolved.
 
-Multiplayer mirrors this pattern:
-- action submission writes `game_actions` documents in Convex;
-- host review records the unresolved night result;
-- `sessions:resolveNightAtomic` applies deaths and the next phase in one Convex mutation.
+Multiplayer keeps the pattern, but Convex computes every outcome:
+- players submit actions with `play:submitAction` for the current `round_id`;
+- `night:recordNightActions` checks that every action is in, stores the unresolved night record and locks the night;
+- `night:resolveNightAtomic` applies deaths and saves, checks winners, and moves to `morning` or `game_over`;
+- voting mirrors it: `voting:closeVoting` tallies the votes, then `voting:resolveVoteAtomic` applies the elimination and starts the next night or ends the game;
+- the host client only calls these and `phases:advancePhase`; all are safe to retry and never move the phase backwards.
 
 ## Backend Stack
 
 The backend is Convex + Clerk.
 
-- `Core/Backend/ConvexService.swift` owns the Convex Swift client.
+- `Core/Backend/ConvexService.swift` owns the Convex Swift client and injects the guest proof into every call.
 - `Core/Backend/ConvexConfig.swift` reads the Convex deployment URL and Clerk publishable key from Info.plist, set by `Configuration/*.xcconfig`.
 - `Core/Auth/Services/AuthService.swift` wraps Clerk sign-up/sign-in/reset flows and creates/restores Convex user documents.
 - `Core/Auth/Store/AuthStore.swift` is the UI-facing auth facade, including guest mode.
 - `Core/Backend/DatabaseService.swift` handles stats, custom role configs, and player groups via Convex.
-- `Core/Multiplayer/Services/SessionService.swift` calls Convex multiplayer mutations/queries.
-- `Core/Multiplayer/Services/RealtimeService.swift` subscribes to Convex reactive queries for sessions, players, actions, and tentative selections.
+- `Core/Backend/BackendError.swift` shows a `ConvexError` string as-is and a generic message for anything else.
+- `Core/Multiplayer/Services/SessionService.swift` calls Convex multiplayer mutations.
+- `Core/Multiplayer/Services/SubscriptionSupervisor.swift` keeps one subscription alive and resubscribes with backoff.
+- `Core/Multiplayer/Store/BotDirector.swift` submits bot actions and votes from the host's snapshots.
 
 Convex backend files:
-- `convex/schema.ts` - declared schema and indexes.
-- `convex/users.ts` - Clerk/guest profile functions.
+- `convex/schema.ts` - schema and indexes.
+- `convex/users.ts` - Clerk/guest profiles, guest merge, legacy-account claim.
 - `convex/stats.ts` - stats/custom role/player group CRUD.
-- `convex/sessions.ts` - rooms, players, actions, phase updates, tentative selections, and atomic night resolution.
-- `convex/health.ts` - deployment health check.
+- `convex/sessions.ts` - create/join/leave, kick, host claim, heartbeat, readiness, start, return to lobby.
+- `convex/phases.ts` - `advancePhase`.
+- `convex/play.ts` - action submission and tentative selections.
+- `convex/night.ts`, `convex/voting.ts` - the record/resolve pairs.
+- `convex/views.ts` - the three subscription queries.
+- `convex/health.ts` - health check (`api_contract` 4).
+- `convex/lib/` - identity, guards, game rules, transitions, privacy projections, error messages.
 
 ## Identity Model
 
-Swift-facing user IDs remain UUID strings for compatibility with the existing app models. Convex stores these IDs in each document's `id` field and indexes them with `by_app_id`.
+App IDs are UUID strings stored in each document's `id` field (`by_app_id` index). Clients cannot choose them.
 
-Account users:
-- Clerk authenticates the user.
-- Convex validates the Clerk JWT and maps `identity.subject` to a `users.auth_subject`.
+The server resolves the caller for every function; no function accepts a user id:
+1. If `guest_secret_hash` matches a live guest (`users.guest_secret_digest` is sha256 of it), the caller is that guest.
+2. Otherwise the caller is the Clerk user (`identity.subject` → `users.auth_subject`).
+3. Otherwise the caller is unauthenticated.
 
-Guest users:
-- The app stores a local random secret in Keychain.
-- A SHA-256 hash of that secret restores a Convex guest user document.
-- Guest IDs are still UUID strings and can be used for multiplayer/session ownership.
+Guests: the app keeps a random secret in the Keychain and sends its sha256 hex as `guest_secret_hash` while the user is a guest or a guest merge is pending.
+Accounts: Convex validates the Clerk JWT from the `convex` template. `users:ensureUser` claims a legacy row only when the token's email is verified.
 
 ## Multiplayer Model
 
@@ -73,14 +81,14 @@ Core session rules:
 - host user ID is stored on `game_sessions`;
 - player rows hold public metadata plus private role/number data;
 - action rows are keyed by session, round ID, action type, phase index, and actor;
-- `current_round_id` isolates night/voting actions and prevents action replay;
-- `phase_sequence` increments on server-side state changes so clients can detect missed updates.
+- the server issues a new `current_round_id` for each night and voting phase, which isolates actions and prevents replay.
 
-Role privacy is enforced in the Convex `sessions:getSessionPlayers` query:
+Role privacy is enforced in `convex/lib/projections.ts`, which every `views:*` query uses:
 - players can see their own role;
 - Mafia can see Mafia teammates;
-- the host can see all roles;
-- everyone can see final roles after game over.
+- the host can see all roles (it drives the bots);
+- everyone can see final roles after game over;
+- during the night, non-host viewers see other seats as not ready, so readiness does not reveal roles.
 
 ## Data Flow
 
@@ -96,15 +104,15 @@ GameOverView.task -> GameStore.syncPlayerStatsToCloud() -> DatabaseService -> Co
 
 Multiplayer:
 ```text
-View action -> MultiplayerGameStore -> SessionService -> Convex mutation
-Convex query subscription -> RealtimeService -> MultiplayerGameStore -> SwiftUI refresh
+View action -> MultiplayerGameStore -> SessionService -> Convex mutation (server computes outcomes)
+views:* subscription -> SubscriptionSupervisor -> MultiplayerGameStore state (assigned as-is) -> SwiftUI refresh
 ```
 
 ## Win Conditions
 
 - Citizens win when no Mafia are alive.
-- Mafia win when alive Mafia are greater than or equal to alive non-Mafia.
-- Checks happen after night resolution and after day eliminations.
+- Mafia win when alive Mafia outnumber alive non-Mafia after a night, or equal or outnumber them after a vote.
+- Checks happen after night resolution and after day eliminations; in multiplayer the server runs them.
 
 ## Tuist
 
