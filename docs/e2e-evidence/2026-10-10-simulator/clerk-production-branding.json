@@ -1,8 +1,0 @@
-{
-  "verifiedOn": "2026-10-10",
-  "sourceEndpoint": "https://clerk.mafia.monitorthesituations.com/v1/environment?_is_native=true",
-  "applicationName": "Mafia",
-  "instanceEnvironmentType": "production",
-  "defaultApplicationNameResolved": true,
-  "postRenameEmailDeliveryRetested": false
-}

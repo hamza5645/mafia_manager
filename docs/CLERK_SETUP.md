@@ -17,7 +17,7 @@ From the Clerk dashboard:
 
 ## App Configuration
 
-Update [ConvexConfig.swift](/Users/hamzaosama/Documents/Developer/SwiftUI/mafia_manager/Core/Backend/ConvexConfig.swift) if the Clerk project changes. Clerk publishable keys are client-side keys and are safe to include in the iOS app.
+Update the Clerk values in [Debug.xcconfig](../Configuration/Debug.xcconfig) (development) or [Production.xcconfig](../Configuration/Production.xcconfig) (release) if the Clerk project changes, then regenerate with Tuist. Clerk publishable keys are client-side keys and are safe to include in the iOS app.
 
 Sync Convex with the Clerk Frontend API URL. **This step is required.** The backend refuses deployment when `CLERK_FRONTEND_API_URL` is missing. To verify or set:
 
@@ -47,11 +47,11 @@ Then run the app and verify:
 
 ## Release configuration and publishing
 
-Debug uses the development services. Release reads production values from
-[Production.xcconfig](../Configuration/Production.xcconfig) through generated
-build settings/Info.plist; it has no development fallback. The pre-build guard
-rejects missing/test Clerk keys, the known development Convex host, and a Clerk
-frontend domain that does not match the key. Tuist generates the matching
+Debug reads development values from [Debug.xcconfig](../Configuration/Debug.xcconfig)
+and Release reads production values from
+[Production.xcconfig](../Configuration/Production.xcconfig), both through generated
+build settings/Info.plist; there is no fallback. `ConvexConfig` stops the app at
+launch if a value is missing, and Release also requires a `pk_live_` Clerk key. Tuist generates the matching
 `webcredentials` associated-domain entitlement, following
 [Clerk's iOS quickstart](https://clerk.com/docs/ios/getting-started/quickstart).
 

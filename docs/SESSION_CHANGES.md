@@ -1,10 +1,20 @@
+## 2026-10-10 — repo cleanup and xcconfig-based backend configuration
+
+- Removed QA campaign records (`docs/e2e-evidence/`, dated E2E/retest reports) and the audit scripts in `scripts/e2e/` (only `verify-deployment.mjs` remains). The migration plan is now the short `docs/BACKEND_DECISIONS.md`; history is in git.
+- Untracked the Tuist-generated `mafia_manager.xcodeproj`/`.xcworkspace`. `.gitignore` ignores them, `xcuserdata/`, Claude local settings/worktrees and the locally installed Clerk skills instead of all of `.agents/` and `.claude/`.
+- Removed the unused vendored `ClerkConvex.xcodeproj` and `Package.swift`; `Vendor/clerk-convex-swift/VENDORED.md` records the upstream tag and local patches.
+- Debug and Release read `MAFIA_CONVEX_HOST`, `MAFIA_CLERK_PUBLISHABLE_KEY` and `MAFIA_CLERK_FRONTEND_HOST` from `Configuration/Debug.xcconfig` / `Production.xcconfig`. `ConvexConfig` fails fast when one is missing and requires `pk_live_` in Release. Removed `hasConfiguredClerkKey` and the Python pre-build guard; `apiContractVersion` is 4.
+- Docs: iOS 18+, README prerequisites, one test command (`tuist test mafia_manager`).
+- Rollback: revert these commits, then `tuist generate`. Reverting the config commit restores the `#if DEBUG` literals and contract 3.
+- Gotchas: after pulling, run `tuist install && tuist generate`, because git deletes the previously tracked project/workspace. The app now needs a backend that reports contract 4 (`node scripts/e2e/verify-deployment.mjs`). A missing xcconfig value crashes at launch rather than failing the build.
+
 ## 2026-10-10 — final simulator campaign results
 
 - Ten simulator follow-ups were fixed, reviewed, committed, and pushed separately (FOLLOWUP-10 through FOLLOWUP-19). Final native suite is 64/64 with zero skips; backend suite 45/45; TypeScript and three production configuration checks pass.
 - Production UI covered real-email account lifecycle, cold account/active-room restoration, full solo play and stats, two-device gameplay, saved-data CRUD, and a multi-round bot match with a Doctor save, elimination, game-over/rematch. The original stalled Citizen-host round recovered all independent bot role actions and resolved successfully after the bot/reentry fixes.
-- Development and production backends include the reentry fix. Final signed archive/export are `/tmp/mafia-manager-release-final-20261010.xcarchive` and `/tmp/mafia-manager-release-final-export-20261010/mafia_manager.ipa`, built from code commit 0561247. Distribution signature, production configuration, team/application ID and Associated Domain are verified. No merge or App Store upload occurred.
-- The user renamed Clerk's production application to "Mafia". Its public native environment confirms that name and the production instance type, resolving the default-name finding. Evidence is `docs/e2e-evidence/2026-10-10-simulator/clerk-production-branding.json`; a fresh email was not sent after the rename.
-- Full coverage, rollback references, remaining real-user/device/network limits, and cleanup are in `docs/SIMULATOR_E2E_FINAL_2026-10-10.md`. Do not treat simulator passes as proof for untested environments or real legacy account restoration.
+- Development and production backends include the reentry fix. The final signed archive/IPA were built locally (not committed) from code commit 0561247. Distribution signature, production configuration, team/application ID and Associated Domain are verified. No merge or App Store upload occurred.
+- The user renamed Clerk's production application to "Mafia". Its public native environment confirms that name and the production instance type, resolving the default-name finding. A fresh email was not sent after the rename.
+- The campaign report and evidence were removed on 2026-10-10 (see git history). Do not treat simulator passes as proof for untested environments or real legacy account restoration.
 - Rollback: revert individual fix commits in reverse order; regenerate with Tuist; deploy reverted Convex code for backend changes. No data/schema rollback is required for these follow-ups.
 
 ## 2026-10-10 — FOLLOWUP-19: restore an existing multiplayer seat after restart
@@ -29,7 +39,7 @@
 - Production simulator room 315742 with a Citizen host and six bots stalled on Night 1. A phase snapshot could arrive before assigned roles, allowing a role-less bot pass to be marked processed permanently.
 - Night readiness now refreshes assigned players and recovers missing current-round bot actions. Completed targets/timestamps are preserved. Bot responses can follow an existing human action after a missed realtime event, and tracking resets by round rather than by retry.
 - Added three live Swift Testing scenarios: stale roster, pre-submitted Doctor action, and pre-submitted human Mafia action without its realtime event. Both original cases fail before the fix; the final full suite passes 62/62 with zero skips. Tuist regenerated the project to add the test source; Release builds successfully.
-- Production UI retest: the old room became unavailable during the pause. A fresh seven-player room (934779) with a Doctor host and six bots blocks Finish Night until the human action, then resolves to Morning with two Mafia bot actions, the Police bot check, and Doctor self-protection. Evidence is under `docs/e2e-evidence/2026-10-10-simulator/`.
+- Production UI retest: the old room became unavailable during the pause. A fresh seven-player room (934779) with a Doctor host and six bots blocks Finish Night until the human action, then resolves to Morning with two Mafia bot actions, the Police bot check, and Doctor self-protection.
 - Rollback: revert this commit and regenerate Tuist. No backend/schema changes or deployment required; reverting restores the bot-night stall.
 - Final campaign steps still pending: complete the bot match, rebuild/export distribution artifacts from this fix, and finalize the PR report. Earlier IPAs predate this fix. The temporary approval-service usage failure was resolved before this retest.
 
@@ -77,7 +87,7 @@
 
 - Simulator E2E reproduced a retained target when moving from one solo voter to the next. The next player could confirm the previous target without selecting a card, including a self-vote.
 - Voting now clears its local selection at handoff, enables confirmation only for a live eligible target, and advances only after an accepted store vote. `GameStore` rejects self-votes, unknown/dead participants, and attempts to replace locked votes.
-- Validation: focused gameplay tests 24/24; full Swift suite with live integration flags 53/53, zero skips; Release simulator build succeeds. The real UI handoff shows Lock Vote disabled until selection; the four-role game completes with the expected citizen win and event log. Evidence in `docs/e2e-evidence/2026-10-09-simulator/`.
+- Validation: focused gameplay tests 24/24; full Swift suite with live integration flags 53/53, zero skips; Release simulator build succeeds. The real UI handoff shows Lock Vote disabled until selection; the four-role game completes with the expected citizen win and event log.
 - Rollback: revert this commit and regenerate through Tuist. No backend/schema change; reverting restores the solo vote handoff defect.
 - Gotcha: rebuild the signed distribution artifact after this fix. Full production multiplayer UI testing remains in progress.
 
@@ -86,7 +96,7 @@
 - Simulator E2E reproduced a production account mismatch: Clerk retained an active session after relaunch, but Settings displayed Login / Sign Up and another login returned “You’re already signed in.”
 - `AuthService.currentUser` now installs cached Clerk authentication in Convex before loading the account profile. The bounded auth wait also checks Clerk environment/client readiness.
 - Added three Swift Testing regressions for token-before-profile ordering, failed-token short circuit, and signed-out launch.
-- Validation: focused auth tests 10/10, no skips; backend 39/39; production contract 3; Release simulator build succeeds; production account restored on two consecutive cold launches. Screenshot: `docs/e2e-evidence/2026-10-09-simulator/account-restored.png`.
+- Validation: focused auth tests 10/10, no skips; backend 39/39; production contract 3; Release simulator build succeeds; production account restored on two consecutive cold launches.
 - Rollback: revert this commit and regenerate through Tuist; doing so reintroduces the observed startup race. No backend/schema change.
 - Gotcha: the earlier signed archive/IPA predates this fix and must be rebuilt before distribution. Full simulator E2E remains in progress.
 
@@ -94,9 +104,8 @@
 
 ## Convex audit fixes — 2026-10-08
 
-Fixes are committed and pushed separately, in report order. The original audit
-remains the before-fix record; [final E2E results](CONVEX_MIGRATION_FIXES_AND_RETEST.md)
-are recorded separately.
+Fixes are committed and pushed separately, in report order. The audit and retest
+reports were removed on 2026-10-10 (see git history).
 
 ### Production real-email account and room checks — 2026-10-09
 
@@ -121,9 +130,7 @@ are recorded separately.
   validation remain unverified. A real legacy account was not supplied.
 - Production emails still identify the application as "My Application". Update
   Clerk branding to Mafia Manager before inviting users; this is a dashboard item.
-- Evidence: production-auth-and-room-results.json and qa-room-cleanup.json under
-  docs/e2e-evidence/2026-10-09-production. Rollback: docs/evidence can be reverted;
-  these tests changed only their own QA profile/rooms, never the 142 legacy rows.
+- Rollback: these tests changed only their own QA profile/rooms, never the 142 legacy rows.
 
 ### Signed production archive and App Store export — 2026-10-09
 
@@ -133,10 +140,8 @@ are recorded separately.
   application identifier, and `webcredentials:clerk.mafia.monitorthesituations.com`.
   The exported IPA uses Apple Distribution, disables get-task-allow, has an App
   Store profile without device restrictions, and includes Associated Domains.
-- Local artifacts: /tmp/mafia-manager-production-ready-20261009.xcarchive and
-  /tmp/mafia-manager-production-export-20261009/mafia_manager.ipa. No upload or
-  App Store submission was performed. Sanitized signature/hash evidence is in
-  `docs/e2e-evidence/2026-10-09-production/distribution-checks.json`.
+- The archive and IPA stayed local (not committed). No upload or
+  App Store submission was performed.
 - Production Release UI signup reached real email verification and delivery was
   confirmed by the user. Browser and simulator automation services then became
   unavailable; the Verify tap could not be confirmed. API account checks are
@@ -199,8 +204,7 @@ are recorded separately.
 - Remaining: signed archive, real production account/JWT/legacy-account checks,
   and physical-device E2E. Live legacy source is unavailable; parity establishes
   the saved export only. No development test fixture campaign ran on production.
-- Evidence: `docs/e2e-evidence/2026-10-09-production/` contains sanitized setup,
-  insertion and parity results. Raw production snapshots are private in /tmp.
+- Raw production snapshots were kept private and never committed.
 - Rollback: revert the production config commit to block Release again. Backend
   rollback must coordinate API contract 3 with the app. Restore the prior issuer
   only with a matching backend/client. Imported rows are new; remove only verified
@@ -218,8 +222,7 @@ are recorded separately.
   - `clk2._domainkey.mafia` → `dkim2.dqnbqbamj40d.clerk.services`
   - `clkmail.mafia` → `mail.dqnbqbamj40d.clerk.services`
 - Validation: all five match exactly on both authoritative Cloudflare
-  nameservers, and Cloudflare shows DNS-only for each. See sanitized
-  `docs/e2e-evidence/2026-10-09-retest/clerk-production-dns.json`.
+  nameservers, and Cloudflare shows DNS-only for each.
 - No existing DMARC TXT policy was found at the root or Mafia subdomain;
   no TXT value was supplied, so DMARC was not changed. Existing root/tunnel
   records were preserved. Clerk verification/certificates still need to be
@@ -563,13 +566,12 @@ are recorded separately.
 
 ### What Changed
 
-- Added `docs/CONVEX_MIGRATION_E2E_REPORT.md`: 14 confirmed issues and 3
+- Added a migration E2E report (removed 2026-10-10; see git history): 14 confirmed issues and 3
   source-review findings, with severity, reproductions, affected code, evidence,
   coverage limits, and test-data cleanup notes. No app/backend fixes were made.
 - Added development-only public-client audit scripts for multiplayer/privacy/
   authorization/cloud data and Clerk account/merge/reset flows, plus a read-only
-  saved-export parity checker. Sanitized evidence is under
-  `docs/e2e-evidence/2026-10-08`.
+  saved-export parity checker (removed 2026-10-10).
 - Added opt-in `ClerkAccountIntegrationTests.swift` for the actual native
   ClerkKit → ConvexMobile account lifecycle. `tuist generate --no-open`
   regenerated the project to include the source; the project file was not

@@ -12,7 +12,7 @@ Modes:
 
 Tech stack:
 - SwiftUI + MVVM
-- iOS 26+
+- iOS 18+
 - Tuist-managed Xcode project
 - Convex backend functions and database
 - Clerk auth for account users
@@ -114,9 +114,11 @@ Convex backend:
 
 ## Backend Setup Notes
 
-`Core/Backend/ConvexConfig.swift` must contain:
-- Convex deployment URL.
-- Clerk publishable key.
+`Configuration/Debug.xcconfig` (Debug) and `Configuration/Production.xcconfig` (Release) must contain:
+- Convex deployment host (`MAFIA_CONVEX_HOST`).
+- Clerk publishable key (`MAFIA_CLERK_PUBLISHABLE_KEY`) and frontend host (`MAFIA_CLERK_FRONTEND_HOST`).
+
+`Core/Backend/ConvexConfig.swift` reads them from Info.plist and stops the app if one is missing; Release also requires a `pk_live_` key.
 
 `convex/auth.config.ts` reads the Clerk issuer/frontend API URL from the Convex `CLERK_FRONTEND_API_URL` environment variable.
 
@@ -137,4 +139,4 @@ Guest mode uses a local Keychain secret hashed into `users.guest_secret_hash`; a
 - `docs/ARCHITECTURE_NOTES.md` - deeper architecture notes.
 - `docs/MULTIPLAYER_GUIDE.md` - multiplayer backend and test guide.
 - `docs/CLERK_SETUP.md` - required Clerk dashboard and config values.
-- `docs/SUPABASE_TO_CONVEX_MIGRATION_PLAN.md` - migration plan and audit history.
+- `docs/BACKEND_DECISIONS.md` - why Convex + Clerk, guest proof, legacy-account claiming.
