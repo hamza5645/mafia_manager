@@ -41,6 +41,7 @@ Rollback and per-step validation are in [SESSION_CHANGES.md](SESSION_CHANGES.md)
 | Bot retry cases | Live Swift Testing cases verify stale role-less roster, existing Doctor action, missed human Mafia event, and partial Mafia-bot submission. Completed action targets/timestamps survive repeated readiness checks. |
 | Saved data | Production group create/read/rename/delete passed. Custom preset create/read/count edit/delete passed (seven players changed to six). Disposable fixtures were deleted and empty libraries reloaded. Saved-library failure presentation was verified by source review, compilation, and existing error mapping tests; an OS-level outage was not forced. |
 | Migration/configuration | Imported data parity and synthetic legacy profile claim remain verified by the earlier audit/backend tests. Current production values, release fail-fast guards, Date encoding, raw JSON arguments, authorization, projections, cancellation, merge/rematch, and compatibility are covered by the automated suites. |
+| Production branding | After the user renamed the application, Clerk's public production environment reports `application_name: Mafia`. The default-name finding is resolved. A fresh email was not sent after the rename. |
 
 ## Evidence and artifacts
 
@@ -51,13 +52,13 @@ Rollback and per-step validation are in [SESSION_CHANGES.md](SESSION_CHANGES.md)
 - Final signed archive: `/tmp/mafia-manager-release-final-20261010.xcarchive`.
 - Final exported IPA: `/tmp/mafia-manager-release-final-export-20261010/mafia_manager.ipa`.
 - Distribution signature, exact production configuration, team/application ID, Associated Domain, disabled debugging, and profile without device restrictions are verified in the artifact JSON saved alongside this report's evidence.
+- [Production branding verification](e2e-evidence/2026-10-10-simulator/clerk-production-branding.json): Clerk reports the production application name as `Mafia`.
 - No PR merge, App Store upload, or release submission was performed.
 
 ## Practical limits and remaining release checks
 
 - A real existing migrated user's Clerk sign-in/restoration was not supplied. Synthetic legacy claiming and imported-row parity are verified; that real-user path remains unverified, as agreed when using a new QA account.
 - Physical devices/TestFlight, iOS 18 runtime, iPad/landscape, and an OS-level network-disconnect campaign were not run. Simulator passes do not prove those environments.
-- Clerk production emails still identify the application as "My Application". Rename production email/application branding before a public rollout; this is a dashboard configuration item.
 - The reviewable code has passing local tests and the PR is mergeable. Production rollout confidence should include the remaining real-user/device checks above.
 
 ## QA cleanup
