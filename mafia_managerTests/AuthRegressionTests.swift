@@ -138,6 +138,25 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(relaunched.errorMessage)
     }
 
+    func testSettingsRetryFinishesAPendingMerge() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = TestError.expected
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        XCTAssertTrue(store.hasPendingGuestMerge)
+
+        await store.retryGuestMerge()
+        XCTAssertTrue(store.hasPendingGuestMerge)
+        XCTAssertNotNil(store.errorMessage, "Settings shows why the retry failed")
+
+        service.mergeError = nil
+        await store.retryGuestMerge()
+        XCTAssertFalse(store.hasPendingGuestMerge)
+        XCTAssertNil(store.errorMessage)
+        XCTAssertEqual(service.mergedHashes.count, 3)
+    }
+
     func testMissingServerGuestIsForgottenInsteadOfRetriedForever() async {
         let service = FakeAuthService()
         let store = makeStore(service)
@@ -227,6 +246,7 @@ final class FakeAuthService: AuthServicing {
     var restoreError: Error?
     var refreshError: Error?
     var signInError: Error?
+    var guestSignInError: Error?
     var signUpError: Error?
     var passwordResetError: Error?
     var mergeError: Error?
@@ -281,6 +301,7 @@ final class FakeAuthService: AuthServicing {
 
     func signInAsGuest(displayName: String, guestSecretHash: String) async throws -> UserProfile {
         guestSignIns += 1
+        if let guestSignInError { throw guestSignInError }
         return guest
     }
 

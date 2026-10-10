@@ -45,6 +45,9 @@ final class AuthStore: ObservableObject {
     private let authService: any AuthServicing
     private let keychain: any KeychainStoring
     private let defaults: UserDefaults
+    /// The last restore could not reach Clerk or Convex; resuming retries it.
+    private var restoreFailedTransiently = false
+    private var foregroundObserver: AnyCancellable?
 
     private enum KeychainKeys {
         static let guestSecret = "convex_guest_secret"
@@ -68,6 +71,10 @@ final class AuthStore: ObservableObject {
         if authService == nil {
             ConvexService.shared.guestProofProvider = { [weak self] in self?.activeGuestProof }
         }
+        foregroundObserver = NotificationCenter.default.publisher(for: .appDidBecomeActive)
+            .sink { [weak self] _ in
+                Task { @MainActor in await self?.ensureValidSession() }
+            }
         if autoRestore {
             Task {
                 defer { isRestoringSession = false }
@@ -79,12 +86,14 @@ final class AuthStore: ObservableObject {
     }
 
     func restoreSession() async {
+        restoreFailedTransiently = false
         let account: UserProfile?
         do {
             account = try await authService.currentUser
         } catch {
             // Clerk or Convex is unreachable. Not knowing is not signed out:
             // keep the current identity and every stored credential.
+            restoreFailedTransiently = true
             return
         }
         if let account {
@@ -100,17 +109,21 @@ final class AuthStore: ObservableObject {
                 )
                 applyAuthenticatedProfile(profile)
             } catch {
-                clearLocalAuthState()
+                restoreFailedTransiently = true
             }
         } else {
             clearLocalAuthState()
         }
     }
 
-    /// Called when the app resumes. Only refreshes the account's Convex token;
-    /// a failure keeps the current identity, since the next token refresh or
-    /// launch can still succeed.
+    /// Called when the app resumes. Retries a restore that could not reach
+    /// the server; otherwise only refreshes the account's Convex token. A
+    /// failure keeps the current identity.
     func ensureValidSession() async {
+        if restoreFailedTransiently {
+            await restoreSession()
+            return
+        }
         guard authenticatedAccountId != nil else { return }
         try? await authService.refreshConvexAuth()
     }
@@ -276,7 +289,13 @@ final class AuthStore: ObservableObject {
     /// retries, and requests keep acting as the guest until then.
     private func finishAccountAuth(_ profile: UserProfile) async {
         applyAuthenticatedProfile(profile)
-        guard let guestSecretHash = currentGuestSecretHash else { return }
+        await retryGuestMerge()
+    }
+
+    /// Merges this device's guest into the signed-in account, if one is left.
+    func retryGuestMerge() async {
+        guard hasPendingGuestMerge, let guestSecretHash = currentGuestSecretHash else { return }
+        errorMessage = nil
         do {
             try await authService.mergeGuestIntoAccount(guestSecretHash: guestSecretHash)
             clearGuestData()

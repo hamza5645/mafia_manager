@@ -78,6 +78,47 @@ final class AccountRestorationTests {
         #expect(store.authenticatedAccountId == service.account.id)
     }
 
+    @Test func foregroundRetriesAnAccountRestoreThatFailedTransiently() async throws {
+        service.restoredUser = service.account
+        service.restoreError = BackendError(URLError(.notConnectedToInternet))
+        let store = makeStore()
+        await store.restoreSession()
+        #expect(store.isAuthenticated == false)
+
+        service.restoreError = nil
+        NotificationCenter.default.post(name: .appDidBecomeActive, object: nil)
+        for _ in 0..<100 where store.authenticatedAccountId == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(store.authenticatedAccountId == service.account.id)
+    }
+
+    @Test func resumeRetriesAGuestRestoreThatFailedTransiently() async {
+        _ = await makeStore().signInAsGuest(displayName: "Guest")
+        service.guestSignInError = BackendError(URLError(.timedOut))
+        let relaunched = makeStore()
+        await relaunched.restoreSession()
+        #expect(relaunched.isAuthenticated == false)
+        #expect(relaunched.currentGuestSecretHash != nil)
+
+        service.guestSignInError = nil
+        await relaunched.ensureValidSession()
+
+        #expect(relaunched.isAnonymous)
+        #expect(relaunched.currentUserId == service.guest.id)
+    }
+
+    @Test func noRetryWhenClerkDefinitelyHasNoUser() async {
+        let store = makeStore()
+        await store.restoreSession()
+        service.restoredUser = service.account
+
+        await store.ensureValidSession()
+
+        #expect(store.isAuthenticated == false)
+    }
+
     @Test func resumeAsGuestDoesNotTouchClerk() async {
         let store = makeStore()
         _ = await store.signInAsGuest(displayName: "Guest")
