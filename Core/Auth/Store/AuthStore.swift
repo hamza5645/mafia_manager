@@ -61,6 +61,7 @@ final class AuthStore: ObservableObject {
         authService: (any AuthServicing)? = nil,
         keychain: (any KeychainStoring)? = nil,
         defaults: UserDefaults = .standard,
+        notificationCenter: NotificationCenter = .default,
         autoRestore: Bool = true
     ) {
         self.authService = authService ?? AuthService()
@@ -71,7 +72,7 @@ final class AuthStore: ObservableObject {
         if authService == nil {
             ConvexService.shared.guestProofProvider = { [weak self] in self?.activeGuestProof }
         }
-        foregroundObserver = NotificationCenter.default.publisher(for: .appDidBecomeActive)
+        foregroundObserver = notificationCenter.publisher(for: .appDidBecomeActive)
             .sink { [weak self] _ in
                 Task { @MainActor in await self?.ensureValidSession() }
             }
@@ -117,15 +118,20 @@ final class AuthStore: ObservableObject {
     }
 
     /// Called when the app resumes. Retries a restore that could not reach
-    /// the server; otherwise only refreshes the account's Convex token. A
-    /// failure keeps the current identity.
+    /// the server; otherwise refreshes the account's Convex token. If that
+    /// fails, a full restore tells a revoked session (signed out) from an
+    /// unreachable server (identity kept).
     func ensureValidSession() async {
         if restoreFailedTransiently {
             await restoreSession()
             return
         }
         guard authenticatedAccountId != nil else { return }
-        try? await authService.refreshConvexAuth()
+        do {
+            try await authService.refreshConvexAuth()
+        } catch {
+            await restoreSession()
+        }
     }
 
     /// Returns true when Clerk emailed a code that `verifySignUpEmailCode` needs.
@@ -212,6 +218,9 @@ final class AuthStore: ObservableObject {
             try await authService.signOut()
         } catch {
             errorMessage = mapAuthError(error)
+            // Clerk still holds the account and would restore it at the next
+            // launch, merging whatever guest plays here meanwhile. Stay signed in.
+            if authenticatedAccountId != nil { return }
         }
 
         clearLocalAuthState()
@@ -289,22 +298,26 @@ final class AuthStore: ObservableObject {
     /// retries, and requests keep acting as the guest until then.
     private func finishAccountAuth(_ profile: UserProfile) async {
         applyAuthenticatedProfile(profile)
-        await retryGuestMerge()
+        if let failure = await retryGuestMerge() {
+            errorMessage = failure
+        }
     }
 
     /// Merges this device's guest into the signed-in account, if one is left.
-    func retryGuestMerge() async {
-        guard hasPendingGuestMerge, let guestSecretHash = currentGuestSecretHash else { return }
-        errorMessage = nil
+    /// Returns why the merge failed, or nil.
+    @discardableResult
+    func retryGuestMerge() async -> String? {
+        guard hasPendingGuestMerge, let guestSecretHash = currentGuestSecretHash else { return nil }
         do {
             try await authService.mergeGuestIntoAccount(guestSecretHash: guestSecretHash)
             clearGuestData()
-        } catch let error as BackendError where error.message == "Guest progress could not be found." {
+        } catch let error as BackendError where error.isServerMessage && error.message == BackendError.guestNotFound {
             // The guest was never created on the server; nothing is left to merge.
             clearGuestData()
         } catch {
-            errorMessage = "Guest progress was not saved to your account yet and will retry next launch. \(mapAuthError(error))"
+            return "Guest progress was not saved to your account yet and will retry next launch. \(mapAuthError(error))"
         }
+        return nil
     }
 
     private func applyAuthenticatedProfile(_ profile: UserProfile) {

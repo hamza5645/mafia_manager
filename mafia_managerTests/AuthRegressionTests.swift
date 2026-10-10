@@ -146,14 +146,14 @@ final class AuthRegressionTests: XCTestCase {
         await store.signIn(email: "qa@example.com", password: "test-password")
         XCTAssertTrue(store.hasPendingGuestMerge)
 
-        await store.retryGuestMerge()
+        let failure = await store.retryGuestMerge()
         XCTAssertTrue(store.hasPendingGuestMerge)
-        XCTAssertNotNil(store.errorMessage, "Settings shows why the retry failed")
+        XCTAssertNotNil(failure, "Settings shows why the retry failed")
 
         service.mergeError = nil
-        await store.retryGuestMerge()
+        let success = await store.retryGuestMerge()
+        XCTAssertNil(success)
         XCTAssertFalse(store.hasPendingGuestMerge)
-        XCTAssertNil(store.errorMessage)
         XCTAssertEqual(service.mergedHashes.count, 3)
     }
 
@@ -161,7 +161,7 @@ final class AuthRegressionTests: XCTestCase {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
-        service.mergeError = BackendError(ClientError.ConvexError(data: "\"Guest progress could not be found.\""))
+        service.mergeError = BackendError(ClientError.ConvexError(data: "\"\(BackendError.guestNotFound)\""))
 
         await store.signIn(email: "qa@example.com", password: "test-password")
 
@@ -209,6 +209,34 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(store.activeGuestProof)
     }
 
+    func testFailedAccountSignOutKeepsTheAccountAndItsPendingGuest() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = TestError.expected
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        service.signOutError = URLError(.notConnectedToInternet)
+
+        await store.signOut()
+
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id, "Clerk still has the account")
+        XCTAssertTrue(store.hasPendingGuestMerge)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    func testFailedGuestSignOutStillClearsGuestData() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.signOutError = URLError(.notConnectedToInternet)
+
+        await store.signOut()
+
+        XCTAssertFalse(store.isAuthenticated)
+        XCTAssertNil(store.currentGuestSecretHash)
+        XCTAssertNil(store.guestDisplayName)
+    }
+
     func testSignOutWithPendingMergeNeverMergesIntoTheNextAccount() async {
         let service = FakeAuthService()
         let store = makeStore(service)
@@ -247,6 +275,7 @@ final class FakeAuthService: AuthServicing {
     var refreshError: Error?
     var signInError: Error?
     var guestSignInError: Error?
+    var signOutError: Error?
     var signUpError: Error?
     var passwordResetError: Error?
     var mergeError: Error?
@@ -286,7 +315,9 @@ final class FakeAuthService: AuthServicing {
         return account
     }
 
-    func signOut() async throws {}
+    func signOut() async throws {
+        if let signOutError { throw signOutError }
+    }
 
     func startPasswordReset(email: String) async throws {
         if let passwordResetError { throw passwordResetError }

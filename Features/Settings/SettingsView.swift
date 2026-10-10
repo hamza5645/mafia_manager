@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var showingIntro = false
     @State private var showingUpgrade = false
     @State private var showingClearGuestConfirmation = false
+    @State private var guestMergeError: String?
 
     var body: some View {
         NavigationStack {
@@ -53,14 +54,14 @@ struct SettingsView: View {
                                             .foregroundColor(Design.Colors.textSecondary)
                                         Spacer()
                                         Button("Retry") {
-                                            Task { await authStore.retryGuestMerge() }
+                                            Task { guestMergeError = await authStore.retryGuestMerge() }
                                         }
                                         .font(Design.Typography.subheadline)
                                         .foregroundColor(Design.Colors.brandGold)
                                         .buttonStyle(.plain)
                                     }
-                                    if let errorMessage = authStore.errorMessage {
-                                        Text(errorMessage)
+                                    if let guestMergeError {
+                                        Text(guestMergeError)
                                             .font(Design.Typography.caption)
                                             .foregroundColor(Design.Colors.dangerRed)
                                     }
