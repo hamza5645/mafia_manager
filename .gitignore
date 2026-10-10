@@ -1,7 +1,7 @@
 .vscode/settings.json
 DerivedData/
 .idea
-*.xcworkspace/xcuserdata/
+xcuserdata/
 *.xcuserstate
 *.xcresult/
 *.xcarchive/
@@ -21,7 +21,12 @@ Makefile
 
 # Tuist generated artifacts
 Derived/
+mafia_manager.xcodeproj/
+mafia_manager.xcworkspace/
 
-# Local agent / Claude config
-.agents/
-.claude/
+# Local-only agent state (committed skills, agents and settings.json stay tracked)
+.claude/settings.local.json
+.claude/worktrees/
+# Clerk skills installed locally from skills-lock.json
+.agents/skills/clerk*
+.claude/skills/clerk*
