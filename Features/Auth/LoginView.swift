@@ -26,6 +26,12 @@ struct LoginView: View {
                         Text("Sign in to continue")
                             .font(Design.Typography.subheadline)
                             .foregroundColor(Design.Colors.textSecondary)
+
+                        if authStore.isAnonymous {
+                            Text("Your guest progress will be saved to this account.")
+                                .font(Design.Typography.caption)
+                                .foregroundColor(Design.Colors.textSecondary)
+                        }
                     }
                     .padding(.top, 60)
 

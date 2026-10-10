@@ -10,14 +10,16 @@ final class AccountRestorationTests {
     private let service = FakeAuthService()
     private let keychain = MemoryKeychain()
     private let suiteName = "AccountRestorationTests.\(UUID().uuidString)"
+    /// Private, so parallel tests and the host app never see these posts.
+    private let notifications = NotificationCenter()
 
     deinit {
         UserDefaults().removePersistentDomain(forName: suiteName)
     }
 
     private func makeStore() -> AuthStore {
-        AuthStore(authService: service, keychain: keychain,
-                  defaults: UserDefaults(suiteName: suiteName)!, autoRestore: false)
+        AuthStore(authService: service, keychain: keychain, defaults: UserDefaults(suiteName: suiteName)!,
+                  notificationCenter: notifications, autoRestore: false)
     }
 
     @Test func restoresTheSignedInAccount() async {
@@ -67,15 +69,27 @@ final class AccountRestorationTests {
         #expect(relaunched.guestDisplayName == "Guest")
     }
 
-    @Test func resumeRefreshFailureKeepsTheAccount() async {
+    @Test func resumeOnABadNetworkKeepsTheAccount() async {
         let store = makeStore()
         await store.signIn(email: "qa@example.com", password: "test-password")
         service.refreshError = BackendError(URLError(.networkConnectionLost))
+        service.restoreError = BackendError(URLError(.networkConnectionLost))
 
         await store.ensureValidSession()
 
         #expect(service.refreshes == 1)
         #expect(store.authenticatedAccountId == service.account.id)
+    }
+
+    @Test func resumeDetectsARevokedSession() async {
+        let store = makeStore()
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        service.refreshError = ClerkConvexAuthError.noActiveSession
+        service.restoredUser = nil
+
+        await store.ensureValidSession()
+
+        #expect(store.isAuthenticated == false)
     }
 
     @Test func foregroundRetriesAnAccountRestoreThatFailedTransiently() async throws {
@@ -86,7 +100,7 @@ final class AccountRestorationTests {
         #expect(store.isAuthenticated == false)
 
         service.restoreError = nil
-        NotificationCenter.default.post(name: .appDidBecomeActive, object: nil)
+        notifications.post(name: .appDidBecomeActive, object: nil)
         for _ in 0..<100 where store.authenticatedAccountId == nil {
             try await Task.sleep(for: .milliseconds(10))
         }

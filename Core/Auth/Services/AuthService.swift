@@ -98,12 +98,17 @@ final class AuthService {
     }
 
     func signOut() async throws {
+        var clerkError: Error?
         do {
             try await Clerk.shared.auth.signOut()
         } catch let error as ClerkAPIError where error.code == "signed_out" {
             // The requested account state is already satisfied.
+        } catch {
+            clerkError = error
         }
+        // Always drop the Convex identity, even when Clerk could not be reached.
         await convex.logout()
+        if let clerkError { throw clerkError }
     }
 
     func startPasswordReset(email: String) async throws {
@@ -156,7 +161,7 @@ final class AuthService {
     }
 
     func mergeGuestIntoAccount(guestSecretHash: String) async throws {
-        let _: MergeStatsResult = try await convex.mutation(
+        try await convex.mutation(
             "users:mergeGuestIntoAccount",
             with: ["guest_secret_hash": guestSecretHash]
         )
@@ -198,20 +203,6 @@ final class AuthService {
 }
 
 extension AuthService: AuthServicing {}
-
-struct MergeStatsResult: Decodable, Sendable {
-    let success: Bool
-    let error: String?
-    let mergedCount: Int?
-    let transferredCount: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case error
-        case mergedCount = "merged_count"
-        case transferredCount = "transferred_count"
-    }
-}
 
 enum AuthError: LocalizedError {
     case emailAlreadyInUse

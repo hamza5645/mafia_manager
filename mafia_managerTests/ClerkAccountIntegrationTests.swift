@@ -1,3 +1,4 @@
+import ClerkKit
 import CryptoKit
 import XCTest
 
@@ -54,6 +55,17 @@ final class ClerkAccountIntegrationTests: XCTestCase {
             account = try await service.verifySignUpEmailCode("424242", displayName: "QA Native Account")
         }
         XCTAssertFalse(account.isAnonymous)
+
+        print("QA STAGE: convex JWT claims")
+        // Legacy-account claiming in users:ensureUser requires a verified email claim.
+        let token = try await Clerk.shared.session?.getToken(.init(template: "convex"))
+        var payload = String(try XCTUnwrap(token?.split(separator: ".").dropFirst().first))
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        let claims = try JSONSerialization.jsonObject(with: XCTUnwrap(Data(base64Encoded: payload))) as? [String: Any]
+        XCTAssertEqual(claims?["aud"] as? String, "convex")
+        XCTAssertEqual(claims?["email_verified"] as? Bool, true)
 
         print("QA STAGE: native guest stats merge")
         convex.guestProofProvider = nil

@@ -7,6 +7,8 @@ import Foundation
 struct BackendError: LocalizedError, Equatable {
     static let generic = "Something went wrong. Please try again."
     static let network = "Network error. Please check your connection."
+    /// The server's GUEST_NOT_FOUND message: there is no guest left to merge.
+    static let guestNotFound = "Guest progress could not be found."
 
     let message: String
     /// True only when `message` is a ConvexError string from the server.
