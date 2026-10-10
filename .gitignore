@@ -30,3 +30,6 @@ mafia_manager.xcworkspace/
 # Clerk skills installed locally from skills-lock.json
 .agents/skills/clerk*
 .claude/skills/clerk*
+
+# Local one-off migration exports and credentials (never commit)
+scripts/migration/
