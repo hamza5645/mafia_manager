@@ -209,3 +209,20 @@ test('night is_ready is masked for everyone but the viewer and the host', async 
   expect(await readyIn(2)).toEqual([]);
   expect(await readyIn(3)).toEqual(['QA 3']);
 });
+
+test('actions from a mafia who left or was kicked are not counted (D1)', async () => {
+  for (const how of ['leave', 'kick'] as const) {
+    const t = backend(); const r = await room(t, 2, 4);
+    await start(t, r, ['citizen', 'mafia'], ['mafia', 'doctor', 'inspector', 'citizen']);
+    const [host, gone] = r.humans; const [botMafia, doctor, insp, citizen] = r.bots;
+    // Counted, the departed mafia's earlier pick would win the 1-1 tie on created_at.
+    await act(t, r, gone, 'mafia_target', host);
+    await act(t, r, botMafia, 'mafia_target', citizen);
+    if (how === 'leave') await t.mutation(api.sessions.leaveSession, r.as(r.users[1]));
+    else await t.mutation(api.sessions.removePlayer, { ...r.as(r.host), player_record_id: gone.id });
+    await act(t, r, doctor, 'doctor_protect', doctor);
+    await act(t, r, insp, 'inspector_check', botMafia);
+    expect((await finishNight(t, r)).resulting_deaths).toEqual([citizen.player_id]);
+    expect((await sessionRow(t, r.sessionId)).night_history[0].mafia_player_numbers).toEqual([3]);
+  }
+});

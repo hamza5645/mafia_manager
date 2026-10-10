@@ -94,6 +94,7 @@ test('legacy Swift voting results (alternating array, upper-case ids) still reso
       voteCounts: [mafia.player_id.toUpperCase(), 4, r.humans[0].player_id.toUpperCase(), 2],
       eliminatedPlayerId: mafia.player_id.toUpperCase() } });
   });
+  expect(await t.mutation(api.voting.closeVoting, hostArgs)).toEqual({ day_index: 0, eliminated_player_id: mafia.player_id });
   await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'vote_death_reveal' });
   expect((await sessionRow(t, r.sessionId)).current_phase_data).toMatchObject({
     eliminatedPlayerId: mafia.player_id, eliminatedPlayerName: 'QA 1', voteCount: 4 });
@@ -101,4 +102,17 @@ test('legacy Swift voting results (alternating array, upper-case ids) still reso
   expect(readVoteCounts({ voteCounts: { a: 1 } })).toEqual({ a: 1 });
   expect(readVoteCounts({ voteCounts: ['A', 2, 'B'] })).toEqual({ a: 2 });
   expect(readVoteCounts({})).toEqual({});
+});
+
+test('a voted-out player who left before the reveal removes nobody (D2)', async () => {
+  const { t, r, hostArgs } = await votingRoom();
+  const [host, mafia, cit] = r.humans;
+  for (const seat of [host, cit, ...r.bots]) await act(t, r, seat, 'vote', mafia);
+  await act(t, r, mafia, 'vote', cit);
+  expect((await t.mutation(api.voting.closeVoting, hostArgs)).eliminated_player_id).toBe(mafia.player_id);
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'vote_death_reveal' });
+  await t.mutation(api.sessions.leaveSession, r.as(r.users[1]));
+  expect(await t.mutation(api.voting.resolveVoteAtomic, hostArgs))
+    .toEqual({ day_index: 0, eliminated_player_id: null, next_phase: 'night', winner: null });
+  expect((await sessionRow(t, r.sessionId)).day_history[0].removed_player_ids).toEqual([]);
 });

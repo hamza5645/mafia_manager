@@ -22,6 +22,50 @@ const TYPE_OF_ROLE: Record<string, ActionType | undefined> = {
 };
 export const HOST_STALE_SECONDS = 15;
 
+// Shapes of the session fields the schema stores as v.any(). Records written by
+// the old Swift host lack round_id and next_phase.
+export type NightRecord = {
+  night_index: number;
+  round_id?: string;
+  is_resolved: boolean;
+  mafia_target_id?: string;
+  inspector_checked_id?: string;
+  doctor_protected_id?: string;
+  target_was_saved?: boolean;
+  resulting_deaths: string[];
+  revealed_death_roles: Record<string, Role>;
+  mafia_player_numbers?: number[];
+  doctor_player_numbers?: number[];
+  inspector_player_numbers?: number[];
+  next_phase?: "morning" | "game_over";
+  timestamp: number;
+};
+export type DayRecord = {
+  day_index: number;
+  round_id?: string;
+  removed_player_ids: string[];
+  next_phase?: "night" | "game_over";
+  timestamp: number;
+};
+export type PhaseData = {
+  type: string;
+  nightIndex?: number;
+  dayIndex?: number;
+  voteCounts?: Record<string, number> | (string | number)[];
+  eliminatedPlayerId?: string;
+  [key: string]: unknown;
+};
+export type AssignedNumber = { player_id: string; number: number };
+
+export function sessionData(session: Session) {
+  return {
+    phase: session.current_phase_data as PhaseData | undefined,
+    nights: session.night_history as NightRecord[],
+    days: session.day_history as DayRecord[],
+    assigned: session.assigned_numbers as AssignedNumber[],
+  };
+}
+
 // GameStore.swift 488-504.
 export function roleDistribution(n: number) {
   const p = Math.min(Math.max(n, 4), 19);
@@ -78,7 +122,7 @@ export function majorityTarget(actions: Action[], validTargets: string[], humanI
 }
 
 // MGS 2096-2210. Only actions from alive seats holding the matching role count (D1).
-export function buildNightRecord(seats: Seat[], actions: Action[], nightIndex: number, roundId: string) {
+export function buildNightRecord(seats: Seat[], actions: Action[], nightIndex: number, roundId: string): NightRecord {
   const alive = seats.filter((s) => s.is_alive);
   const humanIds = new Set(seats.filter((s) => !s.is_bot).map((s) => s.player_id));
   const actorOf = (a: Action) => alive.find((s) => s.player_id === a.actor_player_id);
@@ -107,8 +151,8 @@ export function buildNightRecord(seats: Seat[], actions: Action[], nightIndex: n
     inspector_checked_id: inspTarget,
     doctor_protected_id: saved ? mafiaTarget : doctorTarget,
     target_was_saved: saved,
-    resulting_deaths: [] as string[],
-    revealed_death_roles: {} as Record<string, Role>,
+    resulting_deaths: [],
+    revealed_death_roles: {},
     mafia_player_numbers: numbers(mafiaA),
     doctor_player_numbers: numbers(doctorA),
     inspector_player_numbers: numbers(inspA),
@@ -141,16 +185,16 @@ export function tallyVotes(seats: Seat[], votes: Action[]) {
 
 // Accepts the server's `{ [player_id]: n }` and the legacy Swift alternating
 // array `[id, n, id, n, ...]`, whose ids Swift encoded in upper case.
-export function readVoteCounts(data: any): Record<string, number> {
+export function readVoteCounts(data: PhaseData | undefined): Record<string, number> {
   const raw = data?.voteCounts;
-  if (!Array.isArray(raw)) return raw && typeof raw === "object" ? raw : {};
+  if (!Array.isArray(raw)) return raw ?? {};
   const counts: Record<string, number> = {};
   for (let i = 0; i + 1 < raw.length; i += 2) counts[String(raw[i]).toLowerCase()] = Number(raw[i + 1]);
   return counts;
 }
 
 // Legacy Swift phase data stored upper-case ids; server ids are lower case.
-export function readEliminatedId(data: any): string | undefined {
+export function readEliminatedId(data: PhaseData | undefined): string | undefined {
   return typeof data?.eliminatedPlayerId === "string" ? data.eliminatedPlayerId.toLowerCase() : undefined;
 }
 
@@ -162,7 +206,8 @@ export function validateGameAction(
   if (session.status !== "in_progress" || session.is_game_over) fail(E.NOT_ACTIVE);
   const isVote = args.action_type === "vote";
   if (session.current_phase !== (isVote ? "voting" : "night")) fail(E.WRONG_PHASE);
-  const active = isVote ? session.current_phase_data?.dayIndex : session.current_phase_data?.nightIndex;
+  const { phase } = sessionData(session);
+  const active = isVote ? phase?.dayIndex : phase?.nightIndex;
   if (!Number.isInteger(active) || args.phase_index !== active) fail(E.MOVED_ON);
   const actor = seats.find((s) => s.player_id === args.actor_player_id) ?? fail(E.PLAYER_NOT_FOUND);
   if (!actor.is_alive) fail(E.ACTOR_DEAD);

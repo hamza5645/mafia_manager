@@ -1,5 +1,5 @@
 import { Doc } from "../_generated/dataModel";
-import { ROLE_OF_TYPE } from "./rules";
+import { AssignedNumber, DayRecord, NightRecord, ROLE_OF_TYPE, sessionData } from "./rules";
 
 // Role privacy is enforced here, not in SwiftUI. The host still sees every
 // role and action because the host client drives the bots.
@@ -28,10 +28,11 @@ const PHASE_FIELDS: Record<string, string[]> = {
   gameOver: ["winner"],
 };
 
-const pick = (row: any, keys: string[]) =>
-  Object.fromEntries(keys.filter((k) => row?.[k] !== undefined).map((k) => [k, row[k]]));
+const pick = <T extends object>(row: T, keys: (keyof T & string)[]) =>
+  Object.fromEntries(keys.filter((k) => row[k] !== undefined).map((k) => [k, row[k]])) as Partial<T>;
 
 export function sessionForViewer(session: Session, caller: User | null, seat: Seat | null) {
+  const { phase, nights, days, assigned } = sessionData(session);
   const outsider = {
     id: session.id,
     room_code: session.room_code,
@@ -47,35 +48,34 @@ export function sessionForViewer(session: Session, caller: User | null, seat: Se
     is_game_over: session.is_game_over,
     winner: session.winner,
     updated_at: session.updated_at,
-    assigned_numbers: [] as any[],
-    night_history: [] as any[],
-    day_history: [] as any[],
+    assigned_numbers: [] as AssignedNumber[],
+    night_history: [] as Partial<NightRecord>[],
+    day_history: [] as Partial<DayRecord>[],
   };
   const isHost = caller !== null && session.host_user_id === caller.id;
   if (isHost || (seat && isOver(session))) {
     return {
       ...outsider,
       original_host_user_id: session.original_host_user_id,
-      current_phase_data: session.current_phase_data,
+      current_phase_data: phase,
       current_round_id: session.current_round_id,
-      assigned_numbers: session.assigned_numbers,
-      night_history: session.night_history,
-      day_history: session.day_history,
+      assigned_numbers: assigned,
+      night_history: nights,
+      day_history: days,
     };
   }
   if (!seat) return outsider;
-  const phase = session.current_phase_data;
-  const fields = PHASE_FIELDS[phase?.type];
+  const fields = phase && PHASE_FIELDS[phase.type];
   return {
     ...outsider,
     original_host_user_id: session.original_host_user_id,
-    current_phase_data: fields ? pick(phase, ["type", ...fields]) : undefined,
+    current_phase_data: phase && fields ? pick(phase, ["type", ...fields]) : undefined,
     current_round_id: session.current_round_id,
-    assigned_numbers: session.assigned_numbers.map((row: any) => ({ player_id: row.player_id, number: row.number })),
-    night_history: session.night_history
-      .filter((row: any) => row.is_resolved === true)
-      .map((row: any) => pick(row, ["night_index", "is_resolved", "resulting_deaths", "revealed_death_roles", "timestamp"])),
-    day_history: session.day_history.map((row: any) => pick(row, ["day_index", "removed_player_ids", "timestamp"])),
+    assigned_numbers: assigned.map((row) => ({ player_id: row.player_id, number: row.number })),
+    night_history: nights
+      .filter((row) => row.is_resolved === true)
+      .map((row) => pick(row, ["night_index", "is_resolved", "resulting_deaths", "revealed_death_roles", "timestamp"])),
+    day_history: days.map((row) => pick(row, ["day_index", "removed_player_ids", "timestamp"])),
   };
 }
 
