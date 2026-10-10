@@ -44,6 +44,28 @@ struct SettingsView: View {
                                 }
                                 .padding(.vertical, 8)
                             }
+
+                            if authStore.hasPendingGuestMerge {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Guest progress hasn't been saved to your account yet.")
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.textSecondary)
+                                        Spacer()
+                                        Button("Retry") {
+                                            Task { await authStore.retryGuestMerge() }
+                                        }
+                                        .font(Design.Typography.subheadline)
+                                        .foregroundColor(Design.Colors.brandGold)
+                                        .buttonStyle(.plain)
+                                    }
+                                    if let errorMessage = authStore.errorMessage {
+                                        Text(errorMessage)
+                                            .font(Design.Typography.caption)
+                                            .foregroundColor(Design.Colors.dangerRed)
+                                    }
+                                }
+                            }
                         } else if authStore.isAnonymous {
                             // Show guest profile section with upgrade CTA
                             VStack(spacing: 16) {
