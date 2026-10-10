@@ -25,7 +25,7 @@ npx convex dev
 ```
 
 2. Configure Clerk for the app:
-- set the Clerk publishable key in `Core/Backend/ConvexConfig.swift`;
+- set the Clerk publishable key in `Configuration/Debug.xcconfig` (Release: `Configuration/Production.xcconfig`);
 - set the real Clerk issuer/frontend API URL in `convex/auth.config.ts`;
 - configure the Clerk Convex JWT integration/template in the Clerk dashboard.
 
@@ -111,6 +111,6 @@ Test scenarios:
 
 - Run `npx convex dev --once` to catch schema/function errors.
 - Use Convex dashboard logs for backend exceptions.
-- Check `ConvexConfig.clerkPublishableKey` and `convex/auth.config.ts` if Clerk users cannot authenticate to Convex.
+- Check `MAFIA_CLERK_PUBLISHABLE_KEY` in `Configuration/*.xcconfig` and `convex/auth.config.ts` if Clerk users cannot authenticate to Convex.
 - Check `current_round_id` if old actions appear to affect a new night or vote.
 - Check `phase_sequence` and trigger a snapshot resync if a device misses a realtime update.

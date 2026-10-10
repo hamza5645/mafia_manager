@@ -29,7 +29,7 @@ Multiplayer mirrors this pattern:
 The backend is Convex + Clerk.
 
 - `Core/Backend/ConvexService.swift` owns the Convex Swift client.
-- `Core/Backend/ConvexConfig.swift` stores the Convex deployment URL and Clerk publishable key.
+- `Core/Backend/ConvexConfig.swift` reads the Convex deployment URL and Clerk publishable key from Info.plist, set by `Configuration/*.xcconfig`.
 - `Core/Auth/Services/AuthService.swift` wraps Clerk sign-up/sign-in/reset flows and creates/restores Convex user documents.
 - `Core/Auth/Store/AuthStore.swift` is the UI-facing auth facade, including guest mode.
 - `Core/Backend/DatabaseService.swift` handles stats, custom role configs, and player groups via Convex.

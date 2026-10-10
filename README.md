@@ -29,8 +29,7 @@ npx convex dev --once
 ```
 
 Required app configuration
-- `Core/Backend/ConvexConfig.swift` contains the Convex deployment URL.
-- `Core/Backend/ConvexConfig.swift` contains the Clerk publishable key.
+- `Configuration/Debug.xcconfig` (Debug) and `Configuration/Production.xcconfig` (Release) hold the Convex host, Clerk publishable key and Clerk frontend host; `ConvexConfig` reads them from Info.plist.
 - `CLERK_FRONTEND_API_URL` is set in the Convex dev deployment.
 - See `docs/CLERK_SETUP.md` for Clerk dashboard/config notes.
 

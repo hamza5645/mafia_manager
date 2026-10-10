@@ -37,7 +37,7 @@ npx convex dev --once
 
 **Auth setup**:
 - Clerk is the account auth provider.
-- Clerk publishable key is configured in `Core/Backend/ConvexConfig.swift`.
+- Clerk publishable key is configured in `Configuration/Debug.xcconfig` (Release: `Configuration/Production.xcconfig`).
 - `CLERK_FRONTEND_API_URL` is set in the Convex dev deployment for account auth.
 - Guest mode uses a Keychain secret and a Convex guest profile for quick play.
 - See `docs/CLERK_SETUP.md` before testing account sign-in.
