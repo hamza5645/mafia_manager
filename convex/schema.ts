@@ -36,14 +36,11 @@ export default defineSchema({
     legacy_supabase_user_id: v.optional(v.string()),
     created_at: v.number(),
     updated_at: v.number(),
-    // Transitional (deploy 1): backfilled into guest_secret_digest, then dropped.
-    guest_secret_hash: v.optional(v.string()),
   })
     .index("by_app_id", ["id"])
     .index("by_auth_subject", ["auth_subject"])
     .index("by_guest_secret_digest", ["guest_secret_digest"])
-    .index("by_email_unclaimed", ["email", "auth_subject"])
-    .index("by_guest_secret_hash", ["guest_secret_hash"]),
+    .index("by_email_unclaimed", ["email", "auth_subject"]),
 
   player_stats: defineTable({
     id: v.string(),
@@ -121,11 +118,6 @@ export default defineSchema({
     day_history: v.array(v.any()),
     current_round_id: v.optional(v.string()),
     updated_at: v.number(),
-    // Transitional (deploy 1): never written; unset by migrations, then dropped.
-    phase_sequence: v.optional(v.number()),
-    night_resolution: v.optional(v.object({
-      round_id: v.string(), fingerprint: v.string(), next_phase: v.string(),
-    })),
   })
     .index("by_app_id", ["id"])
     .index("by_room_code", ["room_code"])

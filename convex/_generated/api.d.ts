@@ -16,7 +16,6 @@ import type * as lib_projections from "../lib/projections.js";
 import type * as lib_rules from "../lib/rules.js";
 import type * as lib_transitions from "../lib/transitions.js";
 import type * as lib_util from "../lib/util.js";
-import type * as migrations from "../migrations.js";
 import type * as night from "../night.js";
 import type * as phases from "../phases.js";
 import type * as play from "../play.js";
@@ -42,7 +41,6 @@ declare const fullApi: ApiFromModules<{
   "lib/rules": typeof lib_rules;
   "lib/transitions": typeof lib_transitions;
   "lib/util": typeof lib_util;
-  migrations: typeof migrations;
   night: typeof night;
   phases: typeof phases;
   play: typeof play;

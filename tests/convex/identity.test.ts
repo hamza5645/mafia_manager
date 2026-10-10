@@ -15,7 +15,6 @@ test('guests are stored by digest only and restored by the same hash', async () 
   expect(g).toMatchObject({ display_name: 'QA Guest', is_anonymous: true });
   const row = await t.run(ctx => ctx.db.query('users').withIndex('by_app_id', q => q.eq('id', g.id)).unique());
   expect(row!.guest_secret_digest).toBe(await sha256Hex(g.hash));
-  expect(row!.guest_secret_hash).toBeUndefined();
   const again = await t.mutation(api.users.createOrRestoreGuest, { display_name: 'Renamed', guest_secret_hash: g.hash });
   expect(again).toMatchObject({ id: g.id, display_name: 'Renamed' });
   for (const bad of ['', 'abc', g.hash.toUpperCase(), `${g.hash}0`]) {
@@ -26,20 +25,6 @@ test('guests are stored by digest only and restored by the same hash', async () 
     .rejects.toThrow(E.DISPLAY_NAME);
   await expect(t.mutation(api.users.createOrRestoreGuest, { display_name: 'x'.repeat(101), guest_secret_hash: randomHash() }))
     .rejects.toThrow(E.DISPLAY_NAME);
-});
-
-test('deploy 1 finds an un-backfilled legacy guest and upgrades it in place', async () => {
-  const t = backend(); const hash = randomHash(); const id = crypto.randomUUID();
-  await t.run(ctx => ctx.db.insert('users', {
-    id, display_name: 'Legacy Guest', is_anonymous: true, guest_secret_hash: hash, created_at: 1, updated_at: 1,
-  }));
-  expect(await t.query(api.users.getMe, { guest_secret_hash: hash })).toMatchObject({ id });
-  expect(await t.mutation(api.users.createOrRestoreGuest, { display_name: 'Back', guest_secret_hash: hash }))
-    .toMatchObject({ id, display_name: 'Back' });
-  const row = await t.run(ctx => ctx.db.query('users').withIndex('by_app_id', q => q.eq('id', id)).unique());
-  expect(row).toMatchObject({ guest_secret_digest: await sha256Hex(hash) });
-  expect(row!.guest_secret_hash).toBeUndefined();
-  expect(await t.query(api.users.getMe, { guest_secret_hash: hash })).toMatchObject({ id });
 });
 
 test('a live guest proof wins over Clerk; after the merge the account takes over', async () => {

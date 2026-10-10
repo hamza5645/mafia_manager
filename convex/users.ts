@@ -88,22 +88,18 @@ export const createOrRestoreGuest = mutation({
   handler: async (ctx, args) => {
     if (!/^[0-9a-f]{64}$/.test(args.guest_secret_hash)) fail(E.GUEST_INVALID);
     const displayName = cleanText(args.display_name, 1, 100, E.DISPLAY_NAME);
-    const digest = await sha256Hex(args.guest_secret_hash);
     const timestamp = nowAppleEpochSeconds();
     const existing = await findGuestByProof(ctx, args.guest_secret_hash);
     if (existing) {
       const patch = { display_name: displayName, updated_at: timestamp };
-      // Deploy 1 only: upgrade a guest found through the legacy hash in place.
-      const upgrade =
-        existing.guest_secret_digest === digest ? {} : { guest_secret_digest: digest, guest_secret_hash: undefined };
-      await ctx.db.patch(existing._id, { ...patch, ...upgrade });
+      await ctx.db.patch(existing._id, patch);
       return publicUser({ ...existing, ...patch });
     }
     const doc = {
       id: uuid(),
       display_name: displayName,
       is_anonymous: true,
-      guest_secret_digest: digest,
+      guest_secret_digest: await sha256Hex(args.guest_secret_hash),
       created_at: timestamp,
       updated_at: timestamp,
     };

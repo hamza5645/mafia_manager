@@ -22,14 +22,7 @@ export async function findGuestByProof(ctx: Ctx, hash: string | undefined): Prom
     .query("users")
     .withIndex("by_guest_secret_digest", (q) => q.eq("guest_secret_digest", digest))
     .collect();
-  const guest = byDigest.find(isLiveGuest);
-  if (guest) return guest;
-  // Deploy 1 only: guests not yet backfilled by migrations:backfillGuestSecretDigests.
-  const legacy = await ctx.db
-    .query("users")
-    .withIndex("by_guest_secret_hash", (q) => q.eq("guest_secret_hash", hash))
-    .collect();
-  return legacy.find(isLiveGuest) ?? null;
+  return byDigest.find(isLiveGuest) ?? null;
 }
 
 export async function getAccountUser(ctx: Ctx): Promise<Doc<"users"> | null> {
