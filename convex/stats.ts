@@ -1,383 +1,278 @@
-import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { roleDistributionValidator, roleValidator } from "./validators";
-import { nowAppleEpochSeconds, resolveCaller, uuid } from "./lib";
+import { v } from "convex/values";
+import { Doc } from "./_generated/dataModel";
+import { MutationCtx, mutation, query } from "./_generated/server";
+import { E, fail } from "./lib/errors";
+import { requireCaller } from "./lib/identity";
+import { cleanText, nowAppleEpochSeconds, uuid } from "./lib/util";
+import { guestArg, roleDistributionValidator, roleValidator } from "./validators";
 
-// Look up a row by app id, then enforce account or guest ownership.
-async function requireOwnerOfRow(
-  ctx: any,
-  table: "player_stats" | "custom_roles_configs" | "player_groups",
-  rowAppId: string,
-  notFoundMessage: string,
-  guestSecretHash?: string,
-) {
-  const row = await ctx.db
+// Every function is scoped to the caller's own rows. Missing and foreign rows
+// behave identically, so existence is never leaked.
+
+type Row<T extends "player_stats" | "custom_roles_configs" | "player_groups"> = Omit<Doc<T>, "_id" | "_creationTime">;
+
+const statOut = (row: Row<"player_stats">) => ({
+  id: row.id,
+  user_id: row.user_id,
+  player_name: row.player_name,
+  games_played: row.games_played,
+  games_won: row.games_won,
+  games_lost: row.games_lost,
+  total_kills: row.total_kills,
+  times_mafia: row.times_mafia,
+  times_doctor: row.times_doctor,
+  times_inspector: row.times_inspector,
+  times_citizen: row.times_citizen,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
+const configOut = (row: Row<"custom_roles_configs">) => ({
+  id: row.id,
+  user_id: row.user_id,
+  config_name: row.config_name,
+  role_distribution: row.role_distribution,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
+const groupOut = (row: Row<"player_groups">) => ({
+  id: row.id,
+  user_id: row.user_id,
+  group_name: row.group_name,
+  player_names: row.player_names,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
+async function ownedRow<T extends "player_stats" | "custom_roles_configs" | "player_groups">(
+  ctx: MutationCtx,
+  table: T,
+  id: string,
+  userId: string,
+): Promise<Doc<T> | null> {
+  const row = (await ctx.db
     .query(table)
-    .withIndex("by_app_id", (q: any) => q.eq("id", rowAppId))
-    .unique();
-  if (!row) throw new ConvexError(notFoundMessage);
-  await resolveCaller(ctx, row.user_id, guestSecretHash);
-  return row;
+    .withIndex("by_app_id", (q: any) => q.eq("id", id))
+    .unique()) as Doc<T> | null;
+  return row && row.user_id === userId ? row : null;
+}
+
+type Distribution = Doc<"custom_roles_configs">["role_distribution"];
+function checkRoleCounts(d: Distribution) {
+  const counts = [d.mafia_count, d.doctor_count, d.inspector_count, d.citizen_count, d.total_players];
+  const sum = d.mafia_count + d.doctor_count + d.inspector_count + d.citizen_count;
+  if (counts.some((n) => !Number.isInteger(n) || n < 0 || n > 30) || d.total_players !== sum || sum < 1) {
+    fail(E.ROLE_COUNTS);
+  }
+}
+
+function cleanPlayerNames(names: string[]) {
+  if (names.length < 1 || names.length > 19) fail(E.GROUP_SIZE);
+  return names.map((name) => cleanText(name, 1, 50, E.PLAYER_NAME));
+}
+
+async function configNamed(ctx: MutationCtx, userId: string, name: string) {
+  return await ctx.db
+    .query("custom_roles_configs")
+    .withIndex("by_user_config_name", (q) => q.eq("user_id", userId).eq("config_name", name))
+    .first();
+}
+
+async function groupNamed(ctx: MutationCtx, userId: string, name: string) {
+  return await ctx.db
+    .query("player_groups")
+    .withIndex("by_user_group_name", (q) => q.eq("user_id", userId).eq("group_name", name))
+    .first();
 }
 
 export const listPlayerStats = query({
-  args: {
-    user_id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
-    return await ctx.db
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const rows = await ctx.db
       .query("player_stats")
-      .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
-      .order("asc")
+      .withIndex("by_user", (q) => q.eq("user_id", caller.id))
       .collect();
+    return rows.map(statOut);
   },
 });
 
 export const getPlayerStat = query({
-  args: {
-    user_id: v.string(),
-    player_name: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { player_name: v.string(), ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
-    return await ctx.db
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const row = await ctx.db
       .query("player_stats")
-      .withIndex("by_user_player", (q) =>
-        q.eq("user_id", args.user_id).eq("player_name", args.player_name),
-      )
-      .unique();
+      .withIndex("by_user_player", (q) => q.eq("user_id", caller.id).eq("player_name", args.player_name))
+      .first();
+    return row ? statOut(row) : null;
   },
 });
 
-export const createPlayerStat = mutation({
-  args: {
-    id: v.optional(v.string()),
-    user_id: v.string(),
-    player_name: v.string(),
-    games_played: v.number(),
-    games_won: v.number(),
-    games_lost: v.number(),
-    total_kills: v.number(),
-    times_mafia: v.number(),
-    times_doctor: v.number(),
-    times_inspector: v.number(),
-    times_citizen: v.number(),
-    guest_secret_hash: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
-    const timestamp = nowAppleEpochSeconds();
-    const { guest_secret_hash: _guestSecretHash, ...values } = args;
-    const doc = {
-      ...values,
-      id: args.id ?? uuid(),
-      created_at: timestamp,
-      updated_at: timestamp,
-    };
-    await ctx.db.insert("player_stats", doc);
-    return doc;
-  },
-});
-
-export const updatePlayerStat = mutation({
-  args: {
-    id: v.string(),
-    games_played: v.number(),
-    games_won: v.number(),
-    games_lost: v.number(),
-    total_kills: v.number(),
-    times_mafia: v.number(),
-    times_doctor: v.number(),
-    times_inspector: v.number(),
-    times_citizen: v.number(),
-    guest_secret_hash: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const stat = await requireOwnerOfRow(
-      ctx,
-      "player_stats",
-      args.id,
-      "Player stat not found",
-      args.guest_secret_hash,
-    );
-    const patch = {
-      games_played: args.games_played,
-      games_won: args.games_won,
-      games_lost: args.games_lost,
-      total_kills: args.total_kills,
-      times_mafia: args.times_mafia,
-      times_doctor: args.times_doctor,
-      times_inspector: args.times_inspector,
-      times_citizen: args.times_citizen,
-      updated_at: nowAppleEpochSeconds(),
-    };
-    await ctx.db.patch(stat._id, patch);
-    return { ...stat, ...patch };
-  },
-});
-
-export const deletePlayerStat = mutation({
-  args: {
-    id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const stat = await ctx.db
-      .query("player_stats")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!stat) return;
-    await resolveCaller(ctx, stat.user_id, args.guest_secret_hash);
-    await ctx.db.delete(stat._id);
-  },
-});
-
+// Records one finished game for one player name. Not idempotent.
 export const upsertPlayerStat = mutation({
-  args: {
-    user_id: v.string(),
-    player_name: v.string(),
-    role: roleValidator,
-    won: v.boolean(),
-    kills: v.number(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { player_name: v.string(), role: roleValidator, won: v.boolean(), kills: v.number(), ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const playerName = cleanText(args.player_name, 1, 50, E.PLAYER_NAME);
+    if (!Number.isInteger(args.kills) || args.kills < 0 || args.kills > 100) fail(E.KILLS);
     const existing = await ctx.db
       .query("player_stats")
-      .withIndex("by_user_player", (q) =>
-        q.eq("user_id", args.user_id).eq("player_name", args.player_name),
-      )
-      .unique();
-
-    const rolePatch = {
+      .withIndex("by_user_player", (q) => q.eq("user_id", caller.id).eq("player_name", playerName))
+      .first();
+    const increments = {
+      games_played: 1,
+      games_won: args.won ? 1 : 0,
+      games_lost: args.won ? 0 : 1,
+      total_kills: args.kills,
       times_mafia: args.role === "mafia" ? 1 : 0,
       times_doctor: args.role === "doctor" ? 1 : 0,
       times_inspector: args.role === "inspector" ? 1 : 0,
       times_citizen: args.role === "citizen" ? 1 : 0,
     };
-
+    const timestamp = nowAppleEpochSeconds();
     if (!existing) {
-      const timestamp = nowAppleEpochSeconds();
       const doc = {
         id: uuid(),
-        user_id: args.user_id,
-        player_name: args.player_name,
-        games_played: 1,
-        games_won: args.won ? 1 : 0,
-        games_lost: args.won ? 0 : 1,
-        total_kills: args.kills,
-        ...rolePatch,
+        user_id: caller.id,
+        player_name: playerName,
+        ...increments,
         created_at: timestamp,
         updated_at: timestamp,
       };
       await ctx.db.insert("player_stats", doc);
-      return doc;
+      return statOut(doc);
     }
-
-    const patch = {
-      games_played: existing.games_played + 1,
-      games_won: existing.games_won + (args.won ? 1 : 0),
-      games_lost: existing.games_lost + (args.won ? 0 : 1),
-      total_kills: existing.total_kills + args.kills,
-      times_mafia: existing.times_mafia + rolePatch.times_mafia,
-      times_doctor: existing.times_doctor + rolePatch.times_doctor,
-      times_inspector: existing.times_inspector + rolePatch.times_inspector,
-      times_citizen: existing.times_citizen + rolePatch.times_citizen,
-      updated_at: nowAppleEpochSeconds(),
-    };
+    const patch = { ...increments, updated_at: timestamp };
+    for (const key of Object.keys(increments) as (keyof typeof increments)[]) patch[key] += existing[key];
     await ctx.db.patch(existing._id, patch);
-    return { ...existing, ...patch };
+    return statOut({ ...existing, ...patch });
+  },
+});
+
+export const deletePlayerStat = mutation({
+  args: { id: v.string(), ...guestArg },
+  handler: async (ctx, args) => {
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const row = await ownedRow(ctx, "player_stats", args.id, caller.id);
+    if (row) await ctx.db.delete(row._id);
+    return null;
   },
 });
 
 export const listCustomRoleConfigs = query({
-  args: {
-    user_id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
-    return await ctx.db
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const rows = await ctx.db
       .query("custom_roles_configs")
-      .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
+      .withIndex("by_user", (q) => q.eq("user_id", caller.id))
       .collect();
-  },
-});
-
-export const getCustomRoleConfig = query({
-  args: {
-    id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const config = await ctx.db
-      .query("custom_roles_configs")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!config) return null;
-    await resolveCaller(ctx, config.user_id, args.guest_secret_hash);
-    return config;
+    return rows.map(configOut);
   },
 });
 
 export const createCustomRoleConfig = mutation({
-  args: {
-    id: v.optional(v.string()),
-    user_id: v.string(),
-    config_name: v.string(),
-    role_distribution: roleDistributionValidator,
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { config_name: v.string(), role_distribution: roleDistributionValidator, ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const configName = cleanText(args.config_name, 1, 100, E.LIBRARY_NAME);
+    checkRoleCounts(args.role_distribution);
+    if (await configNamed(ctx, caller.id, configName)) fail(E.CONFIG_EXISTS);
     const timestamp = nowAppleEpochSeconds();
-    const { guest_secret_hash: _guestSecretHash, ...values } = args;
     const doc = {
-      ...values,
-      id: args.id ?? uuid(),
+      id: uuid(),
+      user_id: caller.id,
+      config_name: configName,
+      role_distribution: args.role_distribution,
       created_at: timestamp,
       updated_at: timestamp,
     };
     await ctx.db.insert("custom_roles_configs", doc);
-    return doc;
+    return configOut(doc);
   },
 });
 
 export const updateCustomRoleConfig = mutation({
-  args: {
-    id: v.string(),
-    config_name: v.string(),
-    role_distribution: roleDistributionValidator,
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { id: v.string(), config_name: v.string(), role_distribution: roleDistributionValidator, ...guestArg },
   handler: async (ctx, args) => {
-    const config = await requireOwnerOfRow(
-      ctx,
-      "custom_roles_configs",
-      args.id,
-      "Custom role config not found",
-      args.guest_secret_hash,
-    );
-    const patch = {
-      config_name: args.config_name,
-      role_distribution: args.role_distribution,
-      updated_at: nowAppleEpochSeconds(),
-    };
-    await ctx.db.patch(config._id, patch);
-    return { ...config, ...patch };
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const row = (await ownedRow(ctx, "custom_roles_configs", args.id, caller.id)) ?? fail(E.CONFIG_NOT_FOUND);
+    const configName = cleanText(args.config_name, 1, 100, E.LIBRARY_NAME);
+    checkRoleCounts(args.role_distribution);
+    const clash = await configNamed(ctx, caller.id, configName);
+    if (clash && clash.id !== row.id) fail(E.CONFIG_EXISTS);
+    const patch = { config_name: configName, role_distribution: args.role_distribution, updated_at: nowAppleEpochSeconds() };
+    await ctx.db.patch(row._id, patch);
+    return configOut({ ...row, ...patch });
   },
 });
 
 export const deleteCustomRoleConfig = mutation({
-  args: {
-    id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { id: v.string(), ...guestArg },
   handler: async (ctx, args) => {
-    const config = await ctx.db
-      .query("custom_roles_configs")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!config) return;
-    await resolveCaller(ctx, config.user_id, args.guest_secret_hash);
-    await ctx.db.delete(config._id);
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const row = await ownedRow(ctx, "custom_roles_configs", args.id, caller.id);
+    if (row) await ctx.db.delete(row._id);
+    return null;
   },
 });
 
 export const listPlayerGroups = query({
-  args: {
-    user_id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
-    return await ctx.db
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const rows = await ctx.db
       .query("player_groups")
-      .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
+      .withIndex("by_user", (q) => q.eq("user_id", caller.id))
       .collect();
-  },
-});
-
-export const getPlayerGroup = query({
-  args: {
-    id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const group = await ctx.db
-      .query("player_groups")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!group) return null;
-    await resolveCaller(ctx, group.user_id, args.guest_secret_hash);
-    return group;
+    return rows.map(groupOut);
   },
 });
 
 export const createPlayerGroup = mutation({
-  args: {
-    id: v.optional(v.string()),
-    user_id: v.string(),
-    group_name: v.string(),
-    player_names: v.array(v.string()),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { group_name: v.string(), player_names: v.array(v.string()), ...guestArg },
   handler: async (ctx, args) => {
-    await resolveCaller(ctx, args.user_id, args.guest_secret_hash);
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const groupName = cleanText(args.group_name, 1, 100, E.LIBRARY_NAME);
+    const playerNames = cleanPlayerNames(args.player_names);
+    if (await groupNamed(ctx, caller.id, groupName)) fail(E.GROUP_EXISTS);
     const timestamp = nowAppleEpochSeconds();
-    const { guest_secret_hash: _guestSecretHash, ...values } = args;
     const doc = {
-      ...values,
-      id: args.id ?? uuid(),
+      id: uuid(),
+      user_id: caller.id,
+      group_name: groupName,
+      player_names: playerNames,
       created_at: timestamp,
       updated_at: timestamp,
     };
     await ctx.db.insert("player_groups", doc);
-    return doc;
+    return groupOut(doc);
   },
 });
 
 export const updatePlayerGroup = mutation({
-  args: {
-    id: v.string(),
-    group_name: v.string(),
-    player_names: v.array(v.string()),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { id: v.string(), group_name: v.string(), player_names: v.array(v.string()), ...guestArg },
   handler: async (ctx, args) => {
-    const group = await requireOwnerOfRow(
-      ctx,
-      "player_groups",
-      args.id,
-      "Player group not found",
-      args.guest_secret_hash,
-    );
-    const patch = {
-      group_name: args.group_name,
-      player_names: args.player_names,
-      updated_at: nowAppleEpochSeconds(),
-    };
-    await ctx.db.patch(group._id, patch);
-    return { ...group, ...patch };
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const row = (await ownedRow(ctx, "player_groups", args.id, caller.id)) ?? fail(E.GROUP_NOT_FOUND);
+    const groupName = cleanText(args.group_name, 1, 100, E.LIBRARY_NAME);
+    const playerNames = cleanPlayerNames(args.player_names);
+    const clash = await groupNamed(ctx, caller.id, groupName);
+    if (clash && clash.id !== row.id) fail(E.GROUP_EXISTS);
+    const patch = { group_name: groupName, player_names: playerNames, updated_at: nowAppleEpochSeconds() };
+    await ctx.db.patch(row._id, patch);
+    return groupOut({ ...row, ...patch });
   },
 });
 
 export const deletePlayerGroup = mutation({
-  args: {
-    id: v.string(),
-    guest_secret_hash: v.optional(v.string()),
-  },
+  args: { id: v.string(), ...guestArg },
   handler: async (ctx, args) => {
-    const group = await ctx.db
-      .query("player_groups")
-      .withIndex("by_app_id", (q) => q.eq("id", args.id))
-      .unique();
-    if (!group) return;
-    await resolveCaller(ctx, group.user_id, args.guest_secret_hash);
-    await ctx.db.delete(group._id);
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const row = await ownedRow(ctx, "player_groups", args.id, caller.id);
+    if (row) await ctx.db.delete(row._id);
+    return null;
   },
 });

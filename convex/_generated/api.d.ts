@@ -8,17 +8,24 @@
  * @module
  */
 
-import type * as actions from "../actions.js";
-import type * as gameFlow from "../gameFlow.js";
 import type * as health from "../health.js";
-import type * as lib from "../lib.js";
-import type * as migration from "../migration.js";
-import type * as players from "../players.js";
-import type * as roomCodes from "../roomCodes.js";
+import type * as lib_errors from "../lib/errors.js";
+import type * as lib_guards from "../lib/guards.js";
+import type * as lib_identity from "../lib/identity.js";
+import type * as lib_projections from "../lib/projections.js";
+import type * as lib_rules from "../lib/rules.js";
+import type * as lib_transitions from "../lib/transitions.js";
+import type * as lib_util from "../lib/util.js";
+import type * as migrations from "../migrations.js";
+import type * as night from "../night.js";
+import type * as phases from "../phases.js";
+import type * as play from "../play.js";
 import type * as sessions from "../sessions.js";
 import type * as stats from "../stats.js";
 import type * as users from "../users.js";
 import type * as validators from "../validators.js";
+import type * as views from "../views.js";
+import type * as voting from "../voting.js";
 
 import type {
   ApiFromModules,
@@ -27,17 +34,24 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  actions: typeof actions;
-  gameFlow: typeof gameFlow;
   health: typeof health;
-  lib: typeof lib;
-  migration: typeof migration;
-  players: typeof players;
-  roomCodes: typeof roomCodes;
+  "lib/errors": typeof lib_errors;
+  "lib/guards": typeof lib_guards;
+  "lib/identity": typeof lib_identity;
+  "lib/projections": typeof lib_projections;
+  "lib/rules": typeof lib_rules;
+  "lib/transitions": typeof lib_transitions;
+  "lib/util": typeof lib_util;
+  migrations: typeof migrations;
+  night: typeof night;
+  phases: typeof phases;
+  play: typeof play;
   sessions: typeof sessions;
   stats: typeof stats;
   users: typeof users;
   validators: typeof validators;
+  views: typeof views;
+  voting: typeof voting;
 }>;
 
 /**
