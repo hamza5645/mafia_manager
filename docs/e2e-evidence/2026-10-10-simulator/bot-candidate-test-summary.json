@@ -5,7 +5,7 @@
   "errorCount": 0,
   "analyzerWarningCount": 0,
   "resultBundle": "/tmp/mafia-final-bots-full.xcresult",
-  "sourceCommit": "671d51c07d341fa14a0ea06cbc11dc3a5f65d379 + working-tree bot recovery fix",
+  "sourceCommit": "1ca07338f940f5f4d1450d1ff2cb3f678602e571",
   "optInFlags": [
     "TEST_RUNNER_CONVEX_INTEGRATION=1",
     "TEST_RUNNER_CLERK_ACCOUNT_E2E=1"
@@ -15,17 +15,13 @@
     "already-submitted Doctor action",
     "human Mafia action with missing bot response"
   ],
-  "pending": [
-    "complete final bot match",
-    "commit and push bot fix",
-    "rebuild distribution artifacts with bot fix",
-    "finalize campaign report"
-  ],
   "nativeProductionRetest": {
     "roomCode": "934779",
     "hostRole": "doctor",
     "botCount": 6,
     "phaseAfterResolution": "morning",
     "nightIndex": 0
-  }
+  },
+  "recordType": "Historical verification at the initial bot-recovery fix",
+  "finalVerification": "See final-swift-test-summary.json and docs/SIMULATOR_E2E_FINAL_2026-10-10.md"
 }
