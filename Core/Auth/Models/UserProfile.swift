@@ -15,6 +15,20 @@ struct UserProfile: Codable, Identifiable, Sendable {
         case updatedAt = "updated_at"
     }
 
+    init(
+        id: UUID,
+        displayName: String,
+        isAnonymous: Bool,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.isAnonymous = isAnonymous
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)

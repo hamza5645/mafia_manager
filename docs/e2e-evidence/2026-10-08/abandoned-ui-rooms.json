@@ -1,0 +1,20 @@
+[
+  {
+    "roomCode": "521622",
+    "sessionId": "8f922281-e724-47b3-88e2-6afa35348f5d",
+    "status": "in_progress",
+    "phase": "voting",
+    "humanCount": 0,
+    "botCount": 3,
+    "hostIsMember": false
+  },
+  {
+    "roomCode": "987744",
+    "sessionId": "96c4039f-adaf-4b3a-a85e-e1a7800039d9",
+    "status": "waiting",
+    "phase": "lobby",
+    "humanCount": 0,
+    "botCount": 0,
+    "hostIsMember": false
+  }
+]

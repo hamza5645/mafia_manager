@@ -5,13 +5,19 @@ import PackageDescription
 import ProjectDescription
 
 let packageSettings = PackageSettings(
-    productTypes: [:]
+    productTypes: [:],
+    targetSettings: [
+        // Tuist renames this product to ConvexMobileWrapper.framework while the
+        // module inside stays ConvexMobile, which breaks `import ConvexMobile`.
+        "ConvexMobile": .settings(base: ["PRODUCT_NAME": "ConvexMobile"]),
+    ]
 )
 #endif
 
 let package = Package(
     name: "mafia_manager",
     dependencies: [
-        .package(url: "https://github.com/supabase/supabase-swift", from: "2.5.1"),
+        .package(url: "https://github.com/get-convex/convex-swift", from: "0.8.0"),
+        .package(url: "https://github.com/clerk/clerk-ios", from: "1.0.0"),
     ]
 )

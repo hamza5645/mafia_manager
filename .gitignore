@@ -21,3 +21,7 @@ Makefile
 
 # Tuist generated artifacts
 Derived/
+
+# Local agent / Claude config
+.agents/
+.claude/

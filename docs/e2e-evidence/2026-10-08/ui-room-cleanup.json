@@ -1,0 +1,14 @@
+[
+  {
+    "room_code": "521622",
+    "cleaned": true,
+    "status": "cancelled",
+    "removedBots": 3
+  },
+  {
+    "room_code": "987744",
+    "cleaned": true,
+    "status": "cancelled",
+    "removedBots": 0
+  }
+]

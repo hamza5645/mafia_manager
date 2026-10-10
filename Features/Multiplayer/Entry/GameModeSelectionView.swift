@@ -68,6 +68,7 @@ struct GameModeSelectionView: View {
                                 isSelected: selectedMode == .online,
                                 isLocked: false  // Guests can play too!
                             ) {
+                                guard !authStore.isRestoringSession else { return }
                                 if authStore.isAuthenticated {
                                     selectedMode = .online
                                 } else {
@@ -75,6 +76,16 @@ struct GameModeSelectionView: View {
                                     showingGuestNameInput = true
                                 }
                             }
+                            .disabled(authStore.isRestoringSession)
+                            .overlay(alignment: .topTrailing) {
+                                if authStore.isRestoringSession {
+                                    ProgressView()
+                                        .tint(Design.Colors.brandGold)
+                                        .padding(28)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .accessibilityValue(authStore.isRestoringSession ? "Restoring account" : "")
                         }
                         .padding(.horizontal, 20)
 

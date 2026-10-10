@@ -6,12 +6,15 @@ let project = Project(
         base: [
             "DEVELOPMENT_TEAM": "5GH22BAXAU",
             "CODE_SIGN_STYLE": "Automatic",
+            // ConvexMobile's Rust XCFramework ships an arm64-only simulator slice.
+            "EXCLUDED_ARCHS[sdk=iphonesimulator*]": "x86_64",
             "MARKETING_VERSION": "5.0",
-            "CURRENT_PROJECT_VERSION": "10",
+            "CURRENT_PROJECT_VERSION": "11",
             "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
             "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
             "STRING_CATALOG_GENERATE_SYMBOLS": "NO",
             "SWIFT_EMIT_LOC_STRINGS": "NO",
+            "MAFIA_CLERK_FRONTEND_HOST": "striking-elf-22.clerk.accounts.dev",
         ]
     ),
     targets: [
@@ -25,6 +28,8 @@ let project = Project(
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
                 "CFBundleDisplayName": "Mafia",
+                "MafiaProductionConvexHost": "$(MAFIA_PRODUCTION_CONVEX_HOST)",
+                "MafiaProductionClerkPublishableKey": "$(MAFIA_PRODUCTION_CLERK_PUBLISHABLE_KEY)",
                 "ITSAppUsesNonExemptEncryption": false,
                 "UIApplicationSupportsIndirectInputEvents": true,
                 "UILaunchScreen": [:],
@@ -44,20 +49,33 @@ let project = Project(
                 "App/**",
                 "Core/**",
                 "Features/**",
+                "Vendor/clerk-convex-swift/Sources/ClerkKitConvex/**",
             ],
             resources: [
                 "Assets.xcassets",
                 "Resources/**",
                 "PrivacyInfo.xcprivacy",
             ],
+            entitlements: .dictionary([
+                "com.apple.developer.associated-domains": ["webcredentials:$(MAFIA_CLERK_FRONTEND_HOST)"],
+            ]),
+            scripts: [
+                .pre(path: "scripts/verify_release_config.sh", name: "Validate production backend configuration", basedOnDependencyAnalysis: false),
+            ],
             dependencies: [
-                .external(name: "Supabase"),
+                .external(name: "ConvexMobile"),
+                .external(name: "ClerkKit"),
+                .external(name: "ClerkKitUI"),
             ],
             settings: .settings(
                 base: [
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
                     "ENABLE_PREVIEWS": "YES",
+                ],
+                configurations: [
+                    .debug(name: "Debug"),
+                    .release(name: "Release", xcconfig: "Configuration/Production.xcconfig"),
                 ]
             )
         ),

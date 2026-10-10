@@ -157,7 +157,7 @@ enum InputValidator {
             return .failure(.empty)
         }
 
-        // Minimum 6 characters (Supabase default)
+        // Minimum 6 characters (common email/password auth minimum)
         guard trimmed.count >= 6 else {
             return .failure(.tooShort(minimum: 6))
         }

@@ -19,6 +19,10 @@ struct VotingView: View {
         store.alivePlayers.filter { $0.id != currentPlayer?.id }
     }
 
+    private var hasValidSelection: Bool {
+        alivePlayers.contains { $0.id == selectedTargetID }
+    }
+
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
@@ -68,7 +72,7 @@ struct VotingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(CTAButtonStyle(kind: .primary))
-                    .disabled(selectedTargetID == nil)
+                    .disabled(!hasValidSelection)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(Design.Colors.surface0.opacity(0.95))
@@ -80,6 +84,10 @@ struct VotingView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .onChange(of: currentPlayer?.id) { _, _ in
+            selectedTargetID = nil
+            showConfirmation = false
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -113,10 +121,13 @@ struct VotingView: View {
 
     private func confirmVote() {
         guard let currentPlayer = currentPlayer,
-              let targetID = selectedTargetID else { return }
+              let targetID = selectedTargetID,
+              hasValidSelection else { return }
 
-        store.recordVote(from: currentPlayer.id, for: targetID)
-        store.advanceToNextVoter()
+        if store.recordVote(from: currentPlayer.id, for: targetID) {
+            selectedTargetID = nil
+            store.advanceToNextVoter()
+        }
     }
 }
 

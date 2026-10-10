@@ -64,6 +64,15 @@ struct PlayerGroupsView: View {
             EditPlayerGroupView(group: group, onSave: { await loadGroups() })
                 .environmentObject(authStore)
         }
+        .alert("Player Groups", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("Reload") { Task { await loadGroups() } }
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "Could not complete the request. Please try again.")
+        }
     }
 
     private func loadGroups() async {
@@ -77,9 +86,10 @@ struct PlayerGroupsView: View {
         errorMessage = nil
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            playerGroups = try await databaseService.getPlayerGroups(userId: userId)
+            playerGroups = try await databaseService.getPlayerGroups(
+                userId: userId,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -94,9 +104,10 @@ struct PlayerGroupsView: View {
         }
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            try await databaseService.deletePlayerGroup(id: group.id)
+            try await databaseService.deletePlayerGroup(
+                id: group.id,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await loadGroups()
         } catch {
             errorMessage = error.localizedDescription
@@ -379,9 +390,10 @@ struct AddPlayerGroupView: View {
         )
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            try await databaseService.createPlayerGroup(newGroup)
+            try await databaseService.createPlayerGroup(
+                newGroup,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {
@@ -561,9 +573,10 @@ struct EditPlayerGroupView: View {
         updatedGroup.updatedAt = Date()
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            try await databaseService.updatePlayerGroup(updatedGroup)
+            try await databaseService.updatePlayerGroup(
+                updatedGroup,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {

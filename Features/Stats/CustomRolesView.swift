@@ -64,6 +64,15 @@ struct CustomRolesView: View {
             EditCustomRoleConfigView(config: config, onSave: { await loadConfigs() })
                 .environmentObject(authStore)
         }
+        .alert("Custom Roles", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("Reload") { Task { await loadConfigs() } }
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "Could not complete the request. Please try again.")
+        }
     }
 
     private func loadConfigs() async {
@@ -77,9 +86,10 @@ struct CustomRolesView: View {
         errorMessage = nil
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            customConfigs = try await databaseService.getCustomRoleConfigs(userId: userId)
+            customConfigs = try await databaseService.getCustomRoleConfigs(
+                userId: userId,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -94,9 +104,10 @@ struct CustomRolesView: View {
         }
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            try await databaseService.deleteCustomRoleConfig(id: config.id)
+            try await databaseService.deleteCustomRoleConfig(
+                id: config.id,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await loadConfigs()
         } catch {
             errorMessage = error.localizedDescription
@@ -351,9 +362,10 @@ struct AddCustomRoleConfigView: View {
         )
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            try await databaseService.createCustomRoleConfig(newConfig)
+            try await databaseService.createCustomRoleConfig(
+                newConfig,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {
@@ -488,9 +500,10 @@ struct EditCustomRoleConfigView: View {
         updatedConfig.updatedAt = Date()
 
         do {
-            // WORKAROUND: Pass access token to database service
-            databaseService.accessToken = authStore.accessToken
-            try await databaseService.updateCustomRoleConfig(updatedConfig)
+            try await databaseService.updateCustomRoleConfig(
+                updatedConfig,
+                guestSecretHash: authStore.isAnonymous ? authStore.currentGuestSecretHash : nil
+            )
             await onSave()
             dismiss()
         } catch {

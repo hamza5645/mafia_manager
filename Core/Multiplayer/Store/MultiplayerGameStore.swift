@@ -43,9 +43,6 @@ final class MultiplayerGameStore: ObservableObject {
     // Kick detection
     @Published var wasKicked: Bool = false
 
-    // Stores original host ID for Play Again host reclaim logic
-    private var originalHostUserId: UUID?
-
     // Heartbeat timer
     private var heartbeatTimer: Timer?
     private var playerRefreshTimer: Timer?
@@ -54,10 +51,12 @@ final class MultiplayerGameStore: ObservableObject {
     private let resyncDebounceInterval: TimeInterval = 2.0  // Minimum 2 seconds between resyncs
     private var isPerformingResync = false
     private var pendingAutoAdvanceTask: Task<Void, Never>?
-    private var processedBotNightIndices: Set<Int> = []
     private var processedBotVotingDays: Set<Int> = []
     private var isResolvingPhase = false
+    private var isCompletingNight = false
     private var isProcessingBotVotes = false // HAMZA-FIX: Recursion guard for bot voting
+    private var isProcessingBotNightActions = false
+    private var botActionsRoundId: UUID?
     private var eliminatedPlayerIds: Set<UUID> = [] // Keep dead players dead across refreshes
 
     // HAMZA-FIX: Bot reactive voting - track which bots have submitted night actions
@@ -95,6 +94,8 @@ final class MultiplayerGameStore: ObservableObject {
     var testSessionSnapshotProvider: ((UUID) async throws -> GameSession?)?
     var testPlayerSnapshotProvider: ((UUID) async throws -> [SessionPlayer])?
     var testCurrentUserIdProvider: (() -> UUID?)?
+    var testGuestSecretHashProvider: (() -> String?)?
+    var testNightRecordStoredHandler: (() -> Void)?
 #endif
 
     func setAuthStore(_ authStore: AuthStore) {
@@ -110,13 +111,24 @@ final class MultiplayerGameStore: ObservableObject {
         return authStore?.currentUserId
     }
 
+    private var guestSecretHash: String? {
+#if DEBUG
+        if let provider = testGuestSecretHashProvider {
+            return provider()
+        }
+#endif
+        return authStore?.isAnonymous == true ? authStore?.currentGuestSecretHash : nil
+    }
+
     private func loadSessionSnapshot(sessionId: UUID) async throws -> GameSession? {
 #if DEBUG
         if let provider = testSessionSnapshotProvider {
             return try await provider(sessionId)
         }
 #endif
-        return try await sessionService.getSession(sessionId: sessionId)
+        return try await sessionService.getSession(
+            sessionId: sessionId, viewerUserId: currentUserId(), guestSecretHash: guestSecretHash
+        )
     }
 
     private func loadPlayerSnapshot(sessionId: UUID) async throws -> [SessionPlayer] {
@@ -125,7 +137,11 @@ final class MultiplayerGameStore: ObservableObject {
             return try await provider(sessionId)
         }
 #endif
-        return try await sessionService.getSessionPlayers(sessionId: sessionId)
+        return try await sessionService.getSessionPlayers(
+            sessionId: sessionId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
+        )
     }
 
 #if DEBUG
@@ -136,14 +152,27 @@ final class MultiplayerGameStore: ObservableObject {
     func testHandlePlayerUpdate(_ player: SessionPlayer) {
         handlePlayerUpdate(player)
     }
+
+    func testEvaluatePhaseReadiness() async {
+        await evaluatePhaseProgression(trigger: "test")
+    }
+
+    func testEnterPhase(_ phase: PhaseData) async {
+        await handlePhaseEntry(for: phase)
+    }
+
+    func testHandlePlayerRemoval(_ playerId: UUID) {
+        handlePlayerRemoval(playerId: playerId)
+    }
 #endif
 
     /// Clear per-game caches so bots/actions get re-processed for a brand new game
     private func resetPhaseProcessingState() {
-        processedBotNightIndices.removeAll()
+        botActionsRoundId = nil
         processedBotVotingDays.removeAll()
         isPhaseReadyToAdvance = false
         isResolvingPhase = false
+        isCompletingNight = false
         botNightActionsSubmitted.removeAll()
         previousNightVotes.removeAll()
         nightVoteCounts.removeAll()
@@ -357,7 +386,8 @@ final class MultiplayerGameStore: ObservableObject {
             let session = try await sessionService.createSession(
                 hostUserId: userId,
                 maxPlayers: 19,
-                botCount: botCount
+                botCount: botCount,
+                guestSecretHash: guestSecretHash
             )
 
             // Add host as first player
@@ -365,7 +395,9 @@ final class MultiplayerGameStore: ObservableObject {
                 sessionId: session.id,
                 userId: userId,
                 playerName: playerName,
-                isBot: false
+                isBot: false,
+                callerUserId: userId,
+                guestSecretHash: guestSecretHash
             )
 
             // Add bots
@@ -375,7 +407,9 @@ final class MultiplayerGameStore: ObservableObject {
                         sessionId: session.id,
                         userId: nil,
                         playerName: "Bot \(i)",
-                        isBot: true
+                        isBot: true,
+                        callerUserId: userId,
+                        guestSecretHash: guestSecretHash
                     )
                 }
             }
@@ -431,7 +465,8 @@ final class MultiplayerGameStore: ObservableObject {
             let (session, player) = try await sessionService.joinSession(
                 roomCode: roomCode,
                 userId: userId,
-                playerName: playerName
+                playerName: playerName,
+                guestSecretHash: guestSecretHash
             )
 
             // Update local state
@@ -462,30 +497,40 @@ final class MultiplayerGameStore: ObservableObject {
         }
     }
 
-    /// Leave the current session
+    /// Leave this seat; the backend transfers host or cancels an empty room.
     func leaveSession() async throws {
-        guard let playerId = myPlayer?.id else {
-            throw SessionError.playerNotFound
-        }
+        guard let player = myPlayer, let userId = player.userId,
+              let sessionId = currentSession?.id else { throw SessionError.playerNotFound }
+        // Keep the connection/timers intact if the network request fails, so
+        // the user can retry without being stranded in a disconnected lobby.
+        try await sessionService.leaveSession(sessionId: sessionId, userId: userId, guestSecretHash: guestSecretHash)
+        await clearLocalSession()
+    }
 
+    /// The host's End Game action cancels the room for every participant.
+    func endSession() async throws {
+        guard isHost, let sessionId = currentSession?.id,
+              let userId = currentUserId() else { throw SessionError.notHost }
+        try await sessionService.cancelSession(sessionId: sessionId, callerUserId: userId, guestSecretHash: guestSecretHash)
+        await clearLocalSession()
+    }
+
+    private func clearLocalSession() async {
         resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
-
         stopHeartbeat()
-        stopHostMonitorTimer() // HAMZA-165: Stop monitoring host
+        stopHostMonitorTimer()
         stopPlayerRefreshTimer()
         stopConsistencyCheckTimer()
         await realtimeService.unsubscribeAll()
-
-        // Remove player directly by their session player ID (works for both authenticated and unauthenticated users)
-        try await sessionService.removePlayer(playerId: playerId)
-
-        // Clear local state
+        currentSessionId = nil
         currentSession = nil
         myPlayer = nil
         allPlayers = []
         isHost = false
         isInSession = false
+        wasKicked = false
+        isRealtimeConnected = false
         visiblePlayers = []
         myRole = nil
         myNumber = nil
@@ -513,15 +558,12 @@ final class MultiplayerGameStore: ObservableObject {
             throw SessionError.noActiveSession
         }
 
-        // Store original host for reclaim logic (first time entering game_over)
-        let originalHost = originalHostUserId ?? currentSession?.hostUserId ?? playerUserId
-
         // Reset session to lobby state via service
         try await sessionService.returnToLobby(
             sessionId: sessionId,
             playerId: playerId,
             playerUserId: playerUserId,
-            originalHostUserId: originalHost
+            guestSecretHash: guestSecretHash
         )
 
         // Clear local game state (keep session connection)
@@ -540,42 +582,21 @@ final class MultiplayerGameStore: ObservableObject {
         resetPhaseProcessingState()
         eliminatedPlayerIds.removeAll()
         isPhaseReadyToAdvance = false
-        // Clear so it gets recaptured when new game starts
-        originalHostUserId = nil
     }
 
     /// Remove a player from the session (Host only)
     func removePlayer(withId playerId: UUID) async throws {
-        guard isHost, let sessionId = currentSession?.id else { return }
-        guard let player = allPlayers.first(where: { $0.id == playerId }) else { return }
-        
-        // If removing a bot, we just delete the record
-        // If removing a human, same thing, they will get disconnected
-        
-        // Using sessionService directly to delete the player record
-        // Note: We're using the player.id (UUID) which is the primary key of session_players
-        // The SessionService.leaveSession uses userId, but we might want to remove by player ID
-        
-        // We'll assume we can use the same mechanism as leaveSession if we have userId
-        if let userId = player.userId {
-            try await sessionService.leaveSession(sessionId: sessionId, userId: userId)
-        } else {
-            // For bots or if we need to remove by player ID directly...
-            // Since SessionService.leaveSession takes userId, let's add a specific removePlayer method to SessionService later if needed.
-            // For now, I'll check if I can use the existing leaveSession or if I need to extend it.
-            // The existing leaveSession selects by userId. Bots don't have userId.
-            
-            // Workaround: Since I can't easily add to SessionService without editing it (which I should avoid if possible or do in a separate step), 
-            // I will rely on the fact that I'm the host and I can probably delete the record.
-            // But wait, I can edit SessionService. The plan says "Ensure sessionService has removePlayer".
-            
-            // Let's skip the implementation details here and assume I'll add `removePlayer(playerId:)` to SessionService.
-            // Wait, I previously used try await sessionService.removePlayer(playerId: player.id)
-            // But I didn't add it to SessionService yet.
-            
-            // I will add it to SessionService in the next step.
-             try await sessionService.removePlayer(playerId: player.id)
+        guard isHost, currentSession?.id != nil else { return }
+        guard let callerUserId = currentUserId() else {
+            throw SessionError.notHost
         }
+        guard let player = allPlayers.first(where: { $0.id == playerId }) else { return }
+
+        try await sessionService.removePlayer(
+            playerId: player.id,
+            callerUserId: callerUserId,
+            guestSecretHash: guestSecretHash
+        )
         
         // Local cleanup will happen via real-time update, but we can do it optimistically
         handlePlayerRemoval(playerId: player.id)
@@ -589,12 +610,18 @@ final class MultiplayerGameStore: ObservableObject {
     
     /// Manually complete the night phase (Host only)
     func completeNightPhase() async throws {
-        guard isHost, 
+        guard isHost, !isCompletingNight,
               case .night(let nightIndex, _) = currentSession?.currentPhaseData else { return }
-        
-        try await resolveNightPhase(nightIndex: nightIndex)
+        isCompletingNight = true
+        defer { isCompletingNight = false }
+        try await checkNightPhaseReadiness(nightIndex: nightIndex)
+        guard isPhaseReadyToAdvance else {
+            throw SessionError.operationFailed("Waiting for all night actions to be submitted.")
+        }
+        let recordedNight = try await recordNightActions(nightIndex: nightIndex)
+        try await resolveNightOutcome(nightIndex: nightIndex, recordedNight: recordedNight)
     }
-    
+
     // MARK: - Real-time Subscriptions
 
     private func subscribeToSession(sessionId: UUID) async throws {
@@ -603,6 +630,8 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await realtimeService.subscribeToSession(
             sessionId: sessionId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash,
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
@@ -613,6 +642,11 @@ final class MultiplayerGameStore: ObservableObject {
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
                     self?.handlePlayerUpdate(player)
+                }
+            },
+            onPlayerRemoved: { [weak self] playerId in
+                Task { @MainActor in
+                    self?.handlePlayerRemoval(playerId: playerId)
                 }
             },
             onActionUpdate: { [weak self] action in
@@ -657,6 +691,8 @@ final class MultiplayerGameStore: ObservableObject {
         // Use RealtimeService's exponential backoff recovery
         realtimeService.attemptResubscribe(
             sessionId: sessionId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash,
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
@@ -667,6 +703,11 @@ final class MultiplayerGameStore: ObservableObject {
                 Task { @MainActor in
                     self?.isRealtimeConnected = true
                     self?.handlePlayerUpdate(player)
+                }
+            },
+            onPlayerRemoved: { [weak self] playerId in
+                Task { @MainActor in
+                    self?.handlePlayerRemoval(playerId: playerId)
                 }
             },
             onActionUpdate: { [weak self] action in
@@ -704,11 +745,9 @@ final class MultiplayerGameStore: ObservableObject {
             resetPhaseProcessingState()
         }
 
-        // Store original host ID when game starts (for Play Again host reclaim)
-        if previousPhaseData == .lobby && session.currentPhaseData != .lobby {
-            originalHostUserId = session.hostUserId
+        if session.currentRoundId != currentSession?.currentRoundId || session.currentPhase != previousPhase {
+            isPhaseReadyToAdvance = false
         }
-
         currentSession = session
 
         updateHostStatus(using: session)
@@ -831,20 +870,26 @@ final class MultiplayerGameStore: ObservableObject {
     private func handlePlayerRemoval(playerId: UUID) {
         allPlayers.removeAll(where: { $0.id == playerId })
 
-        // If it was me, clear my player state and trigger auto-dismiss
         if playerId == myPlayer?.id {
+            stopHeartbeat()
+            stopHostMonitorTimer()
+            stopPlayerRefreshTimer()
+            stopConsistencyCheckTimer()
+            currentSessionId = nil
             myPlayer = nil
             myRole = nil
             myNumber = nil
-            wasKicked = true  // Signal to UI that we were removed
+            mafiaTeammates = []
+            isHost = false
+            isInSession = false
+            isRealtimeConnected = false
+            wasKicked = true
+            Task {
+                await realtimeService.unsubscribeAll()
+            }
         }
 
         updateVisiblePlayers()
-
-        // Refresh players from server to ensure consistency
-        Task {
-            try? await refreshPlayers()
-        }
     }
 
     private func handleActionUpdate(_ action: GameAction) {
@@ -1060,7 +1105,9 @@ final class MultiplayerGameStore: ObservableObject {
             try await realtimeService.broadcastMessage(
                 sessionId: sessionId,
                 event: "tentative_selection",
-                payload: selection
+                payload: selection,
+                callerUserId: currentUserId(),
+                guestSecretHash: guestSecretHash
             )
             print("📡 [TentativeVote] Broadcasted selection: \(actionType) -> \(targetPlayerId?.uuidString.prefix(8) ?? "nil")")
         } catch {
@@ -1121,6 +1168,7 @@ final class MultiplayerGameStore: ObservableObject {
 
         // Check if current player was removed (kicked)
         let wasInSession = myPlayer != nil
+        let previousPlayerId = myPlayer?.id
         let currentUserId = currentUserId()
 
         allPlayers = players
@@ -1133,13 +1181,9 @@ final class MultiplayerGameStore: ObservableObject {
             myNumber = foundPlayer?.playerNumber
 
             // If player was in session but is no longer found, they were kicked
-            if wasInSession && foundPlayer == nil {
+            if wasInSession, foundPlayer == nil, let previousPlayerId {
                 print("⚠️ [MultiplayerGameStore] Current user not found in refreshed players - was kicked")
-                myPlayer = nil
-                myRole = nil
-                myNumber = nil
-                isInSession = false
-                wasKicked = true
+                handlePlayerRemoval(playerId: previousPlayerId)
             }
         }
 
@@ -1176,7 +1220,11 @@ final class MultiplayerGameStore: ObservableObject {
         guard let player = myPlayer else { return }
 
         let newReadyStatus = !player.isReady
-        try await sessionService.updatePlayerReady(playerId: player.id, isReady: newReadyStatus)
+        try await sessionService.updatePlayerReady(
+            playerId: player.id,
+            isReady: newReadyStatus,
+            guestSecretHash: guestSecretHash
+        )
 
         // Update optimistically
         myPlayer?.isReady = newReadyStatus
@@ -1185,7 +1233,11 @@ final class MultiplayerGameStore: ObservableObject {
     /// Explicitly set ready state (used for auto-ready flows like citizens)
     func setReadyStatus(_ isReady: Bool) async throws {
         guard let playerId = myPlayer?.id else { return }
-        try await sessionService.updatePlayerReady(playerId: playerId, isReady: isReady)
+        try await sessionService.updatePlayerReady(
+            playerId: playerId,
+            isReady: isReady,
+            guestSecretHash: guestSecretHash
+        )
         myPlayer?.isReady = isReady
     }
     
@@ -1194,7 +1246,11 @@ final class MultiplayerGameStore: ObservableObject {
         guard let playerId = myPlayer?.id else { return }
 
         // Mark player as having seen their role by setting ready status
-        try await sessionService.updatePlayerReady(playerId: playerId, isReady: true)
+        try await sessionService.updatePlayerReady(
+            playerId: playerId,
+            isReady: true,
+            guestSecretHash: guestSecretHash
+        )
 
         // Update optimistically
         myPlayer?.isReady = true
@@ -1231,21 +1287,16 @@ final class MultiplayerGameStore: ObservableObject {
         }
         guard let session = currentSession else { return }
         
-        // 1. Update phase first so clients transition to Night view immediately
+        isPhaseReadyToAdvance = false
+        // Convex clears previous ready flags in the phase transaction.
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "night",
-            phaseData: .night(nightIndex: 0, activeRole: nil)
+            phaseData: .night(nightIndex: 0, activeRole: nil),
+            callerUserId: currentUserId() ?? UUID(),
+            guestSecretHash: guestSecretHash
         )
-        
-        // 2. Reset ready status for all players (background task)
-        // We do this after phase change to avoid UI flickering "Not Ready" in the Role Reveal view
-        Task {
-            for player in allPlayers {
-                try? await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
-            }
-        }
-        
+
         try await refreshSession()
         try await refreshPlayers()
     }
@@ -1272,11 +1323,18 @@ final class MultiplayerGameStore: ObservableObject {
         // Update database with assignments
         try await sessionService.assignRolesAndNumbers(
             sessionId: session.id,
-            assignments: assignments
+            assignments: assignments,
+            callerUserId: currentUserId() ?? UUID(),
+            guestSecretHash: guestSecretHash
         )
 
         // Update session status and phase
-        try await sessionService.updateSessionStatus(sessionId: session.id, status: .inProgress)
+        try await sessionService.updateSessionStatus(
+            sessionId: session.id,
+            status: .inProgress,
+            callerUserId: currentUserId() ?? UUID(),
+            guestSecretHash: guestSecretHash
+        )
 
         // Reset readiness before role reveal so hosts can't advance until everyone confirms
         await resetAllPlayersReady()
@@ -1284,7 +1342,9 @@ final class MultiplayerGameStore: ObservableObject {
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: "role_reveal",
-            phaseData: .roleReveal(currentPlayerIndex: 0)
+            phaseData: .roleReveal(currentPlayerIndex: 0),
+            callerUserId: currentUserId() ?? UUID(),
+            guestSecretHash: guestSecretHash
         )
 
         // Refresh local state
@@ -1333,7 +1393,9 @@ final class MultiplayerGameStore: ObservableObject {
         try await sessionService.updateSessionPhase(
             sessionId: session.id,
             currentPhase: phase,
-            phaseData: phaseData
+            phaseData: phaseData,
+            callerUserId: currentUserId() ?? UUID(),
+            guestSecretHash: guestSecretHash
         )
     }
 
@@ -1389,7 +1451,10 @@ final class MultiplayerGameStore: ObservableObject {
             return nil
         }
 
-        let response = try await sessionService.submitAction(action)
+        let response = try await sessionService.submitAction(
+            action,
+            guestSecretHash: guestSecretHash
+        )
 
         // If I'm the host, immediately check if this action completes the phase
         // This avoids relying solely on the real-time event which might be delayed
@@ -1442,7 +1507,7 @@ final class MultiplayerGameStore: ObservableObject {
             targetPlayerId: targetPlayerId
         )
 
-        try await sessionService.submitAction(action)
+        try await sessionService.submitAction(action, guestSecretHash: guestSecretHash)
         
         // If I'm the host, immediately check if this action completes the phase
         if isHost {
@@ -1461,7 +1526,10 @@ final class MultiplayerGameStore: ObservableObject {
         heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self, let playerId = self.myPlayer?.id else { return }
-                try? await self.sessionService.updatePlayerHeartbeat(playerId: playerId)
+                try? await self.sessionService.updatePlayerHeartbeat(
+                    playerId: playerId,
+                    guestSecretHash: self.guestSecretHash
+                )
             }
         }
     }
@@ -1495,7 +1563,7 @@ final class MultiplayerGameStore: ObservableObject {
     /// This is a safety net for cases where Realtime events are missed
     private func validateStateConsistency() async {
         // Skip if in middle of phase resolution or resync to avoid false positives
-        guard !isResolvingPhase, !isPerformingResync else {
+        guard !isResolvingPhase, !isCompletingNight, !isPerformingResync else {
             print("⏳ [MultiplayerGameStore] Skipping consistency check - operation in progress")
             return
         }
@@ -1503,7 +1571,9 @@ final class MultiplayerGameStore: ObservableObject {
 
         do {
             // Fetch current server state
-            guard let serverSession = try await sessionService.getSession(sessionId: sessionId) else {
+            guard let serverSession = try await sessionService.getSession(
+                sessionId: sessionId, viewerUserId: currentUserId(), guestSecretHash: guestSecretHash
+            ) else {
                 print("⚠️ [MultiplayerGameStore] Consistency check: session not found on server")
                 return
             }
@@ -1586,8 +1656,10 @@ final class MultiplayerGameStore: ObservableObject {
         await authStore?.ensureValidSession()
 
         // 2. Force reconnect Realtime (don't trust stale WebSocket connection)
-        await realtimeService.forceReconnect(
+        try? await realtimeService.forceReconnect(
             sessionId: sessionId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash,
             onSessionUpdate: { [weak self] session in
                 Task { @MainActor in
                     self?.handleSessionUpdate(session)
@@ -1598,9 +1670,14 @@ final class MultiplayerGameStore: ObservableObject {
                     self?.handlePlayerUpdate(player)
                 }
             },
+            onPlayerRemoved: { [weak self] playerId in
+                Task { @MainActor in
+                    self?.handlePlayerRemoval(playerId: playerId)
+                }
+            },
             onActionUpdate: { [weak self] action in
                 Task { @MainActor in
-                    await self?.handleActionUpdate(action)
+                    self?.handleActionUpdate(action)
                 }
             },
             onTentativeSelection: { [weak self] selection in
@@ -1624,7 +1701,10 @@ final class MultiplayerGameStore: ObservableObject {
 
         // 4. Immediately send heartbeat to mark player online
         if let playerId = myPlayer?.id {
-            try? await sessionService.updatePlayerHeartbeat(playerId: playerId)
+            try? await sessionService.updatePlayerHeartbeat(
+                playerId: playerId,
+                guestSecretHash: guestSecretHash
+            )
         }
 
         print("✅ [MultiplayerGameStore] App resume handling complete")
@@ -1759,7 +1839,12 @@ final class MultiplayerGameStore: ObservableObject {
         print("🔄 [MultiplayerGameStore] Initiating host transfer to next eligible player")
 
         do {
-            try await sessionService.updateSessionHost(sessionId: session.id, newHostUserId: newHostUserId)
+            try await sessionService.updateSessionHost(
+                sessionId: session.id,
+                newHostUserId: newHostUserId,
+                callerUserId: currentUserId() ?? UUID(),
+                guestSecretHash: guestSecretHash
+            )
             // Realtime should sync the change to all clients, but also refresh locally in case it was missed
             try? await refreshSession()
             print("✅ [MultiplayerGameStore] Host transfer initiated successfully")
@@ -1775,28 +1860,13 @@ final class MultiplayerGameStore: ObservableObject {
         guard let phaseData else { return }
 
         switch phaseData {
-        case .night(let nightIndex, _):
-            // Reset all players' ready status at the start of night phase
-            await resetAllPlayersReady()
-
+        case .night:
             // CRITICAL: Refresh session to get correct roundId before processing bots
             // Fixes bug where inspector bot actions get wrong roundId due to Realtime delay
             try? await refreshSession()
 
-            if !processedBotNightIndices.contains(nightIndex) {
-                do {
-                    try await processBotActions(nightIndex: nightIndex)
-                    processedBotNightIndices.insert(nightIndex) // Only mark after successful completion
-                } catch {
-                    print("❌ [MultiplayerGameStore] Failed to process bot night actions: \(error)")
-                    // Don't mark as processed so we can retry on next phase entry
-                }
-            }
             await evaluatePhaseProgression(trigger: "enter_night")
         case .voting(let dayIndex):
-            // Reset all players' ready status at the start of voting phase
-            await resetAllPlayersReady()
-
             // HAMZA-FIX: SIMPLIFIED - Always process bot votes if ANY bots are missing valid votes
             // This is the PRIMARY trigger for bot voting - don't rely on processedBotVotingDays
             let missingBots = await botsMissingVotes(dayIndex: dayIndex)
@@ -1846,7 +1916,11 @@ final class MultiplayerGameStore: ObservableObject {
 
         do {
             // Single RPC call instead of N sequential updates
-            try await sessionService.resetAllPlayersReady(sessionId: session.id)
+            try await sessionService.resetAllPlayersReady(
+                sessionId: session.id,
+                callerUserId: currentUserId() ?? UUID(),
+                guestSecretHash: guestSecretHash
+            )
 
             // Update local state for immediate UI feedback
             for index in allPlayers.indices where !allPlayers[index].isBot {
@@ -1879,7 +1953,11 @@ final class MultiplayerGameStore: ObservableObject {
             guard player.isReady else { continue }
 
             do {
-                try await sessionService.updatePlayerReady(playerId: player.id, isReady: false)
+                try await sessionService.updatePlayerReady(
+                    playerId: player.id,
+                    isReady: false,
+                    guestSecretHash: guestSecretHash
+                )
                 updatedPlayers[index].isReady = false
             } catch {
                 print("❌ Failed to reset ready status for player \(player.playerName): \(error)")
@@ -1897,7 +1975,7 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     private func evaluatePhaseProgression(trigger: String) async {
-        guard isHost, !isResolvingPhase else { return }
+        guard isHost, !isResolvingPhase, !isCompletingNight else { return }
         guard let session = currentSession, let phaseData = session.currentPhaseData else { return }
 
         isResolvingPhase = true
@@ -1945,76 +2023,51 @@ final class MultiplayerGameStore: ObservableObject {
             return
         }
 
-        // PERF: Single-pass categorization instead of 6+ separate filter calls
-        let categories = categorizeAlivePlayers(hostUserId: session.hostUserId)
-
-        let mafiaActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .mafiaTarget,
-            phaseIndex: nightIndex
-        )
-        let inspectorActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .inspectorCheck,
-            phaseIndex: nightIndex
-        )
-        let doctorActions = await loadActionsSafely(
-            sessionId: session.id,
-            actionType: .doctorProtect,
-            phaseIndex: nightIndex
-        )
-
-        // Track who has already submitted an action so we don't block on missing ready flags
-        let mafiaActors = Set(mafiaActions.map { $0.actorPlayerId })
-        let doctorActors = Set(doctorActions.map { $0.actorPlayerId })
-        let inspectorActors = Set(inspectorActions.map { $0.actorPlayerId })
-
-        // Check if the host has an active role and has submitted their action
-        let hostPlayer = allPlayers.first { $0.userId == session.hostUserId }
-        let hostHasActiveRole = hostPlayer?.role != nil && hostPlayer?.role != .citizen
-        let hostHasSubmitted = hostPlayer.map { player in
-            switch player.role {
-            case .mafia:
-                return mafiaActors.contains(player.playerId)
-            case .doctor:
-                return doctorActors.contains(player.playerId)
-            case .inspector:
-                return inspectorActors.contains(player.playerId)
-            default:
-                return true // No action needed for citizens
-            }
-        } ?? true
-
-        // PERF: Use pre-categorized nonHostHumans instead of filtering again
-        let readyNonHostHumans = categories.nonHostHumans.filter { player in
-            let role = player.role
-            let passive = (role == .citizen)
-
-            let hasAction: Bool = {
-                switch role {
-                case .mafia:
-                    return mafiaActors.contains(player.playerId)
-                case .doctor:
-                    return doctorActors.contains(player.playerId)
-                case .inspector:
-                    return inspectorActors.contains(player.playerId)
-                default:
-                    return false
-                }
-            }()
-
-            return passive || player.isReady || hasAction
+        guard let roundId = session.currentRoundId else {
+            isPhaseReadyToAdvance = false
+            return
         }
+        // Readiness checks also recover missing bot submissions after a
+        // delayed roster or failed request, without rewriting completed actions.
+        try await processBotActions(nightIndex: nightIndex)
+        var actions: [GameAction] = []
+        for actionType in [ActionType.mafiaTarget, .inspectorCheck, .doctorProtect] {
+            actions += await loadActionsSafely(
+                sessionId: session.id, actionType: actionType,
+                phaseIndex: nightIndex, roundId: roundId
+            )
+        }
+        // Role-reveal readiness is not evidence of a night action. Every
+        // living active role (including bots and the host) must submit.
+        guard currentSession?.currentRoundId == roundId,
+              currentSession?.currentPhase == "night" else { return }
+        isPhaseReadyToAdvance = Self.nightActionsReady(
+            players: allPlayers, actions: actions,
+            roundId: roundId, nightIndex: nightIndex
+        )
+    }
 
-        let nonHostReady = categories.nonHostHumans.isEmpty || readyNonHostHumans.count == categories.nonHostHumans.count
-        let allReady = nonHostReady && (!hostHasActiveRole || hostHasSubmitted)
-
-        await MainActor.run {
-            self.isPhaseReadyToAdvance = allReady
+    static func nightActionsReady(
+        players: [SessionPlayer], actions: [GameAction], roundId: UUID, nightIndex: Int
+    ) -> Bool {
+        guard players.contains(where: \.isAlive) else { return false }
+        return players.filter(\.isAlive).allSatisfy { player in
+            let required: ActionType
+            switch player.role {
+            case .citizen: return true
+            case .mafia: required = .mafiaTarget
+            case .doctor: required = .doctorProtect
+            case .inspector: required = .inspectorCheck
+            case nil: return false
+            }
+            return actions.contains {
+                $0.actorPlayerId == player.playerId && $0.actionType == required
+                    && $0.roundId == roundId && $0.phaseIndex == nightIndex
+            }
         }
     }
 
-    /// Resilient action fetch that won't block readiness checks if Supabase temporarily fails
+    /// Failed reads return no actions, so an incomplete night stays blocked until a successful retry.
     private func loadActionsSafely(
         sessionId: UUID,
         actionType: ActionType,
@@ -2026,7 +2079,9 @@ final class MultiplayerGameStore: ObservableObject {
                 sessionId: sessionId,
                 actionType: actionType,
                 phaseIndex: phaseIndex,
-                roundId: roundId
+                roundId: roundId,
+                viewerUserId: currentUserId(),
+                guestSecretHash: guestSecretHash
             )
         } catch {
             print("⚠️ [MultiplayerGameStore] Failed to load actions for \(actionType.rawValue) @ phase \(phaseIndex): \(error)")
@@ -2037,21 +2092,17 @@ final class MultiplayerGameStore: ObservableObject {
     // MARK: - Two-Phase Night Resolution Pattern
 
     /// Phase 1: Record night actions without applying deaths (guards against duplicate resolution)
-    func recordNightActions(nightIndex: Int) async throws {
-        guard isHost else { return }
+    @discardableResult
+    func recordNightActions(nightIndex: Int) async throws -> NightActionRecord {
+        guard isHost else { throw SessionError.notHost }
         guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
               activeNightIndex == nightIndex else {
-            return
+            throw SessionError.noActiveSession
         }
-        guard let session = currentSession else { return }
+        guard let session = currentSession else { throw SessionError.noActiveSession }
 
-        // Check if this night is already recorded
         if let existingRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) {
-            if existingRecord.isResolved {
-                return
-            }
-            // If recorded but not resolved, continue to phase 2
-            return
+            return existingRecord
         }
 
         // FIX: Refresh players from database to ensure we have latest playerNumber values
@@ -2065,19 +2116,25 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             actionType: .mafiaTarget,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
         )
         let doctorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .doctorProtect,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
         )
         let inspectorActions = try await sessionService.getActionsForPhase(
             sessionId: session.id,
             actionType: .inspectorCheck,
             phaseIndex: nightIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
         )
 
         // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
@@ -2142,21 +2199,26 @@ final class MultiplayerGameStore: ObservableObject {
         // Update ONLY night_history, don't touch players or phase
         try await sessionService.updateSessionState(
             sessionId: session.id,
-            nightHistory: updatedHistory
+            callerUserId: currentUserId() ?? UUID(),
+            nightHistory: updatedHistory,
+            guestSecretHash: guestSecretHash
         )
+#if DEBUG
+        testNightRecordStoredHandler?()
+#endif
+        return nightRecord
     }
 
     /// Phase 2: Apply night outcomes atomically (with duplicate resolution guard)
-    func resolveNightOutcome(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard let session = currentSession else {
-            print("ERROR: [resolveNightOutcome] No current session - cannot resolve night \(nightIndex)")
-            return
+    func resolveNightOutcome(nightIndex: Int, recordedNight: NightActionRecord? = nil) async throws {
+        guard isHost else { throw SessionError.notHost }
+        guard let session = currentSession else { throw SessionError.noActiveSession }
+        guard case .night(let activeNightIndex, _) = session.currentPhaseData,
+              activeNightIndex == nightIndex, let expectedRoundId = session.currentRoundId else {
+            throw SessionError.noActiveSession
         }
-        guard var nightRecord = session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
-            print("ERROR: [resolveNightOutcome] Night record missing for nightIndex \(nightIndex) in session \(session.id)")
-            print("ERROR: [resolveNightOutcome] Current nightHistory: \(session.nightHistory.map { "night \($0.nightIndex), resolved: \($0.isResolved)" })")
-            return
+        guard var nightRecord = recordedNight ?? session.nightHistory.first(where: { $0.nightIndex == nightIndex }) else {
+            throw SessionError.operationFailed("Night actions are not ready. Please try finishing the night again.")
         }
 
         // CRITICAL: Guard against duplicate resolution
@@ -2185,17 +2247,10 @@ final class MultiplayerGameStore: ObservableObject {
         var updatedHistory = session.nightHistory.filter { $0.nightIndex != nightIndex }
         updatedHistory.append(nightRecord)
         updatedHistory.sort { $0.nightIndex < $1.nightIndex }
-        currentSession?.nightHistory = updatedHistory
 
-        // CRITICAL: Apply deaths to local state BEFORE win check so evaluateWinners sees correct counts
-        for playerId in resultingDeaths {
-            if let index = allPlayers.firstIndex(where: { $0.playerId == playerId }) {
-                allPlayers[index].isAlive = false
-            }
-        }
-
-        // Check win conditions AFTER death but BEFORE phase transition
-        let winnerCheck = evaluateWinners(startOfDay: true)
+        let winnerCheck = evaluateWinners(
+            startOfDay: true, excludingPlayerIds: Set(resultingDeaths)
+        )
         let nextPhaseName: String
         let nextPhaseData: PhaseData
 
@@ -2215,15 +2270,19 @@ final class MultiplayerGameStore: ObservableObject {
         // ATOMIC OPERATION: Apply deaths + update history + advance phase in single transaction
         let success = try await sessionService.resolveNightAtomic(
             sessionId: session.id,
+            expectedRoundId: expectedRoundId,
             nightRecord: nightRecord,
             eliminatedPlayerIds: resultingDeaths,
             nextPhase: nextPhaseName,
             nextPhaseData: nextPhaseData,
+            callerUserId: currentUserId() ?? UUID(),
             isGameOver: winnerCheck.isGameOver ? true : nil,
-            winner: winnerCheck.winner
+            winner: winnerCheck.winner,
+            guestSecretHash: guestSecretHash
         )
 
         if success {
+            currentSession?.nightHistory = updatedHistory
             currentSession?.currentPhase = nextPhaseName
             currentSession?.currentPhaseData = nextPhaseData
             currentSession?.isGameOver = winnerCheck.isGameOver
@@ -2265,7 +2324,9 @@ final class MultiplayerGameStore: ObservableObject {
                 sessionId: session.id,
                 actionType: .doctorProtect,
                 phaseIndex: nightIndex,
-                roundId: session.currentRoundId
+                roundId: session.currentRoundId,
+                viewerUserId: currentUserId(),
+                guestSecretHash: guestSecretHash
             )
             let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
             return doctorProtectionIds.contains(mafiaTargetId)
@@ -2285,131 +2346,6 @@ final class MultiplayerGameStore: ObservableObject {
     }
 
     /// Legacy single-phase resolution (DEPRECATED - kept for backwards compatibility, will be removed)
-    private func resolveNightPhase(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard case .night(let activeNightIndex, _) = currentSession?.currentPhaseData,
-              activeNightIndex == nightIndex else {
-            return
-        }
-        guard let session = currentSession else { return }
-
-        // FIX: Refresh players from database to ensure we have latest playerNumber values
-        try await refreshPlayers()
-        updateVisiblePlayers()
-
-        // Re-fetch actions to ensure we have latest state (filtered by round_id to prevent action replay)
-        let mafiaActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .mafiaTarget,
-            phaseIndex: nightIndex,
-            roundId: session.currentRoundId
-        )
-        let doctorActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .doctorProtect,
-            phaseIndex: nightIndex,
-            roundId: session.currentRoundId
-        )
-        let inspectorActions = try await sessionService.getActionsForPhase(
-            sessionId: session.id,
-            actionType: .inspectorCheck,
-            phaseIndex: nightIndex,
-            roundId: session.currentRoundId
-        )
-
-        // HAMZA-FIX: Compute valid targets for each role (used as fallback in tie-breaker)
-        let alivePlayers = allPlayers.filter { $0.isAlive }
-        let validMafiaTargets = alivePlayers.filter { $0.role != .mafia }.map { $0.playerId }
-        let validInspectorTargets = alivePlayers.filter { $0.role != .inspector }.map { $0.playerId }
-        let validDoctorTargets = alivePlayers.map { $0.playerId }
-
-        // HAMZA-FIX: Use new determineMajorityTarget with tie-breakers
-        let mafiaTargetId = determineMajorityTarget(from: mafiaActions, validTargets: validMafiaTargets)
-        let doctorTargetId = determineMajorityTarget(from: doctorActions, validTargets: validDoctorTargets)
-        let _ = determineMajorityTarget(from: inspectorActions, validTargets: validInspectorTargets)  // Inspector result logged
-
-        let doctorProtectionIds = Set(doctorActions.compactMap { $0.targetPlayerId })
-        let targetWasSaved = mafiaTargetId.flatMap { doctorProtectionIds.contains($0) } ?? false
-        let doctorProtectedId = targetWasSaved ? mafiaTargetId : (doctorTargetId ?? doctorProtectionIds.first)
-
-        var resultingDeaths: [UUID] = []
-        var hostEliminated = false
-        if let targetId = mafiaTargetId, !targetWasSaved {
-            resultingDeaths = [targetId]
-            hostEliminated = try await applyEliminations(resultingDeaths, reason: "Eliminated at night")
-        }
-
-        // Build lookup from visiblePlayers (same source that works for target resolution)
-        let playerNumberLookup = Dictionary(uniqueKeysWithValues:
-            visiblePlayers.map { ($0.playerId, $0.playerNumber) }
-        )
-
-        // Get player numbers from who submitted each action type
-        let mafiaPlayerNumbers = mafiaActions
-            .compactMap { playerNumberLookup[$0.actorPlayerId] }
-            .compactMap { $0 }
-            .sorted()
-        let doctorPlayerNumbers = doctorActions
-            .compactMap { playerNumberLookup[$0.actorPlayerId] }
-            .compactMap { $0 }
-            .sorted()
-        let inspectorPlayerNumbers = inspectorActions
-            .compactMap { playerNumberLookup[$0.actorPlayerId] }
-            .compactMap { $0 }
-            .sorted()
-
-        // Inspector checked ID can be public (but result stays private)
-        let inspectorCheckedId = inspectorActions.first?.targetPlayerId
-
-        let nightRecord = NightActionRecord(
-            nightIndex: nightIndex,
-            mafiaTargetId: mafiaTargetId,
-            inspectorCheckedId: inspectorCheckedId, // Public: Who was checked
-            inspectorResult: nil, // Private: Result stays hidden
-            doctorProtectedId: doctorProtectedId,
-            targetWasSaved: targetWasSaved,
-            resultingDeaths: resultingDeaths,
-            revealedDeathRoles: revealedDeathRoles(for: resultingDeaths),
-            mafiaPlayerNumbers: mafiaPlayerNumbers,
-            doctorPlayerNumbers: doctorPlayerNumbers,
-            inspectorPlayerNumbers: inspectorPlayerNumbers,
-            timestamp: Date()
-        )
-
-        var updatedHistory = session.nightHistory.filter { $0.nightIndex != nightIndex }
-        updatedHistory.append(nightRecord)
-        updatedHistory.sort { $0.nightIndex < $1.nightIndex }
-        currentSession?.nightHistory = updatedHistory
-
-        let winnerCheck = evaluateWinners(startOfDay: true)
-        let nextPhaseName: String
-        let nextPhaseData: PhaseData
-
-        if winnerCheck.isGameOver {
-            nextPhaseName = "game_over"
-            nextPhaseData = .gameOver(winner: winnerCheck.winner?.rawValue)
-        } else {
-            nextPhaseName = "morning"
-            nextPhaseData = .morning(nightIndex: nightIndex)
-        }
-        
-        // Reset readiness flag
-        await MainActor.run {
-            self.isPhaseReadyToAdvance = false
-        }
-
-        try await sessionService.updateSessionState(
-            sessionId: session.id,
-            currentPhase: nextPhaseName,
-            phaseData: nextPhaseData,
-            nightHistory: updatedHistory,
-            isGameOver: winnerCheck.isGameOver ? true : nil,
-            winner: winnerCheck.winner
-        )
-
-        await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
-    }
-
     private func checkVotingPhaseReadiness(dayIndex: Int) async throws {
         guard isHost else { return }
         guard case .voting(let activeDayIndex) = currentSession?.currentPhaseData,
@@ -2493,7 +2429,9 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             actionType: .vote,
             phaseIndex: dayIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
         )
 
         // DEBUG: Log fetched votes
@@ -2545,12 +2483,14 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "voting_results",
             phaseData: nextPhaseData,
             dayIndex: session.dayIndex,
             dayHistory: session.dayHistory,
             isGameOver: nil,
-            winner: nil
+            winner: nil,
+            guestSecretHash: guestSecretHash
         )
     }
 
@@ -2595,12 +2535,14 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "vote_death_reveal",
             phaseData: revealPhaseData,
             dayIndex: session.dayIndex,
             dayHistory: session.dayHistory,
             isGameOver: nil,
-            winner: nil
+            winner: nil,
+            guestSecretHash: guestSecretHash
         )
     }
 
@@ -2660,12 +2602,14 @@ final class MultiplayerGameStore: ObservableObject {
         // Update session - phase and history changes
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: nextPhaseName,
             phaseData: nextPhaseData,
             dayIndex: newDayIndex,
             dayHistory: updatedDayHistory,
             isGameOver: winnerCheck.isGameOver ? true : nil,
-            winner: winnerCheck.winner
+            winner: winnerCheck.winner,
+            guestSecretHash: guestSecretHash
         )
 
         // CRITICAL: Small delay to let Realtime propagate the new roundId before processing bot actions
@@ -2690,7 +2634,9 @@ final class MultiplayerGameStore: ObservableObject {
             sessionId: session.id,
             actionType: .vote,
             phaseIndex: dayIndex,
-            roundId: session.currentRoundId
+            roundId: session.currentRoundId,
+            viewerUserId: currentUserId(),
+            guestSecretHash: guestSecretHash
         )
 
         var voteCounts: [UUID: Int] = [:]
@@ -2746,12 +2692,14 @@ final class MultiplayerGameStore: ObservableObject {
 
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: nextPhaseName,
             phaseData: nextPhaseData,
             dayIndex: newDayIndex,
             dayHistory: updatedDayHistory,
             isGameOver: winnerCheck.isGameOver ? true : nil,
-            winner: winnerCheck.winner
+            winner: winnerCheck.winner,
+            guestSecretHash: guestSecretHash
         )
 
         await transferHostIfNeeded(hostEliminated: hostEliminated, session: session)
@@ -2849,7 +2797,9 @@ final class MultiplayerGameStore: ObservableObject {
             try await sessionService.updatePlayerLifeStatus(
                 recordId: updatedPlayer.id,
                 isAlive: false,
-                removalNote: reason
+                removalNote: reason,
+                callerUserId: currentUserId() ?? UUID(),
+                guestSecretHash: guestSecretHash
             )
         }
 
@@ -2869,7 +2819,12 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         do {
-            try await sessionService.updateSessionHost(sessionId: session.id, newHostUserId: newHostUserId)
+            try await sessionService.updateSessionHost(
+                sessionId: session.id,
+                newHostUserId: newHostUserId,
+                callerUserId: currentUserId() ?? UUID(),
+                guestSecretHash: guestSecretHash
+            )
             try? await refreshSession()
         } catch {
             print("❌ [MultiplayerGameStore] Failed to transfer host after elimination: \(error)")
@@ -2905,8 +2860,10 @@ final class MultiplayerGameStore: ObservableObject {
         return nil
     }
 
-    private func evaluateWinners(startOfDay: Bool) -> (winner: Role?, isGameOver: Bool) {
-        let alivePlayers = allPlayers.filter { $0.isAlive }
+    private func evaluateWinners(
+        startOfDay: Bool, excludingPlayerIds: Set<UUID> = []
+    ) -> (winner: Role?, isGameOver: Bool) {
+        let alivePlayers = allPlayers.filter { $0.isAlive && !excludingPlayerIds.contains($0.playerId) }
         let mafiaCount = alivePlayers.filter { $0.role == .mafia }.count
         let nonMafiaCount = alivePlayers.filter { $0.role != .mafia }.count
         let aliveHumans = alivePlayers.filter { !$0.isBot }
@@ -3003,8 +2960,10 @@ final class MultiplayerGameStore: ObservableObject {
         guard let session = currentSession, !session.isGameOver else { return }
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "death_reveal",
-            phaseData: .deathReveal(nightIndex: nightIndex)
+            phaseData: .deathReveal(nightIndex: nightIndex),
+            guestSecretHash: guestSecretHash
         )
     }
 
@@ -3013,8 +2972,10 @@ final class MultiplayerGameStore: ObservableObject {
         let dayIndex = session.dayIndex
         try await sessionService.updateSessionState(
             sessionId: session.id,
+            callerUserId: currentUserId() ?? UUID(),
             currentPhase: "voting",
-            phaseData: .voting(dayIndex: dayIndex)
+            phaseData: .voting(dayIndex: dayIndex),
+            guestSecretHash: guestSecretHash
         )
 
         // HAMZA-FIX: Call handlePhaseEntry synchronously to ensure bot voting triggers immediately
@@ -3028,28 +2989,57 @@ final class MultiplayerGameStore: ObservableObject {
     /// Process bot actions for current phase
     /// HAMZA-FIX: Bots now follow humans - only process independently if no humans have that role
     func processBotActions(nightIndex: Int) async throws {
-        guard isHost else { return }
-        guard let session = currentSession else { return }
+        guard isHost, !isProcessingBotNightActions else { return }
+        isProcessingBotNightActions = true
+        defer { isProcessingBotNightActions = false }
 
-        // Clear tracking for this new night phase
-        clearBotNightActionsForNewNight()
+        // The phase snapshot may arrive before assigned player roles.
+        try await refreshPlayers()
+        guard let session = currentSession,
+              case .night(let activeNightIndex, _) = session.currentPhaseData,
+              activeNightIndex == nightIndex,
+              let roundId = session.currentRoundId else { return }
+
+        if botActionsRoundId != roundId {
+            clearBotNightActionsForNewNight()
+            botActionsRoundId = roundId
+        }
 
         let aliveBots = allPlayers.filter { $0.isBot && $0.isAlive }
         guard !aliveBots.isEmpty else { return }
+        let existingActions = try await sessionService.getActionsForPhase(
+            sessionId: session.id,
+            actionTypes: [.mafiaTarget, .doctorProtect, .inspectorCheck],
+            phaseIndex: nightIndex, roundId: roundId,
+            viewerUserId: currentUserId(), guestSecretHash: guestSecretHash
+        )
+        guard currentSession?.id == session.id,
+              currentSession?.currentRoundId == roundId,
+              currentSession?.currentPhase == "night" else { return }
+        let completedBots = Set(aliveBots.filter {
+            Self.nightActionsReady(players: [$0], actions: existingActions,
+                                   roundId: roundId, nightIndex: nightIndex)
+        }.map(\.playerId))
+        botNightActionsSubmitted.formUnion(completedBots)
+        let pendingBots = aliveBots.filter { !completedBots.contains($0.playerId) }
 
         let alivePlayersList = allPlayers.filter { $0.isAlive }
         let localAlivePlayers = alivePlayersList.map { makeLocalPlayer(from: $0) }
         let nightHistory = convertNightHistoryToLocalModel(session.nightHistory)
 
         // Group bots by role to process each role's coordination separately
-        let mafiaBots = aliveBots.filter { $0.role == .mafia }
-        let doctorBots = aliveBots.filter { $0.role == .doctor }
-        let inspectorBots = aliveBots.filter { $0.role == .inspector }
+        let mafiaBots = pendingBots.filter { $0.role == .mafia }
+        let doctorBots = pendingBots.filter { $0.role == .doctor }
+        let inspectorBots = pendingBots.filter { $0.role == .inspector }
 
         // MAFIA: Only process independently if NO human Mafia
         if !mafiaBots.isEmpty && !hasHumanWithRole(.mafia) {
             // No human Mafia - bots vote independently but coordinated with each other
-            let sharedMafiaTarget = botService.chooseCoordinatedMafiaTarget(
+            let mafiaIds = Set(aliveBots.filter { $0.role == .mafia }.map(\.playerId))
+            let submittedTarget = existingActions.filter {
+                $0.actionType == .mafiaTarget && mafiaIds.contains($0.actorPlayerId)
+            }.max(by: { $0.createdAt < $1.createdAt })?.targetPlayerId
+            let sharedMafiaTarget = submittedTarget ?? botService.chooseCoordinatedMafiaTarget(
                 mafiaBots: mafiaBots.map { makeLocalPlayer(from: $0) },
                 alivePlayers: localAlivePlayers,
                 nightHistory: nightHistory
@@ -3064,7 +3054,8 @@ final class MultiplayerGameStore: ObservableObject {
             }
             print("🤖 [processBotActions] Mafia bots voted independently (no human Mafia)")
         } else if !mafiaBots.isEmpty {
-            print("🤖 [processBotActions] Mafia bots waiting for human vote via Realtime")
+            await recoverBotActionsFollowingHuman(mafiaBots, role: .mafia, actionType: .mafiaTarget,
+                                                 nightIndex: nightIndex, actions: existingActions)
         }
 
         // DOCTOR: Only process independently if NO human Doctor
@@ -3079,7 +3070,8 @@ final class MultiplayerGameStore: ObservableObject {
             }
             print("🤖 [processBotActions] Doctor bots voted independently (no human Doctor)")
         } else if !doctorBots.isEmpty {
-            print("🤖 [processBotActions] Doctor bots waiting for human vote via Realtime")
+            await recoverBotActionsFollowingHuman(doctorBots, role: .doctor, actionType: .doctorProtect,
+                                                 nightIndex: nightIndex, actions: existingActions)
         }
 
         // INSPECTOR: Only process independently if NO human Inspector
@@ -3094,7 +3086,21 @@ final class MultiplayerGameStore: ObservableObject {
             }
             print("🤖 [processBotActions] Inspector bots voted independently (no human Inspector)")
         } else if !inspectorBots.isEmpty {
-            print("🤖 [processBotActions] Inspector bots waiting for human vote via Realtime")
+            await recoverBotActionsFollowingHuman(inspectorBots, role: .inspector, actionType: .inspectorCheck,
+                                                 nightIndex: nightIndex, actions: existingActions)
+        }
+    }
+
+    private func recoverBotActionsFollowingHuman(
+        _ bots: [SessionPlayer], role: Role, actionType: ActionType,
+        nightIndex: Int, actions: [GameAction]
+    ) async {
+        let humans = Set(allPlayers.filter { $0.isAlive && !$0.isBot && $0.role == role }.map(\.playerId))
+        guard let action = actions.filter({ $0.actionType == actionType && humans.contains($0.actorPlayerId) })
+            .max(by: { $0.createdAt < $1.createdAt }) else { return }
+        for bot in bots {
+            try? await submitBotActionAndTrack(bot: bot, actionType: actionType,
+                                              nightIndex: nightIndex, targetId: action.targetPlayerId)
         }
     }
 
@@ -3279,8 +3285,12 @@ final class MultiplayerGameStore: ObservableObject {
         }
 
         do {
-            try await sessionService.submitAction(action)
-        } catch let error as DecodingError {
+            try await sessionService.submitAction(
+                action,
+                callerUserId: currentUserId(),
+                guestSecretHash: guestSecretHash
+            )
+        } catch is DecodingError {
             // Response parsing failed, but action was likely submitted successfully
             // Don't throw - allow bot processing to continue
         } catch {
@@ -3309,7 +3319,11 @@ final class MultiplayerGameStore: ObservableObject {
         )
 
         do {
-            try await sessionService.submitAction(action)
+            try await sessionService.submitAction(
+                action,
+                callerUserId: currentUserId(),
+                guestSecretHash: guestSecretHash
+            )
         } catch let error as DecodingError {
             // Response parsing failed, but action was likely submitted successfully
             print("⚠️ [submitBotVote] Response decoding failed (action likely submitted): \(error)")
@@ -3382,6 +3396,7 @@ final class MultiplayerGameStore: ObservableObject {
 
     /// Maps raw errors to user-friendly messages, following AuthStore.mapAuthError() pattern
     private func mapSessionError(_ error: Error) -> String {
+        if let backendError = error as? BackendRequestError { return backendError.localizedDescription }
         // 1. Handle known error types with LocalizedError descriptions
         if let sessionError = error as? SessionError {
             return sessionError.errorDescription ?? "Session error occurred"
@@ -3396,8 +3411,8 @@ final class MultiplayerGameStore: ObservableObject {
             return "Network error. Please check your internet connection."
         }
 
-        // 3. Extract and map Supabase/PostgREST errors
-        if let message = extractSupabaseMessage(from: nsError) {
+        // 3. Extract and map backend errors
+        if let message = extractBackendMessage(from: nsError) {
             let normalized = message.lowercased()
 
             if normalized.contains("jwt expired") || normalized.contains("token expired") {
@@ -3406,10 +3421,10 @@ final class MultiplayerGameStore: ObservableObject {
             if normalized.contains("not found") || normalized.contains("does not exist") {
                 return "Game session not found. It may have ended."
             }
-            if normalized.contains("connection refused") || normalized.contains("pgrst") {
+            if normalized.contains("connection refused") || normalized.contains("server error") {
                 return "Unable to connect to game server. Please try again."
             }
-            if normalized.contains("permission denied") || normalized.contains("rls") {
+            if normalized.contains("permission denied") || normalized.contains("authentication required") {
                 return "You don't have permission to perform this action."
             }
             if normalized.contains("duplicate") || normalized.contains("unique") {
@@ -3421,9 +3436,9 @@ final class MultiplayerGameStore: ObservableObject {
         return "Connection error. Please check your internet and try again."
     }
 
-    /// Extracts Supabase error messages from NSError userInfo
-    private func extractSupabaseMessage(from error: NSError) -> String? {
-        // Check various NSError userInfo locations for Supabase messages
+    /// Extracts backend error messages from NSError userInfo
+    private func extractBackendMessage(from error: NSError) -> String? {
+        // Check common NSError userInfo locations for backend messages
         if let message = error.userInfo["error_description"] as? String, !message.isEmpty {
             return message
         }

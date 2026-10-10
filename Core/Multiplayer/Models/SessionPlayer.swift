@@ -39,7 +39,8 @@ struct SessionPlayer: Codable, Identifiable, Sendable {
     /// Returns true if display-relevant properties match (ignores heartbeat/connection state).
     /// Used to prevent unnecessary SwiftUI re-renders when only background properties change.
     func displayPropertiesEqual(to other: SessionPlayer) -> Bool {
-        return self.playerName == other.playerName
+        return self.userId == other.userId
+            && self.playerName == other.playerName
             && self.playerNumber == other.playerNumber
             && self.role == other.role
             && self.isAlive == other.isAlive

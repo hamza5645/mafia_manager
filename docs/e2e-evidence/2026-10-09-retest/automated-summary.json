@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-09",
+  "source_commit": "76e84bb369b3684144eab7331f7062403fcea44b",
+  "swift": {
+    "passed": 48,
+    "failed": 0,
+    "skipped": 0,
+    "suites": {
+      "AuthStoreRegressionTests": 7,
+      "BackendRequestErrorTests": 4,
+      "ClerkAccountIntegrationTests": 1,
+      "ConvexIntegrationTests": 10,
+      "GameStoreTests": 22,
+      "RealtimeRegressionTests": 4
+    }
+  },
+  "backend": {
+    "passed": 39,
+    "failed": 0,
+    "files": 17
+  },
+  "release_guard": {
+    "passed": 3,
+    "failed": 0
+  },
+  "deployment_contract": 3,
+  "environment": "Development Convex + Clerk; signed iOS 27 simulators",
+  "swift_result_bundle": "/tmp/mafia-fix-final-complete.xcresult"
+}

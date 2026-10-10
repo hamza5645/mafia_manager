@@ -1,0 +1,5 @@
+// Production Clerk and Convex values; regenerate with Tuist after changes.
+// The publishable key is safe client configuration; never put a secret key here.
+MAFIA_PRODUCTION_CONVEX_HOST = handsome-tiger-460.eu-west-1.convex.cloud
+MAFIA_PRODUCTION_CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsubWFmaWEubW9uaXRvcnRoZXNpdHVhdGlvbnMuY29tJA
+MAFIA_CLERK_FRONTEND_HOST = clerk.mafia.monitorthesituations.com

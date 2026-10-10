@@ -1,0 +1,31 @@
+{
+  "convexUrl": "https://handsome-tiger-460.eu-west-1.convex.cloud",
+  "clerkIssuer": "https://clerk.mafia.monitorthesituations.com",
+  "deploymentContract": 3,
+  "releaseBuild": "passed; real production key; unsigned device compilation",
+  "configurationGuardTests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "nativeApplicationIdentifier": "5GH22BAXAU.com.hamza5645.mafia",
+  "nativeAssociationPublished": true,
+  "productionAccountE2E": "Native Frontend API checks passed with real email OTPs; native UI completion unverified",
+  "physicalDeviceE2E": "not yet verified",
+  "legacySource": "saved export; live source unavailable",
+  "signedArchive": {
+    "status": "passed",
+    "teamId": "5GH22BAXAU",
+    "associatedDomains": [
+      "webcredentials:clerk.mafia.monitorthesituations.com"
+    ]
+  },
+  "appStoreExport": {
+    "status": "passed",
+    "version": "5.0",
+    "build": "11",
+    "signatureVerified": true,
+    "uploaded": false
+  },
+  "releaseSimulatorBuild": "passed after FOLLOWUP-09 architecture setting",
+  "productionGuestRoomSmoke": "passed via public clients: create/join, host permissions, kick/rejoin, cancel, cleanup"
+}
