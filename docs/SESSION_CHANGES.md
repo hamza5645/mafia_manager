@@ -1,3 +1,11 @@
+## 2026-10-10 — FOLLOWUP-18: preserve the Mafia cohort target during partial retries
+
+- Review of bot recovery found that a missing Mafia bot could choose a new target even when its teammate had already submitted. Recovery now reuses the submitted Mafia target while preserving completed actions.
+- Added a fourth live bot scenario for partial Mafia submission. It asserts that the missing teammate follows the existing target and that readiness retries do not rewrite action timestamps.
+- Validation: full simulator suite passes 63/63, zero skips; Release builds successfully. The preceding production bot match completed through three nights, a Doctor save, voting/elimination, game-over, and rematch.
+- Rollback: revert this commit. No backend/schema changes or deployment required.
+- Final steps: complete the final-build rematch check, regenerate distribution artifacts, and finalize campaign evidence.
+
 ## 2026-10-10 — FOLLOWUP-17: refresh bot roles and recover missing night actions
 
 - Production simulator room 315742 with a Citizen host and six bots stalled on Night 1. A phase snapshot could arrive before assigned roles, allowing a role-less bot pass to be marked processed permanently.

@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct BotNightIntegrationTests {
     enum Scenario: CaseIterable {
-        case noActions, doctorSubmitted, humanMafiaSubmitted
+        case noActions, doctorSubmitted, humanMafiaSubmitted, mafiaBotSubmitted
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["CONVEX_INTEGRATION"] == "1"),
@@ -19,7 +19,8 @@ struct BotNightIntegrationTests {
         do {
             var lobby: [SessionPlayer] = []
             let hostIsMafia = scenario == .humanMafiaSubmitted
-            for index in 0..<(hostIsMafia ? 5 : 4) {
+            let partialMafia = scenario == .mafiaBotSubmitted
+            for index in 0..<((hostIsMafia || partialMafia) ? 5 : 4) {
                 lobby.append(try await service.addPlayer(
                     sessionId: room.id, userId: index == 0 ? host.id : nil,
                     playerName: "QA Bot Night \(index)", isBot: index != 0,
@@ -31,6 +32,7 @@ struct BotNightIntegrationTests {
                 (lobby[2].playerId, .doctor, 3), (lobby[3].playerId, .inspector, 4)
             ]
             if hostIsMafia { assignments.append((lobby[4].playerId, .citizen, 5)) }
+            if partialMafia { assignments.append((lobby[4].playerId, .mafia, 5)) }
             try await service.assignRolesAndNumbers(
                 sessionId: room.id, assignments: assignments,
                 callerUserId: host.id, guestSecretHash: hash
@@ -55,6 +57,12 @@ struct BotNightIntegrationTests {
                     actorPlayerId: lobby[0].playerId, targetPlayerId: lobby[4].playerId
                 ), callerUserId: host.id, guestSecretHash: hash)
             }
+            if partialMafia {
+                _ = try await service.submitAction(.mafiaAction(
+                    sessionId: room.id, roundId: round, nightIndex: 0,
+                    actorPlayerId: lobby[1].playerId, targetPlayerId: lobby[0].playerId
+                ), callerUserId: host.id, guestSecretHash: hash)
+            }
             let store = MultiplayerGameStore()
             store.testCurrentUserIdProvider = { host.id }
             store.testGuestSecretHashProvider = { hash }
@@ -69,7 +77,7 @@ struct BotNightIntegrationTests {
                 sessionId: room.id, actionTypes: types, phaseIndex: 0, roundId: round,
                 viewerUserId: host.id, guestSecretHash: hash
             )
-            let expectedActions = hostIsMafia ? 4 : 3
+            let expectedActions = (hostIsMafia || partialMafia) ? 4 : 3
             #expect(actions.count == expectedActions, "Every living active bot must submit even when the phase arrives before roles")
             #expect(store.isPhaseReadyToAdvance)
             if scenario == .doctorSubmitted {
@@ -79,6 +87,10 @@ struct BotNightIntegrationTests {
             if hostIsMafia {
                 #expect(actions.first(where: { $0.actorPlayerId == lobby[1].playerId })?.targetPlayerId == lobby[4].playerId,
                         "Missing bot actions must follow an existing human action even without its realtime event")
+            }
+            if partialMafia {
+                #expect(actions.first(where: { $0.actorPlayerId == lobby[4].playerId })?.targetPlayerId == lobby[0].playerId,
+                        "A Mafia bot retry must follow the target already submitted by its teammate")
             }
             await store.testEvaluatePhaseReadiness()
             let retried = try await service.getActionsForPhase(

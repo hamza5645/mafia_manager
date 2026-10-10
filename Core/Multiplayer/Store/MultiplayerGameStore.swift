@@ -3035,7 +3035,11 @@ final class MultiplayerGameStore: ObservableObject {
         // MAFIA: Only process independently if NO human Mafia
         if !mafiaBots.isEmpty && !hasHumanWithRole(.mafia) {
             // No human Mafia - bots vote independently but coordinated with each other
-            let sharedMafiaTarget = botService.chooseCoordinatedMafiaTarget(
+            let mafiaIds = Set(aliveBots.filter { $0.role == .mafia }.map(\.playerId))
+            let submittedTarget = existingActions.filter {
+                $0.actionType == .mafiaTarget && mafiaIds.contains($0.actorPlayerId)
+            }.max(by: { $0.createdAt < $1.createdAt })?.targetPlayerId
+            let sharedMafiaTarget = submittedTarget ?? botService.chooseCoordinatedMafiaTarget(
                 mafiaBots: mafiaBots.map { makeLocalPlayer(from: $0) },
                 alivePlayers: localAlivePlayers,
                 nightHistory: nightHistory
