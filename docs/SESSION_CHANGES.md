@@ -1,3 +1,11 @@
+## 2026-10-10 — FOLLOWUP-15: fail closed before the night roster loads
+
+- Full-suite retest exposed a manual-night fixture that omitted its living Police bot action. Updated it to submit every required role action and seed the last known roster before exercising the delayed snapshot race.
+- Readiness now rejects an absent/all-dead roster rather than treating an empty list as complete; Convex continues independently validating the real roster/actions.
+- Validation: live manual-night integration and four Swift Testing readiness regressions pass (5/5). The initial full run was 57/58; a complete rerun is required after this correction.
+- Rollback: revert this commit. No deployment or schema change; the guard is client-only.
+- Gotcha: missing or failed roster reads must not enable Finish Night. The retained delayed-read test still asserts resolved atomic history and actual player death after all role actions exist.
+
 ## 2026-10-10 — FOLLOWUP-14: wait for account restoration before online entry
 
 - A quick Online Game selection could open guest signup while the cached Clerk account was still restoring.

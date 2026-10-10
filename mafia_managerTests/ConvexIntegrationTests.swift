@@ -247,6 +247,7 @@ final class ConvexIntegrationTests: XCTestCase {
             let round = try XCTUnwrap(active.currentRoundId)
             _ = try await sessionService.submitAction(.mafiaAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[0].playerId, targetPlayerId: players[3].playerId), guestSecretHash: hash)
             _ = try await sessionService.submitAction(.doctorAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[1].playerId, targetPlayerId: players[1].playerId), callerUserId: host.id, guestSecretHash: hash)
+            _ = try await sessionService.submitAction(.inspectorAction(sessionId: session.id, roundId: round, nightIndex: 0, actorPlayerId: players[2].playerId, targetPlayerId: players[0].playerId, result: nil), callerUserId: host.id, guestSecretHash: hash)
             let store = MultiplayerGameStore()
             store.testCurrentUserIdProvider = { host.id }
             store.testGuestSecretHashProvider = { hash }
@@ -254,6 +255,7 @@ final class ConvexIntegrationTests: XCTestCase {
             store.isHost = true
             store.myPlayer = players[0]
             let fullRoster = try await sessionService.getSessionPlayers(sessionId: session.id, viewerUserId: host.id, guestSecretHash: hash)
+            store.allPlayers = fullRoster
             let readinessStarted = expectation(description: "Background readiness read is in flight")
             var pendingRead: CheckedContinuation<[SessionPlayer], Error>?
             var pauseNextRead = true

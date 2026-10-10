@@ -2051,7 +2051,8 @@ final class MultiplayerGameStore: ObservableObject {
     static func nightActionsReady(
         players: [SessionPlayer], actions: [GameAction], roundId: UUID, nightIndex: Int
     ) -> Bool {
-        players.filter(\.isAlive).allSatisfy { player in
+        guard players.contains(where: \.isAlive) else { return false }
+        return players.filter(\.isAlive).allSatisfy { player in
             let required: ActionType
             switch player.role {
             case .citizen: return true

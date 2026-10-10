@@ -5,6 +5,10 @@ import Testing
 
 @MainActor
 struct NightReadinessTests {
+    @Test func absentRosterCannotCompleteNight() {
+        #expect(MultiplayerGameStore.nightActionsReady(players: [], actions: [], roundId: UUID(), nightIndex: 0) == false)
+    }
+
     private func player(role: Role?, bot: Bool = false) -> SessionPlayer {
         SessionPlayer(id: UUID(), sessionId: UUID(), userId: bot ? nil : UUID(), playerId: UUID(),
                       playerName: "QA", playerNumber: 1, role: role, isBot: bot, isAlive: true,
