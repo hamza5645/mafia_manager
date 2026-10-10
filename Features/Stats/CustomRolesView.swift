@@ -64,6 +64,15 @@ struct CustomRolesView: View {
             EditCustomRoleConfigView(config: config, onSave: { await loadConfigs() })
                 .environmentObject(authStore)
         }
+        .alert("Custom Roles", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("Reload") { Task { await loadConfigs() } }
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "Could not complete the request. Please try again.")
+        }
     }
 
     private func loadConfigs() async {

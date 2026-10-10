@@ -64,6 +64,15 @@ struct PlayerGroupsView: View {
             EditPlayerGroupView(group: group, onSave: { await loadGroups() })
                 .environmentObject(authStore)
         }
+        .alert("Player Groups", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("Reload") { Task { await loadGroups() } }
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "Could not complete the request. Please try again.")
+        }
     }
 
     private func loadGroups() async {

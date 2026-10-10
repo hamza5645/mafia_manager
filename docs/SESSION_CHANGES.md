@@ -1,3 +1,11 @@
+## 2026-10-10 — FOLLOWUP-16: display saved-library request failures
+
+- Source review found that Player Groups and Custom Roles captured load/delete failures in state but never rendered them, allowing a failed load to appear as an empty library.
+- Both screens now display the mapped request error in an alert with Reload and OK actions. Existing data stays intact after failed deletes.
+- Validation: full simulator suite with live Clerk/Convex integration flags passes 59/59, zero skips. Release rebuild and final artifact verification follow this commit. Production saved-group create/read UI passes; edit/delete checks are continuing.
+- Rollback: revert this commit. No backend/schema or migration changes.
+- Gotcha: alerts use the existing sanitized backend error mapping. An OS-level network-disconnect test has not been forced; the previously unreachable error presentation path is verified by code review and compilation.
+
 ## 2026-10-10 — FOLLOWUP-15: fail closed before the night roster loads
 
 - Full-suite retest exposed a manual-night fixture that omitted its living Police bot action. Updated it to submit every required role action and seed the last known roster before exercising the delayed snapshot race.
