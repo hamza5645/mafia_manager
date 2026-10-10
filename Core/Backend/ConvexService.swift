@@ -9,6 +9,10 @@ final class ConvexService {
 
     let client: ConvexClient
 
+    /// Returns this device's guest proof, or nil. Read on every request and
+    /// sent as `guest_secret_hash` unless the caller passes one explicitly.
+    var guestProofProvider: (@MainActor () -> String?)?
+
     private let authProvider: ClerkConvexAuthProvider?
     private let signOutHandler: (() async -> Void)?
 
@@ -88,9 +92,14 @@ final class ConvexService {
 
     // Convex's `v.optional(...)` accepts undefined/missing keys but rejects JSON `null`.
     // convex-swift encodes Optional.none as `null`, so we drop nil entries before sending.
+    // The server derives the caller from Clerk auth or the guest proof added here.
     private func stripNilArgs(_ args: [String: ConvexEncodable?]?) -> [String: ConvexEncodable?]? {
-        guard let args else { return nil }
-        return args.filter { $0.value != nil }
+        var prepared = (args ?? [:]).filter { $0.value != nil }
+        if prepared["guest_secret_hash"] == nil,
+           let proof = guestProofProvider?(), !proof.isEmpty {
+            prepared["guest_secret_hash"] = proof
+        }
+        return prepared
     }
 
     func logout() async {

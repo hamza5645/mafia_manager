@@ -13,6 +13,9 @@ final class AuthStore: ObservableObject {
     @Published var isRestoringSession = true
     @Published var isAnonymous = false
     @Published private(set) var hasPendingGuestMerge = false
+    /// Changes whenever the identity sent to Convex may have changed;
+    /// multiplayer subscriptions restart when it does.
+    @Published private(set) var identityRevision = 0
 
     /// Guests are authenticated too; account identity is the completion signal
     /// for sign-in/signup/reset presentation, including guest upgrades.
@@ -76,6 +79,11 @@ final class AuthStore: ObservableObject {
         self.keychain = keychain ?? KeychainHelper.shared
         self.defaults = defaults
         hasPendingGuestMerge = pendingMergeAnonymousUserId != nil
+        // The real AuthService talks to ConvexService.shared; give it this
+        // device's guest proof. Injected test services leave Convex untouched.
+        if authService == nil {
+            ConvexService.shared.guestProofProvider = { [weak self] in self?.activeGuestProof }
+        }
         if autoRestore {
             Task {
                 defer { isRestoringSession = false }
@@ -424,6 +432,7 @@ final class AuthStore: ObservableObject {
         userProfile = profile
         isAuthenticated = true
         isAnonymous = profile.isAnonymous
+        identityRevision += 1
     }
 
     private func clearLocalAuthState() {
@@ -431,6 +440,7 @@ final class AuthStore: ObservableObject {
         currentUserId = nil
         userProfile = nil
         isAnonymous = false
+        identityRevision += 1
     }
 
     private func loadOrCreateGuestSecret() throws -> String {
@@ -449,6 +459,12 @@ final class AuthStore: ObservableObject {
         return hash(secret)
     }
 
+    /// Guest proof sent with every Convex request: only while playing as a
+    /// guest or while guest progress still waits to merge into an account.
+    var activeGuestProof: String? {
+        (isAnonymous || hasPendingGuestMerge) ? currentGuestSecretHash : nil
+    }
+
     private var pendingMergeAnonymousUserId: UUID? {
         defaults.string(forKey: DefaultsKeys.pendingMergeFromAnonymousId)
             .flatMap(UUID.init(uuidString:))
@@ -464,6 +480,7 @@ final class AuthStore: ObservableObject {
 
     private func clearGuestSecret() {
         try? keychain.delete(forKey: KeychainKeys.guestSecret)
+        identityRevision += 1
     }
 
     private func hash(_ secret: String) -> String {
