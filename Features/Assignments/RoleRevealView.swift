@@ -3,7 +3,8 @@ import SwiftUI
 struct RoleRevealView: View {
     @EnvironmentObject private var store: GameStore
     @State private var isRoleRevealed = false
-    @State private var showBlur = false
+    /// Shows the pass-phone screen; the hand-off delay runs in `.task(id: isPassingPhone)`.
+    @State private var isPassingPhone = false
     @State private var showEndGameConfirmation = false
 
     var body: some View {
@@ -11,8 +12,8 @@ struct RoleRevealView: View {
             Design.Colors.surface0
                 .ignoresSafeArea()
 
-            if showBlur {
-                PrivacyBlurView()
+            if isPassingPhone {
+                PassPhoneInterstitial()
                     .transition(.opacity)
             } else {
                 mainContent
@@ -39,9 +40,27 @@ struct RoleRevealView: View {
         } message: {
             Text("This will end the current game without determining a winner.")
         }
+        .sensoryFeedback(.success, trigger: isRoleRevealed) { _, revealed in revealed }
         .onAppear {
             isRoleRevealed = false
-            showBlur = false
+            isPassingPhone = false
+        }
+        // Cancelled with the view (End Game), so a stale hand-off cannot advance the game
+        .task(id: isPassingPhone) {
+            guard isPassingPhone else { return }
+
+            // After the cover transition, update state while it is still showing
+            try? await Task.sleep(for: .seconds(2.0))
+            guard !Task.isCancelled else { return }
+            isRoleRevealed = false
+            store.advanceToNextPlayer()
+
+            // Then hide the cover after state has settled
+            try? await Task.sleep(for: .seconds(0.1))
+            guard !Task.isCancelled else { return }
+            withAnimation(Design.Animations.easeInOut) {
+                isPassingPhone = false
+            }
         }
     }
 
@@ -65,6 +84,7 @@ struct RoleRevealView: View {
                 Spacer()
             }
             .padding(.horizontal, Design.Spacing.lg)
+            .readableContentWidth()
         } else {
             // Fallback
             Text("Loading...")
@@ -153,9 +173,6 @@ struct RoleRevealView: View {
                 withAnimation(.spring(response: 0.3)) {
                     isRoleRevealed = true
                 }
-                // Haptic feedback
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "eye.fill")
@@ -232,6 +249,7 @@ struct RoleRevealView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: Design.Radii.extraLarge, style: .continuous)
                         .fill(palette.backgroundGradient)
+                        .shadow(color: palette.glowColor.opacity(0.4), radius: 30, y: 10)
 
                     RoundedRectangle(cornerRadius: Design.Radii.extraLarge, style: .continuous)
                         .fill(
@@ -254,28 +272,13 @@ struct RoleRevealView: View {
                         lineWidth: 2
                     )
             )
-            .shadow(color: palette.glowColor.opacity(0.4), radius: 30, y: 10)
             .accessiblePlayerCard(name: player.name, number: player.number, role: player.role.displayName)
 
             // Action button
             Button {
-                // Show blur immediately for privacy
+                // Remove the role card immediately; `.task(id: isPassingPhone)` hands over after 2 seconds
                 withAnimation(Design.Animations.easeInOut) {
-                    showBlur = true
-                }
-
-                // After blur transition delay, update state while still blurred
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    // Reset state while blur is still showing
-                    isRoleRevealed = false
-                    store.advanceToNextPlayer()
-
-                    // Then hide blur after state has settled
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(Design.Animations.easeInOut) {
-                            showBlur = false
-                        }
-                    }
+                    isPassingPhone = true
                 }
             } label: {
                 HStack(spacing: 12) {

@@ -37,7 +37,6 @@ export default defineSchema({
     created_at: v.number(),
     updated_at: v.number(),
   })
-    .index("by_app_id", ["id"])
     .index("by_auth_subject", ["auth_subject"])
     .index("by_guest_secret_digest", ["guest_secret_digest"])
     .index("by_email_unclaimed", ["email", "auth_subject"]),
@@ -60,8 +59,14 @@ export default defineSchema({
     updated_at: v.number(),
   })
     .index("by_app_id", ["id"])
-    .index("by_user", ["user_id"])
     .index("by_user_player", ["user_id", "player_name"]),
+
+  // Games already counted by stats:recordGame, so a retry never counts twice.
+  recorded_games: defineTable({
+    user_id: v.string(),
+    game_id: v.string(),
+    recorded_at: v.number(),
+  }).index("by_user_game", ["user_id", "game_id"]),
 
   custom_roles_configs: defineTable({
     id: v.string(),
@@ -80,7 +85,6 @@ export default defineSchema({
     updated_at: v.number(),
   })
     .index("by_app_id", ["id"])
-    .index("by_user", ["user_id"])
     .index("by_user_config_name", ["user_id", "config_name"]),
 
   player_groups: defineTable({
@@ -94,7 +98,6 @@ export default defineSchema({
     updated_at: v.number(),
   })
     .index("by_app_id", ["id"])
-    .index("by_user", ["user_id"])
     .index("by_user_group_name", ["user_id", "group_name"]),
 
   game_sessions: defineTable({
@@ -137,15 +140,25 @@ export default defineSchema({
     is_alive: v.boolean(),
     is_online: v.boolean(),
     is_ready: v.boolean(),
-    last_heartbeat: v.number(),
+    // Presence lives in session_presence; old rows may still carry this.
+    last_heartbeat: v.optional(v.number()),
     joined_at: v.number(),
     removal_note: v.optional(v.string()),
   })
-    .index("by_app_id", ["id"])
     .index("by_session", ["session_id"])
     .index("by_session_user", ["session_id", "user_id"])
     .index("by_session_player", ["session_id", "player_id"])
     .index("by_user", ["user_id"]),
+
+  // One row per human seat, written by heartbeats. Kept apart from
+  // session_players so a heartbeat does not invalidate roster readers.
+  session_presence: defineTable({
+    session_id: v.string(),
+    user_id: v.string(),
+    last_heartbeat: v.number(),
+  })
+    .index("by_session_user", ["session_id", "user_id"])
+    .index("by_session", ["session_id"]),
 
   game_actions: defineTable({
     id: v.string(),
@@ -158,14 +171,6 @@ export default defineSchema({
     action_data: v.optional(v.any()),
     created_at: v.number(),
   })
-    .index("by_app_id", ["id"])
-    .index("by_session", ["session_id"])
-    .index("by_session_round_type_phase", [
-      "session_id",
-      "round_id",
-      "action_type",
-      "phase_index",
-    ])
     .index("by_unique_action", [
       "session_id",
       "round_id",
@@ -183,8 +188,6 @@ export default defineSchema({
     phase_index: v.number(),
     updated_at: v.number(),
   })
-    .index("by_app_id", ["id"])
-    .index("by_session_phase_type", ["session_id", "phase_index", "action_type"])
     .index("by_actor", [
       "session_id",
       "phase_index",

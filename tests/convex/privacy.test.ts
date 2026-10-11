@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import { api } from '../../convex/_generated/api';
-import { act, backend, guest, proof, room, start } from './helpers';
+import { actionForViewer, tentativeForViewer } from '../../convex/lib/projections';
+import { NIGHT_TYPES } from '../../convex/lib/rules';
+import { Backend, act, backend, finishNight, guest, proof, room, round, start } from './helpers';
 
 // humans: 0 citizen (host), 1 mafia, 2 doctor, 3 inspector, 4 citizen, 5 mafia
 const ROLES = ['citizen', 'mafia', 'doctor', 'inspector', 'citizen', 'mafia'] as const;
@@ -43,7 +45,7 @@ test('night actions and drafts are visible only to the host, the actor and same-
 
   // A second inspector sees the row but not its result.
   await t.run(async ctx => {
-    const row = await ctx.db.query('session_players').withIndex('by_app_id', q => q.eq('id', r.humans[4].id)).unique();
+    const row = await ctx.db.query('session_players').filter(q => q.eq(q.field('id'), r.humans[4].id)).unique();
     await ctx.db.patch(row!._id, { role: 'inspector' });
   });
   const peer = await rows(4);
@@ -87,7 +89,7 @@ test('roles are visible to self, the host, mafia teammates, and everyone after t
   expect(await rolesSeenBy(4)).toEqual(expected([0, 1, 2, 3, 4, 5]));
 });
 
-test('votes stay hidden until every living player has voted; vote drafts stay private', async () => {
+test('votes stay hidden until every living player has voted; vote drafts are never shown', async () => {
   const t = backend(); const r = await room(t, 4);
   await start(t, r, ['citizen', 'mafia', 'inspector', 'citizen']);
   const [host, mafia, insp, cit] = r.humans;
@@ -106,7 +108,9 @@ test('votes stay hidden until every living player has voted; vote drafts stay pr
   expect((await seen(2)).tentative).toEqual([]);
   expect((await seen(1)).actions.map(a => a.action_type)).toEqual(['vote']);
   expect((await seen(0)).actions.map(a => a.action_type)).toEqual(['vote']);
-  expect((await seen(0)).tentative).toHaveLength(1);
+  // The app sends drafts only at night, so vote drafts are not read at all.
+  expect((await seen(0)).tentative).toEqual([]);
+  expect((await seen(1)).tentative).toEqual([]);
   // The dead citizen does not need to vote.
   await act(t, r, host, 'vote', mafia);
   await act(t, r, insp, 'vote');
@@ -157,4 +161,108 @@ test('session projection depends on the viewer', async () => {
     for (const key of ['current_phase_data', 'current_round_id', 'original_host_user_id']) expect(outsider.session).not.toHaveProperty(key);
   }
   expect(await t.query(api.views.getSessionView, { session_id: crypto.randomUUID() })).toBeNull();
+});
+
+// The getRoundState algorithm before PA-20: read the whole roster, every row of
+// the round and every draft range, then filter with the same projections. The
+// narrowed reads must return exactly this (minus vote drafts, which are no
+// longer read).
+async function filteredAfterFullRead(t: Backend, sessionId: string, userId: string) {
+  return await t.run(async ctx => {
+    const session = (await ctx.db.query('game_sessions').withIndex('by_app_id', q => q.eq('id', sessionId)).unique())!;
+    const seats = (await ctx.db.query('session_players').withIndex('by_session', q => q.eq('session_id', sessionId)).collect())
+      .sort((a, b) => a.joined_at - b.joined_at || a._creationTime - b._creationTime);
+    const seat = seats.find(s => s.user_id === userId)!;
+    const data = session.current_phase_data;
+    const phaseIndex = session.current_phase === 'night' ? data?.nightIndex ?? null
+      : ['voting', 'voting_results', 'vote_death_reveal'].includes(session.current_phase) ? data?.dayIndex ?? null : null;
+    const roundId = session.current_round_id;
+    const actions = roundId
+      ? (await ctx.db.query('game_actions').withIndex('by_unique_action', q => q.eq('session_id', sessionId).eq('round_id', roundId)).collect())
+        .sort((a, b) => a.created_at - b.created_at || a._creationTime - b._creationTime)
+      : [];
+    const tentatives = [];
+    if (session.current_phase === 'night' && phaseIndex !== null) {
+      for (const type of NIGHT_TYPES) {
+        tentatives.push(...(await ctx.db.query('tentative_selections')
+          .withIndex('by_actor', q => q.eq('session_id', sessionId).eq('phase_index', phaseIndex).eq('action_type', type)).collect())
+          .sort((a, b) => a._creationTime - b._creationTime));
+      }
+    }
+    const votes = actions.filter(a => a.action_type === 'vote' && a.phase_index === phaseIndex);
+    const allVoted = seats.filter(s => s.is_alive).every(s => votes.some(a => a.actor_player_id === s.player_id));
+    const viewer = { session, seat, isHost: session.host_user_id === userId, allVoted };
+    return {
+      actions: actions.flatMap(row => actionForViewer(row, viewer) ?? []),
+      tentative: tentatives.flatMap(row => tentativeForViewer(row, viewer) ?? []),
+    };
+  });
+}
+
+test('narrowed round reads match the full read for every viewer in every phase (PA-20)', async () => {
+  const { t, r, rows } = await nightRoom();
+  const h = r.humans;
+  const checkpoint = async (label: string) => {
+    for (const [i, user] of r.users.entries()) {
+      const { actions, tentative } = await rows(i);
+      expect({ label, i, actions, tentative }).toEqual({ label, i, ...await filteredAfterFullRead(t, r.sessionId, user.id) });
+    }
+  };
+  const setAlive = (i: number, is_alive: boolean) => t.run(async ctx => {
+    const row = await ctx.db.query('session_players').filter(q => q.eq(q.field('id'), h[i].id)).unique();
+    await ctx.db.patch(row!._id, { is_alive });
+  });
+  await checkpoint('night');
+  // A dead mafia still sees the team's rows, and only those.
+  await setAlive(5, false);
+  await checkpoint('night, dead mafia');
+  expect((await rows(5)).actions.map(a => a.action_type)).toEqual(['mafia_target']);
+  expect((await rows(5)).tentative.map(a => a.action_type)).toEqual(['mafia_target']);
+  // Citizens read nothing at night.
+  expect(await rows(4)).toMatchObject({ actions: [], tentative: [] });
+  expect(await rows(0)).toMatchObject({ actions: [expect.anything(), expect.anything(), expect.anything()] });
+
+  // Mafia picked 4, the doctor saved 4.
+  expect((await finishNight(t, r)).resulting_deaths).toEqual([]);
+  await checkpoint('morning');
+  expect((await rows(4)).actions).toEqual([]);
+  expect((await rows(1)).actions.map(a => a.action_type)).toEqual(['mafia_target']);
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'death_reveal' });
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'voting' });
+  await checkpoint('voting, nobody voted');
+  // Around allVoted: each non-host sees only its own vote until every living seat voted.
+  for (const [voter, target] of [[1, 0], [2, 1], [4, 1], [0, 1]] as const) await act(t, r, h[voter], 'vote', h[target]);
+  await checkpoint('voting, one living voter left');
+  expect((await rows(2)).actions.map(a => a.actor_player_id)).toEqual([h[2].player_id]);
+  expect((await rows(3)).actions).toEqual([]);
+  expect((await rows(5)).actions).toEqual([]);
+  expect((await rows(0)).actions).toHaveLength(4);
+  await act(t, r, h[3], 'vote', h[1]);
+  await checkpoint('voting, all living voted');
+  for (const i of [2, 3, 4, 5]) expect((await rows(i)).actions).toHaveLength(5);
+
+  const { round_id } = await round(t, r);
+  await t.mutation(api.voting.closeVoting, { ...r.as(r.host), round_id: round_id! });
+  await checkpoint('voting results');
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'vote_death_reveal' });
+  await checkpoint('vote death reveal');
+  // The last living mafia is voted out: game over.
+  expect(await t.mutation(api.voting.resolveVoteAtomic, { ...r.as(r.host), round_id: round_id! }))
+    .toMatchObject({ next_phase: 'game_over', winner: 'citizen' });
+  await checkpoint('game over');
+  for (const i of [3, 4, 5]) expect((await rows(i)).actions).toHaveLength(5);
+});
+
+test('after a game ends at night everyone sees that night, inspector results included', async () => {
+  const { t, r, rows } = await nightRoom();
+  await t.run(async ctx => {
+    const s = await ctx.db.query('game_sessions').withIndex('by_app_id', q => q.eq('id', r.sessionId)).unique();
+    await ctx.db.patch(s!._id, { current_phase: 'game_over', is_game_over: true, status: 'completed' });
+  });
+  for (const i of [1, 2, 4, 5]) {
+    const seen = await rows(i);
+    expect(seen.actions.map(a => a.action_type).sort()).toEqual(['doctor_protect', 'inspector_check', 'mafia_target']);
+    expect(seen.actions.find(a => a.action_type === 'inspector_check')!.action_data).toEqual({ inspector_result: 'mafia' });
+    expect(seen.tentative).toEqual([]);
+  }
 });

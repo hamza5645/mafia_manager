@@ -1,0 +1,26 @@
+{
+  "session": {
+    "assigned_numbers": [],
+    "bot_count": 2,
+    "created_at": 813412800.5,
+    "current_phase": "night",
+    "day_history": [],
+    "day_index": 1,
+    "host_user_id": "00000001-0000-4000-8000-000000000001",
+    "id": "00000002-0000-4000-8000-000000000001",
+    "is_game_over": false,
+    "max_players": 19,
+    "night_history": [],
+    "room_code": "123456",
+    "started_at": 813412860.5,
+    "status": "in_progress",
+    "updated_at": 813412928.5
+  },
+  "viewer": {
+    "is_host": false,
+    "is_member": false,
+    "player_id": null,
+    "player_record_id": null,
+    "user_id": "00000001-0000-4000-8000-000000000005"
+  }
+}

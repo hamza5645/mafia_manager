@@ -96,6 +96,7 @@ struct QuickStartSheet: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
         }
+        .readableContentWidth()
         .background(Design.Colors.surface0)
     }
 }

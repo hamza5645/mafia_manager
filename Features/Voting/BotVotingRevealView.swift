@@ -51,6 +51,8 @@ struct BotVotingRevealView: View {
                     }
                     .padding(.horizontal)
                 }
+                // Let the list take the spare height before the Spacer below does
+                .layoutPriority(1)
 
                 Spacer()
 
@@ -67,6 +69,7 @@ struct BotVotingRevealView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 20)
             }
+            .readableContentWidth()
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -133,12 +136,12 @@ struct BotVoteCard: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Design.Colors.surface1)
+                .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(Design.Colors.stroke, lineWidth: 1.5)
                 )
         )
-        .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(bot.name) voted for \(target.name)")
     }

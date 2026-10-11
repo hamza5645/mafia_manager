@@ -29,25 +29,6 @@ final class DatabaseService {
         )
     }
 
-    /// Records one finished game for this player name. Not idempotent:
-    /// a retry after a lost response counts the game twice.
-    func upsertPlayerStat(
-        playerName: String,
-        role: Role,
-        won: Bool,
-        kills: Int
-    ) async throws {
-        let _: PlayerStats = try await convex.mutation(
-            "stats:upsertPlayerStat",
-            with: [
-                "player_name": playerName,
-                "role": role.rawValue,
-                "won": won,
-                "kills": Double(kills),
-            ]
-        )
-    }
-
     // MARK: - Custom Role Configs
 
     func getCustomRoleConfigs() async throws -> [CustomRoleConfig] {
@@ -55,34 +36,42 @@ final class DatabaseService {
         return configs.sorted { $0.configName.localizedCaseInsensitiveCompare($1.configName) == .orderedAscending }
     }
 
+    // Library edits are interactive: they give up after
+    // `interactiveMutationTimeout` and say the change may still go through.
+
+    @discardableResult
     func createCustomRoleConfig(
         name: String,
         roleDistribution: CustomRoleConfig.RoleDistribution
-    ) async throws {
-        let _: CustomRoleConfig = try await convex.mutation(
+    ) async throws -> CustomRoleConfig {
+        try await convex.mutation(
             "stats:createCustomRoleConfig",
             with: [
                 "config_name": name,
                 "role_distribution": try ConvexJSON(roleDistribution),
-            ]
+            ],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
-    func updateCustomRoleConfig(_ config: CustomRoleConfig) async throws {
-        let _: CustomRoleConfig = try await convex.mutation(
+    @discardableResult
+    func updateCustomRoleConfig(_ config: CustomRoleConfig) async throws -> CustomRoleConfig {
+        try await convex.mutation(
             "stats:updateCustomRoleConfig",
             with: [
                 "id": config.id.uuidString.lowercased(),
                 "config_name": config.configName,
                 "role_distribution": try ConvexJSON(config.roleDistribution),
-            ]
+            ],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
     func deleteCustomRoleConfig(id: UUID) async throws {
         try await convex.mutation(
             "stats:deleteCustomRoleConfig",
-            with: ["id": id.uuidString.lowercased()]
+            with: ["id": id.uuidString.lowercased()],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
@@ -93,31 +82,36 @@ final class DatabaseService {
         return groups.sorted { $0.groupName.localizedCaseInsensitiveCompare($1.groupName) == .orderedAscending }
     }
 
-    func createPlayerGroup(name: String, playerNames: [String]) async throws {
-        let _: PlayerGroup = try await convex.mutation(
+    @discardableResult
+    func createPlayerGroup(name: String, playerNames: [String]) async throws -> PlayerGroup {
+        try await convex.mutation(
             "stats:createPlayerGroup",
             with: [
                 "group_name": name,
                 "player_names": try ConvexJSON(playerNames),
-            ]
+            ],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
-    func updatePlayerGroup(_ group: PlayerGroup) async throws {
-        let _: PlayerGroup = try await convex.mutation(
+    @discardableResult
+    func updatePlayerGroup(_ group: PlayerGroup) async throws -> PlayerGroup {
+        try await convex.mutation(
             "stats:updatePlayerGroup",
             with: [
                 "id": group.id.uuidString.lowercased(),
                 "group_name": group.groupName,
                 "player_names": try ConvexJSON(group.playerNames),
-            ]
+            ],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
     func deletePlayerGroup(id: UUID) async throws {
         try await convex.mutation(
             "stats:deletePlayerGroup",
-            with: ["id": id.uuidString.lowercased()]
+            with: ["id": id.uuidString.lowercased()],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 }

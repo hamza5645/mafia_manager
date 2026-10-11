@@ -7,6 +7,8 @@ struct PlayerGroupsView: View {
     @State private var showAddGroup = false
     @State private var editingGroup: PlayerGroup?
     @State private var errorMessage: String?
+    /// A sheet's save ran out of time; the list reloads when the sheet closes.
+    @State private var reloadAfterSheet = false
     private let databaseService = DatabaseService()
 
     var body: some View {
@@ -14,7 +16,7 @@ struct PlayerGroupsView: View {
             Design.Colors.surface0
                 .ignoresSafeArea()
 
-            if isLoading {
+            if isLoading && playerGroups.isEmpty {
                 ProgressView()
                     .tint(.white)
             } else if playerGroups.isEmpty {
@@ -35,6 +37,7 @@ struct PlayerGroupsView: View {
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
         }
@@ -56,12 +59,12 @@ struct PlayerGroupsView: View {
         .refreshable {
             await loadGroups()
         }
-        .sheet(isPresented: $showAddGroup) {
-            AddPlayerGroupView(onSave: { await loadGroups() })
+        .sheet(isPresented: $showAddGroup, onDismiss: reloadAfterTimedOutSave) {
+            AddPlayerGroupView(onSave: upsert, onTimeout: { reloadAfterSheet = true })
                 .environmentObject(authStore)
         }
-        .sheet(item: $editingGroup) { group in
-            EditPlayerGroupView(group: group, onSave: { await loadGroups() })
+        .sheet(item: $editingGroup, onDismiss: reloadAfterTimedOutSave) { group in
+            EditPlayerGroupView(group: group, onSave: upsert, onTimeout: { reloadAfterSheet = true })
                 .environmentObject(authStore)
         }
         .alert("Player Groups", isPresented: Binding(
@@ -86,11 +89,27 @@ struct PlayerGroupsView: View {
 
         do {
             playerGroups = try await databaseService.getPlayerGroups()
+        } catch is CancellationError {
+            // Left the screen; keep what is shown.
         } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
+    }
+
+    /// A save that ran out of time may still apply, so show what the server has.
+    private func reloadAfterTimedOutSave() {
+        guard reloadAfterSheet else { return }
+        reloadAfterSheet = false
+        Task { await loadGroups() }
+    }
+
+    /// Inserts or replaces the row the server returned, without a reload.
+    private func upsert(_ group: PlayerGroup) {
+        playerGroups.removeAll { $0.id == group.id }
+        playerGroups.append(group)
+        playerGroups.sort { $0.groupName.localizedCaseInsensitiveCompare($1.groupName) == .orderedAscending }
     }
 
     private func deleteGroup(_ group: PlayerGroup) async {
@@ -101,7 +120,11 @@ struct PlayerGroupsView: View {
 
         do {
             try await databaseService.deletePlayerGroup(id: group.id)
+            playerGroups.removeAll { $0.id == group.id }
+        } catch let error as BackendError where error.isTimeout {
+            // It may still be deleted: show what the server has instead of this list.
             await loadGroups()
+            if errorMessage == nil { errorMessage = error.message }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -224,14 +247,16 @@ struct AddPlayerGroupView: View {
     @EnvironmentObject var authStore: AuthStore
     @Environment(\.dismiss) var dismiss
     @State private var groupName = ""
-    @State private var playerNames: [String] = ["", "", "", ""]
+    @State private var playerRows: [GroupPlayerRow] = (0..<4).map { _ in GroupPlayerRow(name: "") }
     @State private var isLoading = false
     @State private var errorMessage: String?
-    let onSave: () async -> Void
+    let onSave: (PlayerGroup) -> Void
+    /// The save ran out of time and may still apply.
+    var onTimeout: () -> Void = {}
     private let databaseService = DatabaseService()
 
     private var validPlayerNames: [String] {
-        playerNames.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        playerRows.map(\.name).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     private var canSave: Bool {
@@ -282,50 +307,7 @@ struct AddPlayerGroupView: View {
                         }
 
                         // Player Names
-                        VStack(spacing: 12) {
-                            ForEach(playerNames.indices, id: \.self) { index in
-                                HStack {
-                                    TextField("Player \(index + 1)", text: $playerNames[index])
-                                        .padding()
-                                        .background(Design.Colors.surface1)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(Design.Radii.card)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: Design.Radii.card)
-                                                .stroke(Design.Colors.stroke, lineWidth: 1)
-                                        )
-
-                                    if index >= 4 {
-                                        Button {
-                                            playerNames.remove(at: index)
-                                        } label: {
-                                            Image(systemName: "minus.circle.fill")
-                                                .foregroundColor(Design.Colors.dangerRed)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if playerNames.count < 19 {
-                                Button {
-                                    playerNames.append("")
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "plus.circle.fill")
-                                        Text("Add Player")
-                                    }
-                                    .foregroundColor(Design.Colors.brandGold)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Design.Colors.surface1)
-                                    .cornerRadius(Design.Radii.card)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Design.Radii.card)
-                                            .stroke(Design.Colors.stroke, lineWidth: 1)
-                                    )
-                                }
-                            }
-                        }
+                        GroupPlayerRowsEditor(rows: $playerRows)
 
                         if let errorMessage = errorMessage {
                             Text(errorMessage)
@@ -340,6 +322,7 @@ struct AddPlayerGroupView: View {
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
             .navigationTitle("New Player Group")
@@ -373,14 +356,15 @@ struct AddPlayerGroupView: View {
         errorMessage = nil
 
         do {
-            try await databaseService.createPlayerGroup(
+            let saved = try await databaseService.createPlayerGroup(
                 name: groupName,
                 playerNames: validPlayerNames
             )
-            await onSave()
+            onSave(saved)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+            if (error as? BackendError)?.isTimeout == true { onTimeout() }
         }
 
         isLoading = false
@@ -392,14 +376,16 @@ struct EditPlayerGroupView: View {
     @Environment(\.dismiss) var dismiss
     let group: PlayerGroup
     @State private var groupName = ""
-    @State private var playerNames: [String] = []
+    @State private var playerRows: [GroupPlayerRow] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    let onSave: () async -> Void
+    let onSave: (PlayerGroup) -> Void
+    /// The save ran out of time and may still apply.
+    var onTimeout: () -> Void = {}
     private let databaseService = DatabaseService()
 
     private var validPlayerNames: [String] {
-        playerNames.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        playerRows.map(\.name).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     private var canSave: Bool {
@@ -450,50 +436,7 @@ struct EditPlayerGroupView: View {
                         }
 
                         // Player Names
-                        VStack(spacing: 12) {
-                            ForEach(playerNames.indices, id: \.self) { index in
-                                HStack {
-                                    TextField("Player \(index + 1)", text: $playerNames[index])
-                                        .padding()
-                                        .background(Design.Colors.surface1)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(Design.Radii.card)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: Design.Radii.card)
-                                                .stroke(Design.Colors.stroke, lineWidth: 1)
-                                        )
-
-                                    if index >= 4 {
-                                        Button {
-                                            playerNames.remove(at: index)
-                                        } label: {
-                                            Image(systemName: "minus.circle.fill")
-                                                .foregroundColor(Design.Colors.dangerRed)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if playerNames.count < 19 {
-                                Button {
-                                    playerNames.append("")
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "plus.circle.fill")
-                                        Text("Add Player")
-                                    }
-                                    .foregroundColor(Design.Colors.brandGold)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Design.Colors.surface1)
-                                    .cornerRadius(Design.Radii.card)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Design.Radii.card)
-                                            .stroke(Design.Colors.stroke, lineWidth: 1)
-                                    )
-                                }
-                            }
-                        }
+                        GroupPlayerRowsEditor(rows: $playerRows)
 
                         if let errorMessage = errorMessage {
                             Text(errorMessage)
@@ -508,6 +451,7 @@ struct EditPlayerGroupView: View {
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
             .navigationTitle("Edit Player Group")
@@ -531,10 +475,10 @@ struct EditPlayerGroupView: View {
             .onAppear {
                 // Initialize with existing group data
                 groupName = group.groupName
-                playerNames = group.playerNames
+                playerRows = group.playerNames.map { GroupPlayerRow(name: $0) }
                 // Ensure we have at least 4 empty slots if needed
-                while playerNames.count < 4 {
-                    playerNames.append("")
+                while playerRows.count < 4 {
+                    playerRows.append(GroupPlayerRow(name: ""))
                 }
             }
         }
@@ -555,13 +499,74 @@ struct EditPlayerGroupView: View {
         updatedGroup.updatedAt = Date()
 
         do {
-            try await databaseService.updatePlayerGroup(updatedGroup)
-            await onSave()
+            let saved = try await databaseService.updatePlayerGroup(updatedGroup)
+            onSave(saved)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+            if (error as? BackendError)?.isTimeout == true { onTimeout() }
         }
 
         isLoading = false
+    }
+}
+
+/// One editable player name. The id keeps each row's identity (and focus)
+/// when another row is removed; positions would not.
+private struct GroupPlayerRow: Identifiable {
+    let id = UUID()
+    var name: String
+}
+
+/// The player name fields shared by the Add and Edit group sheets.
+private struct GroupPlayerRowsEditor: View {
+    @Binding var rows: [GroupPlayerRow]
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach($rows) { $row in
+                let index = rows.firstIndex { $0.id == row.id } ?? 0
+                HStack {
+                    TextField("Player \(index + 1)", text: $row.name)
+                        .padding()
+                        .background(Design.Colors.surface1)
+                        .foregroundColor(.white)
+                        .cornerRadius(Design.Radii.card)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Design.Radii.card)
+                                .stroke(Design.Colors.stroke, lineWidth: 1)
+                        )
+
+                    if index >= 4 {
+                        Button {
+                            rows.removeAll { $0.id == row.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundColor(Design.Colors.dangerRed)
+                        }
+                    }
+                }
+            }
+
+            if rows.count < 19 {
+                Button {
+                    rows.append(GroupPlayerRow(name: ""))
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add Player")
+                    }
+                    .foregroundColor(Design.Colors.brandGold)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Design.Colors.surface1)
+                    .cornerRadius(Design.Radii.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Design.Radii.card)
+                            .stroke(Design.Colors.stroke, lineWidth: 1)
+                    )
+                }
+            }
+        }
     }
 }

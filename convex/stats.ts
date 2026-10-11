@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, Infer, v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
 import { E, fail } from "./lib/errors";
@@ -98,7 +98,7 @@ export const listPlayerStats = query({
     const caller = await requireCaller(ctx, args.guest_secret_hash);
     const rows = await ctx.db
       .query("player_stats")
-      .withIndex("by_user", (q) => q.eq("user_id", caller.id))
+      .withIndex("by_user_player", (q) => q.eq("user_id", caller.id))
       .collect();
     return rows.map(statOut);
   },
@@ -117,44 +117,90 @@ export const getPlayerStat = query({
   },
 });
 
-// Records one finished game for one player name. Not idempotent.
+const gameResultValidator = v.object({ player_name: v.string(), role: roleValidator, won: v.boolean(), kills: v.number() });
+type GameResult = Infer<typeof gameResultValidator>;
+
+// Validates one result row; throws the same errors upsertPlayerStat always has.
+function cleanResult(row: GameResult) {
+  const playerName = cleanText(row.player_name, 1, 50, E.PLAYER_NAME);
+  if (!Number.isInteger(row.kills) || row.kills < 0 || row.kills > 100) fail(E.KILLS);
+  return playerName;
+}
+
+async function addGameToStats(ctx: MutationCtx, userId: string, playerName: string, row: GameResult) {
+  const existing = await ctx.db
+    .query("player_stats")
+    .withIndex("by_user_player", (q) => q.eq("user_id", userId).eq("player_name", playerName))
+    .first();
+  const increments = {
+    games_played: 1,
+    games_won: row.won ? 1 : 0,
+    games_lost: row.won ? 0 : 1,
+    total_kills: row.kills,
+    times_mafia: row.role === "mafia" ? 1 : 0,
+    times_doctor: row.role === "doctor" ? 1 : 0,
+    times_inspector: row.role === "inspector" ? 1 : 0,
+    times_citizen: row.role === "citizen" ? 1 : 0,
+  };
+  const timestamp = nowAppleEpochSeconds();
+  if (!existing) {
+    const doc = {
+      id: uuid(),
+      user_id: userId,
+      player_name: playerName,
+      ...increments,
+      created_at: timestamp,
+      updated_at: timestamp,
+    };
+    await ctx.db.insert("player_stats", doc);
+    return statOut(doc);
+  }
+  const patch = { ...increments, updated_at: timestamp };
+  for (const key of Object.keys(increments) as (keyof typeof increments)[]) patch[key] += existing[key];
+  await ctx.db.patch(existing._id, patch);
+  return statOut({ ...existing, ...patch });
+}
+
+// Records one finished game for one player name. Not idempotent; kept for
+// older builds. New builds call recordGame.
 export const upsertPlayerStat = mutation({
   args: { player_name: v.string(), role: roleValidator, won: v.boolean(), kills: v.number(), ...guestArg },
   handler: async (ctx, args) => {
     const caller = await requireCaller(ctx, args.guest_secret_hash);
-    const playerName = cleanText(args.player_name, 1, 50, E.PLAYER_NAME);
-    if (!Number.isInteger(args.kills) || args.kills < 0 || args.kills > 100) fail(E.KILLS);
-    const existing = await ctx.db
-      .query("player_stats")
-      .withIndex("by_user_player", (q) => q.eq("user_id", caller.id).eq("player_name", playerName))
+    return await addGameToStats(ctx, caller.id, cleanResult(args), args);
+  },
+});
+
+// Records a whole finished game in one transaction, once per caller and
+// game_id, so the client can retry until acknowledged. Invalid rows are
+// skipped and counted rather than failing the game.
+export const recordGame = mutation({
+  args: {
+    game_id: v.string(),
+    results: v.array(gameResultValidator),
+    ...guestArg,
+  },
+  handler: async (ctx, args) => {
+    const caller = await requireCaller(ctx, args.guest_secret_hash);
+    const recorded = await ctx.db
+      .query("recorded_games")
+      .withIndex("by_user_game", (q) => q.eq("user_id", caller.id).eq("game_id", args.game_id))
       .first();
-    const increments = {
-      games_played: 1,
-      games_won: args.won ? 1 : 0,
-      games_lost: args.won ? 0 : 1,
-      total_kills: args.kills,
-      times_mafia: args.role === "mafia" ? 1 : 0,
-      times_doctor: args.role === "doctor" ? 1 : 0,
-      times_inspector: args.role === "inspector" ? 1 : 0,
-      times_citizen: args.role === "citizen" ? 1 : 0,
-    };
-    const timestamp = nowAppleEpochSeconds();
-    if (!existing) {
-      const doc = {
-        id: uuid(),
-        user_id: caller.id,
-        player_name: playerName,
-        ...increments,
-        created_at: timestamp,
-        updated_at: timestamp,
-      };
-      await ctx.db.insert("player_stats", doc);
-      return statOut(doc);
+    if (recorded) return { recorded: false, skipped: 0 };
+    let skipped = 0;
+    for (const row of args.results) {
+      let playerName: string;
+      try {
+        playerName = cleanResult(row);
+      } catch (error) {
+        if (!(error instanceof ConvexError)) throw error;
+        skipped += 1;
+        continue;
+      }
+      await addGameToStats(ctx, caller.id, playerName, row);
     }
-    const patch = { ...increments, updated_at: timestamp };
-    for (const key of Object.keys(increments) as (keyof typeof increments)[]) patch[key] += existing[key];
-    await ctx.db.patch(existing._id, patch);
-    return statOut({ ...existing, ...patch });
+    await ctx.db.insert("recorded_games", { user_id: caller.id, game_id: args.game_id, recorded_at: nowAppleEpochSeconds() });
+    return { recorded: true, skipped };
   },
 });
 
@@ -174,7 +220,7 @@ export const listCustomRoleConfigs = query({
     const caller = await requireCaller(ctx, args.guest_secret_hash);
     const rows = await ctx.db
       .query("custom_roles_configs")
-      .withIndex("by_user", (q) => q.eq("user_id", caller.id))
+      .withIndex("by_user_config_name", (q) => q.eq("user_id", caller.id))
       .collect();
     return rows.map(configOut);
   },
@@ -232,7 +278,7 @@ export const listPlayerGroups = query({
     const caller = await requireCaller(ctx, args.guest_secret_hash);
     const rows = await ctx.db
       .query("player_groups")
-      .withIndex("by_user", (q) => q.eq("user_id", caller.id))
+      .withIndex("by_user_group_name", (q) => q.eq("user_id", caller.id))
       .collect();
     return rows.map(groupOut);
   },

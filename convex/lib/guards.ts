@@ -21,14 +21,25 @@ export async function listSeats(ctx: Ctx, sessionId: string): Promise<Doc<"sessi
   return seats.sort((a, b) => a.joined_at - b.joined_at || a._creationTime - b._creationTime);
 }
 
+// Point reads: only the named seat enters the read set, not the roster range.
+export async function seatOf(ctx: Ctx, sessionId: string, userId: string): Promise<Doc<"session_players"> | null> {
+  return await ctx.db
+    .query("session_players")
+    .withIndex("by_session_user", (q) => q.eq("session_id", sessionId).eq("user_id", userId))
+    .first();
+}
+
+export async function seatByPlayer(ctx: Ctx, sessionId: string, playerId: string): Promise<Doc<"session_players"> | null> {
+  return await ctx.db
+    .query("session_players")
+    .withIndex("by_session_player", (q) => q.eq("session_id", sessionId).eq("player_id", playerId))
+    .first();
+}
+
 export async function requireSeat(ctx: Ctx, a: SessionArgs) {
   const session = (await getSession(ctx, a.session_id)) ?? fail(E.GAME_NOT_FOUND);
   const caller = await requireCaller(ctx, a.guest_secret_hash);
-  const seat =
-    (await ctx.db
-      .query("session_players")
-      .withIndex("by_session_user", (q) => q.eq("session_id", a.session_id).eq("user_id", caller.id))
-      .first()) ?? fail(E.NOT_MEMBER);
+  const seat = (await seatOf(ctx, a.session_id, caller.id)) ?? fail(E.NOT_MEMBER);
   return { caller, session, seat };
 }
 

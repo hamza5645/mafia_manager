@@ -7,11 +7,11 @@
 - `Core/` - domain logic (`Auth`, `Backend`, `Gameplay`, `Multiplayer`, `Stats`, `Support`)
 - `Features/` - SwiftUI views
 - `convex/` - Convex schema, queries, mutations, auth config, and generated API files
-- `scripts/` - build/launch automation
+- `scripts/` - simulator launch helper, Clerk test-user cleanup, deployment check (`e2e/`)
 
-**Run on simulator**:
+**Run on simulator** (runs `tuist install` and `tuist generate`, then builds, boots the simulator if needed, installs and launches; defaults to the first available iPhone):
 ```bash
-./scripts/run_ios_sim.sh
+./scripts/run_ios_sim.sh ["iPhone 18 Pro"]
 ```
 
 **Tuist build/test**:
@@ -19,7 +19,8 @@
 tuist install
 tuist generate
 tuist build mafia_manager
-tuist test mafia_manager
+tuist test mafia_manager --no-selective-testing
+npm run test:backend
 ```
 
 **Convex backend**:
@@ -31,10 +32,10 @@ npx convex dev --once
 **Critical architecture**:
 - `GameStore` owns solo game mutations. Views never mutate solo state directly.
 - Night resolution is two-phase: `endNight()` records actions, then `resolveNightOutcome()` applies deaths.
-- Multiplayer outcomes are computed by Convex with the same pattern (`night:recordNightActions` → `night:resolveNightAtomic`, `voting:closeVoting` → `voting:resolveVoteAtomic`). The host only requests transitions (`phases:advancePhase`) and drives bots.
+- Multiplayer outcomes are computed by Convex with the same pattern (`night:finishNight` runs `recordNightActions` then `resolveNightAtomic` in one transaction; `voting:closeVoting` → `voting:resolveVoteAtomic`). The host only requests transitions (`phases:advancePhase`) and drives bots.
 - Solo persistence writes JSON to Application Support.
-- Multiplayer sends mutations through `SessionService` and assigns three supervised subscriptions (`views:getSessionView`, `views:getPlayers`, `views:getRoundState`) directly to `MultiplayerGameStore` state.
-- Stats/custom roles/player groups sync through `DatabaseService`, backed by Convex.
+- Multiplayer sends mutations through `SessionService` and assigns four supervised subscriptions (`views:getSessionView`, `views:getPlayers`, `views:getRoundState`, `views:getHostPresence`) directly to `MultiplayerGameStore` state.
+- Custom roles and player groups sync through `DatabaseService`; finished solo games go through `StatsOutbox` to `stats:recordGame`.
 
 **Auth setup**:
 - Clerk is the account auth provider.

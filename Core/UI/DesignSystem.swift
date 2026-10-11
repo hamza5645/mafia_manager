@@ -115,9 +115,13 @@ struct Card: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 ZStack {
-                    // Base surface
+                    // Base surface; shadows are drawn from this shape only, never from the content
                     RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
                         .fill(Design.Colors.surface1)
+                        .shadow(color: Design.Shadows.medium.color, radius: Design.Shadows.medium.radius, x: Design.Shadows.medium.x, y: Design.Shadows.medium.y)
+                        .if(withGlow) { shape in
+                            shape.shadow(color: Design.Colors.glowGold, radius: Design.Shadows.glow.radius)
+                        }
 
                     // Subtle gradient overlay for depth
                     RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
@@ -147,10 +151,6 @@ struct Card: ViewModifier {
                         lineWidth: 1.5
                     )
             )
-            .shadow(color: Design.Shadows.medium.color, radius: Design.Shadows.medium.radius, x: Design.Shadows.medium.x, y: Design.Shadows.medium.y)
-            .if(withGlow) { view in
-                view.shadow(color: Design.Colors.glowGold, radius: Design.Shadows.glow.radius)
-            }
     }
 }
 
@@ -194,7 +194,7 @@ struct CTAButtonStyle: ButtonStyle {
                 .frame(maxWidth: .infinity)
                 .background(
                     ZStack {
-                        // Gradient background
+                        // Gradient background; it alone casts the button's single shadow
                         RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
                             .fill(
                                 LinearGradient(
@@ -203,6 +203,7 @@ struct CTAButtonStyle: ButtonStyle {
                                     endPoint: .bottomTrailing
                                 )
                             )
+                            .shadow(color: colors.shadow, radius: configuration.isPressed ? 8 : 16, y: configuration.isPressed ? 2 : 4)
                             .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.4)
 
                         // Subtle shimmer overlay
@@ -221,13 +222,12 @@ struct CTAButtonStyle: ButtonStyle {
                     RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
                         .stroke(colors.border.opacity(isEnabled ? 0.3 : 0.1), lineWidth: 1.5)
                 )
-                .shadow(color: colors.glow, radius: configuration.isPressed ? 8 : 16, y: configuration.isPressed ? 2 : 4)
-                .shadow(color: Design.Shadows.large.color, radius: Design.Shadows.large.radius, x: Design.Shadows.large.x, y: Design.Shadows.large.y)
                 .scaleEffect(configuration.isPressed && isEnabled ? 0.97 : 1)
                 .animation(Design.Animations.quick, value: configuration.isPressed)
         }
 
-        private func palette(for kind: CTAKind) -> (gradient: [Color], foreground: Color, border: Color, glow: Color) {
+        /// `shadow` is the coloured glow for accented kinds and a plain drop shadow otherwise.
+        private func palette(for kind: CTAKind) -> (gradient: [Color], foreground: Color, border: Color, shadow: Color) {
             switch kind {
             case .primary:
                 return (
@@ -241,7 +241,7 @@ struct CTAButtonStyle: ButtonStyle {
                     [Design.Colors.surface2, Design.Colors.surface3],
                     Design.Colors.textPrimary,
                     Design.Colors.strokeLight,
-                    Color.clear
+                    Design.Shadows.large.color
                 )
             case .danger:
                 return (
@@ -288,6 +288,7 @@ struct CompactGridButtonStyle: ButtonStyle {
                                     endPoint: .bottomTrailing
                                 )
                             )
+                            .shadow(color: colors.shadow, radius: configuration.isPressed ? 6 : 12, y: configuration.isPressed ? 1 : 2)
                             .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.35)
 
                         // Shimmer effect for primary buttons
@@ -308,13 +309,12 @@ struct CompactGridButtonStyle: ButtonStyle {
                     RoundedRectangle(cornerRadius: Design.Radii.button, style: .continuous)
                         .stroke(colors.border.opacity(isEnabled ? 0.4 : 0.15), lineWidth: 1.5)
                 )
-                .shadow(color: colors.glow, radius: configuration.isPressed ? 6 : 12)
-                .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
                 .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1)
                 .animation(Design.Animations.quick, value: configuration.isPressed)
         }
 
-        private func palette(for kind: GridButtonKind) -> (gradient: [Color], foreground: Color, border: Color, glow: Color) {
+        /// `shadow` is the coloured glow for accented kinds and a plain drop shadow otherwise.
+        private func palette(for kind: GridButtonKind) -> (gradient: [Color], foreground: Color, border: Color, shadow: Color) {
             switch kind {
             case .primary:
                 return (
@@ -328,7 +328,7 @@ struct CompactGridButtonStyle: ButtonStyle {
                     [Design.Colors.surface2, Design.Colors.surface3],
                     Design.Colors.textPrimary,
                     Design.Colors.stroke,
-                    Color.clear
+                    Design.Shadows.small.color
                 )
             case .accent:
                 return (
@@ -345,70 +345,6 @@ struct CompactGridButtonStyle: ButtonStyle {
                     Design.Colors.glowRed.opacity(0.3)
                 )
             }
-        }
-    }
-}
-
-// MARK: - Enhanced Pill Button Style
-struct PillButtonStyle: ButtonStyle {
-    var background: Color = Design.Colors.actionBlue
-    var foreground: Color = .white
-
-    func makeBody(configuration: Configuration) -> some View {
-        Pill(configuration: configuration, background: background, foreground: foreground)
-    }
-
-    private struct Pill: View {
-        let configuration: Configuration
-        let background: Color
-        let foreground: Color
-        @Environment(\.isEnabled) private var isEnabled
-        @ScaledMetric(relativeTo: .subheadline) private var hPadding: CGFloat = 20
-        @ScaledMetric(relativeTo: .subheadline) private var vPadding: CGFloat = 12
-
-        var body: some View {
-            configuration.label
-                .font(Design.Typography.subheadline)
-                .foregroundStyle(foreground.opacity(isEnabled ? 1 : 0.4))
-                .padding(.horizontal, hPadding)
-                .padding(.vertical, vPadding)
-                .background(
-                    ZStack {
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [background, background.opacity(0.85)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .opacity(fillOpacity)
-
-                        // Shimmer overlay
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.2), .clear],
-                                    startPoint: .topLeading,
-                                    endPoint: .center
-                                )
-                            )
-                            .opacity(isEnabled ? 1 : 0)
-                    }
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(foreground.opacity(isEnabled ? 0.15 : 0.05), lineWidth: 1.5)
-                )
-                .shadow(color: background.opacity(0.4), radius: configuration.isPressed ? 6 : 12)
-                .shadow(color: Design.Shadows.small.color, radius: Design.Shadows.small.radius, x: Design.Shadows.small.x, y: Design.Shadows.small.y)
-                .scaleEffect(configuration.isPressed && isEnabled ? 0.94 : 1)
-                .animation(Design.Animations.quick, value: configuration.isPressed)
-        }
-
-        private var fillOpacity: Double {
-            guard isEnabled else { return 0.3 }
-            return configuration.isPressed ? 0.8 : 1
         }
     }
 }
@@ -456,11 +392,12 @@ struct Chip: View {
             }
         )
         .overlay(
+            // The border casts the chip's glow; its translucent fill is too faint to
             Capsule()
                 .strokeBorder(borderColor, lineWidth: 1.5)
+                .shadow(color: shadowColor, radius: 6, y: 2)
         )
         .foregroundStyle(foreground)
-        .shadow(color: shadowColor, radius: 6, y: 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(text)
     }
@@ -513,7 +450,6 @@ extension View {
             .accessibilityLabel(label)
             .accessibilityHint(hint ?? "")
             .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier(accessibilityIdentifierSlug(from: label))
     }
 
     /// Combines child elements and adds a descriptive label for player cards
@@ -545,24 +481,20 @@ extension View {
             .accessibilityLabel(label)
             .accessibilityHint(hint ?? (isSelected ? "Double tap to deselect" : "Double tap to select"))
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-            .accessibilityIdentifier(accessibilityIdentifierSlug(from: label))
     }
 
     /// Adds a stable automation identifier for simulator and UI test flows.
     func automationID(_ identifier: String) -> some View {
         self.accessibilityIdentifier(identifier)
     }
+}
 
-    private func accessibilityIdentifierSlug(from label: String) -> String {
-        let sanitized = label
-            .lowercased()
-            .replacingOccurrences(
-                of: "[^a-z0-9]+",
-                with: ".",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+// MARK: - Readable width
 
-        return "ui.\(sanitized)"
+extension View {
+    /// Caps a screen's content stack on wide windows (iPad) and keeps it centred.
+    /// Apply it to the content, not to a full-screen background.
+    func readableContentWidth(_ maxWidth: CGFloat = 640) -> some View {
+        frame(maxWidth: maxWidth).frame(maxWidth: .infinity)
     }
 }

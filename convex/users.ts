@@ -1,9 +1,21 @@
 import { v } from "convex/values";
+import { Doc } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
-import { E, fail } from "./lib/errors";
+import { E, fail, mergeSeatConflict } from "./lib/errors";
+import { getSession, seatOf } from "./lib/guards";
 import { findGuestByProof, getAccountUser, getCaller, publicUser, requireCaller } from "./lib/identity";
+import { deletePresence, presenceOf } from "./lib/presence";
 import { cleanText, nowAppleEpochSeconds, sha256Hex, uuid } from "./lib/util";
 import { guestArg } from "./validators";
+
+// merged_guest_digests keeps only the latest merges into an account.
+const MERGE_TOMBSTONES = 20;
+
+// When a seat was last used: its presence heartbeat, else (rows from before
+// session_presence) its own heartbeat, else when it joined.
+async function lastSeen(ctx: MutationCtx, seat: Doc<"session_players">, userId: string) {
+  return (await presenceOf(ctx, seat.session_id, userId))?.last_heartbeat ?? seat.last_heartbeat ?? seat.joined_at;
+}
 
 function displayNameFromIdentity(identity: { name?: string; nickname?: string; email?: string }) {
   const name = identity.name ?? identity.nickname ?? identity.email;
@@ -25,11 +37,11 @@ export const ensureUser = mutation({
     const email = typeof identity.email === "string" ? identity.email.toLowerCase() : undefined;
 
     if (existing) {
-      const patch = {
-        display_name: requested || existing.display_name || displayNameFromIdentity(identity),
-        email: email ?? existing.email,
-        updated_at: timestamp,
-      };
+      const displayName = requested || existing.display_name || displayNameFromIdentity(identity);
+      const nextEmail = email ?? existing.email;
+      // Every launch calls this; a write that changes nothing is skipped.
+      if (displayName === existing.display_name && nextEmail === existing.email) return publicUser(existing);
+      const patch = { display_name: displayName, email: nextEmail, updated_at: timestamp };
       await ctx.db.patch(existing._id, patch);
       return publicUser({ ...existing, ...patch });
     }
@@ -91,6 +103,8 @@ export const createOrRestoreGuest = mutation({
     const timestamp = nowAppleEpochSeconds();
     const existing = await findGuestByProof(ctx, args.guest_secret_hash);
     if (existing) {
+      // Every guest launch restores; a write that changes nothing is skipped.
+      if (existing.display_name === displayName) return publicUser(existing);
       const patch = { display_name: displayName, updated_at: timestamp };
       await ctx.db.patch(existing._id, patch);
       return publicUser({ ...existing, ...patch });
@@ -164,18 +178,30 @@ export const mergeGuestIntoAccount = mutation({
       .query("session_players")
       .withIndex("by_user", (q) => q.eq("user_id", guest.id))
       .collect();
+    // Both identities may hold a seat in one room. Only a game in progress
+    // refuses (the player must leave one seat); elsewhere the seat that was
+    // used last is kept and the other is deleted with its presence.
+    const movingSeats: Doc<"session_players">[] = [];
     for (const member of memberships) {
-      const existingSeat = await ctx.db
-        .query("session_players")
-        .withIndex("by_session_user", (q) => q.eq("session_id", member.session_id).eq("user_id", account.id))
-        .first();
-      if (existingSeat) fail(E.MERGE_SEAT_CONFLICT);
+      const accountSeat = await seatOf(ctx, member.session_id, account.id);
+      if (!accountSeat) {
+        movingSeats.push(member);
+        continue;
+      }
+      const room = await getSession(ctx, member.session_id);
+      if (room?.status === "in_progress") fail(mergeSeatConflict(room.room_code));
+      const guestSeen = await lastSeen(ctx, member, guest.id);
+      const accountSeen = await lastSeen(ctx, accountSeat, account.id);
+      const [dropped, droppedUser] = guestSeen > accountSeen ? [accountSeat, account.id] : [member, guest.id];
+      await ctx.db.delete(dropped._id);
+      await deletePresence(ctx, member.session_id, droppedUser);
+      if (dropped === accountSeat) movingSeats.push(member);
     }
 
     let transferredCount = 0;
     const guestStats = await ctx.db
       .query("player_stats")
-      .withIndex("by_user", (q) => q.eq("user_id", guest.id))
+      .withIndex("by_user_player", (q) => q.eq("user_id", guest.id))
       .collect();
     for (const source of guestStats) {
       const targets = await ctx.db
@@ -210,7 +236,7 @@ export const mergeGuestIntoAccount = mutation({
 
     const configs = await ctx.db
       .query("custom_roles_configs")
-      .withIndex("by_user", (q) => q.eq("user_id", guest.id))
+      .withIndex("by_user_config_name", (q) => q.eq("user_id", guest.id))
       .collect();
     for (const config of configs) {
       const configName = await freeLibraryName(ctx, "custom_roles_configs", account.id, config.config_name);
@@ -219,7 +245,7 @@ export const mergeGuestIntoAccount = mutation({
     }
     const groups = await ctx.db
       .query("player_groups")
-      .withIndex("by_user", (q) => q.eq("user_id", guest.id))
+      .withIndex("by_user_group_name", (q) => q.eq("user_id", guest.id))
       .collect();
     for (const group of groups) {
       const groupName = await freeLibraryName(ctx, "player_groups", account.id, group.group_name);
@@ -227,24 +253,52 @@ export const mergeGuestIntoAccount = mutation({
       transferredCount += 1;
     }
 
+    // A retried recordGame after the merge must find the guest's games, or it counts them twice.
+    const guestGames = await ctx.db
+      .query("recorded_games")
+      .withIndex("by_user_game", (q) => q.eq("user_id", guest.id))
+      .collect();
+    for (const game of guestGames) {
+      const known = await ctx.db
+        .query("recorded_games")
+        .withIndex("by_user_game", (q) => q.eq("user_id", account.id).eq("game_id", game.game_id))
+        .first();
+      if (known) await ctx.db.delete(game._id);
+      else await ctx.db.patch(game._id, { user_id: account.id });
+    }
+
     // Preserve player ids, roles and actions while switching the proven owner.
-    for (const member of memberships) await ctx.db.patch(member._id, { user_id: account.id });
+    for (const member of movingSeats) {
+      await ctx.db.patch(member._id, { user_id: account.id });
+      const presence = await presenceOf(ctx, member.session_id, guest.id);
+      if (presence) await ctx.db.patch(presence._id, { user_id: account.id });
+    }
+    // Only rooms that can still matter change hands: open lobbies, games in
+    // progress, and finished games where the guest had a seat (Play Again).
+    // Each is patched once with both host fields; dead rooms are left alone.
+    const guestRoomIds = new Set(memberships.map((m) => m.session_id));
     const hostedRooms = await ctx.db
       .query("game_sessions")
       .withIndex("by_host", (q) => q.eq("host_user_id", guest.id))
       .collect();
-    for (const room of hostedRooms) {
-      await ctx.db.patch(room._id, { host_user_id: account.id, updated_at: nowAppleEpochSeconds() });
-    }
     const originalRooms = await ctx.db
       .query("game_sessions")
       .withIndex("by_original_host", (q) => q.eq("original_host_user_id", guest.id))
       .collect();
-    for (const room of originalRooms) {
-      await ctx.db.patch(room._id, { original_host_user_id: account.id, updated_at: nowAppleEpochSeconds() });
+    const rooms = new Map([...hostedRooms, ...originalRooms].map((room) => [room._id, room]));
+    for (const room of rooms.values()) {
+      const live = room.status === "waiting" || room.status === "in_progress";
+      if (!live && !(room.status === "completed" && guestRoomIds.has(room.id))) continue;
+      await ctx.db.patch(room._id, {
+        ...(room.host_user_id === guest.id ? { host_user_id: account.id } : {}),
+        ...(room.original_host_user_id === guest.id ? { original_host_user_id: account.id } : {}),
+        updated_at: nowAppleEpochSeconds(),
+      });
     }
 
-    await ctx.db.patch(account._id, { merged_guest_digests: [...(account.merged_guest_digests ?? []), digest] });
+    // Tombstones only serve a retry after a lost response, so a few suffice.
+    const tombstones = [...(account.merged_guest_digests ?? []), digest].slice(-MERGE_TOMBSTONES);
+    await ctx.db.patch(account._id, { merged_guest_digests: tombstones });
     await ctx.db.delete(guest._id);
     return { success: true, merged_count: transferredCount, transferred_count: transferredCount };
   },

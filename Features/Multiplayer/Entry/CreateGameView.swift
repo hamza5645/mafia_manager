@@ -10,7 +10,8 @@ struct CreateGameView: View {
     @State private var isCreating = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
-    @State private var hasStartedSession = false
+    /// Set by Cancel or by leaving the screen, so a guest sign-in that finishes later never creates a room.
+    @State private var entryCancelled = false
 
     var body: some View {
         NavigationStack {
@@ -119,13 +120,15 @@ struct CreateGameView: View {
 
                         Spacer(minLength: 40)
                     }
+                    .readableContentWidth()
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if hasStartedSession {
+                        cancelEntry()
+                        if multiplayerStore.isInSession {
                             Task {
                                 try? await multiplayerStore.leaveSession()
                                 dismiss()
@@ -150,14 +153,23 @@ struct CreateGameView: View {
                 }
             }
             .onDisappear {
-                // Cleanup on swipe-to-dismiss if session was started but not navigated to lobby
-                if hasStartedSession && !showingLobby {
+                // Leaving before the lobby opened: drop a create still in flight, and leave a
+                // room that already exists (pushing the lobby also hides this screen).
+                guard !showingLobby else { return }
+                cancelEntry()
+                if multiplayerStore.isInSession {
                     Task {
                         try? await multiplayerStore.leaveSession()
                     }
                 }
             }
         }
+    }
+
+    /// The store drops a create that is still in flight (and leaves the room it returns).
+    private func cancelEntry() {
+        entryCancelled = true
+        multiplayerStore.cancelPendingEntry()
     }
 
     private func createGame() {
@@ -170,6 +182,7 @@ struct CreateGameView: View {
 
         isCreating = true
         errorMessage = nil
+        entryCancelled = false
 
         Task {
             // Auto sign-in as guest if not authenticated
@@ -184,28 +197,27 @@ struct CreateGameView: View {
                 }
             }
 
+            // Cancelled during the sign-in: never start the request.
+            guard !entryCancelled else {
+                isCreating = false
+                return
+            }
+
             // Now create the session
             do {
-                // Mark session as started before async call
-                await MainActor.run {
-                    hasStartedSession = true
-                }
-
                 try await multiplayerStore.createSession(
                     playerName: trimmedName,
                     botCount: botCount
                 )
 
-                await MainActor.run {
-                    isCreating = false
-                    showingLobby = true
-                }
+                isCreating = false
+                // Cancelled mid-request: the store has already dropped the room.
+                guard !entryCancelled else { return }
+                showingLobby = true
             } catch {
-                await MainActor.run {
-                    isCreating = false
-                    hasStartedSession = false // Reset on failure
-                    errorMessage = error.localizedDescription
-                }
+                isCreating = false
+                guard !entryCancelled else { return }
+                errorMessage = error.localizedDescription
             }
         }
     }

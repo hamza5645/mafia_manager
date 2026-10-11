@@ -1,7 +1,7 @@
 import Foundation
 
 // Represents an action taken during the game (night or day)
-struct GameAction: Codable, Identifiable, Sendable {
+struct GameAction: Codable, Identifiable, Sendable, Equatable {
     let id: UUID
     let sessionId: UUID
     let roundId: UUID // Links to game_sessions.current_round_id for action isolation
@@ -33,7 +33,7 @@ enum ActionType: String, Codable, Sendable {
 }
 
 // Additional action data stored as JSON
-struct ActionData: Codable, Sendable {
+struct ActionData: Codable, Sendable, Equatable {
     var inspectorResult: String? // "mafia", "not_mafia", "blocked"
     var mafiaVoteCount: Int? // Number of mafia who voted for this target
     var voteWeight: Int? // For potential weighted voting systems
@@ -48,7 +48,7 @@ struct ActionData: Codable, Sendable {
 // MARK: - Tentative Selection (for real-time vote preview)
 
 /// A draft target shown to teammates before submission (`RoundState.tentative`).
-struct TentativeSelection: Codable, Sendable {
+struct TentativeSelection: Codable, Sendable, Equatable {
     let actorPlayerId: UUID
     let targetPlayerId: UUID?  // nil means deselected
     let actionType: ActionType

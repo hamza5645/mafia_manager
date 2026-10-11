@@ -2,55 +2,41 @@ import SwiftUI
 
 struct MultiplayerVotingResultsView: View {
     @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
+    /// The phase payload, from the router.
+    let voteCounts: [UUID: Int]
+    let eliminatedPlayerId: UUID?
+
     @State private var isTransitioning = false
     @State private var transitionError: String?
 
-    private var voteData: (dayIndex: Int, voteCounts: [UUID: Int], eliminatedId: UUID?)? {
-        guard let session = multiplayerStore.currentSession,
-              case .votingResults(let dayIndex, let voteCounts, let eliminatedPlayerId) = session.currentPhaseData else {
-            return nil
-        }
-        return (dayIndex, voteCounts, eliminatedPlayerId)
-    }
-
-    private var playerLookup: [UUID: PublicPlayerInfo] {
-        Dictionary(uniqueKeysWithValues: multiplayerStore.visiblePlayers.map { ($0.playerId, $0) })
-    }
-
-    private var sortedVoteCounts: [(player: PublicPlayerInfo, votes: Int)] {
-        guard let data = voteData else { return [] }
-
-        // HAMZA-FIX: Use map instead of compactMap to never silently drop vote entries
-        // If a player is missing from visiblePlayers, create a placeholder
-        return data.voteCounts.map { (playerID, voteCount) -> (PublicPlayerInfo, Int) in
-            let player = playerLookup[playerID] ?? PublicPlayerInfo(
-                id: playerID,
-                playerId: playerID,
-                playerName: "Unknown Player",
-                playerNumber: nil,
-                isBot: false,
-                isAlive: false,
-                isOnline: false,
-                isReady: false
-            )
-            return (player, voteCount)
-        }
-        .sorted(by: { $0.1 > $1.1 })
-    }
-
-    private var eliminatedPlayer: PublicPlayerInfo? {
-        guard let data = voteData, let eliminatedId = data.eliminatedId else { return nil }
-        // HAMZA-FIX: Handle missing eliminated player with placeholder
-        return playerLookup[eliminatedId] ?? PublicPlayerInfo(
-            id: eliminatedId,
-            playerId: eliminatedId,
-            playerName: "Eliminated Player",
+    /// HAMZA-FIX: never silently drop a vote entry; a player missing from the roster gets a placeholder.
+    private static func placeholder(_ id: UUID, name: String) -> PublicPlayerInfo {
+        PublicPlayerInfo(
+            id: id,
+            playerId: id,
+            playerName: name,
             playerNumber: nil,
             isBot: false,
             isAlive: false,
             isOnline: false,
             isReady: false
         )
+    }
+
+    /// Most votes first; ties by player number, then id, so every device shows the same order.
+    static func sortedTallies(
+        _ voteCounts: [UUID: Int],
+        lookup: [UUID: PublicPlayerInfo]
+    ) -> [(player: PublicPlayerInfo, votes: Int)] {
+        voteCounts
+            .map { playerID, voteCount in
+                (player: lookup[playerID] ?? placeholder(playerID, name: "Unknown Player"), votes: voteCount)
+            }
+            .sorted { a, b in
+                if a.votes != b.votes { return a.votes > b.votes }
+                return (a.player.playerNumber ?? .max, a.player.playerId.uuidString)
+                    < (b.player.playerNumber ?? .max, b.player.playerId.uuidString)
+            }
     }
 
     private var nextPhaseButtonLabel: String {
@@ -60,6 +46,14 @@ struct MultiplayerVotingResultsView: View {
     }
 
     var body: some View {
+        // Built once per render, outside the ForEach.
+        let lookup = Dictionary(
+            multiplayerStore.visiblePlayers.map { ($0.playerId, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let tallies = Self.sortedTallies(voteCounts, lookup: lookup)
+        let eliminatedPlayer = eliminatedPlayerId.map { lookup[$0] ?? Self.placeholder($0, name: "Eliminated Player") }
+
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
 
@@ -73,20 +67,21 @@ struct MultiplayerVotingResultsView: View {
                 // Vote tally (scrollable)
                 ScrollView {
                     VStack(spacing: 16) {
-                        ForEach(sortedVoteCounts, id: \.player.playerId) { item in
+                        ForEach(tallies, id: \.player.playerId) { item in
                             MultiplayerVoteCountRow(
                                 player: item.player,
                                 voteCount: item.votes,
-                                isEliminated: item.player.playerId == eliminatedPlayer?.playerId
+                                isEliminated: item.player.playerId == eliminatedPlayerId
                             )
                         }
                     }
                     .padding(.horizontal)
                 }
+                .layoutPriority(1)
 
                 // Elimination result
-                if let eliminated = eliminatedPlayer {
-                    eliminationSection(for: eliminated)
+                if let eliminatedPlayer {
+                    eliminationSection(for: eliminatedPlayer)
                 } else {
                     noEliminationSection
                 }
@@ -103,7 +98,7 @@ struct MultiplayerVotingResultsView: View {
                                 do {
                                     try await multiplayerStore.continueFromVotingResults()
                                 } catch {
-                                    transitionError = "Failed to continue: \(error.localizedDescription)"
+                                    transitionError = HostTransition.errorMessage(for: error)
                                 }
                                 isTransitioning = false
                             }
@@ -137,6 +132,7 @@ struct MultiplayerVotingResultsView: View {
                         .padding(.bottom, 32)
                 }
             }
+            .readableContentWidth()
         }
         .navigationBarBackButtonHidden(true)
     }
@@ -236,7 +232,7 @@ struct MultiplayerVoteCountRow: View {
 
 #Preview {
     NavigationStack {
-        MultiplayerVotingResultsView()
+        MultiplayerVotingResultsView(voteCounts: [:], eliminatedPlayerId: nil)
             .environmentObject(MultiplayerGameStore())
             .preferredColorScheme(.dark)
     }

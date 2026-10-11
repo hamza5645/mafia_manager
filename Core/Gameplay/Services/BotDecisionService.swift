@@ -2,7 +2,7 @@ import Foundation
 
 /// Service responsible for making strategic decisions for bot players during gameplay
 @MainActor
-final class BotDecisionService {
+struct BotDecisionService {
 
     // MARK: - Night Phase Decisions
 

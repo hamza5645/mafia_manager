@@ -8,11 +8,11 @@ Multiplayer mode turns the local pass-and-play Mafia assistant into online rooms
 
 - **Server (Convex)** validates every action and transition, computes outcomes and win checks, and projects private data per viewer.
 - **Host client** only requests transitions and drives the bots. It never writes outcomes.
-- **Every client** sends its own actions and renders three snapshot subscriptions.
+- **Every client** sends its own actions and renders four snapshot subscriptions.
 
 Key components:
 - `MultiplayerGameStore` (+`Connection`, +`HostPhases`) - snapshot state, player actions, host requests, heartbeat.
-- `BotDirector` - host-side bot actions and votes, driven by `views:getRoundState` snapshots.
+- `BotDirector` - host-side bot actions and votes, driven by `views:getRoundState` snapshots and sent in one `play:submitBotActions` call per pass.
 - `SessionService` - Convex mutations.
 - `SubscriptionSupervisor` - keeps one subscription alive.
 - `convex/sessions.ts`, `phases.ts`, `play.ts`, `night.ts`, `voting.ts`, `views.ts` - server logic; shared helpers are in `convex/lib/`.
@@ -34,21 +34,24 @@ npx convex dev
 3. Validate functions and the API contract:
 ```bash
 npx convex dev --once
-node scripts/e2e/verify-deployment.mjs
+node scripts/e2e/verify-deployment.mjs          # development; --prod checks Configuration/Production.xcconfig's deployment
 ```
+The check passes when the deployment's `api_contract` is at least the app's `ConvexConfig.apiContractVersion` (5) and its `min_client_contract` is at most the app's. `npm run convex:deploy` runs the backend tests, deploys, then runs the check with `--prod`. Backend and app ship together at contract 5.
 
 ## Game Flow
 
 1. The host calls `sessions:createSession`. The server creates the 6-digit room code, the host seat and the bot seats.
-2. Players join with `sessions:joinSession`. Rejoining restores the existing seat.
+2. Players join with `sessions:joinSession`. Rejoining restores the existing seat and returns `rejoined: true`, so a cancelled re-entry keeps it.
 3. The host calls `sessions:startGame`, which assigns every role and number in one mutation and enters `role_reveal`.
-4. Players reveal their roles and mark ready. The host calls `phases:advancePhase(night)`.
-5. Night: players submit `play:submitAction` for the current `round_id`. The host calls `night:recordNightActions`, then `night:resolveNightAtomic`, which moves to `morning` or `game_over`.
+4. Players reveal their roles and mark ready (`sessions:setReady` with `phase: "role_reveal"`; the server ignores it in any other phase). The host calls `phases:advancePhase(night)`.
+5. Night: players submit `play:submitAction` for the current `round_id`; the host sends the bots' actions with `play:submitBotActions`. The host's Finish Night calls `night:finishNight`, which records the night and resolves it in one transaction and moves to `morning` or `game_over`. (`night:recordNightActions` and `night:resolveNightAtomic` remain as the two separate steps.)
 6. The host calls `phases:advancePhase(death_reveal)`, then `phases:advancePhase(voting)`.
 7. Voting: players submit votes. The host calls `voting:closeVoting` (results), `phases:advancePhase(vote_death_reveal)`, then `voting:resolveVoteAtomic`, which starts the next night or ends the game.
 8. Play Again calls `sessions:returnToLobby`; the host's End Game calls `sessions:cancelSession`.
 
-Host calls are safe to retry. Clients heartbeat every 5 s. If the host's heartbeat is older than 15 s, the successor calls `sessions:claimHost`.
+The host sees who the phase is waiting for (role reveal, night, voting), with an offline badge and Remove; a removed player can rejoin only after the game ends. The host can start the night before everyone confirmed their role. Night finishes on its own for a citizen or eliminated host; an alive Inspector host taps Finish Night.
+
+Host calls are safe to retry. Clients heartbeat every 5 s with `sessions:heartbeat`, which writes only the caller's `session_presence` row; the host's heartbeat also refreshes each seat's `is_online`. Clients watch the host through `views:getHostPresence`, which compares the host's last heartbeat with the server clock. Once the host is stale (90 s in the lobby, 15 s in a game), any member may call `sessions:claimHost`, and the server installs the successor.
 
 ## Privacy Rules
 
@@ -67,8 +70,11 @@ Host calls are safe to retry. Clients heartbeat every 5 s. If the host's heartbe
 - `views:getSessionView`
 - `views:getPlayers`
 - `views:getRoundState`
+- `views:getHostPresence` (reads only the host's presence row, so other players' heartbeats never re-run it)
 
-Each snapshot is assigned directly to store state; everything else is derived. There is no diffing or polling. A `SubscriptionSupervisor` resubscribes after a failure with `min(30, 2^attempt)` s backoff and jitter. It also restarts on app foreground and on an identity change, when the guest proof changes.
+Each snapshot is assigned directly to store state unless it equals the current value; everything else is derived. There is no polling. A `SubscriptionSupervisor` resubscribes after a failure with `min(30, 2^attempt)` s backoff and jitter. It also restarts on app foreground and when the guest proof changes. A value that fails to decode twice in a row stops the subscription and asks for an app update (`BackendCompatibility`).
+
+A 5 s ticker heartbeats, checks the host and re-runs host automation, so failed bot submissions and the role-reveal advance retry without new snapshots. Heartbeats and host claims go one at a time with the 12 s mutation limit, so a call that never returns cannot stop them and an outage queues one per limit, not one per tick. Create and join stop the user's wait after 12 s; a room or new seat that arrives later, or after a Cancel, is given back. "Reconnecting…" shows after 3 failed retries, 2.5 s of socket reconnecting, or a tap still sending after 5 s; the banner always has Retry.
 
 ## Testing
 
@@ -79,13 +85,17 @@ Test scenarios:
 - guest profile restoration;
 - Clerk account sign-in;
 - role privacy for host, Mafia, and non-Mafia players;
-- night action submission and `night:resolveNightAtomic`;
+- night action submission and `night:finishNight`;
 - voting and tie/no-elimination behavior;
 - reconnect after backgrounding;
 - bot auto-actions;
 - completed-game stats sync.
 
-Server rules are covered by `npm run test:backend`.
+Server rules are covered by `npm run test:backend`, which type-checks the tests and then checks `tests/fixtures/rules-parity.json` (role table, target rules, parity win cases, shared error strings) and the contract fixtures in `tests/fixtures/contract/` that the Swift decoding tests read. A normal run fails when either drifts; regenerate on purpose with `npx vitest run tests/convex/contract.test.ts -u` or `npx vitest run tests/convex/rules-parity.test.ts -u` and update the Swift side in the same change. CI runs it on every pull request.
+
+The store runs against `FakeSessionService` and `ManualClock` in unit tests (`MultiplayerStoreTests`, `BotDirectorTests`, `SubscriptionSupervisorTests`). The live suite is opt-in: `TEST_RUNNER_CONVEX_INTEGRATION=1`, and in Debug `TEST_RUNNER_MAFIA_CONVEX_URL=<url>` for another backend. It runs one live store per identity and names its guests `QA …`, which the dev-only `testing:purgeQa` mutation removes (see `AGENTS.md`).
+
+Win rule (both modes): Mafia win when living Mafia are at least the living non-Mafia, after a night and after a vote; Citizens win when no Mafia are alive; a game with only bots alive ends.
 
 ## Troubleshooting
 

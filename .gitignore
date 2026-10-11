@@ -24,6 +24,9 @@ Derived/
 mafia_manager.xcodeproj/
 mafia_manager.xcworkspace/
 
+# Machine-specific; regenerate with `xcode-build-server config -workspace mafia_manager.xcworkspace -scheme mafia_manager`
+buildServer.json
+
 # Local-only agent state (committed skills, agents and settings.json stay tracked)
 .claude/settings.local.json
 .claude/worktrees/

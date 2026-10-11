@@ -20,67 +20,71 @@ struct GuestNameInputView: View {
             ZStack {
                 Design.Colors.surface0.ignoresSafeArea()
 
-                VStack(spacing: 32) {
-                    // Title and description
-                    VStack(spacing: 12) {
-                        Text("What should we call you?")
-                            .font(Design.Typography.title2)
-                            .foregroundStyle(Design.Colors.textPrimary)
+                // In landscape the keyboard leaves little height: the title and
+                // field scroll, and the button stays pinned above the keyboard.
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // Title and description
+                        VStack(spacing: 12) {
+                            Text("What should we call you?")
+                                .font(Design.Typography.title2)
+                                .foregroundStyle(Design.Colors.textPrimary)
 
-                        Text("This is how you'll appear to other players in multiplayer games.")
-                            .font(Design.Typography.body)
-                            .foregroundStyle(Design.Colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 40)
+                            Text("This is how you'll appear to other players in multiplayer games.")
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 40)
 
-                    // Name input field
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextField("Enter your name", text: $displayName)
-                            .textFieldStyle(.plain)
-                            .font(Design.Typography.body)
-                            .foregroundStyle(Design.Colors.textPrimary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(Design.Colors.surface1)
-                            .cornerRadius(Design.Radii.medium)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                    .stroke(
-                                        isNameFieldFocused ? Design.Colors.brandGold : Design.Colors.stroke.opacity(0.3),
-                                        lineWidth: isNameFieldFocused ? 2 : 1
-                                    )
-                            )
-                            .focused($isNameFieldFocused)
-                            .textContentType(.name)
-                            .autocorrectionDisabled()
-                            .submitLabel(.done)
-                            .onSubmit {
-                                if isValidName {
-                                    Task { await submitGuestSignIn() }
+                        // Name input field
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Enter your name", text: $displayName)
+                                .textFieldStyle(.plain)
+                                .font(Design.Typography.body)
+                                .foregroundStyle(Design.Colors.textPrimary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(Design.Colors.surface1)
+                                .cornerRadius(Design.Radii.medium)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Design.Radii.medium)
+                                        .stroke(
+                                            isNameFieldFocused ? Design.Colors.brandGold : Design.Colors.stroke.opacity(0.3),
+                                            lineWidth: isNameFieldFocused ? 2 : 1
+                                        )
+                                )
+                                .focused($isNameFieldFocused)
+                                .textContentType(.name)
+                                .autocorrectionDisabled()
+                                .submitLabel(.done)
+                                .onSubmit {
+                                    if isValidName {
+                                        Task { await submitGuestSignIn() }
+                                    }
                                 }
-                            }
 
-                        // Validation hint
-                        if !displayName.isEmpty && !isValidName {
-                            Text(validationHint)
-                                .font(Design.Typography.caption)
+                            // Validation hint
+                            if !displayName.isEmpty && !isValidName {
+                                Text(validationHint)
+                                    .font(Design.Typography.caption)
+                                    .foregroundStyle(Design.Colors.dangerRed)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+
+                        // Error message
+                        if let error = authStore.errorMessage {
+                            Text(error)
+                                .font(Design.Typography.footnote)
                                 .foregroundStyle(Design.Colors.dangerRed)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 24)
                         }
                     }
-                    .padding(.horizontal, 24)
-
-                    // Error message
-                    if let error = authStore.errorMessage {
-                        Text(error)
-                            .font(Design.Typography.footnote)
-                            .foregroundStyle(Design.Colors.dangerRed)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
-                    }
-
-                    Spacer()
-
+                    .readableContentWidth()
+                }
+                .safeAreaInset(edge: .bottom) {
                     // Start Playing button
                     Button {
                         Task { await submitGuestSignIn() }
@@ -104,7 +108,9 @@ struct GuestNameInputView: View {
                     }
                     .disabled(!isValidName || isSubmitting)
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 32)
+                    .padding(.vertical, 16)
+                    .readableContentWidth()
+                    .background(Design.Colors.surface0)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

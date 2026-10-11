@@ -1,6 +1,7 @@
 import { Doc } from "../_generated/dataModel";
 import { MutationCtx } from "../_generated/server";
 import { listSeats } from "./guards";
+import { deletePresence, deleteSessionPresence, heartbeatsOf } from "./presence";
 import { nextHostAfterDeath, nextHostOnLeave } from "./rules";
 import { nowAppleEpochSeconds, uuid } from "./util";
 
@@ -10,7 +11,7 @@ type Seat = Doc<"session_players">;
 async function deleteTentatives(ctx: MutationCtx, sessionId: string) {
   const rows = await ctx.db
     .query("tentative_selections")
-    .withIndex("by_session_phase_type", (q) => q.eq("session_id", sessionId))
+    .withIndex("by_actor", (q) => q.eq("session_id", sessionId))
     .collect();
   for (const row of rows) await ctx.db.delete(row._id);
 }
@@ -18,7 +19,7 @@ async function deleteTentatives(ctx: MutationCtx, sessionId: string) {
 async function deleteActionsAndTentatives(ctx: MutationCtx, sessionId: string) {
   const actions = await ctx.db
     .query("game_actions")
-    .withIndex("by_session", (q) => q.eq("session_id", sessionId))
+    .withIndex("by_unique_action", (q) => q.eq("session_id", sessionId))
     .collect();
   for (const action of actions) await ctx.db.delete(action._id);
   await deleteTentatives(ctx, sessionId);
@@ -53,7 +54,7 @@ export async function finishGame(ctx: MutationCtx, session: Session, seats: Seat
 
 // `seats` must already reflect this transaction's deaths.
 export async function transferHostAfterDeath(ctx: MutationCtx, session: Session, seats: Seat[]) {
-  const next = nextHostAfterDeath(seats, session.host_user_id, true);
+  const next = nextHostAfterDeath(seats, session.host_user_id, await heartbeatsOf(ctx, session.id));
   if (next?.user_id) {
     await ctx.db.patch(session._id, { host_user_id: next.user_id, updated_at: nowAppleEpochSeconds() });
   }
@@ -73,7 +74,18 @@ export async function cancelSessionAndRemovePlayers(ctx: MutationCtx, session: S
     updated_at: now,
   });
   for (const seat of seats) await ctx.db.delete(seat._id);
+  await deleteSessionPresence(ctx, session.id);
   await deleteActionsAndTentatives(ctx, session.id);
+}
+
+// Every row a room owns besides the session itself: seats, presence, actions
+// and drafts. Returns how many seats there were.
+export async function deleteRoomRows(ctx: MutationCtx, sessionId: string) {
+  const seats = await listSeats(ctx, sessionId);
+  for (const seat of seats) await ctx.db.delete(seat._id);
+  await deleteSessionPresence(ctx, sessionId);
+  await deleteActionsAndTentatives(ctx, sessionId);
+  return seats.length;
 }
 
 // Deletes the seat (if any); a leaving host hands over to the earliest remaining
@@ -84,7 +96,10 @@ export async function removeSeatAndTransferHost(
   seat: Seat | null,
   leavingUserId: string | undefined,
 ) {
-  if (seat) await ctx.db.delete(seat._id);
+  if (seat) {
+    await ctx.db.delete(seat._id);
+    if (seat.user_id) await deletePresence(ctx, session.id, seat.user_id);
+  }
   if (!leavingUserId || session.host_user_id !== leavingUserId) return;
   const next = nextHostOnLeave(await listSeats(ctx, session.id));
   if (!next?.user_id) return await cancelSessionAndRemovePlayers(ctx, session);

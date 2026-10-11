@@ -31,6 +31,7 @@ struct MorningSummaryView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
+            .readableContentWidth()
         }
         .navigationTitle("Morning Summary")
         .navigationBarBackButtonHidden(true)
@@ -75,6 +76,7 @@ struct MorningSummaryView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
+            .readableContentWidth()
             .background(Design.Colors.surface0.opacity(0.95))
         }
     }
