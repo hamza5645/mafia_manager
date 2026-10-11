@@ -32,25 +32,33 @@ struct IntroView: View {
                     .padding(.top, 8)
                     .padding(.trailing, 12)
 
-                    // Custom paging view using offset
+                    // Custom paging view using offset. Pages that are off screen are hidden from
+                    // VoiceOver. The pager takes the height the header and footer leave, so it can
+                    // never be negative and the footer can grow with Dynamic Type.
                     HStack(spacing: 0) {
                         IntroScreen1()
                             .frame(width: geometry.size.width)
+                            .accessibilityHidden(currentPage != 0)
 
                         IntroScreen2()
                             .frame(width: geometry.size.width)
+                            .accessibilityHidden(currentPage != 1)
 
                         IntroScreen3()
                             .frame(width: geometry.size.width)
+                            .accessibilityHidden(currentPage != 2)
 
                         IntroScreen4()
                             .frame(width: geometry.size.width)
+                            .accessibilityHidden(currentPage != 3)
 
                         IntroScreen5()
                             .frame(width: geometry.size.width)
+                            .accessibilityHidden(currentPage != 4)
                     }
                     .offset(x: -CGFloat(currentPage) * geometry.size.width)
-                    .frame(width: geometry.size.width, height: geometry.size.height - 200, alignment: .leading)
+                    .frame(width: geometry.size.width, alignment: .leading)
+                    .frame(maxHeight: .infinity)
                     .clipped()
                     .animation(.easeInOut(duration: 0.3), value: currentPage)
                     .gesture(
@@ -77,6 +85,7 @@ struct IntroView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 32)
+                    .readableContentWidth()
                     .background(Design.Colors.surface0)
                 }
             }
@@ -125,7 +134,8 @@ struct IntroView: View {
             .accessibilityLabel(currentPage < totalPages - 1 ? "Go to next screen" : "Start game setup")
             .accessibilityIdentifier(currentPage < totalPages - 1 ? "intro_next_button" : "intro_start_button")
         }
-        .frame(height: 56)
+        // The CTA style scales its height with Dynamic Type; let the row grow with it
+        .frame(minHeight: 56)
     }
 }
 
@@ -222,6 +232,7 @@ private struct IntroScreen1: View {
                 Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
+            .readableContentWidth()
         }
     }
 }
@@ -276,6 +287,7 @@ private struct IntroScreen2: View {
                 Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
+            .readableContentWidth()
         }
     }
 }
@@ -345,6 +357,7 @@ private struct IntroScreen3: View {
                 Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
+            .readableContentWidth()
         }
     }
 }
@@ -405,6 +418,7 @@ private struct IntroScreen4: View {
                 Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
+            .readableContentWidth()
         }
     }
 }
@@ -470,6 +484,7 @@ private struct IntroScreen5: View {
                 Spacer().frame(height: 20)
             }
             .padding(.horizontal, 20)
+            .readableContentWidth()
         }
     }
 }
@@ -573,42 +588,6 @@ private struct RoleRow: View {
         case .inspector: return Design.Colors.actionBlue
         case .citizen: return Design.Colors.textTertiary
         }
-    }
-}
-
-private struct PhaseCard: View {
-    let icon: String
-    let phase: String
-    let description: String
-    let color: Color
-    @ScaledMetric(relativeTo: .callout) private var iconSize: CGFloat = 20
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.2))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: icon)
-                    .font(.system(size: iconSize, weight: .semibold))
-                    .foregroundStyle(color)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(phase)
-                    .font(Design.Typography.headline)
-                    .foregroundStyle(Design.Colors.textPrimary)
-
-                Text(description)
-                    .font(Design.Typography.callout)
-                    .foregroundStyle(Design.Colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(14)
-        .background(Design.Colors.surface1)
-        .cornerRadius(Design.Radii.medium)
     }
 }
 

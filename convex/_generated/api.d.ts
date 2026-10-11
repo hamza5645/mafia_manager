@@ -8,10 +8,13 @@
  * @module
  */
 
+import type * as cleanup from "../cleanup.js";
+import type * as crons from "../crons.js";
 import type * as health from "../health.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_guards from "../lib/guards.js";
 import type * as lib_identity from "../lib/identity.js";
+import type * as lib_presence from "../lib/presence.js";
 import type * as lib_projections from "../lib/projections.js";
 import type * as lib_rules from "../lib/rules.js";
 import type * as lib_transitions from "../lib/transitions.js";
@@ -21,6 +24,7 @@ import type * as phases from "../phases.js";
 import type * as play from "../play.js";
 import type * as sessions from "../sessions.js";
 import type * as stats from "../stats.js";
+import type * as testing from "../testing.js";
 import type * as users from "../users.js";
 import type * as validators from "../validators.js";
 import type * as views from "../views.js";
@@ -33,10 +37,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  cleanup: typeof cleanup;
+  crons: typeof crons;
   health: typeof health;
   "lib/errors": typeof lib_errors;
   "lib/guards": typeof lib_guards;
   "lib/identity": typeof lib_identity;
+  "lib/presence": typeof lib_presence;
   "lib/projections": typeof lib_projections;
   "lib/rules": typeof lib_rules;
   "lib/transitions": typeof lib_transitions;
@@ -46,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   play: typeof play;
   sessions: typeof sessions;
   stats: typeof stats;
+  testing: typeof testing;
   users: typeof users;
   validators: typeof validators;
   views: typeof views;

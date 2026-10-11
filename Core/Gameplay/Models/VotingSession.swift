@@ -1,7 +1,7 @@
 import Foundation
 
 /// Tracks voting for a single day phase
-struct VotingSession: Codable, Sendable, Identifiable {
+struct VotingSession: Codable, Sendable, Identifiable, Equatable {
     var id: UUID = UUID()
     var dayIndex: Int
     /// Map of voter ID to voted player ID
@@ -47,5 +47,17 @@ struct VotingSession: Codable, Sendable, Identifiable {
 
         eliminatedPlayerID = playersWithMaxVotes.first?.key
         return eliminatedPlayerID
+    }
+}
+
+extension VotingSession {
+    /// `id` falls back to a new one when an older save lacks it.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        dayIndex = try c.decode(Int.self, forKey: .dayIndex)
+        votes = try c.decode([UUID: UUID].self, forKey: .votes)
+        eliminatedPlayerID = try c.decodeIfPresent(UUID.self, forKey: .eliminatedPlayerID)
+        voteCounts = try c.decode([UUID: Int].self, forKey: .voteCounts)
     }
 }

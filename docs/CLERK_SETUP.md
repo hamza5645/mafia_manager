@@ -50,8 +50,12 @@ Then run the app and verify:
 Debug reads development values from [Debug.xcconfig](../Configuration/Debug.xcconfig)
 and Release reads production values from
 [Production.xcconfig](../Configuration/Production.xcconfig), both through generated
-build settings/Info.plist; there is no fallback. `ConvexConfig` stops the app at
-launch if a value is missing, and Release also requires a `pk_live_` Clerk key. Tuist generates the matching
+build settings/Info.plist; there is no fallback. The "Verify backend config" pre-build
+phase (`Project.swift`) fails the build if a value is missing; in Release it also requires a
+`pk_live_` key, a `.convex.cloud` host other than the Debug one and a frontend host outside
+`.accounts.dev`. Local profiling builds pointed at dev pass `MAFIA_ALLOW_NONPROD_RELEASE=YES`
+to xcodebuild and must never ship. `ConvexConfig` still stops the app at launch if a value is
+missing, and Release also requires a `pk_live_` Clerk key. Tuist generates the matching
 `webcredentials` associated-domain entitlement, following
 [Clerk's iOS quickstart](https://clerk.com/docs/ios/getting-started/quickstart).
 
@@ -65,11 +69,14 @@ launch if a value is missing, and Release also requires a `pk_live_` Clerk key. 
 - Native API is enabled. The published association file lists
   `5GH22BAXAU.com.hamza5645.mafia`.
 
-Before shipping an app build, check that the deployment reports API contract 4:
+Before shipping an app build, check that the production deployment accepts API contract 5
+(its `api_contract` is at least 5 and its `min_client_contract` at most 5):
 
 ```bash
-CONVEX_AUDIT_URL=https://handsome-tiger-460.eu-west-1.convex.cloud node scripts/e2e/verify-deployment.mjs
+node scripts/e2e/verify-deployment.mjs --prod   # reads MAFIA_CONVEX_HOST from Configuration/Production.xcconfig
 ```
+
+`npm run convex:deploy` runs this check after the backend tests and the deploy.
 
 Never run test fixtures against production.
 
@@ -80,7 +87,7 @@ For a future production instance change:
    `email_verified` claim. A copied development instance does not copy integrations.
 3. Update the production key/hostname in `Configuration/Production.xcconfig` and
    set `CLERK_FRONTEND_API_URL` on production Convex to the same issuer.
-4. Regenerate through Tuist and redeploy the matching backend. Verify contract 4
+4. Regenerate through Tuist and redeploy the matching backend. Verify contract 5
    and real native account flows, including a legacy-account claim, before releasing.
 
 See [Clerk's production guide](https://clerk.com/docs/guides/development/deployment/production)

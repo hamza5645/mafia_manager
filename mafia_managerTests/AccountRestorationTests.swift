@@ -17,9 +17,10 @@ final class AccountRestorationTests {
         UserDefaults().removePersistentDomain(forName: suiteName)
     }
 
-    private func makeStore() -> AuthStore {
+    private func makeStore(restoreTimeout: Duration = AuthStore.restoreTimeout) -> AuthStore {
         AuthStore(authService: service, keychain: keychain, defaults: UserDefaults(suiteName: suiteName)!,
-                  notificationCenter: notifications, autoRestore: false)
+                  notificationCenter: notifications, autoRestore: false, restoreTimeout: restoreTimeout,
+                  clearPendingStats: {})
     }
 
     @Test func restoresTheSignedInAccount() async {
@@ -141,5 +142,104 @@ final class AccountRestorationTests {
 
         #expect(service.refreshes == 0)
         #expect(store.isAnonymous)
+    }
+
+    @Test func concurrentResumesShareOneTokenRefresh() async {
+        let store = makeStore()
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        service.refreshDelay = .milliseconds(50)
+
+        async let first: Void = store.ensureValidSession()
+        async let second: Void = store.ensureValidSession()
+        _ = await (first, second)
+
+        #expect(service.refreshes == 1, "AuthStore's observer and the multiplayer resume share one refresh")
+        await store.ensureValidSession()
+        #expect(service.refreshes == 2, "A later resume refreshes again")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func slowRestoreCountsAsTransientAndResumeRetries() async {
+        service.restoredUser = service.account
+        service.restoreDelay = .seconds(30)
+        let store = makeStore(restoreTimeout: .milliseconds(100))
+
+        await store.restoreSession()
+
+        #expect(store.isAuthenticated == false, "A restore that runs out of time keeps waiting off the critical path")
+        service.restoreDelay = nil
+        await store.ensureValidSession()
+        #expect(store.authenticatedAccountId == service.account.id)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSlowRestoreIsAdoptedWhenItArrives() async throws {
+        service.restoredUser = service.account
+        service.restoreDelay = .milliseconds(300)
+        let store = makeStore(restoreTimeout: .milliseconds(50))
+
+        await store.restoreSession()
+        #expect(store.isAuthenticated == false, "The launch does not wait past the time limit")
+
+        // No resume and no new Clerk event: the lookup that timed out lands on its own.
+        for _ in 0..<200 where store.authenticatedAccountId == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(store.authenticatedAccountId == service.account.id)
+        #expect(service.restores == 1, "The late result is used, not a second lookup")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSlowRestoreFindingTheAccountAfterAGuestSignInMergesTheGuest() async throws {
+        service.restoredUser = service.account
+        service.restoreDelay = .milliseconds(300)
+        let store = makeStore(restoreTimeout: .milliseconds(50))
+        await store.restoreSession()
+        // The app looked signed out, so the user played on as a guest.
+        _ = await store.signInAsGuest(displayName: "Guest")
+        #expect(store.isAnonymous)
+
+        for _ in 0..<200 where store.authenticatedAccountId == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(store.authenticatedAccountId == service.account.id, "As when Clerk reports the account later")
+        #expect(service.mergedHashes.count == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func accountSessionFoundAfterLaunchReplacesTheGuest() async throws {
+        let store = makeStore()
+        _ = await store.signInAsGuest(displayName: "Guest")
+        await store.restoreSession()
+        #expect(store.isAnonymous, "Clerk held no user at launch, so the guest was restored at once")
+
+        service.restoredUser = service.account
+        service.startAccountSession()
+        for _ in 0..<200 where store.authenticatedAccountId == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(store.authenticatedAccountId == service.account.id)
+        #expect(service.mergedHashes.count == 1, "The guest's progress merges into the account")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func accountSessionDuringInteractiveSignInIsLeftToTheFlow() async throws {
+        let store = makeStore()
+        _ = await store.signInAsGuest(displayName: "Guest")
+        service.restoredUser = service.account
+        service.signInDelay = .milliseconds(300)
+        let restores = service.restores
+
+        let signIn = Task { await store.signIn(email: "qa@example.com", password: "test-password") }
+        for _ in 0..<100 where !store.isLoading {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(store.isLoading)
+        #expect(store.authenticatedAccountId == nil, "Still the guest while the flow runs")
+        // Clerk reports the session from inside setActive, while the sign-in flow is still running.
+        service.startAccountSession()
+        try await Task.sleep(for: .milliseconds(50))
+        await signIn.value
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(store.authenticatedAccountId == service.account.id)
+        #expect(service.restores == restores, "The flow finishes its own sign-in; no restore runs alongside it")
+        #expect(service.mergedHashes.count == 1, "One guest merge, by the flow")
     }
 }

@@ -3,7 +3,7 @@ import SwiftUI
 /// A subscription or sign-in problem shown above the multiplayer game screens.
 struct ConnectionBanner: View {
     let message: String
-    let onRetry: (() -> Void)?
+    let onRetry: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -11,11 +11,10 @@ struct ConnectionBanner: View {
                 .accessibilityHidden(true)
             Text(message)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if let onRetry {
-                Button("Retry", action: onRetry)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Design.Colors.brandGold)
-            }
+            Button("Retry", action: onRetry)
+                .fontWeight(.bold)
+                .foregroundStyle(Design.Colors.brandGold)
+                .automationID("multiplayer.connection.retry")
         }
         .font(Design.Typography.footnote)
         .foregroundStyle(Design.Colors.textPrimary)

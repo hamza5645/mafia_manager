@@ -109,6 +109,7 @@ struct ProfileView: View {
 
                     Spacer()
                 }
+                .readableContentWidth()
             }
         }
         .confirmationDialog("Sign Out", isPresented: $showLogoutConfirmation, titleVisibility: .visible) {

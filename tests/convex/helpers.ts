@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from 'convex-test';
+import { vi } from 'vitest';
 import schema from '../../convex/schema';
 import { api } from '../../convex/_generated/api';
 
@@ -36,7 +37,7 @@ export async function room(t: Backend, humans = 4, bots = 0) {
   const as = (user: { hash: string }) => ({ session_id: sessionId, ...proof(user) });
   const all = await t.query(api.views.getPlayers, as(host));
   return {
-    sessionId, roomCode: entered.room_code, users, host, as,
+    sessionId, roomCode: entered.room_code, entered, users, host, as,
     humans: users.map(user => all.find(p => p.user_id === user.id)!),
     bots: all.filter(p => p.is_bot),
   };
@@ -85,3 +86,19 @@ export async function seatRow(t: Backend, playerId: string) {
 export async function sessionRow(t: Backend, sessionId: string) {
   return (await t.run(ctx => ctx.db.query('game_sessions').withIndex('by_app_id', q => q.eq('id', sessionId)).unique()))!;
 }
+
+export async function presenceRows(t: Backend, sessionId: string) {
+  return await t.run(ctx => ctx.db.query('session_presence').withIndex('by_session', q => q.eq('session_id', sessionId)).collect());
+}
+
+// Rewrites a user's last heartbeat, as if they went quiet at `seconds` (Apple epoch).
+export async function setHeartbeat(t: Backend, sessionId: string, userId: string, seconds: number) {
+  await t.run(async ctx => {
+    const row = await ctx.db.query('session_presence')
+      .withIndex('by_session_user', q => q.eq('session_id', sessionId).eq('user_id', userId)).unique();
+    await ctx.db.patch(row!._id, { last_heartbeat: seconds });
+  });
+}
+
+// Moves the fake clock (vi.useFakeTimers({ toFake: ['Date'] })) forward.
+export const advance = (seconds: number) => vi.setSystemTime(Date.now() + seconds * 1000);

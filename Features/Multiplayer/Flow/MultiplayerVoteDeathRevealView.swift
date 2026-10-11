@@ -3,78 +3,69 @@ import AudioToolbox
 
 struct MultiplayerVoteDeathRevealView: View {
     @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
-    let dayIndex: Int
+    /// The phase payload, from the router (which gives each day a fresh view).
+    let reveal: VoteRevealData
 
     // Animation state
     @State private var isCardFlipped = false
     @State private var showMysteryCard = true
-    @State private var revealTriggered = false
-    @State private var isTransitioning = false
-
-    // Extracted reveal data from phase
-    private var revealData: VoteRevealData? {
-        guard let session = multiplayerStore.currentSession,
-              case .voteDeathReveal(
-                  let idx,
-                  let playerId,
-                  let name,
-                  let number,
-                  let roleStr,
-                  let votes
-              ) = session.currentPhaseData,
-              idx == dayIndex else {
-            return nil
-        }
-        return VoteRevealData(
-            eliminatedPlayerId: playerId,
-            playerName: name,
-            playerNumber: number,
-            role: roleStr.flatMap { Role(rawValue: $0) },
-            voteCount: votes
-        )
-    }
 
     private var isEliminated: Bool {
         guard let myPlayer = multiplayerStore.myPlayer,
-              let data = revealData else { return false }
-        return data.eliminatedPlayerId == myPlayer.playerId
+              let eliminatedId = reveal.eliminatedPlayerId else { return false }
+        return eliminatedId == myPlayer.playerId
     }
 
     private var hasElimination: Bool {
-        revealData?.eliminatedPlayerId != nil
+        reveal.eliminatedPlayerId != nil
     }
 
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
 
-            VStack(spacing: 32) {
-                Spacer()
+            // Scrolls when the card and buttons don't fit (short windows, iPad mini landscape).
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(spacing: 32) {
+                        Spacer()
 
-                // Header
-                Text("The Town Has Voted")
-                    .font(Design.Typography.title1)
-                    .foregroundStyle(Design.Colors.textPrimary)
+                        // Header
+                        Text("The Town Has Voted")
+                            .font(Design.Typography.title1)
+                            .foregroundStyle(Design.Colors.textPrimary)
+                            .multilineTextAlignment(.center)
 
-                // Card container
-                cardRevealSection
-                    .frame(width: 280, height: 380)
+                        // Card container
+                        cardRevealSection
+                            .frame(width: 280, height: 380)
 
-                Spacer()
+                        Spacer()
 
-                // Bottom message
-                bottomMessageSection
+                        // Bottom message
+                        bottomMessageSection
 
-                // Host continue button
-                if multiplayerStore.isHost && isCardFlipped {
-                    hostContinueButton
+                        // Host continue button
+                        if multiplayerStore.isHost && isCardFlipped {
+                            HostTransitionButton(title: "Continue to Night") {
+                                try await multiplayerStore.continueFromVoteReveal()
+                            }
+                            .padding(.bottom, 20)
+                        }
+                    }
+                    .padding(24)
+                    .frame(minHeight: proxy.size.height)
+                    .readableContentWidth()
                 }
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(24)
         }
         .navigationBarBackButtonHidden(true)
-        .onAppear {
-            startRevealSequence()
+        .task {
+            await runRevealSequence()
+        }
+        .sensoryFeedback(.success, trigger: showMysteryCard) { wasShowing, isShowing in
+            wasShowing && !isShowing
         }
     }
 
@@ -137,9 +128,9 @@ struct MultiplayerVoteDeathRevealView: View {
 
     @ViewBuilder
     private var revealCard: some View {
-        if let data = revealData, let role = data.role, data.eliminatedPlayerId != nil {
+        if let role = reveal.role, reveal.eliminatedPlayerId != nil {
             // Player elimination card
-            eliminationCard(data: data, role: role)
+            eliminationCard(data: reveal, role: role)
         } else {
             // No elimination card
             noEliminationCard
@@ -261,20 +252,11 @@ struct MultiplayerVoteDeathRevealView: View {
 
     // MARK: - Animation
 
-    private func startRevealSequence() {
-        guard !revealTriggered else { return }
-        revealTriggered = true
-
-        // Delay before flip (2.5-3 seconds of suspense)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            triggerCardFlip()
-        }
-    }
-
-    private func triggerCardFlip() {
-        // Prepare haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.prepare()
+    /// 2.5 s of suspense, the flip sound and the flip, then the haptic as the card turns.
+    /// Tied to the view's lifetime, so a player who leaves early hears and feels nothing later.
+    private func runRevealSequence() async {
+        guard !isCardFlipped else { return }
+        guard (try? await Task.sleep(for: .seconds(2.5))) != nil else { return }
 
         // Play system sound (card flip)
         AudioServicesPlaySystemSound(1057)
@@ -283,11 +265,9 @@ struct MultiplayerVoteDeathRevealView: View {
             isCardFlipped = true
         }
 
-        // After half the animation, swap visibility and trigger haptic
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            showMysteryCard = false
-            generator.notificationOccurred(.success)
-        }
+        // After half the animation, swap visibility (the haptic follows via .sensoryFeedback)
+        try? await Task.sleep(for: .seconds(0.3))
+        showMysteryCard = false
     }
 
     // MARK: - Bottom Section
@@ -302,7 +282,7 @@ struct MultiplayerVoteDeathRevealView: View {
                         .font(Design.Typography.body)
                         .foregroundStyle(Design.Colors.textSecondary)
 
-                    if let role = revealData?.role {
+                    if let role = reveal.role {
                         Text("Your time as \(role.displayName) has ended.")
                             .font(Design.Typography.body)
                             .foregroundStyle(role.accentColor)
@@ -323,39 +303,12 @@ struct MultiplayerVoteDeathRevealView: View {
                 .foregroundStyle(Design.Colors.textSecondary)
         }
     }
-
-    private var hostContinueButton: some View {
-        Button {
-            Task {
-                isTransitioning = true
-                try? await multiplayerStore.continueFromVoteReveal()
-                isTransitioning = false
-            }
-        } label: {
-            HStack {
-                if isTransitioning {
-                    ProgressView()
-                        .tint(Design.Colors.surface0)
-                } else {
-                    Text("Continue to Night")
-                        .font(Design.Typography.body)
-                        .fontWeight(.bold)
-                }
-            }
-            .foregroundStyle(Design.Colors.surface0)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Design.Colors.brandGold)
-            .cornerRadius(Design.Radii.medium)
-        }
-        .disabled(isTransitioning)
-        .padding(.bottom, 20)
-    }
 }
 
 // MARK: - Supporting Types
 
-private struct VoteRevealData {
+/// The `voteDeathReveal` phase payload.
+struct VoteRevealData {
     let eliminatedPlayerId: UUID?
     let playerName: String?
     let playerNumber: Int?
@@ -364,7 +317,9 @@ private struct VoteRevealData {
 }
 
 #Preview {
-    MultiplayerVoteDeathRevealView(dayIndex: 1)
+    MultiplayerVoteDeathRevealView(
+        reveal: VoteRevealData(eliminatedPlayerId: nil, playerName: nil, playerNumber: nil, role: nil, voteCount: nil)
+    )
         .environmentObject(MultiplayerGameStore())
         .preferredColorScheme(.dark)
 }

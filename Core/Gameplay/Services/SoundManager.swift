@@ -1,10 +1,14 @@
 import AVFoundation
+import Combine
 
 enum GameSound: String, CaseIterable {
     case mafiaGunshot = "mafia_gunshot"
     case policeSiren = "police_siren"
     case doctorEcg = "doctor_ecg"
     case wakeupRooster = "wakeup_rooster"
+
+    /// The bundled AAC file (M4A container).
+    var url: URL? { Bundle.main.url(forResource: rawValue, withExtension: "m4a") }
 }
 
 @MainActor
@@ -14,20 +18,40 @@ final class SoundManager {
     private var players: [GameSound: AVAudioPlayer] = [:]
     private var hasWarmedUp = false
     private var isSessionActive = false
+    private var interruptionObserver: AnyCancellable?
 
-    private init() {}
+    private init() {
+        // A call or Siri deactivates the session; re-activate it when that ends,
+        // so only a real trip to the background has to reset it.
+        // AVAudioSession may post off the main thread; these closures are main-actor.
+        interruptionObserver = NotificationCenter.default
+            .publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: DispatchQueue.main)
+            .compactMap { note in
+                (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                    .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+            }
+            .sink { [weak self] type in
+                self?.handleInterruption(type)
+            }
+    }
 
     // MARK: - Warm Up
 
-    /// Preloads all sound files and prepares them for playback.
-    /// Guarded by `hasWarmedUp` — safe to call multiple times.
+    /// Preloads all sound files and prepares them for playback. Not called at
+    /// launch: the solo night's Start Night warms up, and `play()` falls back to it.
+    /// Guarded by `hasWarmedUp`, so calling it again costs nothing.
     func warmUp() {
         guard !hasWarmedUp else { return }
         hasWarmedUp = true
 
+        // Mix with other audio before any player exists, so preparing one
+        // never interrupts the user's music.
+        ensureAudioSession()
+
         for sound in GameSound.allCases {
-            guard let url = Bundle.main.url(forResource: sound.rawValue, withExtension: "wav") else {
-                print("[SoundManager] Missing sound file: \(sound.rawValue).wav")
+            guard let url = sound.url else {
+                print("[SoundManager] Missing sound file: \(sound.rawValue).m4a")
                 continue
             }
             do {
@@ -64,6 +88,17 @@ final class SoundManager {
     /// Called when the app enters background to track session state.
     func handleBackgrounding() {
         isSessionActive = false
+    }
+
+    private func handleInterruption(_ type: AVAudioSession.InterruptionType) {
+        switch type {
+        case .began:
+            isSessionActive = false
+        case .ended:
+            ensureAudioSession()
+        @unknown default:
+            isSessionActive = false
+        }
     }
 
     // MARK: - Playback

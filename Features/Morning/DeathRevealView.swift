@@ -185,6 +185,7 @@ struct DeathRevealView: View {
             continueButton
         }
         .padding(.horizontal, Design.Spacing.lg)
+        .readableContentWidth()
     }
 
     private var deathRevealContent: some View {
@@ -207,6 +208,7 @@ struct DeathRevealView: View {
             // Add actual padding instead of Spacers for proper scrolling
             .padding(.top, topPadding)
             .padding(.bottom, 60)
+            .readableContentWidth()
         }
     }
 
@@ -273,6 +275,7 @@ struct DeathRevealView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: Design.Radii.extraLarge, style: .continuous)
                     .fill(palette.backgroundGradient)
+                    .shadow(color: Design.Colors.glowRed.opacity(0.3), radius: 30, y: 10)
 
                 RoundedRectangle(cornerRadius: Design.Radii.extraLarge, style: .continuous)
                     .fill(
@@ -295,7 +298,6 @@ struct DeathRevealView: View {
                     lineWidth: 2
                 )
         )
-        .shadow(color: Design.Colors.glowRed.opacity(0.3), radius: 30, y: 10)
     }
 
     private var continueButton: some View {

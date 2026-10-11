@@ -7,9 +7,10 @@ import XCTest
 /// Creates an isolated Clerk development account and exercises the actual
 /// ClerkKit -> ConvexMobile -> Convex account path, including a guest merge.
 /// Requires both opt-in flags; every run uses a new email and guest proof.
-@MainActor
-final class ClerkAccountIntegrationTests: XCTestCase {
-    func testVerifiedSignupMergeRestorationAndPasswordReset() async throws {
+// nonisolated, with main-actor members: under default MainActor isolation a main-actor
+// XCTestCase subclass inherits its initializers as main-actor ones (an error in Swift 6).
+nonisolated final class ClerkAccountIntegrationTests: XCTestCase {
+    @MainActor func testVerifiedSignupMergeRestorationAndPasswordReset() async throws {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment["CONVEX_INTEGRATION"] == "1"
                 && ProcessInfo.processInfo.environment["CLERK_ACCOUNT_E2E"] == "1",
@@ -18,6 +19,10 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         let service = AuthService()
         let database = DatabaseService()
         let convex = ConvexService.shared
+        // The test host no longer launches the app, so Clerk starts loading only now.
+        for _ in 0..<100 where !Clerk.shared.isLoaded {
+            try await Task.sleep(for: .milliseconds(100))
+        }
         let email = "mafia-native-\(UUID().uuidString.lowercased())+clerk_test@example.com"
         let password = "Qa-\(UUID().uuidString)-2026!"
         let resetPassword = "Qa-\(UUID().uuidString)-Reset!"
@@ -44,7 +49,11 @@ final class ClerkAccountIntegrationTests: XCTestCase {
         print("QA STAGE: guest stats")
         convex.guestProofProvider = { guestHash }
         _ = try await service.signInAsGuest(displayName: "QA Native Merge", guestSecretHash: guestHash)
-        try await database.upsertPlayerStat(playerName: statName, role: .doctor, won: false, kills: 1)
+        let guestGame = StatsOutbox.Entry(
+            gameID: UUID().uuidString,
+            results: [.init(playerName: statName, role: .doctor, won: false, kills: 1)]
+        )
+        try await StatsOutbox.recordGame(guestGame)
 
         print("QA STAGE: native signup")
         let account: UserProfile
@@ -69,9 +78,14 @@ final class ClerkAccountIntegrationTests: XCTestCase {
 
         print("QA STAGE: native guest stats merge")
         convex.guestProofProvider = nil
-        try await database.upsertPlayerStat(playerName: statName, role: .mafia, won: true, kills: 2)
+        try await StatsOutbox.recordGame(.init(
+            gameID: UUID().uuidString,
+            results: [.init(playerName: statName, role: .mafia, won: true, kills: 2)]
+        ))
         try await service.mergeGuestIntoAccount(guestSecretHash: guestHash)
         try await service.mergeGuestIntoAccount(guestSecretHash: guestHash)
+        // An outbox retry of the guest's game after the merge must not count it again.
+        try await StatsOutbox.recordGame(guestGame)
         let rows = try await database.getPlayerStats()
         XCTAssertEqual(rows.filter { $0.playerName == statName }.count, 1)
         let combined = try await database.getPlayerStat(playerName: statName)

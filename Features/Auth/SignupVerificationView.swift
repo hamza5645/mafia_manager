@@ -109,6 +109,7 @@ struct SignupVerificationView: View {
                     }
                     .padding(.bottom, 32)
                 }
+                .readableContentWidth()
             }
         }
         .onAppear {

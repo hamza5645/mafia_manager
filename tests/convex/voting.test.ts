@@ -99,9 +99,9 @@ test('legacy Swift voting results (alternating array, upper-case ids) still reso
   expect((await sessionRow(t, r.sessionId)).current_phase_data).toMatchObject({
     eliminatedPlayerId: mafia.player_id, eliminatedPlayerName: 'QA 1', voteCount: 4 });
   expect((await t.mutation(api.voting.resolveVoteAtomic, hostArgs)).eliminated_player_id).toBe(mafia.player_id);
-  expect(readVoteCounts({ voteCounts: { a: 1 } })).toEqual({ a: 1 });
-  expect(readVoteCounts({ voteCounts: ['A', 2, 'B'] })).toEqual({ a: 2 });
-  expect(readVoteCounts({})).toEqual({});
+  expect(readVoteCounts({ type: 'votingResults', voteCounts: { a: 1 } })).toEqual({ a: 1 });
+  expect(readVoteCounts({ type: 'votingResults', voteCounts: ['A', 2, 'B'] })).toEqual({ a: 2 });
+  expect(readVoteCounts({ type: 'votingResults' })).toEqual({});
 });
 
 test('a voted-out player who left before the reveal removes nobody (D2)', async () => {
@@ -115,4 +115,32 @@ test('a voted-out player who left before the reveal removes nobody (D2)', async 
   expect(await t.mutation(api.voting.resolveVoteAtomic, hostArgs))
     .toEqual({ day_index: 0, eliminated_player_id: null, next_phase: 'night', winner: null });
   expect((await sessionRow(t, r.sessionId)).day_history[0].removed_player_ids).toEqual([]);
+});
+
+test('votes for a player who left before the votes were closed count for nobody', async () => {
+  // humans: host citizen, mafia, citizen, citizen (leaves); bots: mafia, doctor, inspector.
+  const t = backend(); const r = await room(t, 4, 3);
+  await start(t, r, ['citizen', 'mafia', 'citizen', 'citizen'], ['mafia', 'doctor', 'inspector']);
+  const [host, mafia, cit, gone] = r.humans; const [botMafia, doctor, insp] = r.bots;
+  await act(t, r, mafia, 'mafia_target', cit);
+  await act(t, r, botMafia, 'mafia_target', cit);
+  await act(t, r, doctor, 'doctor_protect', cit);
+  await act(t, r, insp, 'inspector_check', mafia);
+  expect((await finishNight(t, r)).resulting_deaths).toEqual([]);
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'death_reveal' });
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'voting' });
+  const hostArgs = { ...r.as(r.host), round_id: (await round(t, r)).round_id! };
+  // The leaver leads 3-2, then leaves; their own vote goes with them.
+  for (const voter of [host, botMafia, doctor]) await act(t, r, voter, 'vote', gone);
+  for (const voter of [cit, insp]) await act(t, r, voter, 'vote', mafia);
+  await act(t, r, mafia, 'vote', host);
+  await act(t, r, gone, 'vote', host);
+  await t.mutation(api.sessions.leaveSession, r.as(r.users[3]));
+
+  expect(await t.mutation(api.voting.closeVoting, hostArgs)).toEqual({ day_index: 0, eliminated_player_id: mafia.player_id });
+  expect((await sessionRow(t, r.sessionId)).current_phase_data.voteCounts).toEqual(Object.fromEntries([
+    [host.player_id, 1], [mafia.player_id, 2], [cit.player_id, 0], [botMafia.player_id, 0], [doctor.player_id, 0], [insp.player_id, 0]]));
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'vote_death_reveal' });
+  expect(await t.mutation(api.voting.resolveVoteAtomic, hostArgs))
+    .toEqual({ day_index: 0, eliminated_player_id: mafia.player_id, next_phase: 'night', winner: null });
 });

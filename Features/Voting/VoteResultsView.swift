@@ -15,12 +15,18 @@ struct VoteResultsView: View {
 
     private var sortedVoteCounts: [(player: Player, votes: Int)] {
         guard let session = votingSession else { return [] }
+        return Self.sortedVoteCounts(session.voteCounts, players: store.state.players)
+    }
 
-        return session.voteCounts.compactMap { (playerID, voteCount) -> (Player, Int)? in
-            guard let player = store.player(by: playerID) else { return nil }
+    /// Most votes first; ties by player number, so every render (and device) shows the same order.
+    static func sortedVoteCounts(_ voteCounts: [UUID: Int], players: [Player]) -> [(player: Player, votes: Int)] {
+        voteCounts.compactMap { (playerID, voteCount) -> (player: Player, votes: Int)? in
+            guard let player = players.first(where: { $0.id == playerID }) else { return nil }
             return (player, voteCount)
         }
-        .sorted { $0.votes > $1.votes }
+        .sorted { a, b in
+            a.votes != b.votes ? a.votes > b.votes : a.player.number < b.player.number
+        }
     }
 
     private var continueButtonTitle: String {
@@ -52,6 +58,8 @@ struct VoteResultsView: View {
                     }
                     .padding(.horizontal)
                 }
+                // Let the list take the spare height before the Spacer below does
+                .layoutPriority(1)
 
                 // Elimination result
                 if let eliminated = eliminatedPlayer {
@@ -125,6 +133,7 @@ struct VoteResultsView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 20)
             }
+            .readableContentWidth()
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {

@@ -6,9 +6,9 @@ import Testing
 @MainActor
 struct SoloVoteValidationTests {
     @Test func rejectsSelfAndUnknownVotesAndPreservesLockedVote() throws {
-        let store = GameStore()
-        store.resetAll()
-        defer { store.resetAll() }
+        let environment = SoloTestEnvironment()
+        defer { environment.removeFiles() }
+        let store = environment.makeStore()
         store.assignNumbersAndRoles(names: ["QA One", "QA Two", "QA Three", "QA Four"])
         store.startVoting()
         let voter = try #require(store.state.players.first)
@@ -25,9 +25,9 @@ struct SoloVoteValidationTests {
     }
 
     @Test func rejectsDeadVotersAndTargets() throws {
-        let store = GameStore()
-        store.resetAll()
-        defer { store.resetAll() }
+        let environment = SoloTestEnvironment()
+        defer { environment.removeFiles() }
+        let store = environment.makeStore()
         store.assignNumbersAndRoles(names: ["QA One", "QA Two", "QA Three", "QA Four"])
         let dead = try #require(store.state.players.first)
         let alive = store.state.players[1]

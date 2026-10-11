@@ -3,6 +3,7 @@ import SwiftUI
 struct MultiplayerMenuView: View {
     @StateObject private var multiplayerStore = MultiplayerGameStore()
     @EnvironmentObject private var authStore: AuthStore
+    @ObservedObject private var compatibility = BackendCompatibility.shared
     @State private var showingCreateGame = false
     @State private var showingJoinGame = false
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
@@ -98,10 +99,22 @@ struct MultiplayerMenuView: View {
                     .automationID("multiplayer.menu.joinGame")
                     .buttonStyle(PlainButtonStyle())
                 }
+                .disabled(compatibility.updateRequired)
+                .opacity(compatibility.updateRequired ? Design.Opacity.medium : 1)
                 .padding(.horizontal, 20)
+
+                // The backend no longer accepts this build: online play is off until an update.
+                if compatibility.updateRequired {
+                    Label(BackendCompatibility.updateMessage, systemImage: "arrow.down.app")
+                        .font(Design.Typography.footnote)
+                        .foregroundStyle(Design.Colors.textSecondary)
+                        .padding(.horizontal, 20)
+                        .automationID("multiplayer.menu.updateRequired")
+                }
 
                 Spacer()
             }
+            .readableContentWidth()
         }
         .fullScreenCover(isPresented: $showingCreateGame) {
             CreateGameView()

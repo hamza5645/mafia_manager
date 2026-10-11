@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests (Convex)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck Convex functions
+        run: npx tsc --noEmit -p convex/tsconfig.json
+      - run: npm run test:backend
+
+  ios:
+    name: iOS unit tests
+    # macOS minutes are expensive: run only for PRs into main, or by hand.
+    if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
+      # Installs the Tuist and Node versions pinned in mise.toml.
+      - uses: jdx/mise-action@v2
+      - run: tuist install
+      - run: tuist generate --no-open
+      # Selective testing could skip the whole suite, so run everything.
+      - run: tuist test mafia_manager --no-selective-testing
