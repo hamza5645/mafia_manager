@@ -1,12 +1,13 @@
 import Foundation
 
 /// Host-only phase requests. The server checks each transition and computes every outcome;
-/// all calls are safe to retry (api_contract 4, §8.2).
+/// all calls are safe to retry (api_contract 5, §8.2).
 extension MultiplayerGameStore {
     func startGame() async throws {
         guard isHost, let sessionId else { throw SessionError.notHost }
         guard (4...19).contains(players.count) else { throw SessionError.invalidPhase }
-        try await sessionService.startGame(sessionId: sessionId, assignments: Self.makeAssignments(for: players))
+        let assignments = Self.makeAssignments(for: players)
+        try await sending { try await sessionService.startGame(sessionId: sessionId, assignments: assignments) }
     }
 
     /// Shuffled seats get roles from `GameStore.roleDistribution` and numbers from a shuffle of 1...2N.
@@ -34,14 +35,13 @@ extension MultiplayerGameStore {
         try await advance(to: .night)
     }
 
-    /// Finish Night: record the night's actions, then apply the recorded outcome atomically.
+    /// Finish Night: one server transaction records the night's actions, then resolves them.
     func completeNightPhase() async throws {
         guard isHost, !isCompletingNight, let sessionId, currentSession?.currentPhase == "night" else { return }
         isCompletingNight = true
         defer { isCompletingNight = false }
         let roundId = try await currentRoundId()
-        try await sessionService.recordNightActions(sessionId: sessionId, roundId: roundId)
-        try await sessionService.resolveNightAtomic(sessionId: sessionId, roundId: roundId)
+        try await sending { try await sessionService.finishNight(sessionId: sessionId, roundId: roundId) }
     }
 
     func revealDeaths() async throws {
@@ -54,7 +54,8 @@ extension MultiplayerGameStore {
 
     func endVoting() async throws {
         guard isHost, let sessionId else { throw SessionError.notHost }
-        try await sessionService.closeVoting(sessionId: sessionId, roundId: try await currentRoundId())
+        let roundId = try await currentRoundId()
+        try await sending { try await sessionService.closeVoting(sessionId: sessionId, roundId: roundId) }
     }
 
     /// Continue from the voting results to the elimination reveal.
@@ -65,15 +66,17 @@ extension MultiplayerGameStore {
     /// Continue from the elimination reveal: the server applies the vote and opens the next night.
     func continueFromVoteReveal() async throws {
         guard isHost, let sessionId else { throw SessionError.notHost }
-        try await sessionService.resolveVoteAtomic(sessionId: sessionId, roundId: try await currentRoundId())
+        let roundId = try await currentRoundId()
+        try await sending { try await sessionService.resolveVoteAtomic(sessionId: sessionId, roundId: roundId) }
     }
 
     private func advance(to phase: PhaseTarget) async throws {
         guard isHost, let sessionId else { throw SessionError.notHost }
-        try await sessionService.advancePhase(sessionId: sessionId, to: phase)
+        try await sending { try await sessionService.advancePhase(sessionId: sessionId, to: phase) }
     }
 
-    /// Runs on every snapshot: leaves role reveal once everyone is ready and drives the bots.
+    /// Runs on every changed snapshot and every tick: leaves role reveal once everyone is
+    /// ready and drives the bots. Ticks retry what a failed attempt left undone.
     func runHostAutomation() {
         guard isHost, let session = currentSession, let round = roundState else { return }
         if round.phase == "role_reveal", round.readyToAdvance, !isAdvancingFromRoleReveal {

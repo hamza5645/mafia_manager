@@ -7,7 +7,8 @@ final class GameStore: ObservableObject {
     @Published private(set) var state: GameState = .empty
     @Published var isFreshSetup: Bool = true
     @Published var flowID: UUID = UUID()
-    // BUG FIX: Track persistence errors to show to user
+    /// A save that failed, or a saved game that could not be loaded and was set aside.
+    /// RootView shows it once.
     @Published var persistenceError: String?
     // Store previous player names for "Play Again" feature
     @Published var previousPlayerNames: [String] = []
@@ -18,31 +19,56 @@ final class GameStore: ObservableObject {
     // Flag to return directly to solo setup (for "Play Again")
     @Published var returnToSoloSetup: Bool = false
 
-    private let databaseService = DatabaseService()
-    // BUG FIX: Use weak reference to prevent potential retain cycle
-    private weak var authStore: AuthStore?
+    private let persistence: Persistence
+    private let statsOutbox: StatsOutbox
+    private var identityObserver: AnyCancellable?
+    private var activeObserver: AnyCancellable?
 
-    init() {
+    /// The app uses the shared save and outbox; tests pass their own.
+    init(
+        persistence: Persistence? = nil,
+        statsOutbox: StatsOutbox? = nil,
+        notificationCenter: NotificationCenter = .default
+    ) {
+        let persistence = persistence ?? .shared
+        self.persistence = persistence
+        self.statsOutbox = statsOutbox ?? .shared
+
         // BUG FIX: Set up persistence error callback
-        Persistence.shared.onSaveError = { [weak self] error in
+        persistence.onSaveError = { [weak self] error in
             Task { @MainActor in
                 self?.persistenceError = "Failed to save game: \(error.localizedDescription)"
             }
         }
 
-        if let saved = Persistence.shared.load() {
-            self.state = saved
-            self.isFreshSetup = saved.players.isEmpty
+        do {
+            if let saved = try persistence.load() {
+                self.state = saved
+                self.isFreshSetup = saved.players.isEmpty
+            }
+        } catch {
+            persistenceError = "Your saved game could not be loaded and was set aside."
         }
+
+        activeObserver = notificationCenter.publisher(for: .appDidBecomeActive)
+            .sink { [outbox = self.statsOutbox] _ in
+                Task { await outbox.flush() }
+            }
     }
 
+    /// Finished games are recorded for whoever is signed in (an account's games only
+    /// for that account); a new identity (sign-in, restore, guest) sends what is waiting.
     func setAuthStore(_ authStore: AuthStore) {
-        self.authStore = authStore
+        statsOutbox.canSend = { [weak authStore] in authStore?.isAuthenticated == true }
+        statsOutbox.currentAccount = { [weak authStore] in authStore?.authenticatedAccountId?.uuidString.lowercased() }
+        identityObserver = authStore.$identityRevision
+            .removeDuplicates()
+            .sink { [statsOutbox] _ in
+                Task { await statsOutbox.flush() }
+            }
     }
 
     // MARK: - Setup & Persistence
-
-    var hasSavedGame: Bool { Persistence.shared.hasSavedState() }
 
     func resetAll() {
         // Preserve human player names and bot count for "Play Again" feature
@@ -62,15 +88,8 @@ final class GameStore: ObservableObject {
         state = .empty
         isFreshSetup = true
         returnToSoloSetup = true
-        Persistence.shared.reset()
+        persistence.reset()
         flowID = UUID()
-    }
-
-    func loadLastGame() {
-        if let saved = Persistence.shared.load() {
-            state = saved
-            isFreshSetup = saved.players.isEmpty
-        }
     }
 
     func assignNumbersAndRoles(names: [String], numberOfBots: Int = 0, customRoleConfig: CustomRoleConfig? = nil) {
@@ -191,7 +210,7 @@ final class GameStore: ObservableObject {
             players.append(Player(id: UUID(), number: number, name: name, role: role, alive: true, isBot: isBot, removalNote: nil))
         }
 
-        state = GameState(players: players, nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil, currentPhase: .roleReveal(currentPlayerIndex: 0))
+        state = GameState(players: players, nightHistory: [], dayHistory: [], dayIndex: 0, isGameOver: false, winner: nil, currentPhase: .roleReveal(currentPlayerIndex: 0), gameID: UUID())
         isFreshSetup = false
         // Regenerate flowID to trigger NavigationStack rebuild with transition
         flowID = UUID()
@@ -199,26 +218,10 @@ final class GameStore: ObservableObject {
     }
 
     private func save() {
-        Persistence.shared.save(state)
+        persistence.save(state)
     }
 
     // MARK: - Phase Management
-
-    func startRoleReveal() {
-        state.currentPhase = .roleReveal(currentPlayerIndex: 0)
-        save()
-
-        // If the first player is a bot, advance to the first human
-        if !state.players.isEmpty && state.players[0].isBot {
-            advanceToNextPlayer()
-        }
-    }
-
-    func revealRoleToPlayer(at index: Int) {
-        guard index >= 0 && index < state.players.count else { return }
-        state.currentPhase = .roleReveal(currentPlayerIndex: index)
-        save()
-    }
 
     func advanceToNextPlayer() {
         guard case .roleReveal(let currentIndex) = state.currentPhase else { return }
@@ -455,7 +458,7 @@ final class GameStore: ObservableObject {
             state.dayHistory.append(dayAction)
             state.dayIndex += 1
             state.currentVotingSession = nil
-            evaluateWinners(startOfDay: false)
+            evaluateWinners()
             if !state.isGameOver {
                 wakeUpRole(.mafia)
             }
@@ -477,7 +480,7 @@ final class GameStore: ObservableObject {
         state.currentVotingSession = nil
 
         // Check for winners
-        evaluateWinners(startOfDay: false)
+        evaluateWinners()
 
         // Reveal who was voted out before moving on to the next phase.
         transitionToVoteDeathReveal()
@@ -506,13 +509,8 @@ final class GameStore: ObservableObject {
     // MARK: - Queries
 
     var alivePlayers: [Player] { state.players.filter { $0.alive } }
-    var mafiaPlayers: [Player] { state.players.filter { $0.role == .mafia } }
     var aliveMafia: [Player] { state.players.filter { $0.role == .mafia && $0.alive } }
     var aliveNonMafia: [Player] { state.players.filter { $0.role != .mafia && $0.alive } }
-    var botPlayers: [Player] { state.players.filter { $0.isBot } }
-    var humanPlayers: [Player] { state.players.filter { !$0.isBot } }
-    var aliveBots: [Player] { state.players.filter { $0.isBot && $0.alive } }
-    var aliveHumans: [Player] { state.players.filter { !$0.isBot && $0.alive } }
     var currentNightIndex: Int {
         if let lastNight = state.nightHistory.last {
             // If last night is resolved, we're on the next night
@@ -526,10 +524,6 @@ final class GameStore: ObservableObject {
     var currentDayIndex: Int { state.dayIndex }
 
     // MARK: - Role-based queries
-
-    func playersWithRole(_ role: Role) -> [Player] {
-        state.players.filter { $0.role == role }
-    }
 
     func alivePlayersWithRole(_ role: Role) -> [Player] {
         state.players.filter { $0.role == role && $0.alive }
@@ -554,6 +548,8 @@ final class GameStore: ObservableObject {
     // MARK: - Night phase
 
     func endNight(mafiaTargetID: UUID?, inspectorCheckedID: UUID?, doctorProtectedID: UUID?) {
+        // A night turn still pending after End Game must not change the abandoned game.
+        guard !state.isGameOver else { return }
         let resulting: [UUID] = []
         var inspectorResult: Bool?
         var inspectorRole: Role?
@@ -621,7 +617,7 @@ final class GameStore: ObservableObject {
     }
 
     func resolveNightOutcome(targetWasSaved: Bool) {
-        guard let lastIndex = state.nightHistory.indices.last else { return }
+        guard !state.isGameOver, let lastIndex = state.nightHistory.indices.last else { return }
         var action = state.nightHistory[lastIndex]
 
         // BUG FIX: Guard against duplicate resolution using isResolved flag
@@ -648,116 +644,76 @@ final class GameStore: ObservableObject {
         state.nightHistory[lastIndex] = action
 
         // After resolving the night outcome we check if a team has already won.
-        evaluateWinners(startOfDay: true)
+        evaluateWinners()
 
         save()
     }
 
-    // MARK: - Day management
+    // MARK: - Stats
 
-    func applyDayRemovals(removed: [UUID: Bool], notes: [UUID: String]) {
-        var removedIDs: [UUID] = []
-        for idx in state.players.indices {
-            let pid = state.players[idx].id
-            if removed[pid] == true, state.players[idx].alive {
-                state.players[idx].alive = false
-                removedIDs.append(pid)
-            }
-            if let note = notes[pid], !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                state.players[idx].removalNote = note
-            }
-        }
-        let dayAction = DayAction(dayIndex: currentDayIndex, removedPlayerIDs: removedIDs)
-        state.dayHistory.append(dayAction)
-        state.dayIndex += 1
-
-        evaluateWinners(startOfDay: false)
-
-        save()
-    }
-
-    // MARK: - Cloud Sync
-
-    func syncPlayerStatsToCloud() async {
-        guard authStore?.isAuthenticated == true,
-              state.isGameOver,
-              let winner = state.winner else { return }
+    /// Queues the finished game for `stats:recordGame`. Bots are not recorded.
+    private func enqueueStats(winner: Role) {
+        let gameID = state.gameID ?? UUID()
+        state.gameID = gameID
 
         // BUG FIX: Calculate kills per player using accurate alive mafia tracking
         var killsPerPlayer: [UUID: Int] = [:]
-        for night in state.nightHistory {
-            if night.resultingDeaths.first != nil {
-                // Use new aliveMafiaIDs field if available (post-fix), fall back to old logic
-                if let aliveMafiaIDs = night.aliveMafiaIDs {
-                    // New accurate method: use tracked alive mafia IDs
-                    for mafiaID in aliveMafiaIDs {
-                        killsPerPlayer[mafiaID, default: 0] += 1
-                    }
-                } else {
-                    // Old fallback method (for backward compatibility with old saves)
-                    let aliveMafiaInNight = state.players.filter { player in
-                        player.role == .mafia &&
-                        night.mafiaNumbers.contains(player.number)
-                    }
-                    for mafiaPlayer in aliveMafiaInNight {
-                        killsPerPlayer[mafiaPlayer.id, default: 0] += 1
-                    }
-                }
+        for night in state.nightHistory where !night.resultingDeaths.isEmpty {
+            // Saves from before aliveMafiaIDs existed fall back to the night's mafia numbers.
+            let killers = night.aliveMafiaIDs ?? state.players
+                .filter { $0.role == .mafia && night.mafiaNumbers.contains($0.number) }
+                .map(\.id)
+            for mafiaID in killers {
+                killsPerPlayer[mafiaID, default: 0] += 1
             }
         }
 
-        // Sync stats for each player
-        for player in state.players {
-            let playerWon = (winner == .mafia && player.role == .mafia) ||
-                           (winner != .mafia && player.role != .mafia)
-            let kills = killsPerPlayer[player.id] ?? 0
-
-            do {
-                try await databaseService.upsertPlayerStat(
-                    playerName: player.name,
-                    role: player.role,
-                    won: playerWon,
-                    kills: kills
-                )
-            } catch {
-                // Continue with other players even if one fails
-                // In production, this should log to a proper logging system
-            }
+        let results = state.players.filter { !$0.isBot }.map { player in
+            StatsOutbox.Result(
+                playerName: player.name,
+                role: player.role,
+                won: (player.role == .mafia) == (winner == .mafia),
+                kills: killsPerPlayer[player.id] ?? 0
+            )
         }
+        guard !results.isEmpty else { return }
+        statsOutbox.enqueue(.init(gameID: gameID.uuidString.lowercased(), results: results))
     }
 
     // MARK: - Victory
 
-    private func evaluateWinners(startOfDay: Bool) {
+    /// The same rule as the server's `evaluateWinners` (convex/lib/rules.ts),
+    /// after a night and after a vote alike.
+    private func evaluateWinners() {
         // BUG FIX: Prevent re-evaluation if game is already over
         guard !state.isGameOver else { return }
 
         let mafiaCount = aliveMafia.count
         let nonMafiaCount = aliveNonMafia.count
-        let totalAlive = mafiaCount + nonMafiaCount
+        let winner: Role?
 
-        // Edge case: Everyone is dead - game ends with no winner
-        if totalAlive == 0 {
-            state.isGameOver = true
-            state.winner = nil // No winner - everyone died
-            state.currentPhase = .gameOver
+        if mafiaCount + nonMafiaCount == 0 {
+            // Everyone is dead - game ends with no winner
+            winner = nil
+        } else if alivePlayers.allSatisfy(\.isBot), state.players.contains(where: { !$0.isBot }) {
+            // The last human is gone, so nobody can play on. A game that never had a human
+            // (Setup allows all bots) plays to a real finish.
+            winner = mafiaCount == 0 ? .citizen : .mafia
+        } else if mafiaCount == 0 {
+            // Citizens win: All mafia eliminated
+            winner = .citizen
+        } else if mafiaCount >= nonMafiaCount {
+            // Mafia win at parity or better.
+            winner = .mafia
+        } else {
             return
         }
 
-        // Citizens win: All mafia eliminated
-        if mafiaCount == 0 {
-            state.isGameOver = true
-            state.winner = .citizen // represent villagers team
-            state.currentPhase = .gameOver
-            return
-        }
-
-        // Mafia win condition is parity or better at every resolution point.
-        if mafiaCount >= nonMafiaCount {
-            state.isGameOver = true
-            state.winner = .mafia
-            state.currentPhase = .gameOver
-            return
+        state.isGameOver = true
+        state.winner = winner
+        state.currentPhase = .gameOver
+        if let winner {
+            enqueueStats(winner: winner)
         }
     }
 
@@ -775,6 +731,28 @@ final class GameStore: ObservableObject {
     #if DEBUG
     func setVotingSessionForPreview(_ session: VotingSession) {
         state.currentVotingSession = session
+    }
+
+    /// Removes players outside a vote, for tests that need dead players.
+    func applyDayRemovals(removed: [UUID: Bool], notes: [UUID: String]) {
+        var removedIDs: [UUID] = []
+        for idx in state.players.indices {
+            let pid = state.players[idx].id
+            if removed[pid] == true, state.players[idx].alive {
+                state.players[idx].alive = false
+                removedIDs.append(pid)
+            }
+            if let note = notes[pid], !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                state.players[idx].removalNote = note
+            }
+        }
+        let dayAction = DayAction(dayIndex: currentDayIndex, removedPlayerIDs: removedIDs)
+        state.dayHistory.append(dayAction)
+        state.dayIndex += 1
+
+        evaluateWinners()
+
+        save()
     }
     #endif
 

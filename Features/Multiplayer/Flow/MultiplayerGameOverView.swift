@@ -46,6 +46,7 @@ struct MultiplayerGameOverView: View {
                 Spacer(minLength: 20)
             }
             .padding(20)
+            .readableContentWidth()
         }
         .navigationTitle("Game Over")
         .navigationBarBackButtonHidden(true)

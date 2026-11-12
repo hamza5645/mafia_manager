@@ -6,15 +6,40 @@ struct NightWakeUpView: View {
     @State private var showResult = false
     @State private var investigationResult: (isMafia: Bool, role: Role)?
     @State private var investigationWasBlocked = false
-    @State private var showTransition = false
+    /// Role whose turn is ending behind the "go to sleep" screen; its delay runs in `.task(id: endingTurn)`.
+    @State private var endingTurn: Role?
     @State private var showInitialSleepScreen = true
     @State private var showStartNightTransition = false
     @State private var showEndGameConfirmation = false
     @State private var awaitingMafiaWakeCue = true
     @State private var showBotActing = false
     @State private var botActingRole: Role?
-    @State private var isExecutingSilently = false
+    @State private var successHaptic = 0
+    @State private var selectionHaptic = 0
+    @State private var errorHaptic = 0
     private let botService = BotDecisionService()
+
+    /// What the bots do for the current step of the night.
+    enum BotAction: Equatable {
+        /// Every living player of the role is a bot: press "Continue" on its wake-up screen.
+        case autoContinue(Role)
+        /// Every living player of the role is a bot: take the role's turn.
+        case takeTurn(Role)
+    }
+
+    /// The all-bot Mafia wake-up waits behind the "Everyone Ready - Start Night" gate like a human
+    /// Mafia does. Other roles are never gated, which also covers a relaunch mid-night, where the
+    /// gate state starts out true (PA-14).
+    static func botAction(for phase: GamePhase, sleepGateUp: Bool, allBots: (Role) -> Bool) -> BotAction? {
+        switch phase {
+        case .nightWakeUp(let role) where allBots(role) && (role != .mafia || !sleepGateUp):
+            return .autoContinue(role)
+        case .nightAction(let role) where allBots(role):
+            return .takeTurn(role)
+        default:
+            return nil
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -22,13 +47,10 @@ struct NightWakeUpView: View {
                 .ignoresSafeArea()
 
             if showBotActing, let role = botActingRole {
-                botActingView(for: role)
+                BotActingView(role: role)
                     .transition(.opacity)
-            } else if showStartNightTransition {
-                TransitionBlurView()
-                    .transition(.opacity)
-            } else if showTransition {
-                TransitionBlurView()
+            } else if showStartNightTransition || endingTurn != nil {
+                GoToSleepInterstitial()
                     .transition(.opacity)
             } else if showInitialSleepScreen, case .nightWakeUp(.mafia) = store.state.currentPhase {
                 initialSleepScreen
@@ -57,34 +79,22 @@ struct NightWakeUpView: View {
         } message: {
             Text("This will end the current game without determining a winner.")
         }
+        .sensoryFeedback(.success, trigger: successHaptic)
+        .sensoryFeedback(.selection, trigger: selectionHaptic)
+        .sensoryFeedback(.error, trigger: errorHaptic)
         .onAppear {
-            isExecutingSilently = false
-
             // Show initial sleep screen when entering night for the first time
             if case .nightWakeUp(.mafia) = store.state.currentPhase {
                 showInitialSleepScreen = true
                 awaitingMafiaWakeCue = true
             }
             maybePlayCurrentWakeUpSound()
-            checkForBotAction()
-
-            // Check if all players of this role are bots - if so, auto-progress
-            if shouldAutoExecuteForAllBots() {
-                scheduleAutoContinueForAllBots()
-            }
         }
         .onChange(of: store.state.currentPhase) { _, newPhase in
-            isExecutingSilently = false
             if case .nightWakeUp(let role) = newPhase, role == .mafia {
                 awaitingMafiaWakeCue = true
             }
             maybePlayCurrentWakeUpSound()
-            checkForBotAction()
-
-            // Check if all players of this role are bots - if so, auto-progress
-            if shouldAutoExecuteForAllBots() {
-                scheduleAutoContinueForAllBots()
-            }
         }
         .onChange(of: store.currentNightIndex) { _, _ in
             // Reset sleep screen for each new night
@@ -92,6 +102,35 @@ struct NightWakeUpView: View {
                 showInitialSleepScreen = true
                 awaitingMafiaWakeCue = true
             }
+        }
+        // Every timed step of the night is a task owned by this view: End Game removes the view,
+        // which cancels the step before it can record an action or resolve the night (PA-58).
+        .task(id: showStartNightTransition) {
+            // After 2 seconds, play the Mafia cue and show the Mafia wake-up screen
+            guard showStartNightTransition, await pause(seconds: 2.0) else { return }
+            awaitingMafiaWakeCue = false
+            SoundManager.shared.playWakeUp(for: .mafia)
+
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showStartNightTransition = false
+                // Lowering the gate is what arms an all-bot Mafia's auto-continue (bot task below)
+                showInitialSleepScreen = false
+            }
+        }
+        .task(id: endingTurn) {
+            guard let role = endingTurn, await pause(seconds: role == .doctor ? 2.0 : 3.0) else { return }
+            finishTurn(role)
+
+            withAnimation(.easeInOut(duration: 0.3)) {
+                endingTurn = nil
+                selectedTargetID = nil
+                showResult = false
+                investigationResult = nil
+                investigationWasBlocked = false
+            }
+        }
+        .task(id: BotStep(phase: store.state.currentPhase, sleepGateUp: showInitialSleepScreen)) {
+            await runBotStep()
         }
     }
 
@@ -103,7 +142,7 @@ struct NightWakeUpView: View {
         case .nightAction(let role):
             actionScreen(for: role)
         case .nightTransition:
-            TransitionBlurView()
+            GoToSleepInterstitial()
         default:
             Text("Loading...")
                 .foregroundColor(Design.Colors.textSecondary)
@@ -164,25 +203,13 @@ struct NightWakeUpView: View {
 
             // Start Night button
             Button {
-                // Play haptic
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
+                successHaptic += 1
+                // The night sounds are built here, not at app launch (PA-55)
+                SoundManager.shared.warmUp()
 
-                // Show transition blur
+                // Show the transition; `.task(id: showStartNightTransition)` continues after 2 seconds
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showStartNightTransition = true
-                }
-
-                // After 2 seconds, play sound and show mafia wake up
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    // Play mafia wake-up cue
-                    awaitingMafiaWakeCue = false
-                    SoundManager.shared.playWakeUp(for: .mafia)
-
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showStartNightTransition = false
-                        showInitialSleepScreen = false
-                    }
                 }
             } label: {
                 HStack(spacing: 12) {
@@ -197,6 +224,7 @@ struct NightWakeUpView: View {
             .padding(.horizontal, Design.Spacing.lg)
             .accessibleButton("Everyone ready, start night", hint: "Begins the night phase")
         }
+        .readableContentWidth()
     }
 
     // MARK: - Wake Up Screens
@@ -207,31 +235,20 @@ struct NightWakeUpView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 32) {
                 // Role-specific wake up content
-                Group {
-                    switch role {
-                    case .mafia:
-                        mafiaWakeUpContent
-                    case .inspector:
-                        policeWakeUpContent
-                    case .doctor:
-                        doctorWakeUpContent
-                    case .citizen:
-                        EmptyView()
-                    }
+                if role != .citizen {
+                    RoleWakeUpContent(role: role, members: store.state.players.filter { $0.role == role })
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(.horizontal, Design.Spacing.lg)
             .padding(.top, Design.Spacing.xl)
             // Leave room for the pinned button
             .padding(.bottom, 120)
-            .frame(maxWidth: .infinity, alignment: .top)
+            .readableContentWidth()
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button {
-                // Play haptic
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
+                successHaptic += 1
 
                 // Transition to action
                 store.beginRoleAction(role)
@@ -248,6 +265,7 @@ struct NightWakeUpView: View {
             .padding(.horizontal, Design.Spacing.lg)
             .padding(.top, Design.Spacing.md)
             .padding(.bottom, Design.Spacing.lg)
+            .readableContentWidth()
             .background(
                 Design.Colors.surface0
                     .opacity(0.98)
@@ -255,234 +273,6 @@ struct NightWakeUpView: View {
             )
             .accessibleButton("Continue to \(role.displayName) action", hint: "Proceed to make your choice")
         }
-    }
-
-    private var mafiaWakeUpContent: some View {
-        VStack(spacing: 32) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Design.Colors.dangerRed.opacity(0.2))
-                    .frame(width: 120, height: 120)
-                    .shadow(color: Design.Colors.glowRed, radius: 20)
-
-                Image(systemName: "flame.fill")
-                    .font(Design.Typography.displayEmoji)
-                    .foregroundStyle(Design.Colors.dangerRed)
-                    .accessibilityHidden(true)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(spacing: 16) {
-                Text("Mafia, Wake Up")
-                    .font(Design.Typography.largeTitle)
-                    .foregroundStyle(Design.Colors.dangerRed)
-                    .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("All mafia members:")
-                        .font(Design.Typography.title3)
-                        .foregroundColor(Design.Colors.textSecondary)
-
-                    // Show all mafia members
-                    VStack(spacing: 12) {
-                        ForEach(store.mafiaPlayers, id: \.id) { player in
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(Design.Colors.dangerRed.opacity(0.3))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Text(player.name.prefix(1).uppercased())
-                                            .font(Design.Typography.subheadline)
-                                            .foregroundColor(Design.Colors.dangerRed)
-                                    )
-
-                                Text(player.name)
-                                    .font(Design.Typography.headline)
-                                    .foregroundColor(Design.Colors.textPrimary)
-
-                                if !player.alive {
-                                    Text("(Dead)")
-                                        .font(Design.Typography.caption)
-                                        .foregroundColor(Design.Colors.textTertiary)
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Design.Colors.surface1)
-                            .cornerRadius(Design.Radii.medium)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Design.Spacing.lg)
-
-                    Text("Discuss among yourselves and choose a target")
-                        .font(Design.Typography.body)
-                        .foregroundColor(Design.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.horizontal, 32)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-    }
-
-    private var policeWakeUpContent: some View {
-        let inspectorPlayers = store.state.players.filter { $0.role == .inspector }
-        return VStack(spacing: 32) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Design.Colors.actionBlue.opacity(0.2))
-                    .frame(width: 120, height: 120)
-                    .shadow(color: Design.Colors.glowBlue, radius: 20)
-
-                Image(systemName: "eye.fill")
-                    .font(Design.Typography.displayEmoji)
-                    .foregroundStyle(Design.Colors.actionBlue)
-                    .accessibilityHidden(true)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(spacing: 16) {
-                Text("Police, Wake Up")
-                    .font(Design.Typography.largeTitle)
-                    .foregroundStyle(Design.Colors.actionBlue)
-                    .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("All police members:")
-                        .font(Design.Typography.title3)
-                        .foregroundColor(Design.Colors.textSecondary)
-
-                    VStack(spacing: 12) {
-                        ForEach(inspectorPlayers, id: \.id) { player in
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(Design.Colors.actionBlue.opacity(0.3))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Text(player.name.prefix(1).uppercased())
-                                            .font(Design.Typography.subheadline)
-                                            .foregroundColor(Design.Colors.actionBlue)
-                                    )
-
-                                Text(player.name)
-                                    .font(Design.Typography.headline)
-                                    .foregroundColor(Design.Colors.textPrimary)
-
-                                if !player.alive {
-                                    Text("(Dead)")
-                                        .font(Design.Typography.caption)
-                                        .foregroundColor(Design.Colors.textTertiary)
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Design.Colors.surface1)
-                            .cornerRadius(Design.Radii.medium)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Design.Spacing.lg)
-
-                    Text("You can investigate one player to discover their role")
-                        .font(Design.Typography.body)
-                        .foregroundColor(Design.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.horizontal, 32)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-    }
-
-    private var doctorWakeUpContent: some View {
-        let doctorPlayers = store.state.players.filter { $0.role == .doctor }
-        return VStack(spacing: 32) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Design.Colors.successGreen.opacity(0.2))
-                    .frame(width: 120, height: 120)
-                    .shadow(color: Design.Colors.glowGreen, radius: 20)
-
-                Image(systemName: "cross.case.fill")
-                    .font(Design.Typography.displayEmoji)
-                    .foregroundStyle(Design.Colors.successGreen)
-                    .accessibilityHidden(true)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(spacing: 16) {
-                Text("Doctor, Wake Up")
-                    .font(Design.Typography.largeTitle)
-                    .foregroundStyle(Design.Colors.successGreen)
-                    .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("All doctors:")
-                        .font(Design.Typography.title3)
-                        .foregroundColor(Design.Colors.textSecondary)
-
-                    VStack(spacing: 12) {
-                        ForEach(doctorPlayers, id: \.id) { player in
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(Design.Colors.successGreen.opacity(0.3))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Text(player.name.prefix(1).uppercased())
-                                            .font(Design.Typography.subheadline)
-                                            .foregroundColor(Design.Colors.successGreen)
-                                    )
-
-                                Text(player.name)
-                                    .font(Design.Typography.headline)
-                                    .foregroundColor(Design.Colors.textPrimary)
-
-                                if !player.alive {
-                                    Text("(Dead)")
-                                        .font(Design.Typography.caption)
-                                        .foregroundColor(Design.Colors.textTertiary)
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Design.Colors.surface1)
-                            .cornerRadius(Design.Radii.medium)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Design.Spacing.lg)
-
-                    Text("You can protect one player from the Mafia's attack tonight")
-                        .font(Design.Typography.body)
-                        .foregroundColor(Design.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.horizontal, 32)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     // MARK: - Action Screens
@@ -507,6 +297,7 @@ struct NightWakeUpView: View {
             .padding(.top, Design.Spacing.xl)
             // Add actual bottom padding to prevent overlap with action button
             .padding(.bottom, 120)
+            .readableContentWidth()
         }
         .safeAreaInset(edge: .bottom) {
             actionButton(for: role)
@@ -534,7 +325,7 @@ struct NightWakeUpView: View {
         // Adaptive spacing: use smaller spacing when there are many players
         let spacing: CGFloat = players.count > 10 ? 8 : 12
 
-        return LazyVStack(spacing: spacing) {
+        LazyVStack(spacing: spacing) {
             ForEach(players) { player in
                 PlayerSelectionRow(
                     player: player,
@@ -542,10 +333,7 @@ struct NightWakeUpView: View {
                     accent: roleColor(for: role)
                 ) {
                     selectedTargetID = player.id
-
-                    // Play haptic
-                    let generator = UISelectionFeedbackGenerator()
-                    generator.selectionChanged()
+                    selectionHaptic += 1
                 }
             }
         }
@@ -642,6 +430,7 @@ struct NightWakeUpView: View {
         }
         .padding(.horizontal, Design.Spacing.lg)
         .padding(.vertical, Design.Spacing.md)
+        .readableContentWidth()
         .background(Design.Colors.surface0.opacity(0.98))
     }
 
@@ -696,9 +485,7 @@ struct NightWakeUpView: View {
     }
 
     private func handleActionComplete(for role: Role) {
-        // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        successHaptic += 1
 
         switch role {
         case .mafia:
@@ -707,8 +494,7 @@ struct NightWakeUpView: View {
                let target = store.player(by: targetID),
                target.role == .mafia {
                 // Invalid target - show error and clear selection
-                let errorGenerator = UINotificationFeedbackGenerator()
-                errorGenerator.notificationOccurred(.error)
+                errorHaptic += 1
 
                 // Clear selection
                 selectedTargetID = nil
@@ -726,20 +512,9 @@ struct NightWakeUpView: View {
                 doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
             )
 
-            // Show transition and move to next role
+            // Show transition; the next role wakes after a delay (`.task(id: endingTurn)`)
             withAnimation(.easeInOut(duration: 0.3)) {
-                showTransition = true
-            }
-
-            // Play sound and transition after delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                store.completeRoleAction()
-                store.transitionToNextRole()
-
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showTransition = false
-                    selectedTargetID = nil
-                }
+                endingTurn = .mafia
             }
 
         case .inspector:
@@ -774,20 +549,7 @@ struct NightWakeUpView: View {
             } else {
                 // Transition to next role
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    showTransition = true
-                }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    store.completeRoleAction()
-                    store.transitionToNextRole()
-
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showTransition = false
-                        selectedTargetID = nil
-                        showResult = false
-                        investigationResult = nil
-                        investigationWasBlocked = false
-                    }
+                    endingTurn = .inspector
                 }
             }
 
@@ -805,29 +567,35 @@ struct NightWakeUpView: View {
 
             // Transition to morning
             withAnimation(.easeInOut(duration: 0.3)) {
-                showTransition = true
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                store.completeRoleAction()
-
-                // Resolve night outcome and go to morning
-                // Get the updated night record after endNight
-                let updatedNight = store.state.nightHistory.last
-                // Check if doctor's protection matches mafia's target
-                let wasSaved = updatedNight?.mafiaTargetPlayerID == updatedNight?.doctorProtectedPlayerID
-                store.resolveNightOutcome(targetWasSaved: wasSaved)
-                store.transitionToMorning()
-
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showTransition = false
-                    selectedTargetID = nil
-                }
+                endingTurn = .doctor
             }
 
         case .citizen:
             break
         }
+    }
+
+    /// Ends a role's turn after its action was recorded with `endNight`: wakes the next role, or,
+    /// after the doctor, resolves the night (`resolveNightOutcome`) and goes to morning.
+    private func finishTurn(_ role: Role) {
+        store.completeRoleAction()
+
+        if role == .doctor {
+            // Get the updated night record after endNight
+            let updatedNight = store.state.nightHistory.last
+            // Check if doctor's protection matches mafia's target
+            let wasSaved = updatedNight?.mafiaTargetPlayerID == updatedNight?.doctorProtectedPlayerID
+            store.resolveNightOutcome(targetWasSaved: wasSaved)
+            store.transitionToMorning()
+        } else {
+            store.transitionToNextRole()
+        }
+    }
+
+    /// Sleeps for `seconds`; false when the task was cancelled (phase changed or view removed).
+    private func pause(seconds: Double) async -> Bool {
+        try? await Task.sleep(for: .seconds(seconds))
+        return !Task.isCancelled
     }
 
     private func maybePlayCurrentWakeUpSound() {
@@ -842,93 +610,74 @@ struct NightWakeUpView: View {
 
     // MARK: - Bot Handling
 
-    /// Checks if ALL players with the current role are bots (silent execution mode)
-    private func shouldAutoExecuteForAllBots() -> Bool {
-        // Check for both wake-up and action phases
-        if case .nightWakeUp(let role) = store.state.currentPhase {
-            return store.allBotsForRole(role)
-        }
-        if case .nightAction(let role) = store.state.currentPhase {
-            return store.allBotsForRole(role)
-        }
-        return false
+    /// Restarts the bot task whenever the phase changes or the Mafia sleep gate is lowered.
+    private struct BotStep: Equatable {
+        let phase: GamePhase
+        let sleepGateUp: Bool
     }
 
-    /// Schedules automatic progression through the UI when all role players are bots
-    private func scheduleAutoContinueForAllBots() {
-        guard case .nightWakeUp(let role) = store.state.currentPhase else { return }
+    /// Drives the UI for a role whose living players are all bots. Runs in `.task(id: BotStep)`,
+    /// so a phase change or End Game cancels it.
+    private func runBotStep() async {
+        let action = Self.botAction(
+            for: store.state.currentPhase,
+            sleepGateUp: showInitialSleepScreen,
+            allBots: { store.allBotsForRole($0) }
+        )
 
-        // Auto-click "Continue" button after a realistic delay (4-6 seconds)
-        // Longer delay prevents humans from getting suspicious about short bot turns
-        let delay = Double.random(in: 4.0...6.0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            // Check if we're still in the wake-up phase for this role
-            if case .nightWakeUp(let currentRole) = self.store.state.currentPhase,
-               currentRole == role {
-                // Haptic feedback
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
+        switch action {
+        case .autoContinue(let role):
+            // Auto-click "Continue" after a realistic delay (4-6 seconds)
+            // Longer delay prevents humans from getting suspicious about short bot turns
+            guard await pause(seconds: Double.random(in: 4.0...6.0)) else { return }
 
-                // Transition to action phase
-                self.store.beginRoleAction(role)
+            // Same haptic as a human's Continue tap
+            successHaptic += 1
+            store.beginRoleAction(role)
+
+        case .takeTurn(let role):
+            // Show bot acting animation until the turn has moved on
+            botActingRole = role
+            withAnimation {
+                showBotActing = true
             }
-        }
-    }
-
-    /// Checks if the current role belongs to a bot and auto-executes if so
-    private func checkForBotAction() {
-        // Only handle action phase - auto-execute if all role players are bots
-        if case .nightAction(let role) = store.state.currentPhase {
-            if shouldAutoExecuteForAllBots() {
-                scheduleAutoBotActionInActionPhase(for: role)
-            }
-        }
-    }
-
-    /// Schedules automatic bot action execution during the action phase when all role players are bots
-    private func scheduleAutoBotActionInActionPhase(for role: Role) {
-        // Show bot acting animation
-        botActingRole = role
-        withAnimation {
-            showBotActing = true
-        }
-
-        Task {
-            // Simulate thinking delay for realism (2-3 seconds)
-            await botService.simulateThinking()
-
-            // Execute the bot action
-            await executeBotAction(for: role)
-
-            // Hide bot animation
-            await MainActor.run {
+            defer {
                 withAnimation {
                     showBotActing = false
                 }
             }
+
+            // Simulate thinking delay for realism
+            await botService.simulateThinking()
+            guard !Task.isCancelled, recordBotAction(for: role) else { return }
+
+            // Transition to next role
+            guard await pause(seconds: 0.5) else { return }
+            finishTurn(role)
+
+        case nil:
+            break
         }
     }
 
-    /// Executes a bot's action for the given role
-    private func executeBotAction(for role: Role) async {
-        await MainActor.run {
-            switch role {
-            case .mafia:
-                executeBotMafiaAction()
-            case .inspector:
-                executeBotInspectorAction()
-            case .doctor:
-                executeBotDoctorAction()
-            case .citizen:
-                break
-            }
+    /// Records the bot's choice for `role` with `endNight`; false when no living bot holds the role.
+    private func recordBotAction(for role: Role) -> Bool {
+        switch role {
+        case .mafia:
+            return executeBotMafiaAction()
+        case .inspector:
+            return executeBotInspectorAction()
+        case .doctor:
+            return executeBotDoctorAction()
+        case .citizen:
+            return false
         }
     }
 
-    private func executeBotMafiaAction() {
+    private func executeBotMafiaAction() -> Bool {
         // Find bot Mafia player(s)
         let botMafia = store.aliveMafia.filter { $0.isBot }
-        guard let botMafiaPlayer = botMafia.first else { return }
+        guard let botMafiaPlayer = botMafia.first else { return false }
 
         // Get bot decision
         let targetID = botService.chooseMafiaTarget(
@@ -946,18 +695,13 @@ struct NightWakeUpView: View {
             inspectorCheckedID: isCurrentNight ? currentNight?.inspectorCheckedPlayerID : nil,
             doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
         )
-
-        // Transition to next role
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            store.completeRoleAction()
-            store.transitionToNextRole()
-        }
+        return true
     }
 
-    private func executeBotInspectorAction() {
+    private func executeBotInspectorAction() -> Bool {
         // Find bot Inspector
         let botInspectors = store.alivePlayers.filter { $0.role == .inspector && $0.isBot }
-        guard let botInspector = botInspectors.first else { return }
+        guard let botInspector = botInspectors.first else { return false }
 
         // Get bot decision
         let targetID = botService.chooseInspectorTarget(
@@ -975,18 +719,13 @@ struct NightWakeUpView: View {
             inspectorCheckedID: targetID,
             doctorProtectedID: isCurrentNight ? currentNight?.doctorProtectedPlayerID : nil
         )
-
-        // Transition to next role
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            store.completeRoleAction()
-            store.transitionToNextRole()
-        }
+        return true
     }
 
-    private func executeBotDoctorAction() {
+    private func executeBotDoctorAction() -> Bool {
         // Find bot Doctor
         let botDoctors = store.alivePlayers.filter { $0.role == .doctor && $0.isBot }
-        guard let botDoctor = botDoctors.first else { return }
+        guard let botDoctor = botDoctors.first else { return false }
 
         // Get bot decision
         let targetID = botService.chooseDoctorProtection(
@@ -1004,27 +743,126 @@ struct NightWakeUpView: View {
             inspectorCheckedID: isCurrentNight ? currentNight?.inspectorCheckedPlayerID : nil,
             doctorProtectedID: targetID
         )
+        return true
+    }
+}
 
-        // Transition to next role (morning)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            store.completeRoleAction()
+// MARK: - Role Wake Up Content
 
-            let updatedNight = store.state.nightHistory.last
-            // Check if doctor's protection matches mafia's target
-            let wasSaved = updatedNight?.mafiaTargetPlayerID == updatedNight?.doctorProtectedPlayerID
-            store.resolveNightOutcome(targetWasSaved: wasSaved)
-            store.transitionToMorning()
+/// Wake-up screen for a night role: its icon, the players who hold it, and what they do tonight.
+private struct RoleWakeUpContent: View {
+    let role: Role
+    let members: [Player]
+
+    private var copy: (title: String, membersTitle: String, instruction: String) {
+        switch role {
+        case .mafia:
+            return ("Mafia, Wake Up", "All mafia members:", "Discuss among yourselves and choose a target")
+        case .inspector:
+            return ("Police, Wake Up", "All police members:", "You can investigate one player to discover their role")
+        case .doctor:
+            return ("Doctor, Wake Up", "All doctors:", "You can protect one player from the Mafia's attack tonight")
+        case .citizen:
+            return ("", "", "")
         }
     }
 
-    /// View shown when a bot is taking their turn
-    @ViewBuilder
-    private func botActingView(for role: Role) -> some View {
+    var body: some View {
+        let accent = role.accentColor
+
+        VStack(spacing: 32) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(accent.opacity(0.2))
+                    .frame(width: 120, height: 120)
+                    .shadow(color: RoleCardPalette(role: role).glowColor, radius: 20)
+
+                Image(systemName: role.symbolName)
+                    .font(Design.Typography.displayEmoji)
+                    .foregroundStyle(accent)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity)
+
+            VStack(spacing: 16) {
+                Text(copy.title)
+                    .font(Design.Typography.largeTitle)
+                    .foregroundStyle(accent)
+                    .frame(maxWidth: .infinity)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(copy.membersTitle)
+                        .font(Design.Typography.title3)
+                        .foregroundColor(Design.Colors.textSecondary)
+
+                    // Show all members of this role
+                    VStack(spacing: 12) {
+                        ForEach(members) { player in
+                            memberRow(for: player, accent: accent)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Design.Spacing.lg)
+
+                    Text(copy.instruction)
+                        .font(Design.Typography.body)
+                        .foregroundColor(Design.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.horizontal, 32)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    private func memberRow(for player: Player, accent: Color) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(accent.opacity(0.3))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Text(player.name.prefix(1).uppercased())
+                        .font(Design.Typography.subheadline)
+                        .foregroundColor(accent)
+                )
+
+            Text(player.name)
+                .font(Design.Typography.headline)
+                .foregroundColor(Design.Colors.textPrimary)
+
+            if !player.alive {
+                Text("(Dead)")
+                    .font(Design.Typography.caption)
+                    .foregroundColor(Design.Colors.textTertiary)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Design.Colors.surface1)
+        .cornerRadius(Design.Radii.medium)
+    }
+}
+
+// MARK: - Bot Acting View
+
+/// Shown while bots take a role's turn
+private struct BotActingView: View {
+    let role: Role
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         VStack(spacing: 40) {
             Spacer()
 
             VStack(spacing: 32) {
-                // Bot icon with pulsing animation
+                // Bot icon, pulsing for as long as this view is shown
                 ZStack {
                     Circle()
                         .fill(role.accentColor.opacity(0.2))
@@ -1036,8 +874,11 @@ struct NightWakeUpView: View {
                         .foregroundStyle(role.accentColor)
                         .accessibilityHidden(true)
                 }
-                .scaleEffect(showBotActing ? 1.1 : 1.0)
-                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: showBotActing)
+                .phaseAnimator([1.0, 1.1]) { icon, scale in
+                    icon.scaleEffect(reduceMotion ? 1.0 : scale)
+                } animation: { _ in
+                    .easeInOut(duration: 1.0)
+                }
 
                 VStack(spacing: 16) {
                     Text("Bot is Deciding...")
@@ -1117,13 +958,14 @@ private struct PlayerSelectionRow: View {
     }
 }
 
-// MARK: - Transition Blur View
+// MARK: - Go To Sleep Interstitial
 
-private struct TransitionBlurView: View {
+/// Opaque "go to sleep" screen shown between roles. The role screens are removed from the view
+/// tree while it shows; that removal, not this view, is what keeps them private.
+private struct GoToSleepInterstitial: View {
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
+            Design.Colors.surface1
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {

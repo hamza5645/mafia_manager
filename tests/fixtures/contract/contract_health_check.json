@@ -1,0 +1,8 @@
+{
+  "api_contract": 5,
+  "backend": "convex",
+  "checked_at": "2026-10-11T12:02:13.500Z",
+  "min_client_contract": 5,
+  "ok": true,
+  "version": "convex-clerk-v5"
+}

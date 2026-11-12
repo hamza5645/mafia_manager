@@ -10,7 +10,8 @@ struct JoinGameView: View {
     @State private var isJoining = false
     @State private var errorMessage: String?
     @State private var showingLobby = false
-    @State private var hasStartedSession = false
+    /// Set by Cancel or by leaving the screen, so a guest sign-in that finishes later never joins.
+    @State private var entryCancelled = false
 
     var body: some View {
         NavigationStack {
@@ -19,74 +20,11 @@ struct JoinGameView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 32) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Join Online Game")
-                                .font(Design.Typography.title1)
-                                .foregroundStyle(Design.Colors.textPrimary)
-                                .accessibilityAddTraits(.isHeader)
-
-                            Text("Enter the room code to join")
-                                .font(Design.Typography.body)
-                                .foregroundStyle(Design.Colors.textSecondary)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
+                        header
 
                         VStack(spacing: 24) {
-                            // Player Name
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Your Name")
-                                    .font(Design.Typography.body)
-                                    .foregroundStyle(Design.Colors.textPrimary)
-
-                                TextField("Enter your name", text: $playerName)
-                                    .font(Design.Typography.body)
-                                    .textInputAutocapitalization(.words)
-                                    .disableAutocorrection(true)
-                                    .padding(.vertical, 14)
-                                    .padding(.horizontal, 16)
-                                    .accessibilityLabel("Player name")
-                                    .accessibilityHint("Enter the name shown to other players")
-                                    .background(Design.Colors.surface2)
-                                    .cornerRadius(Design.Radii.medium)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                            .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
-                                    )
-                                    .automationID("multiplayer.join.playerName")
-                            }
-
-                            // Room Code
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Room Code")
-                                    .font(Design.Typography.body)
-                                    .foregroundStyle(Design.Colors.textPrimary)
-
-                                TextField("000000", text: $roomCode)
-                                    .font(Design.Typography.roomCode)
-                                    .keyboardType(.numberPad)
-                                    .disableAutocorrection(true)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.vertical, 20)
-                                    .accessibilityLabel("Room code")
-                                    .accessibilityHint("Enter the six digit room code from the host")
-                                    .background(Design.Colors.surface1)
-                                    .cornerRadius(Design.Radii.medium)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Design.Radii.medium)
-                                            .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
-                                    )
-                                    .onChange(of: roomCode) { _, newValue in
-                                        // Filter to digits only and limit to 6 digits
-                                        roomCode = String(newValue.filter { $0.isNumber }.prefix(6))
-                                    }
-                                    .automationID("multiplayer.join.roomCode")
-
-                                Text("Ask the host for the 6-digit room code")
-                                    .font(Design.Typography.footnote)
-                                    .foregroundStyle(Design.Colors.textSecondary)
-                            }
+                            playerNameField
+                            roomCodeField
                         }
                         .padding(.horizontal, 20)
 
@@ -98,44 +36,19 @@ struct JoinGameView: View {
                                 .padding(.horizontal, 20)
                         }
 
-                        // Join Button
-                        Button {
-                            joinGame()
-                        } label: {
-                            HStack {
-                                if isJoining {
-                                    ProgressView()
-                                        .tint(Design.Colors.surface0)
-                                } else {
-                                    Text("Join Room")
-                                        .font(Design.Typography.body)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                canJoin
-                                    ? Design.Colors.brandGold
-                                    : Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
-                            )
-                            .foregroundColor(Design.Colors.surface0)
-                            .cornerRadius(Design.Radii.medium)
-                        }
-                        .accessibilityLabel("Join room")
-                        .accessibilityHint("Attempts to join the room with your name and code")
-                        .disabled(!canJoin || isJoining)
-                        .padding(.horizontal, 20)
-                        .automationID("multiplayer.join.submit")
+                        joinButton
 
                         Spacer(minLength: 40)
                     }
+                    .readableContentWidth()
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if hasStartedSession {
+                        cancelEntry()
+                        if multiplayerStore.isInSession {
                             Task {
                                 try? await multiplayerStore.leaveSession()
                                 dismiss()
@@ -161,8 +74,11 @@ struct JoinGameView: View {
                 }
             }
             .onDisappear {
-                // Cleanup on swipe-to-dismiss if session was started but not navigated to lobby
-                if hasStartedSession && !showingLobby {
+                // Leaving before the lobby opened: drop a join still in flight, and leave a
+                // seat that already exists (pushing the lobby also hides this screen).
+                guard !showingLobby else { return }
+                cancelEntry()
+                if multiplayerStore.isInSession {
                     Task {
                         try? await multiplayerStore.leaveSession()
                     }
@@ -171,9 +87,120 @@ struct JoinGameView: View {
         }
     }
 
+    // MARK: - Sections
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Join Online Game")
+                .font(Design.Typography.title1)
+                .foregroundStyle(Design.Colors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+
+            Text("Enter the room code to join")
+                .font(Design.Typography.body)
+                .foregroundStyle(Design.Colors.textSecondary)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+    }
+
+    private var playerNameField: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Name")
+                .font(Design.Typography.body)
+                .foregroundStyle(Design.Colors.textPrimary)
+
+            TextField("Enter your name", text: $playerName)
+                .font(Design.Typography.body)
+                .textInputAutocapitalization(.words)
+                .disableAutocorrection(true)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 16)
+                .accessibilityLabel("Player name")
+                .accessibilityHint("Enter the name shown to other players")
+                .background(Design.Colors.surface2)
+                .cornerRadius(Design.Radii.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.Radii.medium)
+                        .stroke(Design.Colors.stroke.opacity(0.3), lineWidth: 1)
+                )
+                .automationID("multiplayer.join.playerName")
+        }
+    }
+
+    private var roomCodeField: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Room Code")
+                .font(Design.Typography.body)
+                .foregroundStyle(Design.Colors.textPrimary)
+
+            TextField("000000", text: $roomCode)
+                .font(Design.Typography.roomCode)
+                .keyboardType(.numberPad)
+                .disableAutocorrection(true)
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 20)
+                .accessibilityLabel("Room code")
+                .accessibilityHint("Enter the six digit room code from the host")
+                .background(Design.Colors.surface1)
+                .cornerRadius(Design.Radii.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.Radii.medium)
+                        .stroke(Design.Colors.brandGold.opacity(0.3), lineWidth: 2)
+                )
+                .onChange(of: roomCode) { _, newValue in
+                    // Filter to digits only and limit to 6 digits
+                    roomCode = String(newValue.filter { $0.isNumber }.prefix(6))
+                }
+                .automationID("multiplayer.join.roomCode")
+
+            Text("Ask the host for the 6-digit room code")
+                .font(Design.Typography.footnote)
+                .foregroundStyle(Design.Colors.textSecondary)
+        }
+    }
+
+    private var joinButton: some View {
+        Button {
+            joinGame()
+        } label: {
+            HStack {
+                if isJoining {
+                    ProgressView()
+                        .tint(Design.Colors.surface0)
+                } else {
+                    Text("Join Room")
+                        .font(Design.Typography.body)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                canJoin
+                    ? Design.Colors.brandGold
+                    : Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
+            )
+            .foregroundColor(Design.Colors.surface0)
+            .cornerRadius(Design.Radii.medium)
+        }
+        .accessibilityLabel("Join room")
+        .accessibilityHint("Attempts to join the room with your name and code")
+        .disabled(!canJoin || isJoining)
+        .padding(.horizontal, 20)
+        .automationID("multiplayer.join.submit")
+    }
+
+    // MARK: - Actions
+
     private var canJoin: Bool {
         !playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         roomCode.count == 6
+    }
+
+    /// The store drops a join that is still in flight (and leaves the seat it returns).
+    private func cancelEntry() {
+        entryCancelled = true
+        multiplayerStore.cancelPendingEntry()
     }
 
     private func joinGame() {
@@ -191,6 +218,7 @@ struct JoinGameView: View {
 
         isJoining = true
         errorMessage = nil
+        entryCancelled = false
 
         Task {
             // Auto sign-in as guest if not authenticated
@@ -205,28 +233,27 @@ struct JoinGameView: View {
                 }
             }
 
+            // Cancelled during the sign-in: never start the request.
+            guard !entryCancelled else {
+                isJoining = false
+                return
+            }
+
             // Now join the session
             do {
-                // Mark session as started before async call
-                await MainActor.run {
-                    hasStartedSession = true
-                }
-
                 try await multiplayerStore.joinSession(
                     roomCode: roomCode,
                     playerName: trimmedName
                 )
 
-                await MainActor.run {
-                    isJoining = false
-                    showingLobby = true
-                }
+                isJoining = false
+                // Cancelled mid-request: the store has already left the seat.
+                guard !entryCancelled else { return }
+                showingLobby = true
             } catch {
-                await MainActor.run {
-                    isJoining = false
-                    hasStartedSession = false // Reset on failure
-                    errorMessage = error.localizedDescription
-                }
+                isJoining = false
+                guard !entryCancelled else { return }
+                errorMessage = error.localizedDescription
             }
         }
     }

@@ -7,12 +7,13 @@
   },
   "scripts": {
     "convex:dev": "convex dev",
-    "convex:deploy": "convex deploy",
-    "test:backend": "vitest run",
+    "convex:deploy": "npm run test:backend && convex deploy && node scripts/e2e/verify-deployment.mjs --prod",
+    "test:backend": "tsc -p tests --noEmit && vitest run",
     "convex:verify-deployment": "node scripts/e2e/verify-deployment.mjs"
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
+    "@types/node": "25.6.0",
     "convex": "^1.37.0",
     "convex-test": "^0.0.60",
     "typescript": "^7.0.2",

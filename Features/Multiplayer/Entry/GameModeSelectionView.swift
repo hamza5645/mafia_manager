@@ -3,6 +3,7 @@ import SwiftUI
 struct GameModeSelectionView: View {
     @EnvironmentObject private var authStore: AuthStore
     @EnvironmentObject private var gameStore: GameStore
+    @ObservedObject private var compatibility = BackendCompatibility.shared
     @State private var selectedMode: GameMode?
     @State private var showingAuth = false
     @State private var showingSettings = false
@@ -16,163 +17,177 @@ struct GameModeSelectionView: View {
         case online
     }
 
+    /// The selected mode, unless it is Online and this build is too old for the backend.
+    private var continueMode: GameMode? {
+        selectedMode == .online && compatibility.updateRequired ? nil : selectedMode
+    }
+
+    // Lives in RootView's NavigationStack (no stack of its own), so the solo screens it pushes
+    // keep their toolbars and Back returns here.
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                Design.Colors.surface0.ignoresSafeArea()
+        ZStack {
+            // Background
+            Design.Colors.surface0.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 32) {
-                        // Title
-                        VStack(spacing: 10) {
-                            Text("MAFIA")
-                                .font(Design.Typography.largeTitle)
-                                .kerning(1.5)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Title
+                    VStack(spacing: 10) {
+                        Text("MAFIA")
+                            .font(Design.Typography.largeTitle)
+                            .kerning(1.5)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Design.Colors.brandGold, Design.Colors.brandGoldBright],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
-                                .shadow(color: Design.Colors.glowGold, radius: 10, y: 2)
+                            )
+                            .shadow(color: Design.Colors.glowGold, radius: 10, y: 2)
 
-                            Text("Choose your game mode")
-                                .font(Design.Typography.body)
+                        Text("Choose your game mode")
+                            .font(Design.Typography.body)
+                            .foregroundStyle(Design.Colors.textSecondary)
+                    }
+                    .padding(.top, 40)
+
+                    // Game Mode Cards
+                    VStack(spacing: 20) {
+                        // Local Game Card
+                        GameModeCard(
+                            title: "Local Game",
+                            subtitle: "Pass & Play",
+                            description: "Play on one device. Pass the phone around to reveal roles and take turns.",
+                            icon: "iphone",
+                            accentColor: Design.Colors.brandGold,
+                            isSelected: selectedMode == .local
+                        ) {
+                            selectedMode = .local
+                        }
+
+                        // Online Multiplayer Card
+                        GameModeCard(
+                            title: "Online Game",
+                            subtitle: "Multiplayer",
+                            description: "Each player uses their own phone. Create or join a room to play together.",
+                            icon: "person.3.fill",
+                            accentColor: Design.Colors.brandGold,
+                            isSelected: continueMode == .online,
+                            isLocked: false  // Guests can play too!
+                        ) {
+                            guard !authStore.isRestoringSession, !compatibility.updateRequired else { return }
+                            if authStore.isAuthenticated {
+                                selectedMode = .online
+                            } else {
+                                // Show guest name input for unauthenticated users
+                                showingGuestNameInput = true
+                            }
+                        }
+                        .disabled(authStore.isRestoringSession || compatibility.updateRequired)
+                        .opacity(compatibility.updateRequired ? Design.Opacity.medium : 1)
+                        .overlay(alignment: .topTrailing) {
+                            if authStore.isRestoringSession {
+                                ProgressView()
+                                    .tint(Design.Colors.brandGold)
+                                    .padding(28)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .accessibilityValue(onlineAccessibilityValue)
+
+                        // The backend no longer accepts this build: online play is off until an update.
+                        if compatibility.updateRequired {
+                            Label(BackendCompatibility.updateMessage, systemImage: "arrow.down.app")
+                                .font(Design.Typography.footnote)
                                 .foregroundStyle(Design.Colors.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .automationID("gameMode.updateRequired")
                         }
-                        .padding(.top, 40)
+                    }
+                    .padding(.horizontal, 20)
 
-                        // Game Mode Cards
-                        VStack(spacing: 20) {
-                            // Local Game Card
-                            GameModeCard(
-                                title: "Local Game",
-                                subtitle: "Pass & Play",
-                                description: "Play on one device. Pass the phone around to reveal roles and take turns.",
-                                icon: "iphone",
-                                accentColor: Design.Colors.brandGold,
-                                isSelected: selectedMode == .local
-                            ) {
-                                selectedMode = .local
-                            }
-
-                            // Online Multiplayer Card
-                            GameModeCard(
-                                title: "Online Game",
-                                subtitle: "Multiplayer",
-                                description: "Each player uses their own phone. Create or join a room to play together.",
-                                icon: "person.3.fill",
-                                accentColor: Design.Colors.brandGold,
-                                isSelected: selectedMode == .online,
-                                isLocked: false  // Guests can play too!
-                            ) {
-                                guard !authStore.isRestoringSession else { return }
-                                if authStore.isAuthenticated {
-                                    selectedMode = .online
-                                } else {
-                                    // Show guest name input for unauthenticated users
-                                    showingGuestNameInput = true
-                                }
-                            }
-                            .disabled(authStore.isRestoringSession)
-                            .overlay(alignment: .topTrailing) {
-                                if authStore.isRestoringSession {
-                                    ProgressView()
-                                        .tint(Design.Colors.brandGold)
-                                        .padding(28)
-                                        .allowsHitTesting(false)
-                                }
-                            }
-                            .accessibilityValue(authStore.isRestoringSession ? "Restoring account" : "")
+                    // Continue Button
+                    if let mode = continueMode {
+                        NavigationLink(value: mode) {
+                            Text("Continue")
+                                .font(Design.Typography.body)
+                                .foregroundColor(Design.Colors.surface0)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Design.Colors.brandGold)
+                                .cornerRadius(Design.Radii.medium)
                         }
+                        .accessibilityLabel("Continue to \(mode == .local ? "local game setup" : "online multiplayer")")
+                        .accessibilityHint("Uses the selected game mode")
                         .padding(.horizontal, 20)
-
-                        // Continue Button
-                        if selectedMode != nil {
-                            NavigationLink(value: selectedMode!) {
-                                Text("Continue")
-                                    .font(Design.Typography.body)
-                                    .foregroundColor(Design.Colors.surface0)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(
-                                        selectedMode == .local
-                                            ? Design.Colors.brandGold
-                                            : Design.Colors.brandGold
-                                    )
-                                    .cornerRadius(Design.Radii.medium)
-                            }
-                            .accessibilityLabel("Continue to \(selectedMode == .local ? "local game setup" : "online multiplayer")")
-                            .accessibilityHint("Uses the selected game mode")
-                            .padding(.horizontal, 20)
-                            .padding(.top, 10)
-                        }
-
-                        Spacer(minLength: 60)
+                        .padding(.top, 10)
                     }
-                }
-            }
-            // Hidden link to push Online flow automatically after guest sign-in
-            NavigationLink(
-                destination: MultiplayerMenuView(),
-                isActive: $autoNavigateOnline
-            ) { EmptyView() }
 
-            // Hidden link to push Local flow automatically for "Play Again"
-            NavigationLink(
-                destination: SetupView(),
-                isActive: $autoNavigateLocal
-            ) { EmptyView() }
-
-            .navigationDestination(for: GameMode.self) { mode in
-                switch mode {
-                case .local:
-                    SetupView()
-                case .online:
-                    MultiplayerMenuView()
+                    Spacer(minLength: 60)
                 }
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: gearIconSize, weight: .semibold))
-                            .foregroundStyle(Design.Colors.brandGold)
-                    }
-                    .accessibilityLabel("Open settings")
-                    .accessibilityHint("Adjust preferences and saved data")
-                }
-            }
-            .sheet(isPresented: $showingAuth) {
-                LoginView()
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
-            .sheet(isPresented: $showingGuestNameInput) {
-                GuestNameInputView(
-                    onSuccess: {
-                        showingGuestNameInput = false
-                        selectedMode = .online
-                        autoNavigateOnline = true
-                    },
-                    onCancel: {
-                        showingGuestNameInput = false
-                    }
-                )
-            }
-            .onAppear {
-                // Auto-navigate to local setup for "Play Again" flow
-                if gameStore.returnToSoloSetup {
-                    selectedMode = .local
-                    autoNavigateLocal = true
-                }
+                .readableContentWidth()
             }
         }
+        // Pushes the Online flow automatically after guest sign-in
+        .navigationDestination(isPresented: $autoNavigateOnline) {
+            MultiplayerMenuView()
+        }
+        // Pushes the Local flow automatically for "Play Again"
+        .navigationDestination(isPresented: $autoNavigateLocal) {
+            SetupView()
+        }
+        .navigationDestination(for: GameMode.self) { mode in
+            switch mode {
+            case .local:
+                SetupView()
+            case .online:
+                MultiplayerMenuView()
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: gearIconSize, weight: .semibold))
+                        .foregroundStyle(Design.Colors.brandGold)
+                }
+                .accessibilityLabel("Open settings")
+                .accessibilityHint("Adjust preferences and saved data")
+            }
+        }
+        .sheet(isPresented: $showingAuth) {
+            LoginView()
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+        .sheet(isPresented: $showingGuestNameInput) {
+            GuestNameInputView(
+                onSuccess: {
+                    showingGuestNameInput = false
+                    selectedMode = .online
+                    autoNavigateOnline = !compatibility.updateRequired
+                },
+                onCancel: {
+                    showingGuestNameInput = false
+                }
+            )
+        }
+        .onAppear {
+            // Auto-navigate to local setup for "Play Again", once: Back from Setup stays here.
+            if gameStore.returnToSoloSetup {
+                gameStore.returnToSoloSetup = false
+                selectedMode = .local
+                autoNavigateLocal = true
+            }
+        }
+    }
+
+    private var onlineAccessibilityValue: String {
+        if compatibility.updateRequired { return "Update required" }
+        return authStore.isRestoringSession ? "Restoring account" : ""
     }
 }
 
@@ -262,8 +277,10 @@ struct GameModeCard: View {
 }
 
 #Preview {
-    GameModeSelectionView()
-        .environmentObject(GameStore())
-        .environmentObject(AuthStore())
-        .preferredColorScheme(.dark)
+    NavigationStack {
+        GameModeSelectionView()
+    }
+    .environmentObject(GameStore())
+    .environmentObject(AuthStore())
+    .preferredColorScheme(.dark)
 }

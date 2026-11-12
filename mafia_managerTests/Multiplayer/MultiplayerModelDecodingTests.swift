@@ -71,7 +71,7 @@ struct MultiplayerModelDecodingTests {
         let player = try decode(SessionPlayer.self, """
         {"id":"\(UUID().uuidString)","session_id":"\(UUID().uuidString)","player_id":"\(UUID().uuidString)",
          "player_name":"Bot 1","is_bot":true,"is_alive":true,"is_online":false,"is_ready":true,
-         "last_heartbeat":1,"joined_at":1,"is_me":false}
+         "joined_at":1,"is_me":false}
         """)
         #expect(player.userId == nil && player.role == nil && !player.isMe)
     }
@@ -85,5 +85,30 @@ struct MultiplayerModelDecodingTests {
         {"day_index":0,"eliminated_player_id":null,"next_phase":"game_over","winner":"citizen"}
         """)
         #expect(vote.winner == .citizen && vote.eliminatedPlayerId == nil)
+    }
+
+    @Test func hostPresenceDecodesAndMeasuresSilenceOnTheServerClock() throws {
+        let presence = try decode(HostPresence?.self, """
+        {"host_user_id":"\(UUID().uuidString.lowercased())","host_last_heartbeat":800000000,
+         "server_now":800000012.5,"stale_after_seconds":15}
+        """)
+        #expect(presence?.silenceAtReceipt == 12.5)
+        #expect(presence?.staleAfterSeconds == 15)
+
+        let noHeartbeat = try decode(HostPresence.self, """
+        {"host_user_id":"\(UUID().uuidString)","host_last_heartbeat":null,"server_now":1,"stale_after_seconds":90}
+        """)
+        #expect(noHeartbeat.silenceAtReceipt == .infinity)
+        #expect(try decode(HostPresence?.self, "null") == nil, "Non-members get null")
+    }
+
+    @Test func botActionResultsDecodePerItemOutcomes() throws {
+        let bot = UUID()
+        let response = try decode(BotActionResults.self, """
+        {"results":[{"actor_player_id":"\(bot.uuidString.lowercased())","ok":true,"result":"not_mafia"},
+                    {"actor_player_id":"\(UUID().uuidString.lowercased())","ok":false,"error":"Night actions are closed."}]}
+        """)
+        #expect(response.results.first == BotActionResult(actorPlayerId: bot, ok: true, error: nil, result: "not_mafia"))
+        #expect(response.results.last?.error == "Night actions are closed.")
     }
 }

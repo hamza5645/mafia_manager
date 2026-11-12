@@ -1,0 +1,10 @@
+{
+  // Type-checks the backend tests and the deploy check script (and, through
+  // their imports, convex/). Vitest strips types without checking them.
+  "extends": "../convex/tsconfig.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "types": ["node"]
+  },
+  "include": ["./**/*.ts", "../scripts/e2e/*.mjs"]
+}

@@ -1,7 +1,7 @@
 import Foundation
 
 // Represents a multiplayer game session
-struct GameSession: Decodable, Identifiable, Sendable {
+struct GameSession: Decodable, Identifiable, Sendable, Equatable {
     let id: UUID
     let roomCode: String
     var hostUserId: UUID
@@ -169,7 +169,7 @@ enum PhaseData: Decodable, Sendable, Equatable {
 }
 
 // Player number assignment
-struct PlayerNumberAssignment: Codable, Sendable {
+struct PlayerNumberAssignment: Codable, Sendable, Equatable {
     let playerId: UUID
     let number: Int
 
@@ -180,7 +180,7 @@ struct PlayerNumberAssignment: Codable, Sendable {
 }
 
 // Night record written by the server; ignores `round_id` and `next_phase`.
-struct NightActionRecord: Decodable, Sendable {
+struct NightActionRecord: Decodable, Sendable, Equatable {
     let nightIndex: Int
     let isResolved: Bool
     let mafiaTargetId: UUID?
@@ -230,7 +230,7 @@ struct NightActionRecord: Decodable, Sendable {
 }
 
 // Day action record (snapshot)
-struct DayActionRecord: Codable, Sendable {
+struct DayActionRecord: Codable, Sendable, Equatable {
     let dayIndex: Int
     let removedPlayerIds: [UUID]
     let timestamp: Date

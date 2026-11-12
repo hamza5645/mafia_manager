@@ -43,10 +43,9 @@ struct VotingView: View {
                         .padding(.top, 40)
                         .accessiblePhaseHeader("Voting for \(currentPlayer.name)", instruction: "Choose a player to vote out")
 
-                        // Alive players to vote for (Grid layout)
+                        // Alive players to vote for: two columns on every iPhone (320-440 pt), more on wide windows
                         LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
+                            GridItem(.adaptive(minimum: 136), spacing: 12)
                         ], spacing: 12) {
                             ForEach(alivePlayers.sorted(by: { $0.number < $1.number })) { player in
                                 VotingPlayerCard(
@@ -62,6 +61,7 @@ struct VotingView: View {
                         }
                         .padding(.horizontal, 16)
                     }
+                    .readableContentWidth()
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     Button {
@@ -75,6 +75,7 @@ struct VotingView: View {
                     .disabled(!hasValidSelection)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    .readableContentWidth()
                     .background(Design.Colors.surface0.opacity(0.95))
                     .accessibleButton("Lock vote", hint: "Confirms your vote. Cannot be changed.")
                 }
@@ -190,13 +191,13 @@ struct VotingPlayerCard: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(isSelected ? Design.Colors.brandGold : Design.Colors.stroke, lineWidth: isSelected ? 2 : 1)
+                            // PERF: Fixed radius, animate opacity only; cast by the border, not the card's content
+                            .shadow(
+                                color: Design.Colors.brandGold.opacity(isSelected ? 0.2 : 0),
+                                radius: 8,
+                                y: 4
+                            )
                     )
-            )
-            // PERF: Fixed radius, animate opacity only for GPU efficiency
-            .shadow(
-                color: Design.Colors.brandGold.opacity(isSelected ? 0.2 : 0),
-                radius: 8,
-                y: 4
             )
             .animation(.easeInOut(duration: 0.2), value: isSelected)
         }

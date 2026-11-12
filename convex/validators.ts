@@ -21,6 +21,13 @@ export const actionTypeValidator = v.union(
   v.literal("vote"),
 );
 
+// Drafts are shared only at night; a vote is not seen until it is cast.
+export const nightActionTypeValidator = v.union(
+  v.literal("mafia_target"),
+  v.literal("inspector_check"),
+  v.literal("doctor_protect"),
+);
+
 export const roleDistributionValidator = v.object({
   mafia_count: v.number(),
   doctor_count: v.number(),

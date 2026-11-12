@@ -1,6 +1,6 @@
 import Foundation
 
-struct NightAction: Codable, Sendable, Identifiable {
+struct NightAction: Codable, Sendable, Identifiable, Equatable {
     var id: UUID = UUID()
     var nightIndex: Int
     var mafiaTargetPlayerID: UUID?
@@ -19,8 +19,25 @@ struct NightAction: Codable, Sendable, Identifiable {
     var isResolved: Bool = false
     // BUG FIX: Track alive mafia IDs for accurate kill attribution
     var aliveMafiaIDs: [UUID]?
-    // BUG FIX: Phase completion tracking for robust transitions
-    var mafiaPhaseCompleted: Bool = false
-    var inspectorPhaseCompleted: Bool = false
-    var doctorPhaseCompleted: Bool = false
+}
+
+extension NightAction {
+    /// Fields with a default fall back to it when an older save lacks them.
+    /// Keys this model no longer has (the old `*PhaseCompleted` flags) are ignored.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        nightIndex = try c.decode(Int.self, forKey: .nightIndex)
+        mafiaTargetPlayerID = try c.decodeIfPresent(UUID.self, forKey: .mafiaTargetPlayerID)
+        inspectorCheckedPlayerID = try c.decodeIfPresent(UUID.self, forKey: .inspectorCheckedPlayerID)
+        inspectorResultIsMafia = try c.decodeIfPresent(Bool.self, forKey: .inspectorResultIsMafia)
+        inspectorResultRole = try c.decodeIfPresent(Role.self, forKey: .inspectorResultRole)
+        doctorProtectedPlayerID = try c.decodeIfPresent(UUID.self, forKey: .doctorProtectedPlayerID)
+        resultingDeaths = try c.decode([UUID].self, forKey: .resultingDeaths)
+        mafiaNumbers = try c.decode([Int].self, forKey: .mafiaNumbers)
+        inspectorNumbers = try c.decodeIfPresent([Int].self, forKey: .inspectorNumbers)
+        doctorNumbers = try c.decodeIfPresent([Int].self, forKey: .doctorNumbers)
+        isResolved = try c.decodeIfPresent(Bool.self, forKey: .isResolved) ?? false
+        aliveMafiaIDs = try c.decodeIfPresent([UUID].self, forKey: .aliveMafiaIDs)
+    }
 }

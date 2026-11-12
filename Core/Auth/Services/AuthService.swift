@@ -2,11 +2,15 @@ import Foundation
 import ClerkKit
 import ConvexMobile
 
+/// Sendable so `AuthStore` can hand it to a timed-out restore; conformers are main-actor classes.
 @MainActor
-protocol AuthServicing: AnyObject {
-    /// The signed-in account, or nil only when Clerk definitively has no
-    /// user. Throws when Clerk or Convex cannot be reached.
+protocol AuthServicing: AnyObject, Sendable {
+    /// The signed-in account, or nil when Clerk holds no user right now (a
+    /// session Clerk finds later arrives through `accountSessionStarted`).
+    /// Throws when Clerk or Convex cannot be reached.
     var currentUser: UserProfile? { get async throws }
+    /// Yields each time Clerk reports a newly active session.
+    var accountSessionStarted: AsyncStream<Void> { get }
     /// Reinstalls the account's Clerk token in Convex.
     func refreshConvexAuth() async throws
     /// Returns nil when Clerk emailed a code that `verifySignUpEmailCode` needs.
@@ -28,11 +32,25 @@ final class AuthService {
 
     var currentUser: UserProfile? {
         get async throws {
-            if Clerk.shared.user == nil {
-                _ = try await Clerk.shared.refreshClient()
-            }
+            // Clerk.configure loads a signed-in account from its cache and
+            // already refreshes the client itself; waiting for that refresh
+            // here only delayed guests and signed-out users.
             guard Clerk.shared.user != nil else { return nil }
             return try await completeSession()
+        }
+    }
+
+    var accountSessionStarted: AsyncStream<Void> {
+        AsyncStream { continuation in
+            let task = Task { @MainActor in
+                for await event in Clerk.shared.auth.events {
+                    if case .sessionChanged(_, let newSession) = event, newSession?.status == .active {
+                        continuation.yield()
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -143,10 +161,14 @@ final class AuthService {
         return try await completeSession(afterPassword.createdSessionId)
     }
 
+    // The users:* mutations below are idempotent, so a timeout (shown as
+    // "still sending") is safe.
+
     func updateProfile(displayName: String) async throws {
         let _: UserProfile = try await convex.mutation(
             "users:updateProfile",
-            with: ["display_name": displayName]
+            with: ["display_name": displayName],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
@@ -156,14 +178,16 @@ final class AuthService {
             with: [
                 "display_name": displayName,
                 "guest_secret_hash": guestSecretHash,
-            ]
+            ],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
     func mergeGuestIntoAccount(guestSecretHash: String) async throws {
         try await convex.mutation(
             "users:mergeGuestIntoAccount",
-            with: ["guest_secret_hash": guestSecretHash]
+            with: ["guest_secret_hash": guestSecretHash],
+            timeout: ConvexService.interactiveMutationTimeout
         )
     }
 
@@ -183,6 +207,9 @@ final class AuthService {
         // The provider's session-sync task installs the token too, but on its
         // own task; doing it here keeps ensureUser from racing it.
         try await convex.refreshAuthFromClerk()
+        // No time limit: Clerk and Convex already act as the account here, so
+        // giving up would leave the app showing the old identity with nothing
+        // to retry. A restore is bounded by AuthStore.restoreTimeout instead.
         return try await convex.mutation(
             "users:ensureUser",
             with: ["display_name": displayName]

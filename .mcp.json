@@ -1,15 +1,11 @@
 {
   "mcpServers": {
-    "supabase": {
-      "type": "http",
-      "url": "https://mcp.supabase.com/mcp"
-    },
     "convex": {
       "type": "stdio",
       "command": "npx",
       "args": [
         "-y",
-        "convex@latest",
+        "convex@1.46.0",
         "mcp",
         "start"
       ],
@@ -20,7 +16,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "xcodebuildmcp@latest",
+        "xcodebuildmcp@2.7.0",
         "mcp"
       ],
       "env": {}

@@ -30,7 +30,7 @@ export const closeVoting = mutation({
     if (d === undefined || !Number.isInteger(d)) fail(E.MOVED_ON);
     const rows = await ctx.db
       .query("game_actions")
-      .withIndex("by_session_round_type_phase", (q) =>
+      .withIndex("by_unique_action", (q) =>
         q.eq("session_id", session.id).eq("round_id", args.round_id).eq("action_type", "vote").eq("phase_index", d),
       )
       .collect();
@@ -71,7 +71,7 @@ export const resolveVoteAtomic = mutation({
     const removed = victim ? [victim.player_id] : [];
     if (victim) await ctx.db.patch(victim._id, { is_alive: false, removal_note: "Voted out" });
     const seatsAfter = seats.map((s) => (s === victim ? { ...s, is_alive: false } : s));
-    const win = evaluateWinners(seatsAfter.filter((s) => s.is_alive), false);
+    const win = evaluateWinners(seatsAfter.filter((s) => s.is_alive));
     const next = win.over ? "game_over" : "night";
     const record: DayRecord = {
       day_index: d,

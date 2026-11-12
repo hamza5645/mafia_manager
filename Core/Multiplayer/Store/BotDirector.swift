@@ -7,7 +7,7 @@ struct BotPlan: Equatable {
     let target: UUID?
 }
 
-/// Host-only: submits bot night actions and votes from the latest snapshots (api_contract 4, §8.2).
+/// Host-only: submits bot night actions and votes from the latest snapshots (api_contract 5, §8.2).
 @MainActor
 final class BotDirector {
     /// Server messages after which retrying this round can never succeed.
@@ -18,10 +18,10 @@ final class BotDirector {
         "This game is no longer active.",
     ]
 
-    /// Sends one bot action (`play:submitAction`) for the given session, round and phase index.
-    typealias Submit = (_ plan: BotPlan, _ sessionId: UUID, _ roundId: UUID, _ phaseIndex: Int) async throws -> Void
+    /// Sends one pass of bot actions (`play:submitBotActions`) and returns the per-bot results.
+    typealias Submit = (_ plans: [BotPlan], _ sessionId: UUID, _ roundId: UUID, _ phaseIndex: Int) async throws -> [BotActionResult]
 
-    private let submitAction: Submit
+    private let submitActions: Submit
     private let decisions = BotDecisionService()
     private var roundId: UUID?
     /// `"\(roundId):\(botPlayerId)"` for submissions in flight or already accepted this round.
@@ -29,7 +29,7 @@ final class BotDirector {
     private var isRoundClosed = false
 
     init(submit: @escaping Submit) {
-        submitAction = submit
+        submitActions = submit
     }
 
     func reset() {
@@ -38,7 +38,8 @@ final class BotDirector {
         isRoundClosed = false
     }
 
-    /// Runs on every snapshot while I am host. Safe to call repeatedly.
+    /// Runs on every changed snapshot and every tick while I am host. Safe to call repeatedly:
+    /// a failed submission is planned again on a later pass.
     func run(session: GameSession, players: [SessionPlayer], round: RoundState) {
         guard let roundId = round.roundId, roundId == session.currentRoundId,
               let phaseIndex = round.phaseIndex else { return }
@@ -60,43 +61,44 @@ final class BotDirector {
             return
         }
 
-        let alive = players.filter(\.isAlive).map(\.playerId)
-        for plan in plans {
-            let key = "\(roundId):\(plan.botPlayerId)"
-            guard !handled.contains(key) else { continue }
-            handled.insert(key)
-            Task {
-                if await submit(plan, sessionId: session.id, roundId: roundId, phaseIndex: phaseIndex, alive: alive) == false {
-                    handled.remove(key) // Retry on the next snapshot.
-                }
-            }
+        let batch = plans.filter { !handled.contains(Self.key(roundId, $0)) }
+        guard !batch.isEmpty else { return }
+        batch.forEach { handled.insert(Self.key(roundId, $0)) }
+        Task {
+            let retries = await submit(batch, sessionId: session.id, roundId: roundId, phaseIndex: phaseIndex)
+            retries.forEach { handled.remove(Self.key(roundId, $0)) }
         }
     }
 
-    /// Returns false when the submission should be retried.
-    private func submit(_ plan: BotPlan, sessionId: UUID, roundId: UUID, phaseIndex: Int, alive: [UUID]) async -> Bool {
+    /// Returns the plans to send again on a later pass.
+    private func submit(_ batch: [BotPlan], sessionId: UUID, roundId: UUID, phaseIndex: Int) async -> [BotPlan] {
+        let results: [BotActionResult]
         do {
-            try await submitAction(plan, sessionId, roundId, phaseIndex)
-            return true
+            results = try await submitActions(batch, sessionId, roundId, phaseIndex)
         } catch {
-            print("❌ [BotDirector] \(plan.actionType.rawValue) for bot \(plan.botPlayerId) failed: \(error.localizedDescription)")
-            if Self.closesRound(error) {
-                if self.roundId == roundId { isRoundClosed = true }
-                return true
-            }
-            guard plan.actionType == .vote else { return false }
+            print("❌ [BotDirector] Submitting \(batch.count) bot action(s) failed: \(error.localizedDescription)")
+            guard Self.closesRound(error) else { return batch }
+            closeRound(roundId)
+            return []
         }
-        // A rejected vote falls back to another living seat, and to self as the last resort.
-        let fallback = alive.filter { $0 != plan.botPlayerId && $0 != plan.target }.randomElement() ?? plan.botPlayerId
-        do {
-            try await submitAction(BotPlan(botPlayerId: plan.botPlayerId, actionType: .vote, target: fallback),
-                                   sessionId, roundId, phaseIndex)
-            return true
-        } catch {
-            print("❌ [BotDirector] Fallback vote for bot \(plan.botPlayerId) failed: \(error.localizedDescription)")
-            if Self.closesRound(error), self.roundId == roundId { isRoundClosed = true }
-            return Self.closesRound(error)
+        let byBot = Dictionary(results.map { ($0.actorPlayerId, $0) }, uniquingKeysWith: { first, _ in first })
+        return batch.filter { plan in
+            guard let result = byBot[plan.botPlayerId] else { return true }
+            guard !result.ok else { return false }
+            let message = result.error ?? ""
+            print("❌ [BotDirector] \(plan.actionType.rawValue) for bot \(plan.botPlayerId) failed: \(message)")
+            guard Self.roundClosedMessages.contains(message) else { return true }
+            closeRound(roundId)
+            return false
         }
+    }
+
+    private func closeRound(_ roundId: UUID) {
+        if self.roundId == roundId { isRoundClosed = true }
+    }
+
+    private static func key(_ roundId: UUID, _ plan: BotPlan) -> String {
+        "\(roundId):\(plan.botPlayerId)"
     }
 
     /// A server rejection after which no submission can succeed this round.
@@ -107,8 +109,9 @@ final class BotDirector {
 
     // MARK: - Planning
 
-    /// Night actions for living bots that have none this round. A bot follows the latest
-    /// human of its role only when the server would accept that target.
+    /// Night actions for living bots that have none this round. Mafia bots wait for every
+    /// living human Mafia and then back the humans' plurality; doctor and inspector bots follow
+    /// the latest human of their role. A bot follows only a target the server would accept.
     static func nightPlans(
         players: [SessionPlayer],
         actions: [GameAction],
@@ -137,24 +140,35 @@ final class BotDirector {
             }
 
             let humans = Set(alive.filter { !$0.isBot && $0.role == role }.map(\.playerId))
-            if !humans.isEmpty {
+            if role == .mafia {
+                var target: UUID?
+                if !humans.isEmpty {
+                    // The server counts human Mafia rows first; bots only break ties among their leaders.
+                    guard humans.isSubset(of: acted) else { continue }
+                    target = humanLead(rows.filter { humans.contains($0.actorPlayerId) }, actor: pending[0], alive: alive)
+                }
+                if target == nil {
+                    // No human named a usable target: the bots decide together. A submitted bot
+                    // target is reused only while the server still accepts it.
+                    let botIds = Set(alive.filter { $0.isBot && $0.role == .mafia }.map(\.playerId))
+                    target = rows.filter { botIds.contains($0.actorPlayerId) }
+                        .max(by: { $0.createdAt < $1.createdAt })?.targetPlayerId
+                        .flatMap { canTarget($0, actor: pending[0], actionType: type, alive: alive) ? $0 : nil }
+                        ?? decisions.chooseCoordinatedMafiaTarget(
+                            mafiaBots: pending.map(localPlayer), alivePlayers: localAlive, nightHistory: history
+                        )
+                }
+                for bot in pending {
+                    plans.append(BotPlan(botPlayerId: bot.playerId, actionType: type, target: target ?? ownTarget(bot)))
+                }
+            } else if !humans.isEmpty {
                 // Bots wait until a human of their role has acted.
                 guard let latest = rows.filter({ humans.contains($0.actorPlayerId) })
                     .max(by: { $0.createdAt < $1.createdAt }) else { continue }
                 for bot in pending {
-                    let follow = canTarget(latest.targetPlayerId, actor: bot, role: role, alive: alive)
+                    let follow = canTarget(latest.targetPlayerId, actor: bot, actionType: type, alive: alive)
                     plans.append(BotPlan(botPlayerId: bot.playerId, actionType: type,
                                          target: follow ? latest.targetPlayerId : ownTarget(bot)))
-                }
-            } else if role == .mafia {
-                let mafiaIds = Set(alive.filter { $0.role == .mafia }.map(\.playerId))
-                let shared = rows.filter { mafiaIds.contains($0.actorPlayerId) }
-                    .max(by: { $0.createdAt < $1.createdAt })?.targetPlayerId
-                    ?? decisions.chooseCoordinatedMafiaTarget(
-                        mafiaBots: pending.map(localPlayer), alivePlayers: localAlive, nightHistory: history
-                    )
-                for bot in pending {
-                    plans.append(BotPlan(botPlayerId: bot.playerId, actionType: type, target: shared ?? ownTarget(bot)))
                 }
             } else {
                 for bot in pending {
@@ -163,6 +177,18 @@ final class BotDirector {
             }
         }
         return plans
+    }
+
+    /// The target most human Mafia rows name, among targets the server accepts. A tie goes
+    /// to the leader named first, so every bot backs the same leader.
+    private static func humanLead(_ rows: [GameAction], actor: SessionPlayer, alive: [SessionPlayer]) -> UUID? {
+        let named = rows.sorted { $0.createdAt < $1.createdAt }
+            .compactMap(\.targetPlayerId)
+            .filter { canTarget($0, actor: actor, actionType: .mafiaTarget, alive: alive) }
+        var counts: [UUID: Int] = [:]
+        named.forEach { counts[$0, default: 0] += 1 }
+        guard let top = counts.values.max() else { return nil }
+        return named.first { counts[$0] == top }
     }
 
     /// Votes for living bots without a targeted vote this round (bots never abstain).
@@ -185,12 +211,12 @@ final class BotDirector {
         }
     }
 
-    /// Mirrors `validateGameAction` (§4.5) for a target another player chose.
-    static func canTarget(_ target: UUID?, actor: SessionPlayer, role: Role, alive: [SessionPlayer]) -> Bool {
+    /// Mirrors the target checks of `validateGameAction` (§4.5) for an alive actor with the right role.
+    static func canTarget(_ target: UUID?, actor: SessionPlayer, actionType: ActionType, alive: [SessionPlayer]) -> Bool {
         guard let target else { return true } // Abstaining is always accepted.
         guard let seat = alive.first(where: { $0.playerId == target }) else { return false }
-        if role == .mafia && seat.role == .mafia { return false }
-        if role == .inspector && target == actor.playerId { return false }
+        if actionType == .mafiaTarget && seat.role == .mafia { return false }
+        if actionType == .inspectorCheck && target == actor.playerId { return false }
         return true
     }
 

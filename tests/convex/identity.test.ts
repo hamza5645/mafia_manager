@@ -1,8 +1,10 @@
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { api } from '../../convex/_generated/api';
 import { E } from '../../convex/lib/errors';
 import { sha256Hex } from '../../convex/lib/util';
-import { backend, guest, proof, randomHash, room } from './helpers';
+import { advance, backend, guest, proof, randomHash, room } from './helpers';
+
+afterEach(() => { vi.useRealTimers(); });
 
 test('sha256Hex matches the FIPS 180-2 "abc" vector', async () => {
   expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
@@ -13,7 +15,7 @@ test('guests are stored by digest only and restored by the same hash', async () 
   const g = await guest(t, ' QA Guest ');
   expect(Object.keys(g).sort()).toEqual(['created_at', 'display_name', 'hash', 'id', 'is_anonymous', 'updated_at']);
   expect(g).toMatchObject({ display_name: 'QA Guest', is_anonymous: true });
-  const row = await t.run(ctx => ctx.db.query('users').withIndex('by_app_id', q => q.eq('id', g.id)).unique());
+  const row = await t.run(ctx => ctx.db.query('users').filter(q => q.eq(q.field('id'), g.id)).unique());
   expect(row!.guest_secret_digest).toBe(await sha256Hex(g.hash));
   const again = await t.mutation(api.users.createOrRestoreGuest, { display_name: 'Renamed', guest_secret_hash: g.hash });
   expect(again).toMatchObject({ id: g.id, display_name: 'Renamed' });
@@ -70,6 +72,33 @@ test('ensureUser claims a legacy row only for a verified email and keeps edited 
   await expect(t.mutation(api.users.updateProfile, { display_name: 'Nobody' })).rejects.toThrow(E.AUTH);
 });
 
+test('the launch-time restores write nothing when nothing changed', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  const t = backend(); const subject = crypto.randomUUID();
+  const client = t.withIdentity({ subject, email: 'QA-Same@example.com', name: 'QA Same' });
+  const accountRow = () => t.run(ctx => ctx.db.query('users').withIndex('by_auth_subject', q => q.eq('auth_subject', subject)).unique());
+  const account = await client.mutation(api.users.ensureUser, {});
+  const stored = await accountRow();
+  advance(60);
+  expect(await client.mutation(api.users.ensureUser, {})).toEqual(account);
+  expect(await accountRow()).toEqual(stored);
+  advance(60);
+  const renamed = await client.mutation(api.users.ensureUser, { display_name: 'QA Renamed' });
+  expect(renamed).toMatchObject({ id: account.id, display_name: 'QA Renamed' });
+  expect(renamed.updated_at).toBeGreaterThan(account.updated_at);
+
+  const g = await guest(t, 'QA Guest');
+  const guestRow = () => t.run(ctx => ctx.db.query('users').filter(q => q.eq(q.field('id'), g.id)).unique());
+  const before = await guestRow();
+  advance(60);
+  const { hash, ...restored } = g;
+  expect(await t.mutation(api.users.createOrRestoreGuest, { display_name: ' QA Guest ', guest_secret_hash: hash })).toEqual(restored);
+  expect(await guestRow()).toEqual(before);
+  advance(60);
+  expect((await t.mutation(api.users.createOrRestoreGuest, { display_name: 'QA Renamed', guest_secret_hash: hash })).updated_at)
+    .toBeGreaterThan(g.updated_at);
+});
+
 test('updateProfile acts on the caller only', async () => {
   const t = backend(); const g = await guest(t, 'QA Before');
   expect(await t.mutation(api.users.updateProfile, { display_name: ' QA After ', ...proof(g) }))
@@ -77,10 +106,13 @@ test('updateProfile acts on the caller only', async () => {
   await expect(t.mutation(api.users.updateProfile, { display_name: 'a\nb', ...proof(g) })).rejects.toThrow(E.DISPLAY_NAME);
 });
 
-test('health reports api_contract 4 and accepts the guest proof', async () => {
+test('health reports api_contract 5 and the minimum client contract, and accepts the guest proof', async () => {
   const t = backend();
-  expect(await t.query(api.health.check, {})).toMatchObject({ ok: true, backend: 'convex', version: 'convex-clerk-v4', api_contract: 4 });
-  expect(await t.query(api.health.check, { guest_secret_hash: randomHash() })).toMatchObject({ api_contract: 4 });
+  const health = await t.query(api.health.check, {});
+  expect(health).toEqual({ ok: true, backend: 'convex', version: 'convex-clerk-v5', api_contract: 5, min_client_contract: 5,
+    checked_at: expect.any(String) });
+  expect(new Date(health.checked_at).toISOString()).toBe(health.checked_at);
+  expect(await t.query(api.health.check, { guest_secret_hash: randomHash() })).toMatchObject({ api_contract: 5 });
 });
 
 test('every function rejects the removed identity and id args', async () => {
@@ -105,6 +137,12 @@ test('every function rejects the removed identity and id args', async () => {
     [api.views.getSessionView, 'query', { ...proof(g), session_id: sid, viewer_user_id: g.id }],
     [api.views.getPlayers, 'query', { ...proof(g), session_id: sid, viewer_user_id: g.id }],
     [api.views.getRoundState, 'query', { ...proof(g), session_id: sid, viewer_user_id: g.id }],
+    [api.views.getHostPresence, 'query', { ...proof(g), session_id: sid, viewer_user_id: g.id }],
+    [api.sessions.heartbeat, 'mutation', { ...old, session_id: sid }],
+    [api.sessions.claimHost, 'mutation', { ...old, session_id: sid }],
+    [api.night.finishNight, 'mutation', { ...old, session_id: sid, round_id: sid }],
+    [api.play.submitBotActions, 'mutation', { ...old, session_id: sid, round_id: sid, phase_index: 0, actions: [] }],
+    [api.stats.recordGame, 'mutation', { ...old, game_id: sid, results: [] }],
   ];
   for (const [fn, kind, args] of cases) {
     await expect(kind === 'query' ? t.query(fn, args) : t.mutation(fn, args)).rejects.toThrow(/Validator error: Unexpected field/);

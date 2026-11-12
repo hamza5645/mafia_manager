@@ -133,6 +133,7 @@ struct LoginView: View {
                     .accessibilityLabel("Create account")
                     .padding(.bottom, 32)
                 }
+                .readableContentWidth()
             }
         }
         .sheet(isPresented: $showSignup) {
@@ -232,6 +233,7 @@ struct PasswordResetView: View {
 
                     Spacer()
                 }
+                .readableContentWidth()
             }
             .navigationDestination(isPresented: $showCompletionStep) {
                 PasswordResetCompleteView()
@@ -368,6 +370,7 @@ struct PasswordResetCompleteView: View {
 
                     Spacer()
                 }
+                .readableContentWidth()
             }
         }
         .onAppear {

@@ -1,0 +1,4 @@
+# Tool versions for this repo (https://mise.jdx.dev). Run `mise install` once.
+[tools]
+tuist = "4.198.1"
+node = "22.12"

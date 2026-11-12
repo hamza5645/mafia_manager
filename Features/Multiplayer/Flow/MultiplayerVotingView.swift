@@ -2,47 +2,49 @@ import SwiftUI
 
 struct MultiplayerVotingView: View {
     @EnvironmentObject private var multiplayerStore: MultiplayerGameStore
+    /// From the router; a new day gets a new view (`.id(dayIndex)`).
+    let dayIndex: Int
+
     @State private var selectedTargetId: UUID?
     @State private var hasSubmitted = false
     @State private var isSubmitting = false
     @State private var votingError: String?
 
-    var dayIndex: Int {
-        // Extract from current session phase data
-        if case .voting(let index) = multiplayerStore.currentSession?.currentPhaseData {
-            return index
-        }
-        return multiplayerStore.currentSession?.dayIndex ?? 0
-    }
-
-    // HAMZA-94: Sort players by humans first
-    // Note: Mafia CAN vote on teammates during day (to maintain cover)
-    // Only night targeting restricts Mafia from targeting teammates
-    var alivePlayers: [PublicPlayerInfo] {
-        return multiplayerStore.visiblePlayers
-            .filter { $0.isAlive && $0.playerId != multiplayerStore.myPlayer?.playerId }
-            .sortedHumansFirst()
-    }
-
-    var isAlive: Bool {
-        multiplayerStore.myPlayer?.isAlive ?? false
-    }
-
     var body: some View {
         ZStack {
             Design.Colors.surface0.ignoresSafeArea()
 
-            if isAlive {
-                alivePlayerView
+            // Until my seat arrives this is loading, not "You are eliminated".
+            if let me = multiplayerStore.myPlayer {
+                if me.isAlive {
+                    alivePlayerView(me: me)
+                } else {
+                    spectatorView
+                }
             } else {
-                spectatorView
+                ProgressView()
+                    .tint(Design.Colors.brandGold)
             }
         }
         .navigationBarBackButtonHidden(true)
+        .task {
+            restoreSubmittedVote()
+        }
+        .onChange(of: multiplayerStore.myVote?.id) { _, _ in
+            restoreSubmittedVote()
+        }
     }
 
-    private var alivePlayerView: some View {
-        VStack(spacing: 24) {
+    private func alivePlayerView(me: SessionPlayer) -> some View {
+        let isHost = multiplayerStore.isHost
+        // HAMZA-94: Sort players by humans first
+        // Note: Mafia CAN vote on teammates during day (to maintain cover)
+        // Only night targeting restricts Mafia from targeting teammates
+        let alivePlayers = multiplayerStore.visiblePlayers
+            .filter { $0.isAlive && $0.playerId != me.playerId }
+            .sortedHumansFirst()
+
+        return VStack(spacing: 24) {
             // Header
             VStack(spacing: 8) {
                 Text("Day \(dayIndex + 1) Voting")
@@ -81,41 +83,19 @@ struct MultiplayerVotingView: View {
                                 playerInfo: player,
                                 isSelected: selectedTargetId == player.playerId
                             ) {
-                                selectedTargetId = player.playerId
-                                // For host: submit vote silently without showing confirmation
-                                // Pass target explicitly to avoid race condition with state update
-                                if multiplayerStore.isHost && !hasSubmitted {
-                                    submitVote(explicitTarget: player.playerId, showConfirmation: false)
-                                }
+                                selectTarget(player.playerId, isHost: isHost)
                             }
                         }
                     }
                     .padding(.horizontal, 20)
                 }
+                .layoutPriority(1)
 
                 Spacer()
 
                 // Submit Vote Button (only for non-host players)
-                if !hasSubmitted && !multiplayerStore.isHost {
-                    Button {
-                        submitVote()
-                    } label: {
-                        Text("Submit Vote")
-                            .font(Design.Typography.body)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                selectedTargetId == nil
-                                    ? Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
-                                    : Design.Colors.brandGold
-                            )
-                            .foregroundColor(Design.Colors.surface0)
-                            .cornerRadius(Design.Radii.medium)
-                    }
-                    .disabled(isSubmitting || selectedTargetId == nil)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, multiplayerStore.isHost ? 20 : 40)
-                    .automationID("multiplayer.voting.submitVote")
+                if !isHost {
+                    submitButton
 
                     if selectedTargetId == nil {
                         Text("Select a player to vote for")
@@ -162,40 +142,80 @@ struct MultiplayerVotingView: View {
             }
 
             // Host Controls
-            if multiplayerStore.isHost {
-                Button {
-                    endVoting()
-                } label: {
-                    HStack {
-                        Text("End Voting")
-                            .fontWeight(.bold)
-                        
-                        if multiplayerStore.isPhaseReadyToAdvance {
-                            Image(systemName: "arrow.right.circle.fill")
-                        } else {
-                            Image(systemName: "clock.fill")
-                        }
-                    }
-                    .font(Design.Typography.body)
-                    .foregroundStyle(
-                        multiplayerStore.isPhaseReadyToAdvance
-                            ? Design.Colors.brandGold
-                            : Design.Colors.textSecondary.opacity(Design.Opacity.medium)
-                    )
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 16)
-                    .background(
-                        multiplayerStore.isPhaseReadyToAdvance
-                            ? Design.Colors.brandGold.opacity(0.1)
-                            : Color.clear
-                    )
-                    .cornerRadius(Design.Radii.medium)
-                }
-                .disabled(!multiplayerStore.isPhaseReadyToAdvance)
-                .padding(.bottom, 40)
-                .automationID("multiplayer.voting.endVoting")
+            if isHost {
+                WaitingForPlayersSection()
+
+                endVotingButton
             }
         }
+        .readableContentWidth()
+    }
+
+    private var submitButton: some View {
+        Button {
+            submitVote(target: selectedTargetId, showConfirmation: true)
+        } label: {
+            HStack(spacing: 10) {
+                if isSubmitting {
+                    ProgressView()
+                        .tint(Design.Colors.surface0)
+                    Text("Submitting...")
+                } else {
+                    Text("Submit Vote")
+                }
+            }
+            .font(Design.Typography.body)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                isSubmitting
+                    ? Design.Colors.brandGold.opacity(Design.Opacity.strong)
+                    : (selectedTargetId == nil
+                        ? Design.Colors.textSecondary.opacity(Design.Opacity.disabled)
+                        : Design.Colors.brandGold)
+            )
+            .foregroundColor(Design.Colors.surface0)
+            .cornerRadius(Design.Radii.medium)
+        }
+        .disabled(isSubmitting || selectedTargetId == nil)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 40)
+        .automationID("multiplayer.voting.submitVote")
+    }
+
+    private var endVotingButton: some View {
+        let isReady = multiplayerStore.isPhaseReadyToAdvance
+        return Button {
+            endVoting()
+        } label: {
+            HStack {
+                Text("End Voting")
+                    .fontWeight(.bold)
+
+                if isReady {
+                    Image(systemName: "arrow.right.circle.fill")
+                } else {
+                    Image(systemName: "clock.fill")
+                }
+            }
+            .font(Design.Typography.body)
+            .foregroundStyle(
+                isReady
+                    ? Design.Colors.brandGold
+                    : Design.Colors.textSecondary.opacity(Design.Opacity.medium)
+            )
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .background(
+                isReady
+                    ? Design.Colors.brandGold.opacity(0.1)
+                    : Color.clear
+            )
+            .cornerRadius(Design.Radii.medium)
+        }
+        .disabled(!isReady)
+        .padding(.bottom, 40)
+        .automationID("multiplayer.voting.endVoting")
     }
 
     private var spectatorView: some View {
@@ -221,6 +241,21 @@ struct MultiplayerVotingView: View {
         }
     }
 
+    private func selectTarget(_ targetId: UUID, isHost: Bool) {
+        if isHost {
+            // The host votes silently on each tap. An unchanged pick is not re-sent,
+            // except to retry after an error.
+            guard selectedTargetId != targetId || votingError != nil else { return }
+            selectedTargetId = targetId
+            // Pass target explicitly to avoid race condition with state update
+            submitVote(target: targetId, showConfirmation: false)
+        } else {
+            // The confirmation names `selectedTargetId`, so it must not change mid-submit.
+            guard !isSubmitting else { return }
+            selectedTargetId = targetId
+        }
+    }
+
     private func endVoting() {
         votingError = nil
         Task {
@@ -235,39 +270,44 @@ struct MultiplayerVotingView: View {
         }
     }
 
-    private func submitVote(explicitTarget: UUID? = nil, showConfirmation: Bool = true) {
+    private func submitVote(target: UUID?, showConfirmation: Bool) {
         isSubmitting = true
         votingError = nil
-
-        // Use explicit target if provided (avoids race condition), otherwise use state
-        let targetToSubmit = explicitTarget ?? selectedTargetId
 
         Task {
             do {
                 try await multiplayerStore.submitVote(
                     dayIndex: dayIndex,
-                    targetPlayerId: targetToSubmit
+                    targetPlayerId: target
                 )
-
-                // Auto-mark non-host humans as ready after submitting a vote
-                if let me = multiplayerStore.myPlayer, me.isAlive, !multiplayerStore.isHost {
-                    try? await multiplayerStore.setReadyStatus(true)
+                // Only show confirmation screen if requested (non-host players)
+                if showConfirmation {
+                    hasSubmitted = true
                 }
-
-                await MainActor.run {
-                    // Only show confirmation screen if requested (non-host players)
-                    if showConfirmation {
-                        hasSubmitted = true
-                    }
-                    isSubmitting = false
-                }
+                isSubmitting = false
             } catch {
-                await MainActor.run {
-                    isSubmitting = false
+                isSubmitting = false
+                // A timed-out request may still arrive, so it is not called a failure.
+                if let error = error as? BackendError, error.isTimeout {
+                    votingError = error.message
+                } else {
                     votingError = "Failed to submit vote. Tap to retry."
                 }
                 print("Failed to submit vote: \(error.localizedDescription)")
             }
+        }
+    }
+
+    /// After a relaunch and rejoin, show the vote already recorded this round. Only a fresh
+    /// ballot takes the server's target, so a host's newer tap still in flight is never undone;
+    /// the host keeps the ballot to change their vote silently.
+    private func restoreSubmittedVote() {
+        guard let vote = multiplayerStore.myVote else { return }
+        if selectedTargetId == nil {
+            selectedTargetId = vote.targetPlayerId
+        }
+        if !multiplayerStore.isHost {
+            hasSubmitted = true
         }
     }
 }
@@ -352,7 +392,7 @@ struct VoteTargetButton: View {
 }
 
 #Preview {
-    MultiplayerVotingView()
+    MultiplayerVotingView(dayIndex: 0)
         .environmentObject(MultiplayerGameStore())
         .preferredColorScheme(.dark)
 }

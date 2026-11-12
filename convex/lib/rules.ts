@@ -15,12 +15,18 @@ export const ROLE_OF_TYPE: Record<string, Role | undefined> = {
   doctor_protect: "doctor",
   inspector_check: "inspector",
 };
-const TYPE_OF_ROLE: Record<string, ActionType | undefined> = {
+export const TYPE_OF_ROLE: Record<string, ActionType | undefined> = {
   mafia: "mafia_target",
   doctor: "doctor_protect",
   inspector: "inspector_check",
 };
 export const HOST_STALE_SECONDS = 15;
+// The lobby host often leaves the app to share the room code.
+export const LOBBY_HOST_STALE_SECONDS = 90;
+
+// Seconds without a host heartbeat before another member may claim host.
+export const hostStaleAfter = (session: Session) =>
+  session.status === "waiting" ? LOBBY_HOST_STALE_SECONDS : HOST_STALE_SECONDS;
 
 // Shapes of the session fields the schema stores as v.any(). Records written by
 // the old Swift host lack round_id and next_phase.
@@ -121,13 +127,54 @@ export function majorityTarget(actions: Action[], validTargets: string[], humanI
     .sort((a, b) => a.created_at - b.created_at || a._creationTime - b._creationTime)[0].target_player_id;
 }
 
+// The targets named by the most rows.
+function leadersOf(actions: Action[]): string[] {
+  const counts = new Map<string, number>();
+  for (const a of actions) {
+    if (a.target_player_id !== undefined) counts.set(a.target_player_id, (counts.get(a.target_player_id) ?? 0) + 1);
+  }
+  const max = Math.max(...counts.values());
+  return [...counts.keys()].filter((id) => counts.get(id) === max);
+}
+
+// Once a living human Mafia has named a target, the human rows decide: bot
+// rows only break a tie between the human leaders, then the earliest human row
+// does. Without a human pick (an all-bot team, or every human abstained) every
+// row counts as in majorityTarget.
+export function mafiaChoice(actions: Action[], validTargets: string[], humanIds: Set<string>): string | undefined {
+  const isHuman = (a: Action) => humanIds.has(a.actor_player_id);
+  const humanPicks = actions.filter((a) => isHuman(a) && a.target_player_id !== undefined);
+  if (humanPicks.length === 0) return majorityTarget(actions, validTargets, humanIds);
+  const onLeader = (leaders: string[]) => (a: Action) =>
+    a.target_player_id !== undefined && leaders.includes(a.target_player_id);
+  let leaders = leadersOf(humanPicks);
+  if (leaders.length > 1) {
+    const backedByBots = leadersOf(actions.filter((a) => !isHuman(a) && onLeader(leaders)(a)));
+    if (backedByBots.length > 0) leaders = backedByBots;
+  }
+  if (leaders.length === 1) return leaders[0];
+  return humanPicks
+    .filter(onLeader(leaders))
+    .sort((a, b) => a.created_at - b.created_at || a._creationTime - b._creationTime)[0].target_player_id;
+}
+
 // MGS 2096-2210. Only actions from alive seats holding the matching role count (D1).
+// A pick on a seat that is no longer alive (it left or was kicked) is ignored.
+// It is dropped before the majority, and when every pick was dropped the role
+// has no target: the validTargets[0] fallback of majorityTarget is only for a
+// night on which nobody named anyone, not for one whose picks all left.
 export function buildNightRecord(seats: Seat[], actions: Action[], nightIndex: number, roundId: string): NightRecord {
   const alive = seats.filter((s) => s.is_alive);
+  const aliveIds = new Set(alive.map((s) => s.player_id));
   const humanIds = new Set(seats.filter((s) => !s.is_bot).map((s) => s.player_id));
   const actorOf = (a: Action) => alive.find((s) => s.player_id === a.actor_player_id);
   const counted = (type: ActionType) =>
     actions.filter((a) => a.action_type === type && actorOf(a)?.role === ROLE_OF_TYPE[type]);
+  const named = (list: Action[]) => list.some((a) => a.target_player_id !== undefined);
+  const choose = (list: Action[], pick: (living: Action[]) => string | undefined) => {
+    const living = list.filter((a) => a.target_player_id === undefined || aliveIds.has(a.target_player_id));
+    return named(list) && !named(living) ? undefined : pick(living);
+  };
   const numbers = (list: Action[]) =>
     list
       .map((a) => actorOf(a)?.player_number)
@@ -138,9 +185,9 @@ export function buildNightRecord(seats: Seat[], actions: Action[], nightIndex: n
   const mafiaA = counted("mafia_target");
   const doctorA = counted("doctor_protect");
   const inspA = counted("inspector_check");
-  const mafiaTarget = majorityTarget(mafiaA, ids(alive.filter((s) => s.role !== "mafia")), humanIds);
-  const doctorTarget = majorityTarget(doctorA, ids(alive), humanIds);
-  const inspTarget = majorityTarget(inspA, ids(alive.filter((s) => s.role !== "inspector")), humanIds);
+  const mafiaTarget = choose(mafiaA, (l) => mafiaChoice(l, ids(alive.filter((s) => s.role !== "mafia")), humanIds));
+  const doctorTarget = choose(doctorA, (l) => majorityTarget(l, ids(alive), humanIds));
+  const inspTarget = choose(inspA, (l) => majorityTarget(l, ids(alive.filter((s) => s.role !== "inspector")), humanIds));
   // Any single doctor protection on the mafia target saves it (MGS 2151-2152).
   const saved = mafiaTarget !== undefined && doctorA.some((a) => a.target_player_id === mafiaTarget);
   return {
@@ -160,23 +207,25 @@ export function buildNightRecord(seats: Seat[], actions: Action[], nightIndex: n
   };
 }
 
-// MGS 2863-2915.
-export function evaluateWinners(aliveAfter: Seat[], startOfDay: boolean): { over: boolean; winner?: "mafia" | "citizen" } {
+// MGS 2863-2915. Mafia parity ends the game after a night and after a vote,
+// as in solo (GameStore.evaluateWinners).
+export function evaluateWinners(aliveAfter: Seat[]): { over: boolean; winner?: "mafia" | "citizen" } {
   if (aliveAfter.length === 0) return { over: true };
   const mafia = aliveAfter.filter((s) => s.role === "mafia").length;
   const non = aliveAfter.length - mafia;
   if (aliveAfter.every((s) => s.is_bot)) return { over: true, winner: mafia === 0 ? "citizen" : "mafia" };
   if (mafia === 0) return { over: true, winner: "citizen" };
-  if (startOfDay ? mafia > non : mafia >= non) return { over: true, winner: "mafia" };
+  if (mafia >= non) return { over: true, winner: "mafia" };
   return { over: false };
 }
 
-// MGS 2419-2495. A tie or no votes eliminates nobody.
+// MGS 2419-2495. A tie or no votes eliminates nobody. A vote for a seat that is
+// no longer alive (it left or was kicked) counts for nobody.
 export function tallyVotes(seats: Seat[], votes: Action[]) {
   const counts: Record<string, number> = {};
   for (const p of seats) if (p.is_alive) counts[p.player_id] = 0;
   for (const v of votes) {
-    if (v.target_player_id !== undefined) counts[v.target_player_id] = (counts[v.target_player_id] ?? 0) + 1;
+    if (v.target_player_id !== undefined && Object.hasOwn(counts, v.target_player_id)) counts[v.target_player_id] += 1;
   }
   const max = Math.max(...Object.values(counts));
   const leaders = Object.keys(counts).filter((id) => counts[id] === max);
@@ -219,18 +268,16 @@ export function validateGameAction(
   if (args.action_type === "inspector_check" && target.player_id === actor.player_id) fail(E.INSPECT_SELF);
 }
 
-// MGS 2834-2861: alive humans other than the host, optionally with a fresh heartbeat.
-export function nextHostAfterDeath(seats: Seat[], excludingUserId: string, fresh: boolean): Seat | undefined {
+// MGS 2834-2861: alive humans other than the host whose presence (user_id →
+// last heartbeat) is fresh, earliest joined first.
+export function nextHostAfterDeath(seats: Seat[], excludingUserId: string, heartbeats: Map<string, number>): Seat | undefined {
   const now = nowAppleEpochSeconds();
+  const fresh = (userId: string) => {
+    const beat = heartbeats.get(userId);
+    return beat !== undefined && now - beat <= HOST_STALE_SECONDS;
+  };
   return seats
-    .filter(
-      (s) =>
-        s.is_alive &&
-        !s.is_bot &&
-        s.user_id &&
-        s.user_id !== excludingUserId &&
-        (!fresh || now - s.last_heartbeat <= HOST_STALE_SECONDS),
-    )
+    .filter((s) => s.is_alive && !s.is_bot && s.user_id && s.user_id !== excludingUserId && fresh(s.user_id))
     .sort((a, b) => a.joined_at - b.joined_at)[0];
 }
 

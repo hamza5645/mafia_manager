@@ -49,6 +49,10 @@ export const E = {
   VOTES_INCOMPLETE: "Waiting for all votes to be submitted.",
 } as const;
 
+// MERGE_SEAT_CONFLICT naming the room. The app matches the "Leave your other
+// seat" prefix.
+export const mergeSeatConflict = (roomCode: string) => E.MERGE_SEAT_CONFLICT.replace("this room", `room ${roomCode}`);
+
 export function fail(message: string): never {
   throw new ConvexError(message);
 }

@@ -14,6 +14,7 @@ struct SignupView: View {
     // Upgrade mode: When true, this is upgrading a guest account to permanent
     var isUpgrading: Bool = false
 
+    // Split into parts so no single expression is slow to type-check (PA-73).
     var body: some View {
         ZStack {
             Design.Colors.surface0
@@ -21,218 +22,26 @@ struct SignupView: View {
 
             ScrollView {
                 VStack(spacing: 32) {
-                    // Title - different for upgrade vs new signup
-                    VStack(spacing: 8) {
-                        Text(isUpgrading ? "Create Account" : "Create Account")
-                            .font(Design.Typography.title1)
-                            .foregroundColor(Design.Colors.textPrimary)
-                            .accessibilityAddTraits(.isHeader)
-
-                        Text(isUpgrading ? "Keep your game progress" : "Join Mafia")
-                            .font(Design.Typography.subheadline)
-                            .foregroundColor(Design.Colors.textSecondary)
-                    }
-                    .padding(.top, 40)
+                    header
 
                     // Stats preview when upgrading
                     if isUpgrading {
-                        HStack(spacing: 12) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(Design.Typography.body)
-                                .foregroundColor(Design.Colors.successGreen)
-                                .accessibilityHidden(true)
-
-                            Text("Your game stats will be saved to your new account")
-                                .font(Design.Typography.footnote)
-                                .foregroundColor(Design.Colors.textSecondary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Design.Colors.successGreen.opacity(0.15))
-                        .cornerRadius(Design.Radii.small)
-                        .padding(.horizontal, 32)
+                        upgradeNotice
                     }
 
-                    // Input Fields
-                    VStack(spacing: 16) {
-                        TextField("Display Name", text: Binding(
-                            get: { displayName },
-                            set: { displayName = String($0.prefix(50)) }
-                        ))
-                            .textContentType(.name)
-                            .textInputAutocapitalization(.words)
-                            .padding()
-                            .background(Design.Colors.surface1)
-                            .foregroundColor(Design.Colors.textPrimary)
-                            .cornerRadius(Design.Radii.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.card)
-                                    .stroke(Design.Colors.stroke, lineWidth: 1)
-                            )
+                    inputFields
 
-                        TextField("Email", text: Binding(
-                            get: { email },
-                            set: { email = String($0.prefix(255)) }
-                        ))
-                            .textContentType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .disableAutocorrection(true)
-                            .keyboardType(.emailAddress)
-                            .padding()
-                            .background(Design.Colors.surface1)
-                            .foregroundColor(Design.Colors.textPrimary)
-                            .cornerRadius(Design.Radii.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.card)
-                                    .stroke(Design.Colors.stroke, lineWidth: 1)
-                            )
+                    messages
 
-                        SecureField("Password", text: Binding(
-                            get: { password },
-                            set: { password = String($0.prefix(72)) }
-                        ))
-                            .textContentType(.newPassword)
-                            .disableAutocorrection(true)
-                            .padding()
-                            .background(Design.Colors.surface1)
-                            .foregroundColor(Design.Colors.textPrimary)
-                            .cornerRadius(Design.Radii.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.card)
-                                    .stroke(Design.Colors.stroke, lineWidth: 1)
-                            )
+                    signUpButton
 
-                        SecureField("Confirm Password", text: Binding(
-                            get: { confirmPassword },
-                            set: { confirmPassword = String($0.prefix(72)) }
-                        ))
-                            .textContentType(.newPassword)
-                            .disableAutocorrection(true)
-                            .padding()
-                            .background(Design.Colors.surface1)
-                            .foregroundColor(Design.Colors.textPrimary)
-                            .cornerRadius(Design.Radii.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Design.Radii.card)
-                                    .stroke(Design.Colors.stroke, lineWidth: 1)
-                            )
-                    }
-                    .padding(.horizontal, 32)
-
-                    // Validation Error
-                    if let validationError = validationError {
-                        Text(validationError)
-                            .font(Design.Typography.caption)
-                            .foregroundColor(Design.Colors.dangerRed)
-                            .padding(.horizontal, 32)
-                            .accessibilityLabel("Validation error: \(validationError)")
-                    }
-
-                    // Auth Error
-                    if let errorMessage = authStore.errorMessage {
-                        Text(errorMessage)
-                            .font(Design.Typography.caption)
-                            .foregroundColor(Design.Colors.dangerRed)
-                            .padding(.horizontal, 32)
-                            .accessibilityLabel("Error: \(errorMessage)")
-                    }
-
-                    // Sign Up Button
-                    Button {
-                        if validateForm() {
-                            Task {
-                                // A guest's progress merges into the account once
-                                // it exists; errors show via errorMessage.
-                                showVerification = await authStore.startSignUp(
-                                    email: sanitizedEmail,
-                                    password: sanitizedPassword,
-                                    displayName: sanitizedDisplayName
-                                )
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            if authStore.isLoading {
-                                ProgressView()
-                                    .tint(Design.Colors.textPrimary)
-                            } else {
-                                Text("Create Account")
-                                    .font(Design.Typography.headline)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Design.Colors.actionBlue)
-                        .foregroundColor(Design.Colors.textPrimary)
-                        .cornerRadius(Design.Radii.button)
-                        .shadow(color: Design.Colors.actionBlue.opacity(0.3), radius: 16, y: 8)
-                    }
-                    .disabled(authStore.isLoading || !isFormValid)
-                    .padding(.horizontal, 32)
-
-                    // Password Requirements
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Password must:")
-                            .font(Design.Typography.caption)
-                            .foregroundColor(Design.Colors.textSecondary)
-
-                        HStack(spacing: 8) {
-                            Image(systemName: isPasswordLongEnough ? "checkmark.circle.fill" : "circle")
-                                .font(Design.Typography.caption)
-                                .foregroundColor(isPasswordLongEnough ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
-                                .accessibilityHidden(true)
-                            Text("Be at least \(AuthStore.minimumPasswordLength) characters")
-                                .font(Design.Typography.caption)
-                                .foregroundColor(Design.Colors.textSecondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("At least \(AuthStore.minimumPasswordLength) characters: \(isPasswordLongEnough ? "met" : "not met")")
-
-                        HStack(spacing: 8) {
-                            Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "circle")
-                                .font(Design.Typography.caption)
-                                .foregroundColor(passwordsMatch ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
-                                .accessibilityHidden(true)
-                            Text("Match confirmation")
-                                .font(Design.Typography.caption)
-                                .foregroundColor(Design.Colors.textSecondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Passwords match: \(passwordsMatch ? "met" : "not met")")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 32)
+                    passwordRequirements
 
                     Spacer()
 
-                    // Back to Login (hide when upgrading since they're already "logged in" as guest)
-                    if !isUpgrading {
-                        Button {
-                            dismiss()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text("Already have an account?")
-                                    .foregroundColor(Design.Colors.textSecondary)
-                                Text("Sign In")
-                                    .foregroundColor(Design.Colors.brandGold)
-                                    .fontWeight(.semibold)
-                            }
-                            .font(Design.Typography.subheadline)
-                        }
-                        .accessibilityLabel("Sign in to existing account")
-                        .padding(.bottom, 32)
-                    } else {
-                        // For upgrade mode, show option to sign into existing account
-                        Button {
-                            dismiss()
-                        } label: {
-                            Text("Cancel")
-                                .font(Design.Typography.subheadline)
-                                .foregroundColor(Design.Colors.textSecondary)
-                        }
-                        .padding(.bottom, 32)
-                    }
+                    footerButton
                 }
+                .readableContentWidth()
             }
         }
         .onAppear {
@@ -250,6 +59,201 @@ struct SignupView: View {
         .sheet(isPresented: $showVerification) {
             SignupVerificationView()
                 .environmentObject(authStore)
+        }
+    }
+
+    // Title - different for upgrade vs new signup
+    private var header: some View {
+        VStack(spacing: 8) {
+            Text(isUpgrading ? "Create Account" : "Create Account")
+                .font(Design.Typography.title1)
+                .foregroundColor(Design.Colors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+
+            Text(isUpgrading ? "Keep your game progress" : "Join Mafia")
+                .font(Design.Typography.subheadline)
+                .foregroundColor(Design.Colors.textSecondary)
+        }
+        .padding(.top, 40)
+    }
+
+    private var upgradeNotice: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(Design.Typography.body)
+                .foregroundColor(Design.Colors.successGreen)
+                .accessibilityHidden(true)
+
+            Text("Your game stats will be saved to your new account")
+                .font(Design.Typography.footnote)
+                .foregroundColor(Design.Colors.textSecondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Design.Colors.successGreen.opacity(0.15))
+        .cornerRadius(Design.Radii.small)
+        .padding(.horizontal, 32)
+    }
+
+    // Input Fields
+    private var inputFields: some View {
+        VStack(spacing: 16) {
+            TextField("Display Name", text: Binding(
+                get: { displayName },
+                set: { displayName = String($0.prefix(50)) }
+            ))
+                .textContentType(.name)
+                .textInputAutocapitalization(.words)
+                .signupFieldStyle()
+
+            TextField("Email", text: Binding(
+                get: { email },
+                set: { email = String($0.prefix(255)) }
+            ))
+                .textContentType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .keyboardType(.emailAddress)
+                .signupFieldStyle()
+
+            SecureField("Password", text: Binding(
+                get: { password },
+                set: { password = String($0.prefix(72)) }
+            ))
+                .textContentType(.newPassword)
+                .disableAutocorrection(true)
+                .signupFieldStyle()
+
+            SecureField("Confirm Password", text: Binding(
+                get: { confirmPassword },
+                set: { confirmPassword = String($0.prefix(72)) }
+            ))
+                .textContentType(.newPassword)
+                .disableAutocorrection(true)
+                .signupFieldStyle()
+        }
+        .padding(.horizontal, 32)
+    }
+
+    @ViewBuilder
+    private var messages: some View {
+        // Validation Error
+        if let validationError = validationError {
+            Text(validationError)
+                .font(Design.Typography.caption)
+                .foregroundColor(Design.Colors.dangerRed)
+                .padding(.horizontal, 32)
+                .accessibilityLabel("Validation error: \(validationError)")
+        }
+
+        // Auth Error
+        if let errorMessage = authStore.errorMessage {
+            Text(errorMessage)
+                .font(Design.Typography.caption)
+                .foregroundColor(Design.Colors.dangerRed)
+                .padding(.horizontal, 32)
+                .accessibilityLabel("Error: \(errorMessage)")
+        }
+    }
+
+    // Sign Up Button
+    private var signUpButton: some View {
+        Button {
+            if validateForm() {
+                Task {
+                    // A guest's progress merges into the account once
+                    // it exists; errors show via errorMessage.
+                    showVerification = await authStore.startSignUp(
+                        email: sanitizedEmail,
+                        password: sanitizedPassword,
+                        displayName: sanitizedDisplayName
+                    )
+                }
+            }
+        } label: {
+            HStack {
+                if authStore.isLoading {
+                    ProgressView()
+                        .tint(Design.Colors.textPrimary)
+                } else {
+                    Text("Create Account")
+                        .font(Design.Typography.headline)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(Design.Colors.actionBlue)
+            .foregroundColor(Design.Colors.textPrimary)
+            .cornerRadius(Design.Radii.button)
+            .shadow(color: Design.Colors.actionBlue.opacity(0.3), radius: 16, y: 8)
+        }
+        .disabled(authStore.isLoading || !isFormValid)
+        .padding(.horizontal, 32)
+    }
+
+    // Password Requirements
+    private var passwordRequirements: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Password must:")
+                .font(Design.Typography.caption)
+                .foregroundColor(Design.Colors.textSecondary)
+
+            HStack(spacing: 8) {
+                Image(systemName: isPasswordLongEnough ? "checkmark.circle.fill" : "circle")
+                    .font(Design.Typography.caption)
+                    .foregroundColor(isPasswordLongEnough ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
+                    .accessibilityHidden(true)
+                Text("Be at least \(AuthStore.minimumPasswordLength) characters")
+                    .font(Design.Typography.caption)
+                    .foregroundColor(Design.Colors.textSecondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("At least \(AuthStore.minimumPasswordLength) characters: \(isPasswordLongEnough ? "met" : "not met")")
+
+            HStack(spacing: 8) {
+                Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "circle")
+                    .font(Design.Typography.caption)
+                    .foregroundColor(passwordsMatch ? Design.Colors.successGreen : Design.Colors.textSecondary.opacity(Design.Opacity.disabled))
+                    .accessibilityHidden(true)
+                Text("Match confirmation")
+                    .font(Design.Typography.caption)
+                    .foregroundColor(Design.Colors.textSecondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Passwords match: \(passwordsMatch ? "met" : "not met")")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 32)
+    }
+
+    // Back to Login (hide when upgrading since they're already "logged in" as guest)
+    @ViewBuilder
+    private var footerButton: some View {
+        if !isUpgrading {
+            Button {
+                dismiss()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Already have an account?")
+                        .foregroundColor(Design.Colors.textSecondary)
+                    Text("Sign In")
+                        .foregroundColor(Design.Colors.brandGold)
+                        .fontWeight(.semibold)
+                }
+                .font(Design.Typography.subheadline)
+            }
+            .accessibilityLabel("Sign in to existing account")
+            .padding(.bottom, 32)
+        } else {
+            // For upgrade mode, show option to sign into existing account
+            Button {
+                dismiss()
+            } label: {
+                Text("Cancel")
+                    .font(Design.Typography.subheadline)
+                    .foregroundColor(Design.Colors.textSecondary)
+            }
+            .padding(.bottom, 32)
         }
     }
 
@@ -336,5 +340,18 @@ struct SignupView: View {
     private func isValidEmail(_ email: String) -> Bool {
         let pattern = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
         return NSPredicate(format: "SELF MATCHES %@", pattern).evaluate(with: email)
+    }
+}
+
+private extension View {
+    func signupFieldStyle() -> some View {
+        padding()
+            .background(Design.Colors.surface1)
+            .foregroundColor(Design.Colors.textPrimary)
+            .cornerRadius(Design.Radii.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: Design.Radii.card)
+                    .stroke(Design.Colors.stroke, lineWidth: 1)
+            )
     }
 }

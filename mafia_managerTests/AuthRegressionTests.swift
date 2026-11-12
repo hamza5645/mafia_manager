@@ -3,9 +3,10 @@ import XCTest
 
 @testable import mafia_manager
 
-@MainActor
-final class AuthRegressionTests: XCTestCase {
-    func testGuestToAccountTransitionChangesLoginDismissalSignal() async throws {
+// nonisolated, with main-actor members: under default MainActor isolation a main-actor
+// XCTestCase subclass inherits its initializers as main-actor ones (an error in Swift 6).
+nonisolated final class AuthRegressionTests: XCTestCase {
+    @MainActor func testGuestToAccountTransitionChangesLoginDismissalSignal() async throws {
         let service = FakeAuthService()
         let store = makeStore(service)
         XCTAssertNil(store.authenticatedAccountId)
@@ -18,7 +19,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertEqual(store.authenticatedAccountId, service.account.id, "Account identity must trigger form dismissal")
     }
 
-    func testFailedAccountLoginKeepsGuestDismissalSignalEmpty() async throws {
+    @MainActor func testFailedAccountLoginKeepsGuestDismissalSignalEmpty() async throws {
         let service = FakeAuthService()
         service.signInError = TestError.expected
         let store = makeStore(service)
@@ -30,7 +31,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNotNil(store.errorMessage)
     }
 
-    func testClerkCodesMapToActionableErrors() {
+    @MainActor func testClerkCodesMapToActionableErrors() {
         XCTAssertEqual(AuthService.authError(forClerkCode: "form_identifier_exists"), .emailAlreadyInUse)
         XCTAssertEqual(AuthService.authError(forClerkCode: "form_identifier_not_found"), .accountNotFound)
         XCTAssertNil(AuthService.authError(forClerkCode: "form_password_incorrect"))
@@ -39,7 +40,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertTrue(guidance.contains("Sign Up with the same email"))
     }
 
-    func testUnknownEmailShowsLegacyGuidanceOnSignInAndReset() async {
+    @MainActor func testUnknownEmailShowsLegacyGuidanceOnSignInAndReset() async {
         let service = FakeAuthService()
         service.signInError = AuthError.accountNotFound
         service.passwordResetError = AuthError.accountNotFound
@@ -52,7 +53,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertEqual(store.errorMessage, AuthError.accountNotFound.errorDescription)
     }
 
-    func testPasswordsAreTrimmedTheSameWayEverywhere() async {
+    @MainActor func testPasswordsAreTrimmedTheSameWayEverywhere() async {
         let service = FakeAuthService()
         let store = makeStore(service)
 
@@ -64,7 +65,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertEqual(AuthStore.minimumPasswordLength, 8)
     }
 
-    func testTemplatedTokenRefreshForwardsOnlySuccessfulFetch() async {
+    @MainActor func testTemplatedTokenRefreshForwardsOnlySuccessfulFetch() async {
         let token = await ClerkConvexAuthProvider.refreshedConvexToken {
             "convex-template-token"
         }
@@ -76,9 +77,17 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(failed)
     }
 
+    @MainActor func testRefreshedTokenIsPushedOnlyWhenItChanged() {
+        XCTAssertNil(ClerkConvexAuthProvider.tokenToPush("token-a", lastPushed: "token-a"),
+                     "A second .tokenRefreshed with the same token must not re-authenticate Convex")
+        XCTAssertEqual(ClerkConvexAuthProvider.tokenToPush("token-b", lastPushed: "token-a"), "token-b")
+        XCTAssertEqual(ClerkConvexAuthProvider.tokenToPush("token-a", lastPushed: nil), "token-a")
+        XCTAssertNil(ClerkConvexAuthProvider.tokenToPush(nil, lastPushed: "token-a"), "A failed fetch keeps the last token")
+    }
+
     // MARK: - Guest merge
 
-    func testUpgradeMergesGuestAndForgetsIt() async {
+    @MainActor func testUpgradeMergesGuestAndForgetsIt() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -95,7 +104,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(store.activeGuestProof)
     }
 
-    func testPasswordResetFinishesGuestMerge() async {
+    @MainActor func testPasswordResetFinishesGuestMerge() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -107,7 +116,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(store.currentGuestSecretHash)
     }
 
-    func testFailedMergeStaysPendingAndRetriesAtNextLaunch() async {
+    @MainActor func testFailedMergeStaysPendingAndRetriesAtNextLaunch() async {
         let service = FakeAuthService()
         let keychain = MemoryKeychain()
         let store = makeStore(service, keychain: keychain)
@@ -138,7 +147,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(relaunched.errorMessage)
     }
 
-    func testSettingsRetryFinishesAPendingMerge() async {
+    @MainActor func testSettingsRetryFinishesAPendingMerge() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -157,7 +166,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertEqual(service.mergedHashes.count, 3)
     }
 
-    func testMissingServerGuestIsForgottenInsteadOfRetriedForever() async {
+    @MainActor func testMissingServerGuestIsForgottenInsteadOfRetriedForever() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -170,7 +179,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(store.errorMessage)
     }
 
-    func testAbandonedUpgradeLeavesAPlainGuestWithNothingPending() async {
+    @MainActor func testAbandonedUpgradeLeavesAPlainGuestWithNothingPending() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -193,7 +202,7 @@ final class AuthRegressionTests: XCTestCase {
 
     // MARK: - Sign-out
 
-    func testClearingGuestDataRemovesSecretNameAndPendingMerge() async {
+    @MainActor func testClearingGuestDataRemovesSecretNameAndPendingMerge() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -207,9 +216,10 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(store.guestDisplayName)
         XCTAssertFalse(store.hasPendingGuestMerge)
         XCTAssertNil(store.activeGuestProof)
+        XCTAssertEqual(clearedStats, 1, "Sign-out forgets the games waiting to be recorded")
     }
 
-    func testFailedAccountSignOutKeepsTheAccountAndItsPendingGuest() async {
+    @MainActor func testFailedAccountSignOutKeepsTheAccountAndItsPendingGuest() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -222,9 +232,10 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertEqual(store.authenticatedAccountId, service.account.id, "Clerk still has the account")
         XCTAssertTrue(store.hasPendingGuestMerge)
         XCTAssertNotNil(store.errorMessage)
+        XCTAssertEqual(clearedStats, 0, "The account stays signed in, so its pending games stay")
     }
 
-    func testFailedGuestSignOutStillClearsGuestData() async {
+    @MainActor func testFailedGuestSignOutStillClearsGuestData() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -237,7 +248,7 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertNil(store.guestDisplayName)
     }
 
-    func testSignOutWithPendingMergeNeverMergesIntoTheNextAccount() async {
+    @MainActor func testSignOutWithPendingMergeNeverMergesIntoTheNextAccount() async {
         let service = FakeAuthService()
         let store = makeStore(service)
         _ = await store.signInAsGuest(displayName: service.guest.displayName)
@@ -253,11 +264,113 @@ final class AuthRegressionTests: XCTestCase {
         XCTAssertFalse(store.hasPendingGuestMerge)
     }
 
-    private func makeStore(_ service: FakeAuthService, keychain: MemoryKeychain? = nil) -> AuthStore {
+    // MARK: - Seat conflict
+
+    @MainActor func testSeatConflictCanBeDiscardedFromSettings() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = BackendError(ClientError.ConvexError(
+            data: "\"Leave your other seat in this room before saving guest progress.\""
+        ))
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        XCTAssertTrue(store.hasPendingGuestMerge)
+        XCTAssertTrue(store.guestMergeHasSeatConflict, "Settings offers Discard guest progress")
+
+        store.discardPendingGuestProgress()
+
+        XCTAssertFalse(store.hasPendingGuestMerge)
+        XCTAssertFalse(store.guestMergeHasSeatConflict)
+        XCTAssertNil(store.activeGuestProof, "Requests act as the account again")
+        XCTAssertEqual(store.authenticatedAccountId, service.account.id)
+    }
+
+    @MainActor func testOtherMergeFailuresDoNotOfferDiscard() async {
+        let service = FakeAuthService()
+        let store = makeStore(service)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        service.mergeError = BackendError(URLError(.notConnectedToInternet))
+
+        await store.signIn(email: "qa@example.com", password: "test-password")
+
+        XCTAssertTrue(store.hasPendingGuestMerge)
+        XCTAssertFalse(store.guestMergeHasSeatConflict)
+    }
+
+    // MARK: - Guest proof cache and identity revision
+
+    @MainActor func testGuestSecretHashIsReadFromTheKeychainOnce() async {
+        let service = FakeAuthService()
+        let keychain = MemoryKeychain()
+        let store = makeStore(service, keychain: keychain)
+        XCTAssertNil(store.activeGuestProof)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        let loadsAfterSignIn = keychain.loads
+
+        for _ in 0..<20 { _ = store.activeGuestProof }
+
+        XCTAssertNotNil(store.activeGuestProof)
+        XCTAssertEqual(keychain.loads, loadsAfterSignIn, "Every request reuses the cached hash")
+
+        await store.signOut()
+        XCTAssertNil(store.currentGuestSecretHash)
+        let loadsAfterSignOut = keychain.loads
+        for _ in 0..<20 { _ = store.currentGuestSecretHash }
+        XCTAssertEqual(keychain.loads, loadsAfterSignOut, "A missing secret is cached too")
+    }
+
+    @MainActor func testKeychainErrorsOtherThanNotFoundAreNotCached() {
+        let keychain = MemoryKeychain()
+        keychain.loadError = TestError.expected
+        let store = makeStore(FakeAuthService(), keychain: keychain)
+
+        XCTAssertNil(store.currentGuestSecretHash)
+        keychain.loadError = nil
+        try? keychain.save("secret", forKey: "convex_guest_secret")
+
+        XCTAssertNotNil(store.currentGuestSecretHash, "A failed read is tried again")
+    }
+
+    @MainActor func testIdentityRevisionChangesOnlyWithTheIdentity() async {
+        let service = FakeAuthService()
+        let keychain = MemoryKeychain()
+        let store = makeStore(service, keychain: keychain)
+        _ = await store.signInAsGuest(displayName: service.guest.displayName)
+        let guestRevision = store.identityRevision
+
+        await store.restoreSession()
+        await store.ensureValidSession()
+        XCTAssertEqual(store.identityRevision, guestRevision, "Re-applying the same guest restarts nothing")
+
+        service.mergeError = TestError.expected
+        await store.signIn(email: "qa@example.com", password: "test-password")
+        let pendingRevision = store.identityRevision
+        XCTAssertGreaterThan(pendingRevision, guestRevision)
+
+        service.restoredUser = service.account
+        await store.restoreSession()
+        XCTAssertEqual(store.identityRevision, pendingRevision, "Same account, same pending guest proof")
+
+        service.mergeError = nil
+        _ = await store.retryGuestMerge()
+        XCTAssertGreaterThan(store.identityRevision, pendingRevision, "The guest proof stopped being sent")
+    }
+
+    @MainActor private var clearedStats = 0
+
+    @MainActor private func makeStore(_ service: FakeAuthService, keychain: MemoryKeychain? = nil) -> AuthStore {
         let suiteName = "AuthRegressionTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
-        return AuthStore(authService: service, keychain: keychain ?? MemoryKeychain(), defaults: defaults, autoRestore: false)
+        // A private center: the host app and parallel tests never see these stores.
+        return AuthStore(
+            authService: service,
+            keychain: keychain ?? MemoryKeychain(),
+            defaults: defaults,
+            notificationCenter: NotificationCenter(),
+            autoRestore: false,
+            clearPendingStats: { [weak self] in self?.clearedStats += 1 }
+        )
     }
 }
 
@@ -280,20 +393,42 @@ final class FakeAuthService: AuthServicing {
     var passwordResetError: Error?
     var mergeError: Error?
     var signUpNeedsEmailCode = false
+    /// Makes `currentUser` and `refreshConvexAuth` slow, to test overlap and time limits.
+    var restoreDelay: Duration?
+    var refreshDelay: Duration?
+    /// Keeps `signIn` running, like Clerk's setActive and ensureUser on a slow network.
+    var signInDelay: Duration?
     private(set) var passwords: [String] = []
     private(set) var mergedHashes: [String?] = []
     private(set) var guestSignIns = 0
     private(set) var refreshes = 0
+    private(set) var restores = 0
+    private var sessionContinuations: [AsyncStream<Void>.Continuation] = []
 
     var currentUser: UserProfile? {
         get async throws {
+            restores += 1
+            if let restoreDelay { try? await Task.sleep(for: restoreDelay) }
             if let restoreError { throw restoreError }
             return restoredUser
         }
     }
 
+    /// One stream per store, like Clerk's events.
+    var accountSessionStarted: AsyncStream<Void> {
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        sessionContinuations.append(continuation)
+        return stream
+    }
+
+    /// Clerk reports a newly active session.
+    func startAccountSession() {
+        sessionContinuations.forEach { $0.yield() }
+    }
+
     func refreshConvexAuth() async throws {
         refreshes += 1
+        if let refreshDelay { try? await Task.sleep(for: refreshDelay) }
         if let refreshError { throw refreshError }
     }
 
@@ -311,6 +446,7 @@ final class FakeAuthService: AuthServicing {
 
     func signIn(email: String, password: String) async throws -> UserProfile {
         passwords.append(password)
+        if let signInDelay { try? await Task.sleep(for: signInDelay) }
         if let signInError { throw signInError }
         return account
     }
@@ -344,13 +480,18 @@ final class FakeAuthService: AuthServicing {
 
 final class MemoryKeychain: KeychainStoring {
     private var values: [String: String] = [:]
+    private(set) var loads = 0
+    /// Thrown by `load` instead of a result, e.g. a locked Keychain.
+    var loadError: Error?
 
     func save(_ value: String, forKey key: String) throws {
         values[key] = value
     }
 
     func load(forKey key: String) throws -> String {
-        guard let value = values[key] else { throw TestError.expected }
+        loads += 1
+        if let loadError { throw loadError }
+        guard let value = values[key] else { throw KeychainHelper.KeychainError.itemNotFound }
         return value
     }
 

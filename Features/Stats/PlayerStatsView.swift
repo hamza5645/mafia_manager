@@ -12,19 +12,31 @@ struct PlayerStatsView: View {
             Design.Colors.surface0
                 .ignoresSafeArea()
 
-            if isLoading {
+            if isLoading && playerStats.isEmpty {
                 ProgressView()
                     .tint(.white)
+            } else if let errorMessage, playerStats.isEmpty {
+                // Before the empty state: a failed load is not "no stats".
+                StatsLoadErrorView(message: errorMessage) {
+                    Task { await loadStats() }
+                }
+                .readableContentWidth()
             } else if playerStats.isEmpty {
                 EmptyStatsView()
             } else {
                 ScrollView {
                     VStack(spacing: 16) {
+                        if let errorMessage {
+                            StatsLoadErrorView(message: errorMessage) {
+                                Task { await loadStats() }
+                            }
+                        }
                         ForEach(playerStats) { stat in
                             PlayerStatCard(stat: stat)
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
         }
@@ -44,13 +56,45 @@ struct PlayerStatsView: View {
         isLoading = true
         errorMessage = nil
 
+        // A failed load keeps the stats already shown.
         do {
             playerStats = try await databaseService.getPlayerStats()
+        } catch is CancellationError {
+            // Left the screen; nothing to show.
         } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
+    }
+}
+
+/// An inline load failure with Retry, shown in place of (or above) the list.
+struct StatsLoadErrorView: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(Design.Typography.title2)
+                .foregroundColor(Design.Colors.dangerRed)
+                .accessibilityHidden(true)
+
+            Text(message)
+                .font(Design.Typography.subheadline)
+                .foregroundColor(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+
+            Button("Retry", action: onRetry)
+                .font(Design.Typography.headline)
+                .foregroundColor(Design.Colors.brandGold)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Design.Colors.surface1)
+        .cornerRadius(Design.Radii.card)
+        .padding(.horizontal)
     }
 }
 

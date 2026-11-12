@@ -1,7 +1,7 @@
 import Foundation
 
 // Represents a player in a multiplayer session
-struct SessionPlayer: Codable, Identifiable, Sendable {
+struct SessionPlayer: Codable, Identifiable, Sendable, Equatable {
     let id: UUID
     let sessionId: UUID
     let userId: UUID? // null for bots
@@ -13,7 +13,6 @@ struct SessionPlayer: Codable, Identifiable, Sendable {
     var isAlive: Bool
     var isOnline: Bool
     var isReady: Bool
-    var lastHeartbeat: Date
     let joinedAt: Date
     var removalNote: String?
     var isMe: Bool = false
@@ -30,7 +29,6 @@ struct SessionPlayer: Codable, Identifiable, Sendable {
         case isAlive = "is_alive"
         case isOnline = "is_online"
         case isReady = "is_ready"
-        case lastHeartbeat = "last_heartbeat"
         case joinedAt = "joined_at"
         case removalNote = "removal_note"
         case isMe = "is_me"

@@ -9,11 +9,24 @@ struct BackendError: LocalizedError, Equatable {
     static let network = "Network error. Please check your connection."
     /// The server's GUEST_NOT_FOUND message: there is no guest left to merge.
     static let guestNotFound = "Guest progress could not be found."
+    /// A mutation that did not finish in time. It may still be applied.
+    static let stillSending = "Still sending. Check your connection; it may still go through."
+    /// The start of the server's MERGE_SEAT_CONFLICT message (it may name the room).
+    static let mergeSeatConflictPrefix = "Leave your other seat"
 
     let message: String
     /// True only when `message` is a ConvexError string from the server.
     let isServerMessage: Bool
     var errorDescription: String? { message }
+    /// The request ran past its time limit. A mutation that timed out may still be applied.
+    private(set) var isTimeout = false
+
+    /// A request that ran past its time limit.
+    init(timedOut message: String) {
+        self.message = message
+        isServerMessage = false
+        isTimeout = true
+    }
 
     init(_ error: Error) {
         if let error = error as? BackendError {

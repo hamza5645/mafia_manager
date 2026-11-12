@@ -7,6 +7,8 @@ struct CustomRolesView: View {
     @State private var showAddConfig = false
     @State private var editingConfig: CustomRoleConfig?
     @State private var errorMessage: String?
+    /// A sheet's save ran out of time; the list reloads when the sheet closes.
+    @State private var reloadAfterSheet = false
     private let databaseService = DatabaseService()
 
     var body: some View {
@@ -14,7 +16,7 @@ struct CustomRolesView: View {
             Design.Colors.surface0
                 .ignoresSafeArea()
 
-            if isLoading {
+            if isLoading && customConfigs.isEmpty {
                 ProgressView()
                     .tint(.white)
             } else if customConfigs.isEmpty {
@@ -35,6 +37,7 @@ struct CustomRolesView: View {
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
         }
@@ -56,12 +59,12 @@ struct CustomRolesView: View {
         .refreshable {
             await loadConfigs()
         }
-        .sheet(isPresented: $showAddConfig) {
-            AddCustomRoleConfigView(onSave: { await loadConfigs() })
+        .sheet(isPresented: $showAddConfig, onDismiss: reloadAfterTimedOutSave) {
+            AddCustomRoleConfigView(onSave: upsert, onTimeout: { reloadAfterSheet = true })
                 .environmentObject(authStore)
         }
-        .sheet(item: $editingConfig) { config in
-            EditCustomRoleConfigView(config: config, onSave: { await loadConfigs() })
+        .sheet(item: $editingConfig, onDismiss: reloadAfterTimedOutSave) { config in
+            EditCustomRoleConfigView(config: config, onSave: upsert, onTimeout: { reloadAfterSheet = true })
                 .environmentObject(authStore)
         }
         .alert("Custom Roles", isPresented: Binding(
@@ -86,11 +89,27 @@ struct CustomRolesView: View {
 
         do {
             customConfigs = try await databaseService.getCustomRoleConfigs()
+        } catch is CancellationError {
+            // Left the screen; keep what is shown.
         } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
+    }
+
+    /// A save that ran out of time may still apply, so show what the server has.
+    private func reloadAfterTimedOutSave() {
+        guard reloadAfterSheet else { return }
+        reloadAfterSheet = false
+        Task { await loadConfigs() }
+    }
+
+    /// Inserts or replaces the row the server returned, without a reload.
+    private func upsert(_ config: CustomRoleConfig) {
+        customConfigs.removeAll { $0.id == config.id }
+        customConfigs.append(config)
+        customConfigs.sort { $0.configName.localizedCaseInsensitiveCompare($1.configName) == .orderedAscending }
     }
 
     private func deleteConfig(_ config: CustomRoleConfig) async {
@@ -101,7 +120,11 @@ struct CustomRolesView: View {
 
         do {
             try await databaseService.deleteCustomRoleConfig(id: config.id)
+            customConfigs.removeAll { $0.id == config.id }
+        } catch let error as BackendError where error.isTimeout {
+            // It may still be deleted: show what the server has instead of this list.
             await loadConfigs()
+            if errorMessage == nil { errorMessage = error.message }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -246,7 +269,9 @@ struct AddCustomRoleConfigView: View {
     @State private var citizenCount = 4
     @State private var isLoading = false
     @State private var errorMessage: String?
-    let onSave: () async -> Void
+    let onSave: (CustomRoleConfig) -> Void
+    /// The save ran out of time and may still apply.
+    var onTimeout: () -> Void = {}
     private let databaseService = DatabaseService()
 
     private var totalPlayers: Int {
@@ -304,6 +329,7 @@ struct AddCustomRoleConfigView: View {
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
             .navigationTitle("New Configuration")
@@ -345,14 +371,15 @@ struct AddCustomRoleConfigView: View {
         )
 
         do {
-            try await databaseService.createCustomRoleConfig(
+            let saved = try await databaseService.createCustomRoleConfig(
                 name: configName,
                 roleDistribution: roleDistribution
             )
-            await onSave()
+            onSave(saved)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+            if (error as? BackendError)?.isTimeout == true { onTimeout() }
         }
 
         isLoading = false
@@ -370,7 +397,9 @@ struct EditCustomRoleConfigView: View {
     @State private var citizenCount = 4
     @State private var isLoading = false
     @State private var errorMessage: String?
-    let onSave: () async -> Void
+    let onSave: (CustomRoleConfig) -> Void
+    /// The save ran out of time and may still apply.
+    var onTimeout: () -> Void = {}
     private let databaseService = DatabaseService()
 
     private var totalPlayers: Int {
@@ -428,6 +457,7 @@ struct EditCustomRoleConfigView: View {
                         }
                     }
                     .padding()
+                    .readableContentWidth()
                 }
             }
             .navigationTitle("Edit Configuration")
@@ -482,11 +512,12 @@ struct EditCustomRoleConfigView: View {
         updatedConfig.updatedAt = Date()
 
         do {
-            try await databaseService.updateCustomRoleConfig(updatedConfig)
-            await onSave()
+            let saved = try await databaseService.updateCustomRoleConfig(updatedConfig)
+            onSave(saved)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+            if (error as? BackendError)?.isTimeout == true { onTimeout() }
         }
 
         isLoading = false

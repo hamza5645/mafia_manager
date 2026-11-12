@@ -1,0 +1,77 @@
+{
+  "session": {
+    "assigned_numbers": [
+      {
+        "number": 1,
+        "player_id": "00000004-0000-4000-8000-000000000001"
+      },
+      {
+        "number": 2,
+        "player_id": "00000004-0000-4000-8000-000000000002"
+      },
+      {
+        "number": 3,
+        "player_id": "00000004-0000-4000-8000-000000000003"
+      },
+      {
+        "number": 4,
+        "player_id": "00000004-0000-4000-8000-000000000004"
+      },
+      {
+        "number": 5,
+        "player_id": "00000004-0000-4000-8000-000000000005"
+      },
+      {
+        "number": 6,
+        "player_id": "00000004-0000-4000-8000-000000000006"
+      }
+    ],
+    "bot_count": 2,
+    "created_at": 813412800.5,
+    "current_phase": "night",
+    "current_phase_data": {
+      "nightIndex": 1,
+      "type": "night"
+    },
+    "current_round_id": "00000005-0000-4000-8000-000000000003",
+    "day_history": [
+      {
+        "day_index": 0,
+        "removed_player_ids": [
+          "00000004-0000-4000-8000-000000000002"
+        ],
+        "timestamp": 813412928.5
+      }
+    ],
+    "day_index": 1,
+    "host_user_id": "00000001-0000-4000-8000-000000000001",
+    "id": "00000002-0000-4000-8000-000000000001",
+    "is_game_over": false,
+    "max_players": 19,
+    "night_history": [
+      {
+        "is_resolved": true,
+        "night_index": 0,
+        "resulting_deaths": [
+          "00000004-0000-4000-8000-000000000004"
+        ],
+        "revealed_death_roles": {
+          "00000004-0000-4000-8000-000000000004": "citizen"
+        },
+        "timestamp": 813412893.5
+      }
+    ],
+    "original_host_user_id": "00000001-0000-4000-8000-000000000001",
+    "room_code": "123456",
+    "started_at": 813412860.5,
+    "status": "in_progress",
+    "updated_at": 813412928.5
+  },
+  "viewer": {
+    "is_host": false,
+    "is_member": true,
+    "player_id": "00000004-0000-4000-8000-000000000003",
+    "player_record_id": "00000003-0000-4000-8000-000000000003",
+    "user_id": "00000001-0000-4000-8000-000000000003"
+  }
+}
