@@ -5,11 +5,12 @@ import Foundation
 /// Keeps one Convex query subscription alive (api_contract 5, §8.3).
 ///
 /// ConvexMobile 0.8.1 ends the publisher with `.failure` on any query error
-/// (`ConvexError` / `ServerError`) or decode failure (`InternalError`) and never
-/// recovers by itself; it never sends `.finished`. Transport drops are handled
-/// inside the Rust client and only pause values. It attaches its subject only after
-/// the FFI call returns, so a value the Rust client already holds can be dropped;
-/// a subscription with no first value in time is therefore retried like a failure.
+/// (`ConvexError` / `ServerError`) and never recovers by itself; it never sends
+/// `.finished`. A value this build cannot decode ends it with
+/// `ConvexService.undecodableValue`. Transport drops are handled inside the Rust
+/// client and only pause values. It attaches its subject only after the FFI call
+/// returns, so a value the Rust client already holds can be dropped; a subscription
+/// with no first value in time is therefore retried like a failure.
 @MainActor
 final class SubscriptionSupervisor {
     enum Status: Equatable {
@@ -29,25 +30,16 @@ final class SubscriptionSupervisor {
     var onStatusChange: (() -> Void)?
 
     static let firstValueTimeout: Duration = .seconds(15)
-
-    /// ConvexMobile 0.8.1 reports a value its `JSONDecoder` rejects as
-    /// `InternalError(msg: error.localizedDescription)` (`SubscriptionAdapter.onUpdate`), and
-    /// a `DecodingError` bridges to one of these two Foundation messages (built here, so they
-    /// match the device language). A failed subscribe call is an `InternalError` too, but its
-    /// message comes from a UniFFI or encoding error and never matches.
-    nonisolated static let decodeFailureMessages: Set<String> = {
-        let context = DecodingError.Context(codingPath: [], debugDescription: "")
-        return [
-            DecodingError.dataCorrupted(context).localizedDescription, // typeMismatch too
-            DecodingError.valueNotFound(String.self, context).localizedDescription, // keyNotFound too
-        ]
-    }()
+    /// Shown for the one room whose value this build cannot decode.
+    nonisolated static let unreadableMessage = "This version of Mafia can't read this room's data. Try again, or update the app."
 
     /// Names the query in logs and test messages.
     let label: String
     private let open: (SubscriptionSupervisor) -> AnyCancellable
     /// Waits for backoff delays and the first-value timeout (a fake clock in tests).
     private let sleep: (Duration) async -> Void
+    /// Called once a decode failure is confirmed.
+    private let onUnreadable: () -> Void
     private var subscription: AnyCancellable?
     private var retryTask: Task<Void, Never>?
     private var attempt = 0
@@ -58,10 +50,12 @@ final class SubscriptionSupervisor {
         _ subscribe: @escaping () -> AnyPublisher<Value, ClientError>,
         label: String = "",
         sleep: @escaping (Duration) async -> Void = { duration in _ = try? await Task.sleep(for: duration) },
+        onUnreadable: @escaping () -> Void = { Task { await BackendCompatibility.shared.recheck() } },
         onValue: @escaping (Value) -> Void
     ) {
         self.label = label
         self.sleep = sleep
+        self.onUnreadable = onUnreadable
         open = { supervisor in
             subscribe()
                 // FFI callbacks arrive on arbitrary threads; the main queue keeps them in order.
@@ -134,11 +128,12 @@ final class SubscriptionSupervisor {
         }
         if Self.isDecodeFailure(error) {
             decodeFailures += 1
-            // One retry confirms it; after that the server's shape has moved past this build.
+            // One retry confirms it. Only this subscription stops: one bad row must not close
+            // online play everywhere, so whether the app is too old is left to `health:check`.
             if decodeFailures >= 2 {
-                print("❌ [SubscriptionSupervisor] \(label): cannot decode the server's value: \(error)")
-                status = .failed(BackendCompatibility.updateMessage)
-                BackendCompatibility.shared.markUpdateRequired()
+                print("❌ [SubscriptionSupervisor] \(label): cannot decode the server's value")
+                status = .failed(Self.unreadableMessage)
+                onUnreadable()
                 return
             }
         }
@@ -164,10 +159,10 @@ final class SubscriptionSupervisor {
             ?? "Something went wrong. Please try again."
     }
 
-    /// The value arrived but this build's models cannot decode it (see `decodeFailureMessages`).
+    /// The value arrived but this build's models cannot decode it (see `ConvexService.Decoded`).
     nonisolated static func isDecodeFailure(_ error: ClientError) -> Bool {
         guard case .InternalError(let message) = error else { return false }
-        return decodeFailureMessages.contains(message)
+        return message == ConvexService.undecodableValue
     }
 
     /// `min(30, 2^attempt)` seconds, scaled by a 0.8...1.2 jitter factor.

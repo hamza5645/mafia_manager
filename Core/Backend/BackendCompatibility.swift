@@ -35,9 +35,11 @@ final class BackendCompatibility: ObservableObject {
         }
     }
 
-    /// A response the app cannot decode after a confirming retry means the backend moved on.
-    func markUpdateRequired() {
-        updateRequired = true
+    /// A value the app cannot decode may mean the backend moved on while the app was open, or
+    /// only that one room holds a bad row. `health:check` decides, so it is asked again.
+    func recheck() async {
+        hasChecked = false
+        await checkOnce()
     }
 
     private struct HealthCheck: Decodable {

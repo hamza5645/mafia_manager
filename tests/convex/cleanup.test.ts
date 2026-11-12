@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { api, internal } from '../../convex/_generated/api';
+import { finishGame } from '../../convex/lib/transitions';
 import { nowAppleEpochSeconds } from '../../convex/lib/util';
 import { Backend, Room, act, advance, backend, room, start } from './helpers';
 
@@ -75,6 +76,7 @@ test('the sweep cancels abandoned rooms by presence and ages out finished ones',
   const fresh = await room(t, 2);
   await withoutPresence(t, legacyRecent, now - HOUR);
   await withoutPresence(t, legacyStale);
+  // Finished before next_cleanup_at existed: these rooms have no date yet.
   const finish = (r: Room, hoursAgo: number) => patchRoom(t, r, { status: 'completed', current_phase: 'game_over',
     is_game_over: true, completed_at: now - hoursAgo * HOUR });
   await finish(doneYesterday, 25);
@@ -82,7 +84,8 @@ test('the sweep cancels abandoned rooms by presence and ages out finished ones',
   await finish(doneLastMonth, 31 * 24);
   for (const [r, daysAgo] of [[cancelledLastMonth, 31], [cancelledRecently, 29]] as const) {
     await t.mutation(api.sessions.cancelSession, r.as(r.host));
-    await patchRoom(t, r, { completed_at: now - daysAgo * DAY });
+    // As if it had been cancelled that long ago.
+    await patchRoom(t, r, { completed_at: now - daysAgo * DAY, next_cleanup_at: now - daysAgo * DAY + 30 * DAY });
   }
 
   await sweep(t);
@@ -125,4 +128,59 @@ test('a lobby is cancelled 6 hours after its last heartbeat, not before', async 
   advance(2 * HOUR);
   await sweep(t);
   expect((await sessionDoc(t, r.sessionId))!.status).toBe('cancelled');
+});
+
+test('an ended room is listed only when its next cleanup is due', async () => {
+  vi.useFakeTimers();
+  const t = backend();
+  const [finished, cancelled, again] = [await room(t, 2), await room(t, 2), await room(t, 2)];
+  const finishNow = (r: Room) => t.run(async ctx => {
+    const session = await ctx.db.query('game_sessions').withIndex('by_app_id', q => q.eq('id', r.sessionId)).unique();
+    const seats = await ctx.db.query('session_players').withIndex('by_session', q => q.eq('session_id', r.sessionId)).collect();
+    await finishGame(ctx, session!, seats, 'mafia');
+  });
+  await finishNow(finished); await finishNow(again);
+  await t.mutation(api.sessions.cancelSession, cancelled.as(cancelled.host));
+  // Play Again takes the room off the calendar.
+  await t.mutation(api.sessions.returnToLobby, again.as(again.host));
+  expect(await sessionDoc(t, again.sessionId)).not.toHaveProperty('next_cleanup_at');
+  // How many ended rooms one sweep reads; each one listed is cleaned.
+  const listed = async () => {
+    let count = 0;
+    for (const status of ['completed', 'cancelled'] as const) {
+      for (const undated of [false, true]) {
+        count += await t.mutation(internal.cleanup.sweepRooms, { status, undated, now: nowAppleEpochSeconds(), cursor: null });
+      }
+    }
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    return count;
+  };
+  expect(await listed()).toBe(0);
+  // A day later the finished game is due once: its seats go and its date moves to day 30.
+  advance(25 * HOUR);
+  expect(await listed()).toBe(1);
+  expect(await owned(t, finished.sessionId)).toEqual({ seats: 0, presence: 0, actions: 0 });
+  expect((await sessionDoc(t, finished.sessionId))!.status).toBe('completed');
+  expect(await listed()).toBe(0);
+  advance(28 * DAY);
+  expect(await listed()).toBe(0);
+  // Day 30: both ended rooms are deleted.
+  advance(DAY);
+  expect(await listed()).toBe(2);
+  for (const r of [finished, cancelled]) expect(await sessionDoc(t, r.sessionId)).toBeNull();
+  expect((await sessionDoc(t, again.sessionId))!.status).toBe('waiting');
+});
+
+test('each listed room is cleaned on its own: one that vanished is skipped, the rest still go', async () => {
+  vi.useFakeTimers();
+  const t = backend();
+  const [first, second] = [await room(t, 2), await room(t, 2)];
+  for (const r of [first, second]) await t.mutation(api.sessions.cancelSession, r.as(r.host));
+  advance(31 * DAY);
+  // The room listed first is gone by the time its own transaction runs.
+  await t.mutation(internal.cleanup.sweepRooms, { status: 'cancelled', now: nowAppleEpochSeconds(), cursor: null });
+  const gone = (await sessionDoc(t, first.sessionId))!._id;
+  await t.run(ctx => ctx.db.delete(gone));
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await sessionDoc(t, second.sessionId)).toBeNull();
 });

@@ -134,11 +134,7 @@ export const leaveSession = mutation({
     const caller = await requireCaller(ctx, args.guest_secret_hash);
     const session = await getSession(ctx, args.session_id);
     if (!session) return null;
-    const seat = await ctx.db
-      .query("session_players")
-      .withIndex("by_session_user", (q) => q.eq("session_id", session.id).eq("user_id", caller.id))
-      .first();
-    await removeSeatAndTransferHost(ctx, session, seat, caller.id);
+    await removeSeatAndTransferHost(ctx, session, await seatOf(ctx, session.id, caller.id), caller.id);
     return null;
   },
 });
@@ -290,13 +286,16 @@ export const returnToLobby = mutation({
     const { caller, session, seats, seat } = await requireRoster(ctx, args);
     const over = session.is_game_over || session.current_phase === "game_over";
     if (session.current_phase !== "lobby" && !over) fail(E.NOT_GAME_OVER);
-    const originalHostId = session.original_host_user_id ?? session.host_user_id;
     if (session.current_phase !== "lobby") {
+      // Marks the caller ready.
       await resetToLobby(ctx, session, seats, caller.id);
-    } else if (caller.id === originalHostId && session.host_user_id !== originalHostId) {
+      return null;
+    }
+    const originalHostId = session.original_host_user_id ?? session.host_user_id;
+    if (caller.id === originalHostId && session.host_user_id !== originalHostId) {
       await ctx.db.patch(session._id, { host_user_id: originalHostId, updated_at: nowAppleEpochSeconds() });
     }
-    await ctx.db.patch(seat._id, { is_ready: true });
+    if (!seat.is_ready) await ctx.db.patch(seat._id, { is_ready: true });
     return null;
   },
 });

@@ -5,6 +5,7 @@ import { E, fail, mergeSeatConflict } from "./lib/errors";
 import { getSession, seatOf } from "./lib/guards";
 import { findGuestByProof, getAccountUser, getCaller, publicUser, requireCaller } from "./lib/identity";
 import { deletePresence, presenceOf } from "./lib/presence";
+import { trimRecordedGames } from "./lib/recordedGames";
 import { cleanText, nowAppleEpochSeconds, sha256Hex, uuid } from "./lib/util";
 import { guestArg } from "./validators";
 
@@ -266,6 +267,7 @@ export const mergeGuestIntoAccount = mutation({
       if (known) await ctx.db.delete(game._id);
       else await ctx.db.patch(game._id, { user_id: account.id });
     }
+    await trimRecordedGames(ctx, account.id);
 
     // Preserve player ids, roles and actions while switching the proven owner.
     for (const member of movingSeats) {

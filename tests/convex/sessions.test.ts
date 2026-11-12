@@ -1,8 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { api } from '../../convex/_generated/api';
 import { E } from '../../convex/lib/errors';
-import { heartbeat, setReady } from '../../convex/sessions';
-import { Backend, advance, backend, guest, presenceRows, proof, room, round, seatRow, sessionRow, setHeartbeat, start } from './helpers';
+import { advancePhase } from '../../convex/phases';
+import { heartbeat, returnToLobby, setReady } from '../../convex/sessions';
+import { Backend, act, advance, backend, finishNight, guest, presenceRows, proof, room, round, seatRow, sessionRow, setHeartbeat, start } from './helpers';
 
 afterEach(() => { vi.useRealTimers(); });
 
@@ -156,6 +157,8 @@ test('in the lobby the host keeps the room for 90 s; getHostPresence reports the
   advance(89); await beat(2); await beat(3);
   await expect(claim(3)).rejects.toThrow(E.HOST_ACTIVE);
   expect(await presence(3)).toEqual({ host_user_id: r.host.id, host_last_heartbeat: joined, server_now: joined + 89, stale_after_seconds: 90 });
+  // The app's per-subscription nonce is accepted and changes nothing in the result.
+  expect(await t.query(api.views.getHostPresence, { ...r.as(r.users[3]), nonce: 4_294_967_295 })).toEqual(await presence(3));
   advance(2);
   await claim(3);
   // users[1] has been silent for 91 s, beyond the 15 s successor freshness.
@@ -317,6 +320,27 @@ test('setReady counts only in the phase it was sent from and writes only a chang
   expect(await writesOf(t, setReady, { ...r.as(r.users[1]), is_ready: false })).toEqual(['session_players']);
 });
 
+test('a new round resets only seats that are ready; a lobby tap writes only a change', async () => {
+  const t = backend(); const r = await room(t, 4);
+  // Everyone in a fresh lobby is ready already.
+  expect(await writesOf(t, returnToLobby, r.as(r.users[1]))).toEqual([]);
+  const seats = [...r.humans];
+  const roles = ['citizen', 'mafia', 'inspector', 'citizen'] as const;
+  await t.mutation(api.sessions.startGame, { ...r.as(r.host),
+    assignments: seats.map((seat, i) => ({ player_id: seat.player_id, role: roles[i], number: i + 1 })) });
+  for (const user of r.users.slice(0, 2)) await t.mutation(api.sessions.setReady, { ...r.as(user), is_ready: true });
+  // Night 0 clears the two confirmations from role reveal.
+  expect(await writesOf(t, advancePhase, { ...r.as(r.host), to_phase: 'night' }))
+    .toEqual(['session_players', 'session_players', 'game_sessions']);
+  await act(t, r, r.humans[1], 'mafia_target', r.humans[3]);
+  await act(t, r, r.humans[2], 'inspector_check', r.humans[0]);
+  await finishNight(t, r);
+  await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'death_reveal' });
+  // Nobody is ready by then, so the vote round touches no seat (and so re-runs no roster query).
+  expect(await writesOf(t, advancePhase, { ...r.as(r.host), to_phase: 'voting' })).toEqual(['game_sessions']);
+  expect((await round(t, r)).phase).toBe('voting');
+});
+
 test('startGame requires 4 to 19 seats within max_players', async () => {
   const t = backend(); const r = await room(t, 3);
   const assignments = r.humans.map((s, i) => ({ player_id: s.player_id, role: 'citizen' as const, number: i + 1 }));
@@ -345,6 +369,30 @@ test('Play Again resets the finished game; the original host reclaims the lobby'
   await t.mutation(api.sessions.returnToLobby, r.as(r.host));
   expect((await sessionRow(t, r.sessionId)).host_user_id).toBe(r.host.id);
   expect((await t.query(api.views.getPlayers, r.as(r.host))).filter(p => p.is_ready)).toHaveLength(3);
+});
+
+test('an original host who left or was removed cannot take the lobby back by rejoining', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  const t = backend(); const r = await room(t, 3);
+  const [a, b] = r.users;
+  const rejoin = () => t.mutation(api.sessions.joinSession, { room_code: r.roomCode, player_name: 'QA Back', ...proof(a) });
+  // The host goes quiet in the lobby and the next player is installed.
+  advance(91);
+  await t.mutation(api.sessions.heartbeat, r.as(b));
+  await t.mutation(api.sessions.claimHost, r.as(b));
+  expect(await sessionRow(t, r.sessionId)).toMatchObject({ host_user_id: b.id, original_host_user_id: a.id });
+  // Removed by the new host, the original host comes back by code as an ordinary player.
+  await t.mutation(api.sessions.removePlayer, { ...r.as(b), player_record_id: r.humans[0].id });
+  expect(await sessionRow(t, r.sessionId)).not.toHaveProperty('original_host_user_id');
+  await rejoin();
+  await t.mutation(api.sessions.returnToLobby, r.as(a));
+  expect((await sessionRow(t, r.sessionId)).host_user_id).toBe(b.id);
+  // The same after leaving as the host: the hand-over stands.
+  await t.mutation(api.sessions.leaveSession, r.as(b));
+  expect(await sessionRow(t, r.sessionId)).toMatchObject({ host_user_id: r.users[2].id });
+  await t.mutation(api.sessions.joinSession, { room_code: r.roomCode, player_name: 'QA Back', ...proof(b) });
+  await t.mutation(api.sessions.returnToLobby, r.as(b));
+  expect((await sessionRow(t, r.sessionId)).host_user_id).toBe(r.users[2].id);
 });
 
 test('a host without a seat can still leave and hand over host', async () => {

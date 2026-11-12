@@ -31,12 +31,14 @@ jobs:
     name: iOS unit tests
     # macOS minutes are expensive: run only for PRs into main, or by hand.
     if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
-    runs-on: macos-26
+    # Xcode 27 is only on the `xcode-27` image; `macos-26` stops at Xcode 26.
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 27
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
+      # The image's default is 27.1. A missing path fails here, not as an empty `xcode-select -s`.
+      - name: Select Xcode 27.2
+        run: sudo xcode-select -s /Applications/Xcode_27.2.app
       # Installs the Tuist and Node versions pinned in mise.toml.
       - uses: jdx/mise-action@v2
       - run: tuist install

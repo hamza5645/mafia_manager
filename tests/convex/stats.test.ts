@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { api } from '../../convex/_generated/api';
 import { E, mergeSeatConflict } from '../../convex/lib/errors';
+import { RECORDED_GAMES_KEPT } from '../../convex/lib/recordedGames';
 import { sha256Hex } from '../../convex/lib/util';
 import { Backend, advance, backend, guest, presenceRows, proof, room, sessionRow } from './helpers';
 
@@ -206,6 +207,8 @@ test('merge hands over only rooms that can still matter, once each', async () =>
   // The guest leaves `left` (host moves to `other`), and both games finish.
   await t.mutation(api.sessions.joinSession, { room_code: left.room_code, player_name: 'QA Other', ...proof(other) });
   await t.mutation(api.sessions.leaveSession, { session_id: left.session_id, ...proof(g) });
+  // A room from before leaving cleared the original host still names the guest.
+  await patchRoom(t, left.session_id, { original_host_user_id: g.id });
   for (const room of [finished, left]) await patchRoom(t, room.session_id, { status: 'completed', is_game_over: true });
   const rows = async () => Object.fromEntries(await Promise.all([lobby, cancelled, finished, left]
     .map(async room => [room.session_id, await sessionRow(t, room.session_id)])));
@@ -290,4 +293,33 @@ test('a recordGame retried after the guest merged into an account does not count
   const games = await t.run(ctx => ctx.db.query('recorded_games').collect());
   expect(games.map(row => row.game_id).sort()).toEqual([shared.game_id, both.game_id].sort());
   expect(new Set(games.map(row => row.user_id)).size).toBe(1);
+});
+
+test('only the newest 50 recorded games are kept per user, also after a merge', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  const t = backend(); const g = await guest(t, 'QA Guest');
+  const account = t.withIdentity({ subject: crypto.randomUUID(), email: 'qa-trim@example.com' });
+  const me = await account.mutation(api.users.ensureUser, {});
+  const games = (userId: string) => t.run(async ctx =>
+    (await ctx.db.query('recorded_games').withIndex('by_user', q => q.eq('user_id', userId)).collect()).map(row => row.game_id));
+  // One game a second, so "newest" is not decided within one millisecond.
+  const play = async (record: (game: { game_id: string; results: [] }) => Promise<unknown>, count: number) => {
+    const ids: string[] = [];
+    for (let i = 0; i < count; i++) {
+      advance(1);
+      ids.push(crypto.randomUUID());
+      await record({ game_id: ids[i], results: [] });
+    }
+    return ids;
+  };
+  const asGuest = await play(game => t.mutation(api.stats.recordGame, { ...game, ...proof(g) }), RECORDED_GAMES_KEPT + 2);
+  expect(await games(g.id)).toEqual(asGuest.slice(2));
+  // A retry of a game that is still remembered counts nothing.
+  expect(await t.mutation(api.stats.recordGame, { game_id: asGuest[2], results: [], ...proof(g) })).toEqual({ recorded: false, skipped: 0 });
+
+  const asAccount = await play(game => account.mutation(api.stats.recordGame, game), 30);
+  await account.mutation(api.users.mergeGuestIntoAccount, proof(g));
+  // The guest's games are older, so 20 of them stay beside the account's 30.
+  expect(await games(me.id)).toEqual([...asGuest.slice(-20), ...asAccount]);
+  expect(await games(g.id)).toEqual([]);
 });

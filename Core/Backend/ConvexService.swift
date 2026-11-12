@@ -117,7 +117,39 @@ final class ConvexService {
         with args: [String: ConvexEncodable?] = [:],
         as type: T.Type = T.self
     ) -> AnyPublisher<T, ClientError> {
-        client.subscribe(to: name, with: prepare(args), yielding: type)
+        Self.unwrapping(client.subscribe(to: name, with: prepare(args), yielding: Decoded<T>.self), query: name)
+    }
+
+    /// The `InternalError` message of a subscription value this build's models cannot decode.
+    nonisolated static let undecodableValue = "MAFIA_UNDECODABLE_VALUE"
+
+    /// Decoding this never fails: the outcome of decoding `T` is the value. convex-swift
+    /// would report a decoding error as an `InternalError` carrying only Foundation's
+    /// localized message, which nothing can match reliably.
+    struct Decoded<T: Decodable>: Decodable {
+        let result: Result<T, Error>
+
+        init(from decoder: Decoder) throws {
+            result = Result { try T(from: decoder) }
+        }
+    }
+
+    /// Passes decoded values on and ends with `undecodableValue` at the first one that was rejected.
+    nonisolated static func unwrapping<T>(
+        _ publisher: AnyPublisher<Decoded<T>, ClientError>,
+        query: String
+    ) -> AnyPublisher<T, ClientError> {
+        publisher
+            .tryMap { decoded in
+                do {
+                    return try decoded.result.get()
+                } catch {
+                    print("❌ [ConvexService] \(query): cannot decode the server's value: \(error)")
+                    throw ClientError.InternalError(msg: undecodableValue)
+                }
+            }
+            .mapError { $0 as? ClientError ?? .InternalError(msg: "\($0)") }
+            .eraseToAnyPublisher()
     }
 
     // Convex's `v.optional(...)` accepts undefined/missing keys but rejects JSON `null`.

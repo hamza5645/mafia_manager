@@ -62,11 +62,15 @@ export default defineSchema({
     .index("by_user_player", ["user_id", "player_name"]),
 
   // Games already counted by stats:recordGame, so a retry never counts twice.
+  // Only each user's newest rows are kept (lib/recordedGames.ts); by_user lists
+  // them oldest first.
   recorded_games: defineTable({
     user_id: v.string(),
     game_id: v.string(),
     recorded_at: v.number(),
-  }).index("by_user_game", ["user_id", "game_id"]),
+  })
+    .index("by_user_game", ["user_id", "game_id"])
+    .index("by_user", ["user_id"]),
 
   custom_roles_configs: defineTable({
     id: v.string(),
@@ -120,13 +124,17 @@ export default defineSchema({
     night_history: v.array(v.any()),
     day_history: v.array(v.any()),
     current_round_id: v.optional(v.string()),
+    // Ended rooms only: when cleanup.ts next acts on the room (clears a
+    // finished game's rows, later deletes the room).
+    next_cleanup_at: v.optional(v.number()),
     updated_at: v.number(),
   })
     .index("by_app_id", ["id"])
     .index("by_room_code", ["room_code"])
     .index("by_host", ["host_user_id"])
     .index("by_original_host", ["original_host_user_id"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_status_cleanup", ["status", "next_cleanup_at"]),
 
   session_players: defineTable({
     id: v.string(),

@@ -41,23 +41,29 @@ final class MultiplayerGameStore: ObservableObject {
     // Derived from `players` once per change (see `rebuildPlayerCaches`).
     private(set) var myPlayer: SessionPlayer?
     private(set) var visiblePlayers: [PublicPlayerInfo] = []
-    /// Seats by `playerId`.
-    private(set) var playersById: [UUID: SessionPlayer] = [:]
+    /// `visiblePlayers` by `playerId`.
+    private(set) var visiblePlayersById: [UUID: PublicPlayerInfo] = [:]
     /// Only populated if I'm mafia.
     private(set) var mafiaTeammatePlayerIds: Set<UUID> = []
 
     var sessionId: UUID?
     var subscriptions: [SubscriptionSupervisor] = []
+    /// The one of `subscriptions` that feeds `hostPresence` (see `renewHostPresence`).
+    var hostPresenceSubscription: SubscriptionSupervisor?
     var tickTask: Task<Void, Never>?
     var isLeaving = false
     var isInBackground = false
     var isCompletingNight = false
     var isAdvancingFromRoleReveal = false
-    /// Set on resume; the first successful heartbeat afterwards may take the lobby back.
+    /// Set when the app goes to the background while I host the lobby; the first successful
+    /// heartbeat after the resume takes the lobby back if it was lost meanwhile.
     var isReclaimPending = false
     /// The session of the heartbeat / host claim still waiting for the server (one at a time).
     var heartbeatInFlight: UUID?
     var claimInFlight: UUID?
+    /// Host claims that failed in a row, and the ticks the next claim still waits (see `checkHost`).
+    var failedClaims = 0
+    var claimTicksToSkip = 0
     /// The websocket is reconnecting (`ConvexService.connectionState`).
     var isSocketConnecting = false
     /// The socket has been reconnecting for at least `slowConnectionDelay`.
@@ -126,7 +132,7 @@ final class MultiplayerGameStore: ObservableObject {
     private func rebuildPlayerCaches() {
         myPlayer = players.first(where: \.isMe)
         visiblePlayers = players.map(PublicPlayerInfo.init(from:))
-        playersById = Dictionary(players.map { ($0.playerId, $0) }, uniquingKeysWith: { first, _ in first })
+        visiblePlayersById = Dictionary(visiblePlayers.map { ($0.playerId, $0) }, uniquingKeysWith: { first, _ in first })
         mafiaTeammatePlayerIds = myPlayer?.role == .mafia
             ? Set(players.filter { $0.role == .mafia && !$0.isMe }.map(\.playerId))
             : []
@@ -142,7 +148,12 @@ final class MultiplayerGameStore: ObservableObject {
         return counts
     }
 
-    var isPhaseReadyToAdvance: Bool { roundState?.readyToAdvance ?? false }
+    /// The server's "everyone has acted", for the round the session is in. The round snapshot
+    /// arrives apart from the session's, so one left over from the phase before never counts.
+    var isPhaseReadyToAdvance: Bool {
+        guard let round = roundState, round.roundId == currentSession?.currentRoundId else { return false }
+        return round.readyToAdvance
+    }
 
     /// Shown with a Retry button in the game screens.
     var connectionProblem: String? { connectionError ?? (needsSignIn ? Self.signInMessage : nil) }
@@ -204,7 +215,7 @@ final class MultiplayerGameStore: ObservableObject {
         if needsSignIn {
             needsSignIn = false
             // No host presence could arrive while I was unidentified.
-            restartHostPresenceClock()
+            renewHostPresence()
         }
         guard let value, value.viewer.isMember, value.session.status != .cancelled else {
             // Removed by the host, or the host ended the game.
@@ -358,6 +369,7 @@ final class MultiplayerGameStore: ObservableObject {
     func clearLocalSession() {
         subscriptions.forEach { $0.stop() }
         subscriptions = []
+        hostPresenceSubscription = nil
         tickTask?.cancel()
         tickTask = nil
         sessionId = nil
@@ -369,6 +381,8 @@ final class MultiplayerGameStore: ObservableObject {
         hostPresenceReceivedAt = nil
         isLeaving = false
         isReclaimPending = false
+        failedClaims = 0
+        claimTicksToSkip = 0
         needsSignIn = false
         isHostOffline = false
         wasKicked = false

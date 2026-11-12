@@ -25,6 +25,12 @@ extension MultiplayerGameStore {
 
     func startSubscriptions(sessionId: UUID) {
         let service = sessionService
+        let presence = SubscriptionSupervisor(
+            { service.watchHostPresence(sessionId: sessionId) },
+            label: "getHostPresence", sleep: sleep,
+            onValue: { [weak self] in self?.apply(hostPresence: $0) }
+        )
+        hostPresenceSubscription = presence
         subscriptions = [
             SubscriptionSupervisor(
                 { service.watch("views:getSessionView", sessionId: sessionId, as: SessionView?.self) },
@@ -41,11 +47,7 @@ extension MultiplayerGameStore {
                 label: "getRoundState", sleep: sleep,
                 onValue: { [weak self] in self?.apply(roundState: $0) }
             ),
-            SubscriptionSupervisor(
-                { service.watch("views:getHostPresence", sessionId: sessionId, as: HostPresence?.self) },
-                label: "getHostPresence", sleep: sleep,
-                onValue: { [weak self] in self?.apply(hostPresence: $0) }
-            ),
+            presence,
         ]
         for subscription in subscriptions {
             subscription.onStatusChange = { [weak self] in self?.updateConnectionStatus() }
@@ -83,7 +85,7 @@ extension MultiplayerGameStore {
         slowConnectionTask?.cancel()
         let reconnected = isSocketConnecting && state != .connecting
         isSocketConnecting = state == .connecting
-        if reconnected { restartHostPresenceClock() }
+        if reconnected { renewHostPresence() }
         if isSocketConnecting {
             slowConnectionTask = Task { [weak self, sleep] in
                 await sleep(Self.slowConnectionDelay)
@@ -120,8 +122,7 @@ extension MultiplayerGameStore {
     func handleAppResume() async {
         isInBackground = false
         guard sessionId != nil else { return }
-        isReclaimPending = true
-        restartHostPresenceClock()
+        renewHostPresence()
         // Heartbeat right away so the room sees me before the token refresh finishes.
         startTicking()
         await authStore?.ensureValidSession()
@@ -135,6 +136,8 @@ extension MultiplayerGameStore {
         tickTask?.cancel()
         tickTask = nil
         guard let sessionId else { return }
+        // Only a lobby I am hosting now can be lost while I am away and taken back on resume.
+        if isHost, currentSession?.status == .waiting { isReclaimPending = true }
         // One last heartbeat keeps me fresh for as long as possible while suspended.
         endFinalHeartbeat()
         finalHeartbeatTask = UIApplication.shared.beginBackgroundTask(withName: "Final heartbeat") { [weak self] in
@@ -190,13 +193,14 @@ extension MultiplayerGameStore {
             }
             guard let self else { return }
             if heartbeatInFlight == sessionId { heartbeatInFlight = nil }
-            guard sent, self.sessionId == sessionId, isReclaimPending else { return }
+            guard sent, self.sessionId == sessionId, isReclaimPending, !isInBackground else { return }
             isReclaimPending = false
             await reclaimLobbyIfNeeded()
         }
     }
 
-    /// Back from the background: an original host who lost the lobby while away takes it back.
+    /// Back from the background: a host who lost the lobby while away takes it back. A host
+    /// change made on purpose (another player's Play Again) is never undone from here.
     private func reclaimLobbyIfNeeded() async {
         guard let sessionId, let view = sessionView, view.session.status == .waiting, !view.viewer.isHost,
               let me = view.viewer.userId, view.session.originalHostUserId == me else { return }
@@ -210,19 +214,41 @@ extension MultiplayerGameStore {
     /// Asks the server to replace a silent host, at most once per tick and one claim at a
     /// time (with a time limit, like heartbeats). The server re-checks staleness on its own
     /// clock and installs its own successor, so a claim that lands late is harmless.
+    ///
+    /// Only a living player asks: the server never installs an eliminated one, so when only
+    /// eliminated players are connected every claim would fail. A failed claim (HOST_ACTIVE,
+    /// HOST_SUCCESSOR, a timeout) makes the next one wait: 10 s, 20 s, 40 s, then every 60 s.
     func checkHost() {
         refreshHostOffline()
-        guard isHostOffline, let sessionId, claimInFlight != sessionId else { return }
+        guard isHostOffline else {
+            failedClaims = 0
+            claimTicksToSkip = 0
+            return
+        }
+        guard let sessionId, claimInFlight != sessionId, myPlayer?.isAlive == true else { return }
+        guard claimTicksToSkip == 0 else {
+            claimTicksToSkip -= 1
+            return
+        }
         claimInFlight = sessionId
         Task { [weak self, sessionService] in
+            var failed = false
             do {
                 try await sessionService.claimHost(sessionId: sessionId)
             } catch {
-                // HOST_ACTIVE / HOST_SUCCESSOR are expected races; the next tick asks again.
+                failed = true
                 print("⚠️ [MultiplayerGameStore] Host claim failed: \(error.localizedDescription)")
             }
-            if self?.claimInFlight == sessionId { self?.claimInFlight = nil }
+            guard let self, claimInFlight == sessionId else { return }
+            claimInFlight = nil
+            failedClaims = failed ? failedClaims + 1 : 0
+            claimTicksToSkip = failed ? Self.claimBackoffTicks(afterFailures: failedClaims) - 1 : 0
         }
+    }
+
+    /// Ticks from one failed claim to the next attempt: 2, 4, 8, then 12 (one minute).
+    static func claimBackoffTicks(afterFailures failures: Int) -> Int {
+        min(1 << min(failures, 4), 12)
     }
 
     func refreshHostOffline() {
@@ -233,7 +259,7 @@ extension MultiplayerGameStore {
     /// The host's silence on the server's clock when `hostPresence` arrived, plus the local
     /// time since then; no device clock is compared with server time. While the socket is
     /// reconnecting or the server cannot identify me, I may be the one offline (and no new
-    /// value can arrive), so nothing is concluded.
+    /// value can arrive), so nothing is concluded; the same holds until a value has arrived.
     func hostLooksOffline(now: ContinuousClock.Instant = .now) -> Bool {
         guard sessionId != nil, !isHost, !isSocketConnecting, !needsSignIn, sessionView?.viewer.isMember == true,
               let presence = hostPresence, let receivedAt = hostPresenceReceivedAt else { return false }
@@ -244,10 +270,14 @@ extension MultiplayerGameStore {
     }
 
     /// Back from a time in which no presence value could arrive (suspended, socket down,
-    /// unidentified): the host's silence counts on from now instead of adding the time away,
-    /// until a fresh value replaces it. A host that really went quiet is still found once its
-    /// silence passes the limit.
-    func restartHostPresenceClock() {
-        if hostPresenceReceivedAt != nil { hostPresenceReceivedAt = .now }
+    /// unidentified). The last reading says nothing about now: adding the time away would count
+    /// it as host silence, and counting on from zero would hide a host that went quiet
+    /// meanwhile. So the reading is dropped and the query is subscribed again, which has the
+    /// server compute the host's silence as of now (see `SessionService.watchHostPresence`).
+    func renewHostPresence() {
+        hostPresence = nil
+        hostPresenceReceivedAt = nil
+        refreshHostOffline()
+        hostPresenceSubscription?.start()
     }
 }

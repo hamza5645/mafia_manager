@@ -2,7 +2,8 @@ import { fail } from "./errors";
 
 // Apple/NSDate reference epoch (2001-01-01) in seconds. Swift's
 // Date(timeIntervalSinceReferenceDate:) decodes this natively.
-export const nowAppleEpochSeconds = () => Date.now() / 1000 - 978307200;
+export const APPLE_EPOCH_UNIX_SECONDS = 978307200;
+export const nowAppleEpochSeconds = () => Date.now() / 1000 - APPLE_EPOCH_UNIX_SECONDS;
 export const uuid = () => crypto.randomUUID();
 
 export async function sha256Hex(s: string): Promise<string> {

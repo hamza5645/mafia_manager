@@ -6,9 +6,6 @@ struct MultiplayerVotingResultsView: View {
     let voteCounts: [UUID: Int]
     let eliminatedPlayerId: UUID?
 
-    @State private var isTransitioning = false
-    @State private var transitionError: String?
-
     /// HAMZA-FIX: never silently drop a vote entry; a player missing from the roster gets a placeholder.
     private static func placeholder(_ id: UUID, name: String) -> PublicPlayerInfo {
         PublicPlayerInfo(
@@ -46,11 +43,7 @@ struct MultiplayerVotingResultsView: View {
     }
 
     var body: some View {
-        // Built once per render, outside the ForEach.
-        let lookup = Dictionary(
-            multiplayerStore.visiblePlayers.map { ($0.playerId, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        let lookup = multiplayerStore.visiblePlayersById
         let tallies = Self.sortedTallies(voteCounts, lookup: lookup)
         let eliminatedPlayer = eliminatedPlayerId.map { lookup[$0] ?? Self.placeholder($0, name: "Eliminated Player") }
 
@@ -90,38 +83,8 @@ struct MultiplayerVotingResultsView: View {
 
                 // Continue button (host only)
                 if multiplayerStore.isHost {
-                    VStack(spacing: 12) {
-                        Button {
-                            Task {
-                                isTransitioning = true
-                                transitionError = nil
-                                do {
-                                    try await multiplayerStore.continueFromVotingResults()
-                                } catch {
-                                    transitionError = HostTransition.errorMessage(for: error)
-                                }
-                                isTransitioning = false
-                            }
-                        } label: {
-                            HStack {
-                                if isTransitioning {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Text(nextPhaseButtonLabel)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(CTAButtonStyle(kind: .primary))
-                        .disabled(isTransitioning)
-
-                        if let error = transitionError {
-                            Text(error)
-                                .font(Design.Typography.caption)
-                                .foregroundStyle(Design.Colors.dangerRed)
-                                .multilineTextAlignment(.center)
-                        }
+                    HostTransitionButton(title: nextPhaseButtonLabel) {
+                        try await multiplayerStore.continueFromVotingResults()
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 20)

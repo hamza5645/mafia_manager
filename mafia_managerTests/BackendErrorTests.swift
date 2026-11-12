@@ -166,6 +166,23 @@ nonisolated final class BackendErrorTests: XCTestCase {
         XCTAssertTrue(newer.updateRequired)
     }
 
+    @MainActor func testARecheckAsksAgainAndOnlyAMismatchBlocks() async {
+        var minimum = ConvexConfig.apiContractVersion
+        var calls = 0
+        let compatibility = BackendCompatibility(fetchMinClientContract: {
+            calls += 1
+            return minimum
+        })
+        await compatibility.checkOnce()
+        await compatibility.recheck()
+        XCTAssertEqual(calls, 2)
+        XCTAssertFalse(compatibility.updateRequired, "One unreadable room is not an outdated app")
+
+        minimum += 1 // The backend moved on while the app was open.
+        await compatibility.recheck()
+        XCTAssertTrue(compatibility.updateRequired)
+    }
+
     @MainActor func testFailedOrTimedOutCheckNeverBlocksAndIsRetried() async {
         var calls = 0
         var failure: Error? = BackendError(timedOut: BackendError.network)

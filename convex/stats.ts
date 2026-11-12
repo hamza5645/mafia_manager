@@ -3,6 +3,7 @@ import { Doc } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
 import { E, fail } from "./lib/errors";
 import { requireCaller } from "./lib/identity";
+import { trimRecordedGames } from "./lib/recordedGames";
 import { cleanText, nowAppleEpochSeconds, uuid } from "./lib/util";
 import { guestArg, roleDistributionValidator, roleValidator } from "./validators";
 
@@ -173,7 +174,8 @@ export const upsertPlayerStat = mutation({
 
 // Records a whole finished game in one transaction, once per caller and
 // game_id, so the client can retry until acknowledged. Invalid rows are
-// skipped and counted rather than failing the game.
+// skipped and counted rather than failing the game. Only the caller's latest
+// games are remembered (lib/recordedGames.ts).
 export const recordGame = mutation({
   args: {
     game_id: v.string(),
@@ -200,6 +202,7 @@ export const recordGame = mutation({
       await addGameToStats(ctx, caller.id, playerName, row);
     }
     await ctx.db.insert("recorded_games", { user_id: caller.id, game_id: args.game_id, recorded_at: nowAppleEpochSeconds() });
+    await trimRecordedGames(ctx, caller.id);
     return { recorded: true, skipped };
   },
 });

@@ -39,12 +39,12 @@ struct MultiplayerStoreTests {
         #expect(store.mafiaTeammatePlayerIds == [teammate.playerId])
         #expect(store.mafiaTeammates.map(\.id) == [teammate.id])
         #expect(store.visiblePlayers.map(\.id) == [teammate.id, me.id, citizen.id])
-        #expect(store.playersById[citizen.playerId]?.id == citizen.id)
+        #expect(store.visiblePlayersById[citizen.playerId]?.id == citizen.id)
 
         store.players = [teammate, citizen]
         #expect(store.myPlayer == nil)
         #expect(store.mafiaTeammates.isEmpty)
-        #expect(store.playersById[me.playerId] == nil)
+        #expect(store.visiblePlayersById[me.playerId] == nil)
     }
 
     @Test func playersInLobbyCountCountsReadySeats() {
@@ -55,12 +55,32 @@ struct MultiplayerStoreTests {
     }
 
     @Test func phaseReadinessComesOnlyFromTheServer() {
-        let store = makeStore()
+        let round = UUID()
+        let store = joinedStore(Fixture.session(roundId: round))
         #expect(!store.isPhaseReadyToAdvance)
-        store.roundState = Fixture.round(ready: true)
+        store.roundState = Fixture.round(round, ready: true)
         #expect(store.isPhaseReadyToAdvance)
-        store.roundState = Fixture.round(ready: false)
+        store.roundState = Fixture.round(round, ready: false)
         #expect(!store.isPhaseReadyToAdvance)
+    }
+
+    @Test func aRoundSnapshotFromThePhaseBeforeIsNotReady() {
+        // Role reveal has no round id; its "everyone is ready" is still current when night 0 opens.
+        let roleReveal = RoundState(roundId: nil, phase: "role_reveal", phaseIndex: nil, readyToAdvance: true, actions: [], tentative: [])
+        let store = joinedStore(Fixture.session(phase: "role_reveal", roundId: nil), isHost: true)
+        store.roundState = roleReveal
+        #expect(store.isPhaseReadyToAdvance)
+
+        let night = UUID()
+        store.apply(sessionView: Fixture.view(Fixture.session(phase: "night", roundId: night), isHost: true))
+        #expect(!store.isPhaseReadyToAdvance, "The night must not finish on role reveal's readiness")
+        store.roundState = Fixture.round(night, ready: true)
+        #expect(store.isPhaseReadyToAdvance)
+
+        // The same between a finished vote and the next night.
+        store.apply(sessionView: Fixture.view(Fixture.session(phase: "night", roundId: UUID()), isHost: true))
+        #expect(!store.isPhaseReadyToAdvance)
+        store.clearLocalSession()
     }
 
     @Test func tentativeCountsUseTheCurrentRoundStateOnly() {
@@ -416,9 +436,22 @@ struct MultiplayerStoreTests {
 
     // MARK: - Heartbeat and host presence (PA-01, PA-40, PA-93)
 
-    @Test func aStaleHostGetsOneClaimPerTick() async {
+    /// A member with a seat in a running game.
+    private func memberStore(alive: Bool = true) -> MultiplayerGameStore {
         let store = joinedStore()
+        store.apply(players: [Fixture.seat(.citizen, bot: false, alive: alive, isMe: true), Fixture.seat(.mafia, bot: false)])
+        return store
+    }
+
+    /// A member whose host has been silent past the limit.
+    private func staleHostStore(alive: Bool = true) -> MultiplayerGameStore {
+        let store = memberStore(alive: alive)
         store.apply(hostPresence: Fixture.presence(silence: 20))
+        return store
+    }
+
+    @Test func aStaleHostGetsOneClaimPerTick() async {
+        let store = staleHostStore()
         #expect(store.isHostOffline)
 
         store.startTicking()
@@ -427,8 +460,49 @@ struct MultiplayerStoreTests {
         #expect(service.count(.claimHost) == 1)
 
         await clock.advance(by: MultiplayerGameStore.tickInterval)
-        #expect(service.count(.claimHost) == 2, "The server rejects or installs; the next tick asks again")
+        #expect(service.count(.claimHost) == 2, "A claim the server accepted is followed up on the next tick")
         store.clearLocalSession()
+    }
+
+    @Test func aRejectedClaimWaitsLongerEachTime() async {
+        service.claimError = BackendError(ClientError.ConvexError(data: "\"Another player is taking over as host.\""))
+        let store = staleHostStore()
+        store.startTicking()
+        await settle()
+        // The tick (5 s) on which each claim is sent: at once, then 10, 20, 40 and 60 s apart.
+        var sentOnTicks = service.count(.claimHost) == 1 ? [0] : []
+        for tick in 1...40 {
+            let before = service.count(.claimHost)
+            await clock.advance(by: MultiplayerGameStore.tickInterval)
+            if service.count(.claimHost) > before { sentOnTicks.append(tick) }
+        }
+        #expect(sentOnTicks == [0, 2, 6, 14, 26, 38])
+
+        // The host is back and goes quiet again later: the wait starts over.
+        store.apply(hostPresence: Fixture.presence(silence: 0))
+        await clock.advance(by: MultiplayerGameStore.tickInterval)
+        store.apply(hostPresence: Fixture.presence(silence: 20))
+        let before = service.count(.claimHost)
+        await clock.advance(by: MultiplayerGameStore.tickInterval)
+        #expect(service.count(.claimHost) == before + 1)
+        store.clearLocalSession()
+    }
+
+    @Test func anEliminatedPlayerNeverClaims() async {
+        // The server installs only living players, so these claims could only fail.
+        let eliminated = staleHostStore(alive: false)
+        let loading = joinedStore() // My seat has not arrived yet.
+        loading.apply(hostPresence: Fixture.presence(silence: 20))
+        for store in [eliminated, loading] {
+            #expect(store.isHostOffline)
+            store.startTicking()
+        }
+        await settle()
+        for _ in 0..<4 { await clock.advance(by: MultiplayerGameStore.tickInterval) }
+        #expect(service.count(.heartbeat) == 10)
+        #expect(service.count(.claimHost) == 0)
+        eliminated.clearLocalSession()
+        loading.clearLocalSession()
     }
 
     @Test func aFreshHostIsLeftAlone() async {
@@ -466,7 +540,7 @@ struct MultiplayerStoreTests {
     }
 
     @Test func nothingIsConcludedWhileTheSocketReconnects() async {
-        let store = joinedStore()
+        let store = memberStore()
         socket.send(.connecting)
         await drainMainQueue()
         store.apply(hostPresence: Fixture.presence(silence: 60))
@@ -475,15 +549,56 @@ struct MultiplayerStoreTests {
         await settle()
         #expect(service.count(.claimHost) == 0)
 
+        // Back online: what I held is dropped, and the server's reading as of now decides.
         socket.send(.connected)
         await drainMainQueue()
+        #expect(!store.isHostOffline)
+        store.apply(hostPresence: Fixture.presence(silence: 61))
         #expect(store.isHostOffline)
+        store.clearLocalSession()
+    }
+
+    private var presenceSubscriptions: Int { service.feeds["views:getHostPresence"]?.count ?? 0 }
+
+    @Test func aHostWhoWentQuietWhileIWasAwayIsFoundAsSoonAsIAmBack() async {
+        let store = makeStore()
+        store.sessionId = UUID()
+        store.startSubscriptions(sessionId: store.sessionId!)
+        store.apply(sessionView: Fixture.view(Fixture.session()))
+        store.apply(players: [Fixture.seat(.citizen, bot: false, isMe: true)])
+        service.send("views:getHostPresence", Optional(Fixture.presence(silence: 2)))
+        await drainMainQueue()
+        #expect(store.hostPresence != nil)
+        #expect(presenceSubscriptions == 1)
+
+        // Suspended for a minute, in which the host went quiet.
+        store.prepareForBackground()
+        await settle()
+        await store.handleAppResume()
+        await settle()
+        #expect(presenceSubscriptions == 2, "Subscribed again, so the server computes the host's silence now")
+        #expect(service.subscribeCount == 5, "The other three subscriptions are left alone")
+        #expect(store.hostPresence == nil, "The reading from before the suspension is not used again")
+        #expect(service.count(.claimHost) == 0)
+        service.send("views:getHostPresence", Optional(Fixture.presence(silence: 62)))
+        await drainMainQueue()
+        #expect(store.isHostOffline, "Found at once, not after another full limit")
+        await clock.advance(by: MultiplayerGameStore.tickInterval)
+        #expect(service.count(.claimHost) == 1)
+
+        // The same when the socket drops and comes back.
+        socket.send(.connecting)
+        await drainMainQueue()
+        socket.send(.connected)
+        await drainMainQueue()
+        #expect(presenceSubscriptions == 3)
+        #expect(!store.isHostOffline)
         store.clearLocalSession()
     }
 
     @Test func timeAwayIsNotCountedAsHostSilence() async throws {
         // Resume: the first tick runs at once, with the value from before the app was suspended.
-        let resumed = joinedStore()
+        let resumed = memberStore()
         resumed.apply(hostPresence: Fixture.presence(silence: 3))
         resumed.hostPresenceReceivedAt = .now - .seconds(60)
         #expect(resumed.hostLooksOffline())
@@ -492,9 +607,9 @@ struct MultiplayerStoreTests {
         await settle()
         #expect(!resumed.isHostOffline)
         #expect(service.count(.claimHost) == 0)
-        // A host that really went quiet is still found once its silence passes the limit.
-        let restartedAt = try #require(resumed.hostPresenceReceivedAt)
-        #expect(resumed.hostLooksOffline(now: restartedAt + .seconds(13)))
+        // The host kept beating while I was away, as the server's fresh reading shows.
+        resumed.apply(hostPresence: Fixture.presence(silence: 2))
+        #expect(!resumed.isHostOffline)
         resumed.clearLocalSession()
 
         // The socket comes back.
@@ -518,8 +633,7 @@ struct MultiplayerStoreTests {
 
     @Test func aFailingHeartbeatDoesNotStallTheTick() async {
         service.heartbeatError = BackendError(URLError(.timedOut))
-        let store = joinedStore()
-        store.apply(hostPresence: Fixture.presence(silence: 20))
+        let store = staleHostStore()
         store.startTicking()
         await settle()
         #expect(service.count(.heartbeat) == 1)
@@ -532,8 +646,7 @@ struct MultiplayerStoreTests {
     }
 
     @Test func aHeartbeatOrClaimStillWaitingIsNotSentAgain() async {
-        let store = joinedStore()
-        store.apply(hostPresence: Fixture.presence(silence: 20))
+        let store = staleHostStore()
         service.holds = ["heartbeat", "claimHost"] // An outage: neither call has returned yet.
         store.startTicking()
         await settle()
@@ -549,6 +662,8 @@ struct MultiplayerStoreTests {
         await settle()
         await clock.advance(by: MultiplayerGameStore.tickInterval)
         #expect(service.count(.heartbeat) == 2)
+        #expect(service.count(.claimHost) == 1, "A claim that failed waits one more tick")
+        await clock.advance(by: MultiplayerGameStore.tickInterval)
         #expect(service.count(.claimHost) == 2)
         store.clearLocalSession()
     }
@@ -572,35 +687,75 @@ struct MultiplayerStoreTests {
 
     // MARK: - Resume and background (PA-05, PA-06)
 
-    @Test func anOriginalHostTakesTheLobbyBackAfterTheFirstHeartbeatOnResume() async {
-        let me = UUID()
-        let lobby = Fixture.session(status: .waiting, phase: "lobby", roundId: nil, originalHostUserId: me)
-        let store = joinedStore(lobby, userId: me)
-        store.isInBackground = true
+    /// A lobby I host, backgrounded, and what the server shows when I come back.
+    private func lobbyHostAwayStore(me: UUID, onReturn: (inout GameSession) -> Void) async -> MultiplayerGameStore {
+        var lobby = Fixture.session(status: .waiting, phase: "lobby", roundId: nil, hostUserId: me, originalHostUserId: me)
+        let store = joinedStore(lobby, isHost: true, userId: me)
+        store.prepareForBackground()
+        await settle()
+        onReturn(&lobby)
+        store.apply(sessionView: Fixture.view(lobby, userId: me))
+        return store
+    }
+
+    @Test func aHostWhoLostTheLobbyWhileAwayTakesItBackAfterTheFirstHeartbeatOnResume() async {
+        let store = await lobbyHostAwayStore(me: UUID()) { $0.hostUserId = UUID() }
 
         await store.handleAppResume()
         await settle()
-        #expect(service.calls.prefix(2) == [.heartbeat, .returnToLobby])
+        #expect(service.calls == [.heartbeat, .heartbeat, .returnToLobby], "The last heartbeat before suspending, then the resume")
 
         await clock.advance(by: MultiplayerGameStore.tickInterval)
         #expect(service.count(.returnToLobby) == 1, "Only once per resume")
         store.clearLocalSession()
     }
 
-    @Test func noReclaimMidGameOrForOthersOrBeforeAHeartbeatSucceeds() async {
+    @Test func noReclaimOfALobbyIWasNotHostingWhenILeftTheApp() async {
         let me = UUID()
-        let running = joinedStore(Fixture.session(originalHostUserId: me), userId: me)
-        await running.handleAppResume()
+        // Another player's Play Again made them host; I am still the original host.
+        let playAgain = joinedStore(Fixture.session(status: .waiting, phase: "lobby", roundId: nil, originalHostUserId: me), userId: me)
+        // I hosted the game that is running, not a lobby.
+        let running = joinedStore(Fixture.session(hostUserId: me, originalHostUserId: me), isHost: true, userId: me)
+        for store in [playAgain, running] {
+            store.prepareForBackground()
+            await settle()
+        }
+        running.apply(sessionView: Fixture.view(
+            Fixture.session(status: .waiting, phase: "lobby", roundId: nil, originalHostUserId: me), userId: me))
+        for store in [playAgain, running] {
+            await store.handleAppResume()
+            await settle()
+        }
+        #expect(service.count(.heartbeat) == 4)
+        #expect(service.count(.returnToLobby) == 0)
+        playAgain.clearLocalSession()
+        running.clearLocalSession()
+    }
+
+    @Test func noReclaimOnceTheGameStartedOrWhileIAmStillHostOrBeforeAHeartbeatSucceeds() async {
+        let started = await lobbyHostAwayStore(me: UUID()) {
+            $0.hostUserId = UUID()
+            $0.status = .inProgress
+        }
+        let stillHost = joinedStore(Fixture.session(status: .waiting, phase: "lobby", roundId: nil), isHost: true)
+        stillHost.prepareForBackground()
         await settle()
-        let someoneElse = joinedStore(Fixture.session(status: .waiting, phase: "lobby", roundId: nil, originalHostUserId: UUID()))
-        await someoneElse.handleAppResume()
+        for store in [started, stillHost] {
+            await store.handleAppResume()
+            await settle()
+        }
+        #expect(service.count(.returnToLobby) == 0)
+        started.clearLocalSession()
+        stillHost.clearLocalSession()
+
+        let offline = await lobbyHostAwayStore(me: UUID()) { $0.hostUserId = UUID() }
+        service.heartbeatError = BackendError(URLError(.timedOut))
+        await offline.handleAppResume()
         await settle()
         #expect(service.count(.returnToLobby) == 0)
-        running.clearLocalSession()
-        someoneElse.clearLocalSession()
-
-        service.heartbeatError = BackendError(URLError(.timedOut))
-        let offline = joinedStore(Fixture.session(status: .waiting, phase: "lobby", roundId: nil, originalHostUserId: me), userId: me)
+        // Backgrounded again before any heartbeat got through: the reclaim is still owed.
+        offline.prepareForBackground()
+        await settle()
         await offline.handleAppResume()
         await settle()
         #expect(service.count(.returnToLobby) == 0)

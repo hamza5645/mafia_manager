@@ -30,35 +30,9 @@ struct GameOverView: View {
                         }
                     }
                 }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // The card style without its shadow: this card is as tall as the
-                // whole log, and a shadow would be rendered from all of it.
-                .background(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
-                            .fill(Design.Colors.surface1)
-                        RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Design.Colors.surface2.opacity(0.3), Design.Colors.surface1.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    }
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Design.Colors.strokeLight.opacity(0.6), Design.Colors.stroke.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.5
-                        )
-                )
+                // No shadow: this card is as tall as the whole log, and a shadow
+                // would be rendered from all of it.
+                .cardStyle(padding: 18, withShadow: false)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Event log. Contains game history.")
 

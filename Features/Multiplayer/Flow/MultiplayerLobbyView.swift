@@ -671,9 +671,7 @@ struct MultiplayerMorningView: View {
         multiplayerStore.currentSession?.nightHistory.first(where: { $0.nightIndex == nightIndex })
     }
 
-    private var playerLookup: [UUID: PublicPlayerInfo] {
-        Dictionary(multiplayerStore.visiblePlayers.map { ($0.playerId, $0) }, uniquingKeysWith: { first, _ in first })
-    }
+    private var playerLookup: [UUID: PublicPlayerInfo] { multiplayerStore.visiblePlayersById }
 
     private var eliminatedPlayers: [PublicPlayerInfo] {
         guard let record = nightRecord else { return [] }
@@ -852,9 +850,7 @@ struct MultiplayerDeathRevealView: View {
         multiplayerStore.currentSession?.nightHistory.first(where: { $0.nightIndex == nightIndex })
     }
 
-    private var playerLookup: [UUID: PublicPlayerInfo] {
-        Dictionary(multiplayerStore.visiblePlayers.map { ($0.playerId, $0) }, uniquingKeysWith: { first, _ in first })
-    }
+    private var playerLookup: [UUID: PublicPlayerInfo] { multiplayerStore.visiblePlayersById }
 
     private var eliminatedPlayers: [PublicPlayerInfo] {
         guard let record = nightRecord else { return [] }

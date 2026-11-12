@@ -5,7 +5,7 @@ import { E, fail } from "./lib/errors";
 import { requireHost, requireSeat, seatByPlayer } from "./lib/guards";
 import { sessionData, validateGameAction } from "./lib/rules";
 import { nowAppleEpochSeconds, uuid } from "./lib/util";
-import { actionTypeValidator, guestArg } from "./validators";
+import { actionTypeValidator, guestArg, nightActionTypeValidator } from "./validators";
 
 type Seat = Doc<"session_players">;
 type ActionArgs = {
@@ -175,7 +175,7 @@ export const setTentativeSelection = mutation({
   args: {
     session_id: v.string(),
     actor_player_id: v.string(),
-    action_type: actionTypeValidator,
+    action_type: nightActionTypeValidator,
     phase_index: v.number(),
     target_player_id: v.optional(v.string()),
     ...guestArg,
@@ -183,7 +183,7 @@ export const setTentativeSelection = mutation({
   handler: async (ctx, args) => {
     const { caller, session, seat } = await requireSeat(ctx, args);
     validateGameAction(session, await actorAndTarget(ctx, caller, session, seat, args), args);
-    if (args.action_type !== "vote" && nightClosed(session, session.current_round_id)) fail(E.NIGHT_CLOSED);
+    if (nightClosed(session, session.current_round_id)) fail(E.NIGHT_CLOSED);
     const existing = await ctx.db
       .query("tentative_selections")
       .withIndex("by_actor", (q) =>

@@ -7,6 +7,8 @@ import ConvexMobile
 protocol SessionServicing {
     /// A live `views:*` query for one session (see `SubscriptionSupervisor`).
     func watch<T: Decodable>(_ query: String, sessionId: UUID, as type: T.Type) -> AnyPublisher<T, ClientError>
+    /// `views:getHostPresence`, computed by the server when this subscription arrives.
+    func watchHostPresence(sessionId: UUID) -> AnyPublisher<HostPresence?, ClientError>
 
     func createSession(playerName: String, botCount: Int) async throws -> EnterResult
     func joinSession(roomCode: String, playerName: String) async throws -> EnterResult
@@ -56,6 +58,17 @@ final class SessionService: SessionServicing {
 
     func watch<T: Decodable>(_ query: String, sessionId: UUID, as type: T.Type) -> AnyPublisher<T, ClientError> {
         convex.subscribe(query, with: ["session_id": id(sessionId)], as: type)
+    }
+
+    /// The value carries the server's clock at the time it was computed, and nothing recomputes
+    /// it while the host is silent. A new `nonce` makes every subscription a query the server
+    /// has not answered before, so its first value is computed now, not taken from a cache.
+    func watchHostPresence(sessionId: UUID) -> AnyPublisher<HostPresence?, ClientError> {
+        convex.subscribe(
+            "views:getHostPresence",
+            with: ["session_id": id(sessionId), "nonce": Double(UInt32.random(in: 0 ... .max))],
+            as: HostPresence?.self
+        )
     }
 
     // MARK: - Lobby and membership

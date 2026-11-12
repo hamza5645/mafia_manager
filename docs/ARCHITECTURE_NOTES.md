@@ -84,7 +84,7 @@ Convex tables:
 - `session_presence` - one row per human seat with its last heartbeat
 - `game_actions`
 - `tentative_selections`
-- `recorded_games` - which games each user has already recorded (makes `stats:recordGame` idempotent)
+- `recorded_games` - which games each user has already recorded (makes `stats:recordGame` idempotent); the newest 50 per user are kept
 
 Core session rules:
 - room codes are generated server-side;
@@ -93,10 +93,10 @@ Core session rules:
 - action rows are keyed by session, round ID, action type, phase index, and actor;
 - the server issues a new `current_round_id` for each night and voting phase, which isolates actions and prevents replay;
 - presence lives in `session_presence`, not on the seat: `sessions:heartbeat` upserts only the caller's row, so heartbeats never re-run `getPlayers` or `getRoundState`. When the host heartbeats, the server sets each seat's `is_online` (heartbeat within 20 s), writing only seats that changed;
-- `views:getHostPresence` reads only the session, the caller's seat and the host's presence row, and returns the host's last heartbeat with the server clock and the stale threshold (90 s while waiting, else 15 s). Any member may then call `sessions:claimHost`; the server installs its own successor (a seat that heartbeated within 15 s), who may be someone other than the caller;
-- the client judges the host from the server's age at receipt plus local monotonic time, never from its own clock, and concludes nothing while the socket reconnects. An original host who comes back takes the lobby back with `sessions:returnToLobby` after its first successful heartbeat.
+- `views:getHostPresence` reads only the session, the caller's seat and the host's presence row, and returns the host's last heartbeat with the server clock and the stale threshold (90 s while waiting, else 15 s). Any member may then call `sessions:claimHost`; the server installs its own successor (a seat that heartbeated within 15 s), who may be someone other than the caller. The app claims only from a living player's device and backs off after a failed claim (10 s, 20 s, 40 s, then 60 s);
+- the client judges the host from the server's age at receipt plus local monotonic time, never from its own clock, and concludes nothing while the socket reconnects. After a resume or reconnect it drops its reading and subscribes again with a new `nonce`, so the server computes the host's silence at that moment. A host who went to the background while hosting the lobby takes it back with `sessions:returnToLobby` after the first successful heartbeat on resume; a player who left or was removed is no longer the original host.
 
-Data lifecycle (`convex/crons.ts` → `cleanup:sweep`, hourly at minute 17 UTC, 20 rooms per transaction):
+Data lifecycle (`convex/crons.ts` → `cleanup:sweep`, hourly at minute 17 UTC; it lists only rooms that can be due — open rooms created over 6 h ago, ended rooms whose `next_cleanup_at` has passed or is missing — and cleans each in its own transaction):
 - lobbies and games with no presence heartbeat for 6 h are cancelled; rooms from before `session_presence` fall back to the seats' `last_heartbeat` or `joined_at`, and `updated_at` is never used;
 - finished games lose seats, presence, actions and drafts 24 h after `completed_at`;
 - cancelled and finished rooms are deleted after 30 days, which frees their room codes;
@@ -104,7 +104,7 @@ Data lifecycle (`convex/crons.ts` → `cleanup:sweep`, hourly at minute 17 UTC, 
 
 Guest merge (`users:mergeGuestIntoAccount`):
 - a seat conflict refuses the merge only for an `in_progress` room, and the message names the room; in other rooms the seat used last (presence heartbeat, else the seat's old `last_heartbeat`, else `joined_at`) is kept and the other seat is deleted;
-- only waiting, in-progress, and finished-with-a-guest-seat rooms change host fields; the guest's `recorded_games` move to the account; `merged_guest_digests` keeps the last 20.
+- only waiting, in-progress, and finished-with-a-guest-seat rooms change host fields; the guest's `recorded_games` move to the account, which keeps its newest 50; `merged_guest_digests` keeps the last 20.
 
 Role privacy is enforced in `convex/lib/projections.ts`, which every `views:*` query uses:
 - players can see their own role;

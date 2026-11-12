@@ -24,7 +24,6 @@ test('submitted and tentative actions share every validation rule', async () => 
   const { t, r, args, submit, draft } = await nightRoom();
   const cases: [ReturnType<typeof args>, string][] = [
     [args(4, 'mafia_target', 2), E.WRONG_ROLE],
-    [args(1, 'vote', 2), E.WRONG_PHASE],
     [args(1, 'mafia_target', 2, { phase_index: 1 }), E.MOVED_ON],
     [args(1, 'mafia_target', 2, { target_player_id: crypto.randomUUID() }), E.TARGET_DEAD],
     [args(1, 'mafia_target', 1), E.MAFIA_TEAMMATE],
@@ -38,6 +37,9 @@ test('submitted and tentative actions share every validation rule', async () => 
     await expect(submit(a)).rejects.toThrow(error);
     await expect(draft(a)).rejects.toThrow(error);
   }
+  await expect(submit(args(1, 'vote', 2))).rejects.toThrow(E.WRONG_PHASE);
+  // Only night actions have drafts; a vote draft is refused as an argument.
+  await expect(draft(args(1, 'vote', 2))).rejects.toThrow(/Validator error/);
   await expect(t.mutation(api.play.submitAction, { ...args(1, 'mafia_target', 2), round_id: crypto.randomUUID() }))
     .rejects.toThrow(E.MOVED_ON);
   expect((await t.query(api.views.getRoundState, r.as(r.host)))!.actions).toEqual([]);

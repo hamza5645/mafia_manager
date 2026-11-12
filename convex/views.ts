@@ -112,7 +112,7 @@ export const getRoundState = query({
     const actions = (await Promise.all(actionRanges))
       .flat()
       .sort((a, b) => a.created_at - b.created_at || a._creationTime - b._creationTime);
-    // Only night drafts are shared; the app never sends vote drafts. by_actor
+    // Only night drafts are read; setTentativeSelection refuses vote drafts. by_actor
     // orders by actor, so each type's drafts are put back in creation order.
     const tentatives =
       night && phaseIndex !== null
@@ -161,9 +161,11 @@ export const getRoundState = query({
 // The client's host-offline check. Reads the session, the caller's seat and
 // only the host's presence row, so other players' heartbeats never re-run it.
 // `server_now` is the server clock when this result was computed; the result
-// is not recomputed just because time passes.
+// is not recomputed just because time passes. `nonce` is not read: the app
+// sends a new one with every subscription, so each is a query of its own and
+// is computed when it arrives, never answered from an earlier cached result.
 export const getHostPresence = query({
-  args: { session_id: v.string(), ...guestArg },
+  args: { session_id: v.string(), nonce: v.optional(v.number()), ...guestArg },
   returns: v.union(hostPresenceValidator, v.null()),
   handler: async (ctx, args) => {
     const member = await loadMember(ctx, args);

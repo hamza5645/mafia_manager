@@ -20,7 +20,9 @@ test('the deploy check accepts the current health response and rejects mismatche
 test('the deploy check targets production only with --prod, and CONVEX_AUDIT_URL only without it', () => {
   const debug = deploymentURL([], {});
   const prod = deploymentURL(['node', 'verify-deployment.mjs', '--prod'], { CONVEX_AUDIT_URL: 'https://audit.convex.cloud' });
-  for (const url of [debug, prod]) expect(url).toMatch(/^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.convex\.cloud$/);
+  // Any https host: a deployment may move to another Convex host name or a custom domain.
+  for (const url of [debug, prod]) expect(url).toMatch(/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+$/);
   expect(prod).not.toBe(debug);
+  expect(prod).not.toBe('https://audit.convex.cloud');
   expect(deploymentURL([], { CONVEX_AUDIT_URL: 'https://audit.convex.cloud' })).toBe('https://audit.convex.cloud');
 });

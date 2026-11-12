@@ -51,7 +51,7 @@ The check passes when the deployment's `api_contract` is at least the app's `Con
 
 The host sees who the phase is waiting for (role reveal, night, voting), with an offline badge and Remove; a removed player can rejoin only after the game ends. The host can start the night before everyone confirmed their role. Night finishes on its own for a citizen or eliminated host; an alive Inspector host taps Finish Night.
 
-Host calls are safe to retry. Clients heartbeat every 5 s with `sessions:heartbeat`, which writes only the caller's `session_presence` row; the host's heartbeat also refreshes each seat's `is_online`. Clients watch the host through `views:getHostPresence`, which compares the host's last heartbeat with the server clock. Once the host is stale (90 s in the lobby, 15 s in a game), any member may call `sessions:claimHost`, and the server installs the successor.
+Host calls are safe to retry. Clients heartbeat every 5 s with `sessions:heartbeat`, which writes only the caller's `session_presence` row; the host's heartbeat also refreshes each seat's `is_online`. Clients watch the host through `views:getHostPresence`, which compares the host's last heartbeat with the server clock. Once the host is stale (90 s in the lobby, 15 s in a game), any member may call `sessions:claimHost`, and the server installs the successor. The app claims only from a living player's device and waits longer after each failed claim (10 s, 20 s, 40 s, then 60 s).
 
 ## Privacy Rules
 

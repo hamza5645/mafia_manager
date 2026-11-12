@@ -16,6 +16,7 @@ import type * as lib_guards from "../lib/guards.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_presence from "../lib/presence.js";
 import type * as lib_projections from "../lib/projections.js";
+import type * as lib_recordedGames from "../lib/recordedGames.js";
 import type * as lib_rules from "../lib/rules.js";
 import type * as lib_transitions from "../lib/transitions.js";
 import type * as lib_util from "../lib/util.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "lib/identity": typeof lib_identity;
   "lib/presence": typeof lib_presence;
   "lib/projections": typeof lib_projections;
+  "lib/recordedGames": typeof lib_recordedGames;
   "lib/rules": typeof lib_rules;
   "lib/transitions": typeof lib_transitions;
   "lib/util": typeof lib_util;

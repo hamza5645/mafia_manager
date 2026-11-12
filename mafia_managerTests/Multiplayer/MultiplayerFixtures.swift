@@ -204,6 +204,10 @@ final class FakeSessionService: SessionServicing {
         return subject.compactMap { $0 as? T }.eraseToAnyPublisher()
     }
 
+    func watchHostPresence(sessionId: UUID) -> AnyPublisher<HostPresence?, ClientError> {
+        watch("views:getHostPresence", sessionId: sessionId, as: HostPresence?.self)
+    }
+
     func createSession(playerName: String, botCount: Int) async throws -> EnterResult {
         await record(.create, hold: "create")
         return enterResult

@@ -100,15 +100,18 @@ test('votes stay hidden until every living player has voted; vote drafts are nev
   await t.mutation(api.night.resolveNightAtomic, { ...r.as(r.host), round_id: round_id! });
   await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'death_reveal' });
   await t.mutation(api.phases.advancePhase, { ...r.as(r.host), to_phase: 'voting' });
-  await t.mutation(api.play.setTentativeSelection, { ...r.as(r.users[1]), actor_player_id: mafia.player_id,
-    action_type: 'vote', phase_index: 0, target_player_id: host.player_id });
+  // A vote draft is refused; a row an older backend stored is still never shown.
+  await expect(t.mutation(api.play.setTentativeSelection, { ...r.as(r.users[1]), actor_player_id: mafia.player_id,
+    action_type: 'vote' as never, phase_index: 0, target_player_id: host.player_id })).rejects.toThrow(/Validator error/);
+  await t.run(ctx => ctx.db.insert('tentative_selections', { id: crypto.randomUUID(), session_id: r.sessionId,
+    actor_player_id: mafia.player_id, target_player_id: host.player_id, action_type: 'vote', phase_index: 0, updated_at: 0 }));
   await act(t, r, mafia, 'vote', host);
   const seen = async (i: number) => (await t.query(api.views.getRoundState, r.as(r.users[i])))!;
   expect((await seen(2)).actions).toEqual([]);
   expect((await seen(2)).tentative).toEqual([]);
   expect((await seen(1)).actions.map(a => a.action_type)).toEqual(['vote']);
   expect((await seen(0)).actions.map(a => a.action_type)).toEqual(['vote']);
-  // The app sends drafts only at night, so vote drafts are not read at all.
+  // Drafts exist only at night, so vote drafts are not read at all.
   expect((await seen(0)).tentative).toEqual([]);
   expect((await seen(1)).tentative).toEqual([]);
   // The dead citizen does not need to vote.

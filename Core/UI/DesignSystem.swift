@@ -108,6 +108,8 @@ enum Design {
 struct Card: ViewModifier {
     var padding: CGFloat = 16
     var withGlow: Bool = false
+    /// Off for a card as tall as its scrolling content: a shadow would be rendered from all of it.
+    var withShadow: Bool = true
 
     func body(content: Content) -> some View {
         content
@@ -118,7 +120,9 @@ struct Card: ViewModifier {
                     // Base surface; shadows are drawn from this shape only, never from the content
                     RoundedRectangle(cornerRadius: Design.Radii.card, style: .continuous)
                         .fill(Design.Colors.surface1)
-                        .shadow(color: Design.Shadows.medium.color, radius: Design.Shadows.medium.radius, x: Design.Shadows.medium.x, y: Design.Shadows.medium.y)
+                        .if(withShadow) { shape in
+                            shape.shadow(color: Design.Shadows.medium.color, radius: Design.Shadows.medium.radius, x: Design.Shadows.medium.x, y: Design.Shadows.medium.y)
+                        }
                         .if(withGlow) { shape in
                             shape.shadow(color: Design.Colors.glowGold, radius: Design.Shadows.glow.radius)
                         }
@@ -155,8 +159,8 @@ struct Card: ViewModifier {
 }
 
 extension View {
-    func cardStyle(padding: CGFloat = 16, withGlow: Bool = false) -> some View {
-        modifier(Card(padding: padding, withGlow: withGlow))
+    func cardStyle(padding: CGFloat = 16, withGlow: Bool = false, withShadow: Bool = true) -> some View {
+        modifier(Card(padding: padding, withGlow: withGlow, withShadow: withShadow))
     }
 
     // Conditional modifier helper

@@ -21,8 +21,12 @@ struct SubscriptionSupervisorTests {
     private let feed = Feed()
     private let clock = ManualClock()
 
-    private func makeSupervisor(onValue: @escaping (Int) -> Void = { _ in }) -> SubscriptionSupervisor {
-        SubscriptionSupervisor(feed.subscribe, sleep: clock.sleep, onValue: onValue)
+    /// `onUnreadable` defaults to nothing, so no test reaches the shared `BackendCompatibility`.
+    private func makeSupervisor(
+        onUnreadable: @escaping () -> Void = {},
+        onValue: @escaping (Int) -> Void = { _ in }
+    ) -> SubscriptionSupervisor {
+        SubscriptionSupervisor(feed.subscribe, sleep: clock.sleep, onUnreadable: onUnreadable, onValue: onValue)
     }
 
     // MARK: - Classification and backoff
@@ -35,29 +39,52 @@ struct SubscriptionSupervisorTests {
         #expect(SubscriptionSupervisor.deterministicMessage(for: .InternalError(msg: decodeFailure)) == nil)
     }
 
-    /// What ConvexMobile 0.8.1 sends when its `JSONDecoder` rejects a value: the error's
-    /// `localizedDescription` (`SubscriptionAdapter.onUpdate`).
-    private func decoderMessage<T: Decodable>(_ json: String, as type: T.Type) -> String {
-        do {
-            _ = try JSONDecoder().decode(type, from: Data(json.utf8))
-            return ""
-        } catch {
-            return error.localizedDescription
-        }
-    }
+    /// What `ConvexService.subscribe` ends a subscription with when a value cannot be decoded.
+    private let decodeFailure = ConvexService.undecodableValue
 
-    /// A missing key.
-    private var decodeFailure: String { decoderMessage("{}", as: SessionView.self) }
-
-    @Test func onlyTheDecoderMessageCountsAsADecodeFailure() {
+    @Test func onlyTheAppsOwnMarkerCountsAsADecodeFailure() {
         #expect(SubscriptionSupervisor.isDecodeFailure(.InternalError(msg: decodeFailure)))
-        #expect(SubscriptionSupervisor.isDecodeFailure(.InternalError(msg: decoderMessage("\"x\"", as: Int.self))))
-        #expect(SubscriptionSupervisor.isDecodeFailure(.InternalError(msg: decoderMessage("{\"id\":null}", as: GameAction.self))))
-        #expect(SubscriptionSupervisor.isDecodeFailure(.InternalError(msg: decoderMessage("not json", as: Int.self))))
         // A failed subscribe call is an InternalError too, carrying a UniFFI error's description.
         #expect(!SubscriptionSupervisor.isDecodeFailure(.InternalError(msg: "The operation couldn’t be completed. (UniFFI.ClientError error 0.)")))
+        // Foundation's text for a decoding error, which convex-swift would have passed on.
+        #expect(!SubscriptionSupervisor.isDecodeFailure(.InternalError(msg: "The data couldn’t be read because it is missing.")))
         #expect(!SubscriptionSupervisor.isDecodeFailure(.ServerError(msg: decodeFailure)))
         #expect(!SubscriptionSupervisor.isDecodeFailure(.ConvexError(data: "\"\(decodeFailure)\"")))
+    }
+
+    /// Decodes like ConvexMobile does: its `JSONDecoder` on the server's JSON.
+    private func received<T: Decodable>(_ json: String, as type: T.Type) throws -> ConvexService.Decoded<T> {
+        try JSONDecoder().decode(ConvexService.Decoded<T>.self, from: Data(json.utf8))
+    }
+
+    private func isRejected<T: Decodable>(_ json: String, as type: T.Type) throws -> Bool {
+        if case .failure = try received(json, as: type).result { return true }
+        return false
+    }
+
+    @Test func aValueTheModelsRejectEndsTheSubscriptionWithTheMarker() throws {
+        let subject = PassthroughSubject<ConvexService.Decoded<[Int]?>, ClientError>()
+        var values: [[Int]?] = []
+        var failure: ClientError?
+        let subscription = ConvexService.unwrapping(subject.eraseToAnyPublisher(), query: "test").sink(
+            receiveCompletion: { if case .failure(let error) = $0 { failure = error } },
+            receiveValue: { values.append($0) }
+        )
+        subject.send(try received("[1,2]", as: [Int]?.self))
+        subject.send(try received("null", as: [Int]?.self))
+        #expect(values == [[1, 2], nil], "null is a value of an optional query, not a failure")
+        #expect(failure == nil)
+
+        // A missing key, a wrong type and a null where a value is required are outcomes, not thrown errors.
+        #expect(try isRejected("{}", as: SessionView.self))
+        #expect(try isRejected("\"x\"", as: Int.self))
+        #expect(try isRejected("{\"id\":null}", as: GameAction.self))
+        #expect(try !isRejected("7", as: Int.self))
+
+        subject.send(try received("{\"a\":1}", as: [Int]?.self))
+        #expect(failure.map(SubscriptionSupervisor.isDecodeFailure) == true)
+        #expect(values.count == 2)
+        subscription.cancel()
     }
 
     @Test func backoffDoublesUpToThirtySecondsAndAppliesJitter() {
@@ -168,19 +195,21 @@ struct SubscriptionSupervisorTests {
 
     // MARK: - Decode failures (the server's shape moved past this build)
 
-    @Test func aConfirmedDecodeFailureStopsAndAsksForAnUpdate() async {
-        let supervisor = makeSupervisor()
+    @Test func aConfirmedDecodeFailureStopsOnlyThisSubscriptionAndRechecksTheContract() async {
+        var rechecks = 0
+        let supervisor = makeSupervisor(onUnreadable: { rechecks += 1 })
         supervisor.start()
         feed.latest.send(completion: .failure(.InternalError(msg: decodeFailure)))
         await drainMainQueue()
         #expect(supervisor.status == .retrying(attempt: 1), "The first decode failure gets one confirming retry")
+        #expect(rechecks == 0)
 
         await clock.advance(by: .milliseconds(1_200))
         #expect(feed.subjects.count == 2)
         feed.latest.send(completion: .failure(.InternalError(msg: decodeFailure)))
         await drainMainQueue()
-        #expect(supervisor.status == .failed(BackendCompatibility.updateMessage))
-        #expect(BackendCompatibility.shared.updateRequired)
+        #expect(supervisor.status == .failed(SubscriptionSupervisor.unreadableMessage))
+        #expect(rechecks == 1, "Whether the app is too old is health:check's call, asked once")
         await clock.advance(by: .seconds(60))
         #expect(feed.subjects.count == 2, "A confirmed decode failure is not retried automatically")
 
